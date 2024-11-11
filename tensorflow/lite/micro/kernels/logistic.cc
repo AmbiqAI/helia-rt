@@ -35,6 +35,19 @@ void* LogisticInit(TfLiteContext* context, const char* buffer, size_t length) {
   return context->AllocatePersistentBuffer(context, sizeof(OpDataLogistic));
 }
 
+
+void EvalUsingLookupTable(const OpDataLogistic* data, const TfLiteEvalTensor* input,
+                          TfLiteEvalTensor* output) {
+  const int size = MatchingFlatSize(tflite::micro::GetTensorShape(input),
+                                    tflite::micro::GetTensorShape(output));
+  int8_t* output_data = tflite::micro::GetTensorData<int8_t>(output);
+  const int8_t* input_data = tflite::micro::GetTensorData<int8_t>(input);
+
+  for (int i = 0; i < size; ++i) {
+    output_data[i] = data->table[static_cast<uint8_t>(input_data[i])];
+  }
+}
+
 TfLiteStatus LogisticEval(TfLiteContext* context, TfLiteNode* node) {
   const TfLiteEvalTensor* input =
       tflite::micro::GetEvalInput(context, node, kLogisticInputTensor);
@@ -78,12 +91,14 @@ TfLiteStatus LogisticEval(TfLiteContext* context, TfLiteNode* node) {
   } else if (input->type == kTfLiteInt8) {
     switch (output->type) {
       case kTfLiteInt8: {
-        reference_integer_ops::Logistic(
-            data->input_zero_point, data->input_range_radius,
-            data->input_multiplier, data->input_left_shift,
-            NumElements(input->dims),
-            tflite::micro::GetTensorData<int8_t>(input),
-            tflite::micro::GetTensorData<int8_t>(output));
+        //reference_integer_ops::Logistic(
+        //    data->input_zero_point, data->input_range_radius,
+        //    data->input_multiplier, data->input_left_shift,
+        //    NumElements(input->dims),
+        //    tflite::micro::GetTensorData<int8_t>(input),
+        //    tflite::micro::GetTensorData<int8_t>(output));
+
+        EvalUsingLookupTable(data, input, output);
         return kTfLiteOk;
       }
       default:
