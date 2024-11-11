@@ -1,7 +1,13 @@
-# Tensorflow Lite for Microcontrollers
-NeuralSPOT support 3 versions of TFLM - as new versions are added, the oldest are deprecated (not necessarily deleted, just not tested).
+# Ambiq Tensorflow Lite for Microcontrollers
+## Dev Notes
+### 11/11/24
+1. Pull in Ambiq-specific makefile mods (optimization and Windows support)
+2. Pull in Tanh optimizations
 
-> *NOTE* TFLM doesn't label releases - instead, we're using the first 7 digits of the git checkin hash to identify TFLM versions.
+
+
+
+# Detailed Notes
 
 Adding a new version is a fairly straightforward process (more details below):
 1. Clone the desired TFLM version from (here)[https://github.com/tensorflow/tflite-micro]
