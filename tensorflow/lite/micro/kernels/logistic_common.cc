@@ -29,6 +29,43 @@ namespace tflite {
 const int kLogisticInputTensor = 0;
 const int kLogisticOutputTensor = 0;
 
+void PopulateLookupTable(int32_t input_zero_point, int32_t input_range_radius,
+                 int32_t input_multiplier, int32_t input_shift,
+                 OpDataLogistic* data) {
+
+  static constexpr int32_t kInputIntegerBits = 4;
+  static constexpr int32_t kOutputIntegerBits = 8;
+  static constexpr int8_t kMinInt8 = std::numeric_limits<int8_t>::min();
+  static constexpr int8_t kMaxInt8 = std::numeric_limits<int8_t>::max();
+  static constexpr int32_t kOutputZeroPoint = -128;
+
+
+
+  for (int32_t i = kMinInt8; i <= kMaxInt8; ++i) {
+    const int32_t input =
+        static_cast<int32_t>(i) - input_zero_point;
+    if (input <= -input_range_radius) {
+      data->table[static_cast<uint8_t>(i)] = kMinInt8;
+    } else if (input >= input_range_radius) {
+      data->table[static_cast<uint8_t>(i)] = kMaxInt8;
+    } else {
+      const int32_t input_in_q4 = MultiplyByQuantizedMultiplier(
+          input, input_multiplier, input_shift);
+      using FixedPoint4 = gemmlowp::FixedPoint<int32_t, kInputIntegerBits>;
+      const int32_t output_in_q0 =
+          gemmlowp::logistic(FixedPoint4::FromRaw(input_in_q4)).raw();
+
+      // Rescale and downcast.
+      using gemmlowp::RoundingDivideByPOT;
+      int32_t output_in_q23 =
+          RoundingDivideByPOT(output_in_q0, 31 - kOutputIntegerBits);
+      output_in_q23 = std::min(std::max(output_in_q23 + kOutputZeroPoint,
+                                        static_cast<int32_t>(kMinInt8)),
+                               static_cast<int32_t>(kMaxInt8));
+      data->table[static_cast<uint8_t>(i)] = static_cast<int8_t>(output_in_q23);
+    }
+  }
+}
 TfLiteStatus CalculateArithmeticOpDataLogistic(TfLiteContext* context,
                                                TfLiteNode* node,
                                                OpDataLogistic* data) {
@@ -58,6 +95,10 @@ TfLiteStatus CalculateArithmeticOpDataLogistic(TfLiteContext* context,
 
     data->input_range_radius =
         CalculateInputRadius(kInputIntegerBits, data->input_left_shift, 31);
+
+    PopulateLookupTable(data->input_zero_point, data->input_range_radius,
+                data->input_multiplier, data->input_left_shift,
+                data);
   }
 
   if (input->type == kTfLiteInt16) {
