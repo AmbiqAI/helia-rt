@@ -2,7 +2,9 @@
 ## Dev Notes
 ### 11/11/24
 1. Pull in Ambiq-specific makefile mods (optimization and Windows support)
+    1. tensorflow/lite/micro/tools/make/Makefile
 2. Pull in Tanh optimizations
+    1. tanh.cc, logistic.cc, logistic_common.cc
 
 
 
