@@ -88,23 +88,27 @@ arm_cmsis_nn_status arm_pad_s8(
 }
 
 void PopulateCommonParams(
-    cmsis_nn_dims *const input_size, cmsis_nn_dims *const pre_pad, cmsis_nn_dims *const post_pad, const OpData &data,
-    const RuntimeShape &input_shape, )
+    cmsis_nn_dims *const input_size,
+    cmsis_nn_dims *const pre_pad,
+    cmsis_nn_dims *const post_pad,
+    OpDataPad *data,
+    const RuntimeShape &input_shape
+  )
 {
   input_size->n = input_shape.Dims(0);
   input_size->h = input_shape.Dims(1);
   input_size->w = input_shape.Dims(2);
   input_size->c = input_shape.Dims(3);
   // Need to check left_padding_count and put 0 for the rest of the dimensions.
-  pre_pad->n = data.params.left_padding_count >= 1 ? data.params.left_padding[0] : 0;
-  pre_pad->h = data.params.left_padding_count >= 2 ? data.params.left_padding[1] : 0;
-  pre_pad->w = data.params.left_padding_count >= 3 ? data.params.left_padding[2] : 0;
-  pre_pad->c = data.params.left_padding_count >= 4 ? data.params.left_padding[3] : 0;
+  pre_pad->n = data->params.left_padding_count >= 1 ? data->params.left_padding[0] : 0;
+  pre_pad->h = data->params.left_padding_count >= 2 ? data->params.left_padding[1] : 0;
+  pre_pad->w = data->params.left_padding_count >= 3 ? data->params.left_padding[2] : 0;
+  pre_pad->c = data->params.left_padding_count >= 4 ? data->params.left_padding[3] : 0;
 
-  post_pad->n = data.params.right_padding_count >= 1 ? data.params.right_padding[0] : 0;
-  post_pad->h = data.params.right_padding_count >= 2 ? data.params.right_padding[1] : 0;
-  post_pad->w = data.params.right_padding_count >= 3 ? data.params.right_padding[2] : 0;
-  post_pad->c = data.params.right_padding_count >= 4 ? data.params.right_padding[3] : 0;
+  post_pad->n = data->params.right_padding_count >= 1 ? data->params.right_padding[0] : 0;
+  post_pad->h = data->params.right_padding_count >= 2 ? data->params.right_padding[1] : 0;
+  post_pad->w = data->params.right_padding_count >= 3 ? data->params.right_padding[2] : 0;
+  post_pad->c = data->params.right_padding_count >= 4 ? data->params.right_padding[3] : 0;
 }
 
 void *Init(TfLiteContext *context, const char *buffer, size_t length)
@@ -121,7 +125,7 @@ TfLiteStatus Prepare(TfLiteContext *context, TfLiteNode *node)
   OpDataPad *data = static_cast<OpDataPad *>(node->user_data);
 
   TF_LITE_ENSURE(context, NumInputs(node) == 2 || NumInputs(node) == 3);
-  F_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
+  TF_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
 
   TfLiteTensor *input = micro_context->AllocateTempInputTensor(node, /*index=*/0);
   TF_LITE_ENSURE(context, input != nullptr);
@@ -257,7 +261,7 @@ TfLiteStatus Eval(TfLiteContext *context, TfLiteNode *node)
       cmsis_nn_dims input_size;
       cmsis_nn_dims pre_pad;
       cmsis_nn_dims post_pad;
-      PopulateCommonParams(&input_size, &pre_pad, &post_pad, *data, tflite::micro::GetTensorShape(input));
+      PopulateCommonParams(&input_size, &pre_pad, &post_pad, data, tflite::micro::GetTensorShape(input));
       arm_pad_s8(
           tflite::micro::GetTensorData<int8_t>(input), tflite::micro::GetTensorData<int8_t>(output), pad_value,
           &input_size, &pre_pad, &post_pad);
@@ -297,12 +301,14 @@ TfLiteStatus Eval(TfLiteContext *context, TfLiteNode *node)
         tflite::micro::GetTensorShape(output), tflite::micro::GetTensorData<int32_t>(output));
   }
   break;
+
   default:
 
     MicroPrintf("Type %s not currently supported by Pad.", TfLiteTypeGetName(input->type));
     return kTfLiteError;
   }
   return kTfLiteOk;
+}
 
 } // namespace
 
