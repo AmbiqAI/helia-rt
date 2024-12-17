@@ -139,6 +139,10 @@ class TestModelGenerator:
 
 class PerLayerTestGenerator(generate_test_for_model.TestDataGenerator):
 
+  def __init__(self, arena_size_kb: int = 100, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    self.arena_size_kb = arena_size_kb
+
   def generate_tests(self):
     # Collect all target names into a list
     targets = []
@@ -158,7 +162,8 @@ class PerLayerTestGenerator(generate_test_for_model.TestDataGenerator):
           'targets_with_path': targets_with_path,
           'inputs': self.inputs,
           'input_dtypes': self.input_types,
-          'output_dtype': self.output_type
+          'output_dtype': self.output_type,
+          'arena_size_kb': self.arena_size_kb
       }
       file_obj.write(build_template.render(**key_values_in_template))
 
@@ -210,6 +215,7 @@ flags.DEFINE_string('output_dir', None, 'directory to output generated files')
 
 flags.mark_flag_as_required('input_tflite_file')
 flags.mark_flag_as_required('output_dir')
+flags.DEFINE_integer('arena_size_kb', 100, 'Size of arena in KB')
 
 
 def main(_):
@@ -218,7 +224,7 @@ def main(_):
   inputs, builtin_operator = op_info_from_name(FLAGS.output_dir.split('/')[-1])
   generator = TestModelGenerator(model, FLAGS.output_dir, inputs)
   model_names = generator.generate_models(0, builtin_operator)
-  data_generator = PerLayerTestGenerator(FLAGS.output_dir, model_names, inputs)
+  data_generator = PerLayerTestGenerator(output_dir=FLAGS.output_dir, model_paths=model_names, inputs=inputs, arena_size_kb=FLAGS.arena_size_kb)
   data_generator.generate_goldens(builtin_operator)
   data_generator.generate_build_file()
   data_generator.generate_makefile()
