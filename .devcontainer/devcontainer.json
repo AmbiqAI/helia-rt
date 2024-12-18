@@ -1,0 +1,29 @@
+{
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "GitHub.copilot",
+                "GitHub.copilot-chat",
+                "tamasfe.even-better-toml",
+                "mechatroner.rainbow-csv",
+                "ms-python.python",
+                "charliermarsh.ruff",
+                "jeff-hykin.better-cpp-syntax",
+                "ms-vscode.cpptools",
+                "ms-vscode.cpptools-extension-pack",
+                "twxs.cmake",
+                "marus25.cortex-debug",
+                "mcu-debug.debug-tracker-vscode",
+                "mcu-debug.memory-view",
+                "mcu-debug.debug-tracker-vscode",
+                "mcu-debug.rtos-views",
+                "mcu-debug.peripheral-viewer"
+            ]
+        }
+    },
+    "postCreateCommand": "./.devcontainer/install.sh"
+}
