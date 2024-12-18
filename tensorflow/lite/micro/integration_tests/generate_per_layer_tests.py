@@ -220,6 +220,9 @@ flags.DEFINE_integer('arena_size_kb', 100, 'Size of arena in KB')
 
 def main(_):
   model = flatbuffer_utils.read_model(FLAGS.input_tflite_file)
+  # print working directory and output directory
+  print(f'working directory: {os.getcwd()}')
+  print(f'output directory: {FLAGS.output_dir}')
   os.makedirs(FLAGS.output_dir, exist_ok=True)
   inputs, builtin_operator = op_info_from_name(FLAGS.output_dir.split('/')[-1])
   generator = TestModelGenerator(model, FLAGS.output_dir, inputs)
