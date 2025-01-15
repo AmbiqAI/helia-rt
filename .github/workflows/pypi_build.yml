@@ -8,9 +8,9 @@
 name: PyPI Build
 
 on:
-  schedule:
-    # 1pm UTC is 6am or 7am PT depending on daylight savings.
-    - cron: '0 13 * * *'
+  # schedule:
+  #   # 1pm UTC is 6am or 7am PT depending on daylight savings.
+  #   - cron: '0 13 * * *'
 
   workflow_dispatch:
     inputs:

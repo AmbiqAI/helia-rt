@@ -8,9 +8,9 @@
 name: Sync from Upstream TF
 
 on:
-  schedule:
-    # 2pm UTC is 7am or 8am PT depending on daylight savings.
-    - cron: '0 14 * * *'
+  # schedule:
+  #   # 2pm UTC is 7am or 8am PT depending on daylight savings.
+  #   - cron: '0 14 * * *'
 
   # Allow manually triggering of the workflow.
   workflow_dispatch: {}
@@ -63,4 +63,3 @@ jobs:
           body: "BUG=automated sync from upstream\nNO_CHECK_TFLITE_FILES=automated sync from upstream"
           labels: bot:sync-tf, ci:run
           reviewers: suleshahid
-

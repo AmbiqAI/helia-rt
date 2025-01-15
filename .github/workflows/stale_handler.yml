@@ -1,7 +1,7 @@
 name: 'Stale Handler'
 on:
-  schedule:
-    - cron: '0 10 * * *'
+  # schedule:
+  #   - cron: '0 10 * * *'
 
   workflow_dispatch: {}
 
@@ -12,10 +12,10 @@ jobs:
       - uses: actions/stale@v7
         with:
           stale-issue-message: >
-            "This issue is being marked as stale due to inactivity. Remove label or 
+            "This issue is being marked as stale due to inactivity. Remove label or
             comment to prevent closure in 5 days."
           stale-pr-message: >
-            "This PR is being marked as stale due to inactivity. Remove label or 
+            "This PR is being marked as stale due to inactivity. Remove label or
             comment to prevent closure in 5 days."
           close-issue-message: >
             "This issue is being closed because it has been marked as

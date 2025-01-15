@@ -1,12 +1,12 @@
 name: Run-Xtensa
 
-# This is the entry point for xtensa.yml for scheduled and workflow_dispatch events. 
+# This is the entry point for xtensa.yml for scheduled and workflow_dispatch events.
 
 
 on:
-  schedule:
-    # 10am UTC is 3am or 4am PT depending on daylight savings.
-    - cron: '0 10 * * *'
+  # schedule:
+  #   # 10am UTC is 3am or 4am PT depending on daylight savings.
+  #   - cron: '0 10 * * *'
 
   # Allow manually triggering of the workflow.
   workflow_dispatch: {}
