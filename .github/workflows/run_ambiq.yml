@@ -1,0 +1,12 @@
+name: Run-Ambiq
+
+# This is the entry point for ambiq.yml for scheduled and workflow_dispatch events.
+
+on:
+  # Allow manually triggering of the workflow.
+  workflow_dispatch: {}
+
+jobs:
+
+  call-ambiq-presubmit:
+    uses: ./.github/workflows/ambiq_presubmit.yml
