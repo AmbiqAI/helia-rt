@@ -5,7 +5,7 @@ on:
 
 jobs:
   mve_unit_tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-md
 
     name: MVE Unit Tests (presubmit)
     steps:
@@ -29,7 +29,7 @@ jobs:
         with:
           args: /bin/sh -c tensorflow/lite/micro/tools/ci_build/test_ambiq_corstone_300.sh
 
-          
+
       # Save cache
       - name: Save third-party downloads cache
         uses: actions/cache@v3
