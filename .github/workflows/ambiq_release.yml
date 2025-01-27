@@ -1,0 +1,97 @@
+name: Ambiq Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # e.g., v1.0.0
+
+jobs:
+  release:
+    runs-on: ubuntu-latest-md
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      # - name: Install dependencies
+      #   run: |
+      #     sudo apt-get update
+      #     sudo apt-get install -y build-essential
+
+      - name: Make build script executable
+        run: chmod +x ../../build.sh
+      - name: Run build script with Bash
+        run: bash ../../build.sh  # Explicitly using Bash to avoid shell compatibility issues
+
+      # Package the TFLM build outputs as a .zip
+      - name: Archive TFLM artifacts (zip)
+        run: |
+          zip -r ns-tflm-gcc-${{ github.ref_name }}.zip lib treedir
+
+      # Package the TFLM build outputs as a .tar.gz
+      - name: Archive TFLM artifacts (tar.gz)
+        run: |
+          tar -czf ns-tflm-gcc-${{ github.ref_name }}.tar.gz lib treedir
+
+      # Create a full snapshot of the entire repo as .zip + .tar.gz
+      - name: Create snapshot archives
+        run: |
+          git archive --format zip    --output repo-snapshot-${{ github.ref_name }}.zip HEAD
+          git archive --format tar.gz --output repo-snapshot-${{ github.ref_name }}.tar.gz HEAD
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+
+      - name: Upload TFLM zip
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ns-tflm-gcc-${{ github.ref_name }}.zip
+          asset_name: ns-tflm-gcc-${{ github.ref_name }}.zip
+          asset_content_type: application/zip
+
+      - name: Upload TFLM tar.gz
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ns-tflm-gcc-${{ github.ref_name }}.tar.gz
+          asset_name: ns-tflm-gcc-${{ github.ref_name }}.tar.gz
+          asset_content_type: application/gzip
+
+      # Upload the repo snapshot archives
+      - name: Upload repo snapshot (zip)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: repo-snapshot-${{ github.ref_name }}.zip
+          asset_name: repo-snapshot-${{ github.ref_name }}.zip
+          asset_content_type: application/zip
+
+      - name: Upload repo snapshot (tar.gz)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: repo-snapshot-${{ github.ref_name }}.tar.gz
+          asset_name: repo-snapshot-${{ github.ref_name }}.tar.gz
+          asset_content_type: application/gzip
