@@ -24,9 +24,9 @@ jobs:
       #     sudo apt-get install -y build-essential
 
       - name: Make build script executable
-        run: chmod +x ../../build.sh
+        run: chmod +x ./build.sh
       - name: Run build script with Bash
-        run: bash ../../build.sh  # Explicitly using Bash to avoid shell compatibility issues
+        run: bash ./build.sh  # Explicitly using Bash to avoid shell compatibility issues
 
       # Package the TFLM build outputs as a .zip
       - name: Archive TFLM artifacts (zip)
