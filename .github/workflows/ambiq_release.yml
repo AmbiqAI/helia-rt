@@ -7,7 +7,7 @@ on:
 
 jobs:
   release:
-    runs-on: ubuntu-latest-md
+    runs-on: ubuntu-latest
 
     steps:
       - name: Check out code
