@@ -8,6 +8,8 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/ambiqai/ns-tflm-ci:latest 
 
     steps:
       - name: Check out code
