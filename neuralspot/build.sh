@@ -45,7 +45,7 @@ for BUILD in ${BUILDS[@]}; do
         # Replace _ with - in the build name
         BUILD_NAME=$(echo $BUILD | tr _ -)
         TARGET_NAME=$(echo $TARGET_ARCH | sed 's/ortex-//')
-        cp $TFLM_SRC_DIR/gen/${TARGET}_${TARGET_ARCH}_${BUILD}_${OPTIM_KERNEL}_${CO_PROCESSOR}${TOOLCHAIN}/lib/libtensorflow-microlite.a \
+        cp $TFLM_SRC_DIR/gen/${TARGET}_${TARGET_ARCH}_${BUILD}_${OPTIM_KERNEL}_${CO_PROCESSOR_STR}${TOOLCHAIN}/lib/libtensorflow-microlite.a \
             $DIR/lib/libtensorflow-microlite-${TARGET_NAME}-${TOOLCHAIN}-${BUILD_NAME}.a
     done
 done
