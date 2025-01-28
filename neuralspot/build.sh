@@ -6,7 +6,7 @@ echo "Starting to build TFLM"
 
 # Get the directory of this script
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-TFLM_SRC_DIR=$DIR/../ns-tflm
+TFLM_SRC_DIR=$DIR/../
 
 TARGET=cortex_m_generic
 TOOLCHAIN=gcc
