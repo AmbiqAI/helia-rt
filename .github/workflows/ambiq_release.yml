@@ -20,6 +20,16 @@ jobs:
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
 
+      # Restore cache
+      - name: Cache third-party downloads
+        uses: actions/cache@v3
+        with:
+          path: |
+            tensorflow/lite/micro/tools/make/downloads
+          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile') }}
+          restore-keys: |
+            ${{ runner.os }}-third-party-downloads-
+
       - name: Make build script executable
         run: chmod +x ./build.sh
       - name: Run build script with Bash
@@ -92,3 +102,10 @@ jobs:
           asset_path: repo-snapshot-${{ github.ref_name }}.tar.gz
           asset_name: repo-snapshot-${{ github.ref_name }}.tar.gz
           asset_content_type: application/gzip
+      # Save cache
+      - name: Save third-party downloads cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            tensorflow/lite/micro/tools/make/downloads
+          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile') }}
