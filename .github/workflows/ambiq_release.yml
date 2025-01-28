@@ -4,7 +4,9 @@ on:
   push:
     tags:
       - 'v*.*.*'  # e.g., v1.0.0
-
+permissions:
+  contents: write  # Allows write access to contents, which includes release creation
+  
 jobs:
   release:
     runs-on: ubuntu-latest
