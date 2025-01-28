@@ -9,7 +9,7 @@ permissions:
   
 jobs:
   release:
-    runs-on: ubuntu-latest-md
+    runs-on: ubuntu-latest
     container:
       image: ghcr.io/ambiqai/ns-tflm-ci:latest 
 
