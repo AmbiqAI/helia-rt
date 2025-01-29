@@ -35,16 +35,19 @@ def main():
          # Build 3 TFLM release types for each compiler and each target processor
     for compiler in compilers:
         for processor in processors:
+            co_processor_flag = ""
+            if processor == "cortex-m55":
+                co_processor_flag = "ambiq"
             for release_type in release_types:
-                print(f"Building {compiler} {processor} {release_type}")
-                print(f"make -f ./tensorflow/lite/micro/tools/make/Makefile TARGET=cortex_m_generic TARGET_ARCH={processor} TOOLCHAIN={compiler} OPTIMIZED_KERNEL_DIR=cmsis_nn  BUILD_TYPE={release_type} microlite")
-                os.system(f"make -f ./tensorflow/lite/micro/tools/make/Makefile TARGET=cortex_m_generic TARGET_ARCH={processor} TOOLCHAIN={compiler} OPTIMIZED_KERNEL_DIR=cmsis_nn  BUILD_TYPE={release_type} microlite -j8")
+                print(f"Building {compiler} {processor} {co_processor_flag} {release_type}")
+                print(f"make -f ./tensorflow/lite/micro/tools/make/Makefile TARGET=cortex_m_generic TARGET_ARCH={processor} TOOLCHAIN={compiler} OPTIMIZED_KERNEL_DIR=cmsis_nn  CO_PROCESSOR={co_processor_flag} BUILD_TYPE={release_type} microlite")
+                os.system(f"make -f ./tensorflow/lite/micro/tools/make/Makefile TARGET=cortex_m_generic TARGET_ARCH={processor} TOOLCHAIN={compiler} OPTIMIZED_KERNEL_DIR=cmsis_nn CO_PROCESSOR={co_processor_flag} BUILD_TYPE={release_type} microlite -j8")
             
     # create the treedir
     # if params.treedir:
     print ("Creating treedir")
-    print ("python3 ./tensorflow/lite/micro/tools/project_generation/create_tflm_tree.py --makefile_options \"TARGET=cortex_m_generic TARGET_ARCH=cortex-m55 OPTIMIZED_KERNEL_DIR=cmsis_nn\" treedir")
-    os.system('python3 ./tensorflow/lite/micro/tools/project_generation/create_tflm_tree.py --makefile_options "TARGET=cortex_m_generic TARGET_ARCH=cortex-m55 OPTIMIZED_KERNEL_DIR=cmsis_nn" treedir')
+    print ("python3 ./tensorflow/lite/micro/tools/project_generation/create_tflm_tree.py --makefile_options \"TARGET=cortex_m_generic TARGET_ARCH=cortex-m55 OPTIMIZED_KERNEL_DIR=cmsis_nn CO_PROCESSOR=ambiq\" treedir")
+    os.system('python3 ./tensorflow/lite/micro/tools/project_generation/create_tflm_tree.py --makefile_options "TARGET=cortex_m_generic TARGET_ARCH=cortex-m55 OPTIMIZED_KERNEL_DIR=cmsis_nn CO_PROCESSOR=ambiq" treedir')
 
     # delete all .c and .cc files in treedir
     print ("Deleting all .c and .cc files in treedir")
@@ -71,15 +74,17 @@ def main():
                 if processor == "cortex-m4+fp":
                     ns_processor = "cm4"
                     label = "m4+fp"
+                    co_processor_str = ""  # no CO_PROCESSOR for M4
                 elif processor == "cortex-m55":
                     ns_processor = "cm55"
                     label = "m55"
+                    co_processor_str = 'ambiq_' # inject 'ambiq' in the build folder name
                 
                 # replace _ with - in release type
                 ns_release_type = release_type.replace("_", "-")
 
-                dest_lib_name = f"libtensorflow-microlite-{ns_processor}-{compiler}-{ns_release_type}.a"
-                source_lib = f"gen/cortex_m_generic_{processor}_{release_type}_cmsis_nn_{compiler}/lib/libtensorflow-microlite.a"
+                dest_lib_name = f"libtensorflow-microlite-{ns_processor}-{compiler}-{co_processor_str}{ns_release_type}.a"
+                source_lib = f"gen/cortex_m_generic_{processor}_{release_type}_cmsis_nn_{co_processor_str}{compiler}/lib/libtensorflow-microlite.a"
                 print(f"Copying {source_lib} to {os.path.join(tflm_path, 'lib', dest_lib_name)}")
                 os.system(f"cp {source_lib} {os.path.join(tflm_path, 'lib', dest_lib_name)}")
 
