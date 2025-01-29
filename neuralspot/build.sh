@@ -11,25 +11,25 @@ TFLM_SRC_DIR=$DIR/../
 TARGET=cortex_m_generic
 TOOLCHAIN=gcc
 OPTIM_KERNEL=cmsis_nn
-TARGET_ARCHS=(cortex-m4+fp cortex-m55)
+TARGET_ARCHS=("cortex-m4+fp" "cortex-m55")
 TARGET_TOOLCHAIN_ROOT="" # TODO: Override the default which is currently 13.2.Rel1
 # Build TFLM with release, release_with_logs, and debug
-BUILDS=(release release_with_logs debug)
+BUILDS=("debug" "release" "release_with_logs")
 
 cd $DIR
 
 mkdir -p $DIR/lib
 
-for BUILD in ${BUILDS[@]}; do
-    for TARGET_ARCH in ${TARGET_ARCHS[@]}; do
+for BUILD in "${BUILDS[@]}"; do
+    for TARGET_ARCH in "${TARGET_ARCHS[@]}"; do
         if [ "$TARGET_ARCH" == "cortex-m55" ]; then
-            CO_PROCESSOR=ambiq
+            CO_PROCESSOR="ambiq"
             CO_PROCESSOR_STR="ambiq_" # 
         else
             CO_PROCESSOR=""
             CO_PROCESSOR_STR=""
         fi
-        echo "Building TFLM with $BUILD"
+        echo "Building TFLM with $BUILD, TARGET_ARCH=$TARGET_ARCH, CO_PROCESSOR=$CO_PROCESSOR"
 
         cd $TFLM_SRC_DIR
 
