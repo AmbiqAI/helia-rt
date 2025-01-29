@@ -1,8 +1,9 @@
-name: Build TFLM CI Docker Image
+name: Build and Push Docker Image
 
 on:
-  workflow_call:
-
+  push:
+    branches:
+      - main  # Trigger on pushes to main branch
 
 jobs:
   build-and-push:
@@ -20,7 +21,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Docker Image
-        run: docker build -t ghcr.io/ambiqai/ns-tflm-ci:latest -f .devcontainer/Dockerfile .
+        run: docker build -t ghcr.io/AmbiqAI/ns-tflm-ci:latest -f .devcontainer/Dockerfile .
 
       - name: Push Docker Image
-        run: docker push ghcr.io/ambiqai/ns-tflm-ci:latest
+        run: docker push ghcr.io/AmbiqAI/ns-tflm-ci:latest
