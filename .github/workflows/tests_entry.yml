@@ -27,7 +27,8 @@ jobs:
     runs-on: ubuntu-latest-md
     steps:
       - name: fail-without-labels
-        if: github.event.action == 'labeled' &&
+        if: >
+          github.event.action == 'labeled' &&
           !(github.event.label.name == 'ci:run' ||
             github.event.label.name == 'ci:ready_to_merge' ||
             github.event.label.name == 'ci:run_full')
