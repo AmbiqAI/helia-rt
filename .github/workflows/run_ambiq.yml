@@ -4,9 +4,20 @@ name: Run-Ambiq
 
 on:
   # Allow manually triggering of the workflow.
-  workflow_dispatch: {}
+  workflow_call:
+      inputs:
+        trigger-sha:
+          description: "SHA of the commit to test"
+          required: true
+          type: string
 
 jobs:
-
   call-ambiq-presubmit:
-    uses: ./.github/workflows/ambiq_presubmit.yml
+    runs-on: ubuntu-latest-md
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.trigger-sha }}
+      - name: Run Ambiq Presubmit
+        uses: ./.github/workflows/ambiq_presubmit.yml
