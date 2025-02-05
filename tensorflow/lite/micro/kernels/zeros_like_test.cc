@@ -79,6 +79,15 @@ TF_LITE_MICRO_TEST(TestZerosLikeInt8) {
                                          output_data);
 }
 
+TF_LITE_MICRO_TEST(TestZerosLikeInt16) {
+  int16_t output_data[6];
+  int input_dims[] = {3, 1, 2, 3};
+  const int16_t input_values[] = {-2, -1, 0, 1, 2, 3};
+  const int16_t golden[] = {0, 0, 0, 0, 0, 0};
+  tflite::testing::TestZerosLike<int16_t>(input_dims, input_values, golden,
+                                         output_data);
+}
+
 TF_LITE_MICRO_TEST(TestZerosLikeInt32) {
   int32_t output_data[4];
   int input_dims[] = {4, 1, 2, 2, 1};

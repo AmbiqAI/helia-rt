@@ -88,6 +88,17 @@ TfLiteStatus ResizeBilinearEval(TfLiteContext* context, TfLiteNode* node) {
                                   tflite::micro::GetTensorData<int32_t>(size),
                                   tflite::micro::GetTensorShape(output),
                                   tflite::micro::GetTensorData<float>(output));
+  } else if (output->type == kTfLiteInt16) {
+    tflite::ResizeBilinearParams op_params;
+    op_params.align_corners = params->align_corners;
+    op_params.half_pixel_centers = params->half_pixel_centers;
+    reference_ops::ResizeBilinearInteger(
+        op_params, tflite::micro::GetTensorShape(input),
+        tflite::micro::GetTensorData<int16_t>(input),
+        tflite::micro::GetTensorShape(size),
+        tflite::micro::GetTensorData<int32_t>(size),
+        tflite::micro::GetTensorShape(output),
+        tflite::micro::GetTensorData<int16_t>(output));
   } else if (output->type == kTfLiteInt8) {
     tflite::ResizeBilinearParams op_params;
     op_params.align_corners = params->align_corners;

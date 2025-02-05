@@ -68,16 +68,16 @@ TfLiteStatus EvalSvdf(TfLiteContext* context, TfLiteNode* node) {
 
     case kTfLiteInt8: {
       switch (weights_time->type) {
-        case kTfLiteInt16: {
-          EvalInt16SvdfReference(context, node, input, weights_feature,
-                                 weights_time, bias, params, activation_state,
-                                 output, data);
-          break;
-        }
         case kTfLiteInt8: {
           EvalInt8SvdfReference(context, node, input, weights_feature,
                                 weights_time, bias, params, activation_state,
                                 output, data);
+          break;
+        }
+        case kTfLiteInt16: {
+          EvalInt16SvdfReference(context, node, input, weights_feature,
+                                 weights_time, bias, params, activation_state,
+                                 output, data);
           break;
         }
         default:

@@ -45,6 +45,7 @@ TfLiteStatus GatherNdPrepare(TfLiteContext* context, TfLiteNode* node) {
 
   switch (params->type) {
     case kTfLiteFloat32:
+    case kTfLiteInt16:
     case kTfLiteInt8:
       break;
     default:
@@ -170,6 +171,9 @@ TfLiteStatus EvalGatherNd(TfLiteContext* context,
   switch (params->type) {
     case kTfLiteFloat32:
       status = GatherNd<float, IndicesT>(params, indices, output);
+      break;
+    case kTfLiteInt16:
+      status = GatherNd<int16_t, IndicesT>(params, indices, output);
       break;
     case kTfLiteInt8:
       status = GatherNd<int8_t, IndicesT>(params, indices, output);

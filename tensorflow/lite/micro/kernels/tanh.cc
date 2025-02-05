@@ -47,52 +47,6 @@ void* TanhInit(TfLiteContext* context, const char* buffer, size_t length) {
   return context->AllocatePersistentBuffer(context, sizeof(OpData));
 }
 
-void PopulateLookupTable(int32_t input_zero_point, int32_t input_range_radius,
-                 int32_t input_multiplier, int32_t input_shift,
-                 OpData* data) {
-
-  static constexpr int32_t kInputIntegerBits = 4;
-  static constexpr int32_t kOutputScale = 7;
-  static constexpr int32_t kMinInt8 = std::numeric_limits<int8_t>::min();
-  static constexpr int32_t kMaxInt8 = std::numeric_limits<int8_t>::max();
-  using F4 = gemmlowp::FixedPoint<int32_t, kInputIntegerBits>;
-
-
-  for (int32_t i = kMinInt8; i <= kMaxInt8; ++i) {
-    const int32_t input =
-        static_cast<int32_t>(i) - input_zero_point;
-    if (input <= -input_range_radius) {
-      data->table[static_cast<uint8_t>(i)] = kMinInt8;
-    } else if (input >= input_range_radius) {
-      data->table[static_cast<uint8_t>(i)] = kMaxInt8;
-    } else {
-      const int32_t input_in_q4 =
-          MultiplyByQuantizedMultiplier(input, input_multiplier, input_shift);
-      const int32_t output_in_q0 =
-          gemmlowp::tanh(F4::FromRaw(input_in_q4)).raw();
-
-      // Rescale and downcast.
-      using gemmlowp::RoundingDivideByPOT;
-      int32_t output_in_q24 =
-          RoundingDivideByPOT(output_in_q0, 31 - kOutputScale);
-      output_in_q24 = std::min(std::max(output_in_q24, kMinInt8), kMaxInt8);
-      data->table[static_cast<uint8_t>(i)] = static_cast<int8_t>(output_in_q24);
-    }
-  }
-}
-
-void EvalUsingLookupTable(const OpData* data, const TfLiteEvalTensor* input,
-                          TfLiteEvalTensor* output) {
-  const int size = MatchingFlatSize(tflite::micro::GetTensorShape(input),
-                                    tflite::micro::GetTensorShape(output));
-  int8_t* output_data = tflite::micro::GetTensorData<int8_t>(output);
-  const int8_t* input_data = tflite::micro::GetTensorData<int8_t>(input);
-
-  for (int i = 0; i < size; ++i) {
-    output_data[i] = data->table[static_cast<uint8_t>(input_data[i])];
-  }
-}
-
 TfLiteStatus CalculateArithmeticOpData(TfLiteContext* context, TfLiteNode* node,
                                        OpData* data) {
   MicroContext* micro_context = GetMicroContext(context);
@@ -119,9 +73,6 @@ TfLiteStatus CalculateArithmeticOpData(TfLiteContext* context, TfLiteNode* node,
     data->input_range_radius =
         CalculateInputRadius(kInputIntegerBits, data->input_left_shift, 31);
 
-    PopulateLookupTable(data->input_zero_point, data->input_range_radius,
-                data->input_multiplier, data->input_left_shift,
-                data);
   }
 
   if (input->type == kTfLiteInt16) {
@@ -225,13 +176,12 @@ TfLiteStatus TanhEval(TfLiteContext* context, TfLiteNode* node) {
       return kTfLiteOk;
     } break;
     case kTfLiteInt8: {
-      //reference_integer_ops::Tanh(
-      //    data.input_zero_point, data.input_range_radius, data.input_multiplier,
-      //    data.input_left_shift, tflite::micro::GetTensorShape(input),
-      //    tflite::micro::GetTensorData<int8_t>(input),
-      //    tflite::micro::GetTensorShape(output),
-      //    tflite::micro::GetTensorData<int8_t>(output));
-      EvalUsingLookupTable(&data, input, output);
+      reference_integer_ops::Tanh(
+         data.input_zero_point, data.input_range_radius, data.input_multiplier,
+         data.input_left_shift, tflite::micro::GetTensorShape(input),
+         tflite::micro::GetTensorData<int8_t>(input),
+         tflite::micro::GetTensorShape(output),
+         tflite::micro::GetTensorData<int8_t>(output));
       return kTfLiteOk;
     } break;
     default:

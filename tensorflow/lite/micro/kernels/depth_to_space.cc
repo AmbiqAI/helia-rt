@@ -117,6 +117,13 @@ TfLiteStatus DepthToSpaceEval(TfLiteContext* context, TfLiteNode* node) {
                                   tflite::micro::GetTensorShape(output),
                                   tflite::micro::GetTensorData<float>(output));
       break;
+    case kTfLiteInt16:
+      reference_ops::DepthToSpace(op_params,
+                                  tflite::micro::GetTensorShape(input),
+                                  tflite::micro::GetTensorData<int16_t>(input),
+                                  tflite::micro::GetTensorShape(output),
+                                  tflite::micro::GetTensorData<int16_t>(output));
+      break;
     case kTfLiteInt8:
       reference_ops::DepthToSpace(op_params,
                                   tflite::micro::GetTensorShape(input),
