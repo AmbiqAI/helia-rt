@@ -6,12 +6,12 @@ on:
       - 'v*.*.*'  # e.g., v1.0.0
 permissions:
   contents: write  # Allows write access to contents, which includes release creation
-  
+
 jobs:
   release:
     runs-on: ubuntu-latest-md
     container:
-      image: ghcr.io/ambiqai/ns-tflm-ci:latest 
+      image: ghcr.io/ambiqai/ns-tflm-ci:latest
 
     steps:
       - name: Check out code
@@ -30,8 +30,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-third-party-downloads-
 
-      - name: Make build script executable
-        run: chmod +x ./neuralspot/build.sh
       - name: Run build script with Bash
         run: bash ./neuralspot/build.sh  # Explicitly using Bash to avoid shell compatibility issues
 
