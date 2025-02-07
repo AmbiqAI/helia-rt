@@ -113,6 +113,7 @@ def _get_src_and_dest_files(prefix_dir, makefile_options, tensorflow_root):
 
   all_src_files = tflm_src_files + third_party_srcs
   all_dest_files = tflm_dest_files + third_party_dests
+  print("all source files: ", all_src_files)
   return all_src_files, all_dest_files
 
 
@@ -221,14 +222,29 @@ def _rename_cc_to_cpp(output_dir):
         base_name_with_path = os.path.join(path, os.path.splitext(name)[0])
         os.rename(base_name_with_path + ".cc", base_name_with_path + ".cpp")
 
-def _generate_module_mk(output_dir, dest_files):
+
+def _generate_module_mk(
+    output_dir,
+    dest_files,
+    target_arch="cortex-m55",
+    optimized_kernel_dir="CMSIS_NN"
+):
     """
-    Generate a simple module.mk in 'output_dir' that compiles all C/C++ files
-    in 'dest_files' into object files.
+    Generate a module.mk in 'output_dir' that:
+      - references a precompiled toolchain,
+      - relies on precompiled third-party libraries,
+      - dynamically collects TFLM source files from 'source_files',
+      - compiles them into a static archive called ambiq_tflm_custom_ops.a
+
+    :param output_dir: Directory where module.mk will be generated.
+    :param source_files: List of absolute or relative paths to TFLM source files.
+                        We skip any files containing "third_party" in the path.
+    :param target_arch: CPU architecture (e.g. "cortex-m4", "cortex-m55").
+    :param optimized_kernel_dir: Name of subfolder for optimized kernels.
+                                By default set to "CMSIS_NN".
     """
 
     module_mk_path = os.path.join(output_dir, "module.mk")
-
     # Separate out the files we care about
     source_extensions = (".c", ".cc", ".cpp")
     source_files = []
@@ -238,47 +254,133 @@ def _generate_module_mk(output_dir, dest_files):
             # the file references are easier to handle in the .mk
             rel_path = os.path.relpath(df, output_dir)
             source_files.append(rel_path)
-
+  
+    # Filter out files that contain 'third_party' in their path.
+    filtered_srcs = [sf for sf in source_files if "third_party" not in sf]
+    # Filter out test related files
+    filtered_srcs = [sf for sf in filtered_srcs if "test" not in sf]
+  
     with open(module_mk_path, "w") as f:
-        f.write("# Automatically generated module.mk\n")
-        f.write("# Lists and compiles all TFLM source files.\n\n")
+        f.write("###############################################################################\n")
+        f.write("# Minimal Makefile to compile custom TFLM kernels using only precompiled libs #\n")
+        f.write("###############################################################################\n\n")
 
-        f.write("CFLAGS   += -I.\n")
-        f.write("CXXFLAGS += -I.\n\n")
-        
-        # Collect all the source files into one variable
+        f.write("# 1) Toolchain commands (for GCC on ARM)\n")
+        f.write("#    Adjust if you have a different prefix or want to override on the command line.\n")
+        f.write("TOOLCHAIN_PATH := ../tensorflow/lite/micro/tools/make/downloads/gcc_embedded\n\n")
+
+        f.write("CC := $(TOOLCHAIN_PATH)/bin/arm-none-eabi-gcc\n")
+        f.write("CXX := $(TOOLCHAIN_PATH)/bin/arm-none-eabi-g++\n")
+        f.write("AR := $(TOOLCHAIN_PATH)/bin/arm-none-eabi-ar\n")
+        f.write("OBJCOPY := arm-none-eabi-objcopy\n\n")
+
+        f.write(f"TARGET_ARCH := {target_arch}\n\n")
+
+        f.write("# You can change these optimization levels as desired:\n")
+        f.write("CORE_OPTIMIZATION_LEVEL     := -Os\n")
+        f.write("KERNEL_OPTIMIZATION_LEVEL   := -O2\n")
+        f.write("COMMON_FLAGS := \\\n")
+        f.write("  -Werror \\\n")
+        f.write("  -Wall -Wextra -Wno-unused-parameter \\\n")
+        f.write("  -Wsign-compare -Wdouble-promotion -Wunused-variable -Wswitch -Wvla \\\n")
+        f.write("  -fno-unwind-tables -ffunction-sections -fdata-sections -fmessage-length=0 \\\n")
+        f.write("  -DTF_LITE_STATIC_MEMORY -DTF_LITE_DISABLE_X86_NEON\n\n")
+
+        f.write("CXXFLAGS := -std=c++17 -fno-rtti -fno-exceptions $(COMMON_FLAGS)\n")
+        f.write("CFLAGS   := -std=c17 $(COMMON_FLAGS)\n\n")
+
+        f.write("# Remove -Werror from CFLAGS and CXXFLAGS\n")
+        f.write("CFLAGS   := $(filter-out -Werror,$(CFLAGS))\n")
+        f.write("CXXFLAGS := $(filter-out -Werror,$(CXXFLAGS))\n\n")
+
+        f.write(f"# Set optimized kernel folder name:\n")
+        f.write(f"OPTIMIZED_KERNEL_DIR := {optimized_kernel_dir}\n\n")
+        f.write("ifneq ($(OPTIMIZED_KERNEL_DIR),)\n")
+        f.write("\tADDITIONAL_DEFINES += -D$(shell echo $(OPTIMIZED_KERNEL_DIR) | tr [a-z] [A-Z])\n")
+        f.write("endif\n\n")
+
+        f.write("# Add ADDITIONAL_DEFINES to CFLAGS and CXXFLAGS\n")
+        f.write("CFLAGS   += $(ADDITIONAL_DEFINES)\n")
+        f.write("CXXFLAGS += $(ADDITIONAL_DEFINES)\n\n")
+
+        f.write("# 3) Include paths.\n")
+        f.write("CFLAGS   += -I. -I./third_party/$(OPTIMIZED_KERNEL_DIR)\n")
+        f.write("CXXFLAGS += -I. -I./third_party/$(OPTIMIZED_KERNEL_DIR)\n\n")
+
+        f.write("CFLAGS   += -I. -I./third_party/flatbuffers/include\n")
+        f.write("CXXFLAGS += -I. -I./third_party/flatbuffers/include\n\n")
+
+        f.write("CFLAGS   += -I. -I./third_party/gemmlowp\n")
+        f.write("CXXFLAGS += -I. -I./third_party/gemmlowp\n\n")
+
+        f.write("CFLAGS   += -I. -I./third_party/kissfft\n")
+        f.write("CXXFLAGS += -I. -I./third_party/kissfft\n\n")
+
+        f.write("CFLAGS   += -I. -I./third_party/ruy\n")
+        f.write("CXXFLAGS += -I. -I./third_party/ruy\n\n")
+
+        f.write("# 4) Paths to precompiled third-party libraries (adjust as needed).\n")
+        f.write("PRECOMPILED_LIB_DIR := ../neuralspot\n\n")
+        f.write("THIRD_PARTY_STATIC_LIBS := \\\n")
+        f.write("  $(PRECOMPILED_LIB_DIR)/libtensorflow-microlite.a\n\n")
+
+        f.write("# 5) Dynamic collection of TFLM source files (skips anything with 'third_party').\n")
         f.write("TFLM_SRC_FILES := \\\n")
-        for sf in source_files:
+        for sf in filtered_srcs:
             f.write(f"  {sf} \\\n")
         f.write("\n")
+        f.write("BUILD_DIR := bin\n\n")
 
-        # Convert the list of sources into a list of object files
-        # e.g.: foo.c -> foo.o; foo.cc -> foo.o; ...
-        f.write("TFLM_OBJS := $(TFLM_SRC_FILES:.c=.o)\n")
-        f.write("TFLM_OBJS := $(TFLM_OBJS:.cc=.o)\n")
-        f.write("TFLM_OBJS := $(TFLM_OBJS:.cpp=.o)\n\n")
+        f.write("# 6) Convert TFLM_SRC_FILES into object file paths under bin/\n")
+        f.write("#    e.g. \"tensorflow/lite/micro/debug_log.cc\" => \"bin/tensorflow/lite/micro/debug_log.o\"\n")
+        f.write("TFLM_OBJS := $(patsubst %.cc, $(BUILD_DIR)/%.o, \\\n")
+        f.write("  $(patsubst %.c, $(BUILD_DIR)/%.o, \\\n")
+        f.write("  $(patsubst %.S, $(BUILD_DIR)/%.o, \\\n")
+        f.write("  $(TFLM_SRC_FILES))))\n\n")
 
-        # Provide a default rule
+        f.write("# 7) Archive name for your custom kernels (only!).\n")
+        f.write("#    If you want the final .a in bin/, you can do:\n")
+        f.write("#    AMBIQ_TFLM_CUSTOM_OP_LIB := $(BUILD_DIR)/ambiq_tflm_custom_ops.a\n")
+        f.write("AMBIQ_TFLM_CUSTOM_OP_LIB := ambiq_tflm_custom_ops.a\n\n")
+
+        f.write("# 8) Default target: build everything.\n")
         f.write(".PHONY: all\n")
-        f.write("all: libtflm.a\n\n")
+        f.write("all: $(AMBIQ_TFLM_CUSTOM_OP_LIB)\n\n")
 
-        # Archive all object files into libtflm.a
-        f.write("libtflm.a: $(TFLM_OBJS)\n")
-        f.write("\t$(AR) rcs $@ $^\n\n")
+        f.write("# 9) Pattern rules: compile .cc -> bin/path/xyz.o, etc.\n\n")
 
-        # Compile rules for C
-        f.write("%.o: %.c\n")
-        f.write("\t$(CC) $(CFLAGS) -c $< -o $@\n\n")
+        f.write("# For C++ files:\n")
+        f.write("$(BUILD_DIR)/%.o: %.cc\n")
+        f.write("\t@mkdir -p $(dir $@)\n")
+        f.write("\t$(CXX) $(CXXFLAGS) $(KERNEL_OPTIMIZATION_LEVEL) $(INCLUDES) -MMD -MP -c $< -o $@\n\n")
 
-        # Compile rules for C++
-        # This covers both .cc and .cpp
-        f.write("%.o: %.cc\n")
-        f.write("\t$(CXX) $(CXXFLAGS) -c $< -o $@\n\n")
-        f.write("%.o: %.cpp\n")
-        f.write("\t$(CXX) $(CXXFLAGS) -c $< -o $@\n\n")
+        f.write("# For C files:\n")
+        f.write("$(BUILD_DIR)/%.o: %.c\n")
+        f.write("\t@mkdir -p $(dir $@)\n")
+        f.write("\t$(CC) $(CFLAGS) $(CORE_OPTIMIZATION_LEVEL) $(INCLUDES) -MMD -MP -c $< -o $@\n\n")
 
-    print(f"Generated {module_mk_path}")
+        f.write("# For assembly files:\n")
+        f.write("$(BUILD_DIR)/%.o: %.S\n")
+        f.write("\t@mkdir -p $(dir $@)\n")
+        f.write("\t$(CC) $(CFLAGS) $(CORE_OPTIMIZATION_LEVEL) $(INCLUDES) -MMD -MP -c $< -o $@\n\n")
 
+        f.write("# 10) Create a static archive from your custom ops.\n")
+        f.write("$(AMBIQ_TFLM_CUSTOM_OP_LIB): $(TFLM_OBJS)\n")
+        f.write("\t@echo \"Archiving custom ops into $@\"\n")
+        f.write("\t$(AR) rcs $@ $(TFLM_OBJS)\n\n")
+
+        f.write("# Include the Cortex M generic makefile\n")
+        f.write("include cortex_m_generic_makefile.inc\n\n")
+
+        f.write("# 11) Optional 'clean' target.\n")
+        f.write(".PHONY: clean\n")
+        f.write("clean:\n")
+        f.write("\t-rm -f $(TFLM_OBJS) $(AMBIQ_TFLM_CUSTOM_OP_LIB) $(TFLM_OBJS:.o=.d)\n\n")
+
+        f.write("# 12) Auto-include the .d (dependency) files\n")
+        f.write("-include $(TFLM_OBJS:.o=.d)\n")
+
+    print(f"Generated {module_mk_path} with {len(filtered_srcs)} files.")
 
 def main():
     parser = argparse.ArgumentParser(
@@ -300,7 +402,7 @@ def main():
                         help="Additional TFLM Makefile options. For example: "
                         "--makefile_options=\"TARGET=<target> "
                         "OPTIMIZED_KERNEL_DIR=<optimized_kernel_dir> "
-                        "TARGET_ARCH=corex-m4\"")
+                        "TARGET_ARCH=cortex-m4\"")
     parser.add_argument("--examples",
                         "-e",
                         action="append",
@@ -310,6 +412,10 @@ def main():
         "--rename_cc_to_cpp",
         action="store_true",
         help="Rename all .cc files to .cpp in the destination files location.")
+    
+    # parser.add_argument(
+    #    "--create"
+    # )
 
     args = parser.parse_args()
 
@@ -317,11 +423,16 @@ def main():
 
     make_entries = makefile_options.split()
     tensorflow_root = ""
+    target_arch = ""
+    optimized_kernel_dir = ""
     for make_entry in make_entries:
         key_value = make_entry.split("=")
         if key_value[0] == "TENSORFLOW_ROOT":
             tensorflow_root = key_value[1]
-
+        elif key_value[0] == "TARGET_ARCH":
+            target_arch = key_value[1]
+        elif key_value[0] == "OPTIMIZED_KERNEL_DIR":
+            optimized_kernel_dir = key_value[1]
     # TODO(b/143904317): Explicitly call make third_party_downloads. This will
     # no longer be needed once all the downloads are switched over to bash
     # scripts.
@@ -356,7 +467,30 @@ def main():
     if args.rename_cc_to_cpp:
         _rename_cc_to_cpp(args.output_dir)
 
-    _generate_module_mk(args.output_dir, dest_files)
+    # Copy modified cortex_m_generic_makefile.inc to the neuralspot directory.
+    makefile_inc_src = os.path.join(
+        tensorflow_root, 
+        "neuralspot/cortex_m_generic_makefile.inc"
+    )
+    makefile_inc_dst = os.path.join(args.output_dir, "cortex_m_generic_makefile.inc")
+    os.makedirs(os.path.dirname(makefile_inc_dst), exist_ok=True)
+    shutil.copy(makefile_inc_src, makefile_inc_dst)
+
+    # Add xtensa.h and xtensa_pad.h to the output directory. These files are needed by ambiq/pad.cc
+    xtensa_pad_src = os.path.join(tensorflow_root, "tensorflow/lite/micro/kernels/xtensa/xtensa_pad.h")
+    xtensa_h_src = os.path.join(tensorflow_root, "tensorflow/lite/micro/kernels/xtensa/xtensa.h")
+
+    xtensa_pad_dst = os.path.join(args.output_dir, "tensorflow/lite/micro/kernels/xtensa/xtensa_pad.h")
+    xtensa_h_dst = os.path.join(args.output_dir, "tensorflow/lite/micro/kernels/xtensa/xtensa.h")
+
+    os.makedirs(os.path.dirname(xtensa_pad_dst), exist_ok=True)
+    os.makedirs(os.path.dirname(xtensa_h_dst), exist_ok=True)
+
+    shutil.copy(xtensa_pad_src, xtensa_pad_dst)
+    shutil.copy(xtensa_h_src, xtensa_h_dst)
+    dest_files.append(xtensa_pad_dst)
+    dest_files.append(xtensa_h_dst)
+    _generate_module_mk(args.output_dir, dest_files, target_arch, optimized_kernel_dir)
 
 
 if __name__ == "__main__":
