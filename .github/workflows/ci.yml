@@ -128,7 +128,7 @@ jobs:
       - name: Test
         run: |
           cd ../
-          tflite-micro/tensorflow/lite/micro/tools/ci_build/test_bluepill_release.sh tflite-micro/
+          ns-tflm/tensorflow/lite/micro/tools/ci_build/test_bluepill_release.sh ns-tflm/
 
   cortex_m_bluepill_no_release:
     runs-on: ubuntu-latest
@@ -148,7 +148,7 @@ jobs:
       - name: Test
         run: |
           cd ../
-          tflite-micro/tensorflow/lite/micro/tools/ci_build/test_bluepill_no_release.sh tflite-micro/
+          ns-tflm/tensorflow/lite/micro/tools/ci_build/test_bluepill_no_release.sh ns-tflm/
 
   cortex_m_bluepill_renode:
     runs-on: ubuntu-latest
@@ -168,7 +168,7 @@ jobs:
       - name: Test
         run: |
           cd ../
-          tflite-micro/tensorflow/lite/micro/tools/ci_build/test_bluepill_renode.sh tflite-micro/
+          ns-tflm/tensorflow/lite/micro/tools/ci_build/test_bluepill_renode.sh ns-tflm/
 
   cortex_m_qemu:
     runs-on: ubuntu-latest
@@ -184,7 +184,7 @@ jobs:
       - name: Test
         uses: docker://ghcr.io/tflm-bot/tflm-ci:latest
         with:
-          args: /bin/sh -c tensorflow/lite/micro/tools/ci_build/test_cortex_m_qemu.sh tflite-micro/
+          args: /bin/sh -c tensorflow/lite/micro/tools/ci_build/test_cortex_m_qemu.sh ns-tflm/
 
   # check_code_style:
   #   runs-on: ubuntu-latest
@@ -220,7 +220,7 @@ jobs:
       - name: Test
         run: |
           cd ../
-          tflite-micro/tensorflow/lite/micro/tools/ci_build/test_project_generation.sh tflite-micro/
+          ns-tflm/tensorflow/lite/micro/tools/ci_build/test_project_generation.sh ns-tflm/
 
   x86_release:
     runs-on: ubuntu-latest
@@ -241,7 +241,7 @@ jobs:
         run: |
           tensorflow/lite/micro/tools/ci_build/test_makefile.sh
           cd ../
-          tflite-micro/tensorflow/lite/micro/tools/ci_build/test_x86_release.sh tflite-micro/
+          ns-tflm/tensorflow/lite/micro/tools/ci_build/test_x86_release.sh ns-tflm/
 
   x86_default:
     runs-on: ubuntu-latest
@@ -262,7 +262,7 @@ jobs:
         run: |
           tensorflow/lite/micro/tools/ci_build/test_makefile.sh
           cd ../
-          tflite-micro/tensorflow/lite/micro/tools/ci_build/test_x86_default.sh tflite-micro/
+          ns-tflm/tensorflow/lite/micro/tools/ci_build/test_x86_default.sh ns-tflm/
 
   x86_out_of_tree:
     runs-on: ubuntu-latest
@@ -283,7 +283,7 @@ jobs:
         run: |
           tensorflow/lite/micro/tools/ci_build/test_makefile.sh
           cd ../
-          tflite-micro/tensorflow/lite/micro/tools/ci_build/test_x86_out_of_tree.sh tflite-micro/
+          ns-tflm/tensorflow/lite/micro/tools/ci_build/test_x86_out_of_tree.sh ns-tflm/
 
   x86_no_tflite_static_memory:
     runs-on: ubuntu-latest
@@ -304,4 +304,4 @@ jobs:
         run: |
           tensorflow/lite/micro/tools/ci_build/test_makefile.sh
           cd ../
-          tflite-micro/tensorflow/lite/micro/tools/ci_build/test_x86_no_tflite_static_memory.sh tflite-micro/
+          ns-tflm/tensorflow/lite/micro/tools/ci_build/test_x86_no_tflite_static_memory.sh ns-tflm/
