@@ -4,14 +4,10 @@ This directory contains custom kernel operations for TFLM optimized for Ambiq So
 
 ## Target SoCs
 
+# Apollo4 Plus
 * Apollo510 w/ Cortex-M55
 
-## Completed Operations
-
-* Tanh
-* Logistic
-* Leaky ReLU
-* Pad
+## Operator Support Status
 
 | Operator          | C <br> int8 | C<br>int16 | C<br>int4* | DSP<br>int8 | DSP<br>int16 | DSP<br>int4* | MVE<br>int8 | MVE<br>int16 | MVE<br>int4* |
 | ----------------- | ----------- | ---------- |------------|-------------| -------------|--------------|-------------| -------------|--------------|
@@ -66,13 +62,6 @@ This directory contains custom kernel operations for TFLM optimized for Ambiq So
 | tranpose          | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | unpack            | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | zeros_like        | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-
-
-## In Progress Operations
-
-* Sub: Should be essentially duplicate of Add
-* AvgPool: Already implemented but we might be able to further optimize core loop
-* Conv2D: Already implemented but look to optimize 1D convolutions w/ dilations
 
 
 ## Notes
