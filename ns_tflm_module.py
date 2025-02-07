@@ -261,22 +261,16 @@ def _generate_module_mk(
     filtered_srcs = [sf for sf in filtered_srcs if "test" not in sf]
   
     with open(module_mk_path, "w") as f:
-        f.write("###############################################################################\n")
-        f.write("# Minimal Makefile to compile custom TFLM kernels using only precompiled libs #\n")
-        f.write("###############################################################################\n\n")
+        f.write("# Toolchain commands (for GCC on ARM)\n")
+        f.write("TOOLCHAIN_PATH ?= ../tensorflow/lite/micro/tools/make/downloads/gcc_embedded\n\n")
 
-        f.write("# 1) Toolchain commands (for GCC on ARM)\n")
-        f.write("#    Adjust if you have a different prefix or want to override on the command line.\n")
-        f.write("TOOLCHAIN_PATH := ../tensorflow/lite/micro/tools/make/downloads/gcc_embedded\n\n")
-
-        f.write("CC := $(TOOLCHAIN_PATH)/bin/arm-none-eabi-gcc\n")
-        f.write("CXX := $(TOOLCHAIN_PATH)/bin/arm-none-eabi-g++\n")
-        f.write("AR := $(TOOLCHAIN_PATH)/bin/arm-none-eabi-ar\n")
-        f.write("OBJCOPY := arm-none-eabi-objcopy\n\n")
+        f.write("CC ?= $(TOOLCHAIN_PATH)/bin/arm-none-eabi-gcc\n")
+        f.write("CXX ?= $(TOOLCHAIN_PATH)/bin/arm-none-eabi-g++\n")
+        f.write("AR ?= $(TOOLCHAIN_PATH)/bin/arm-none-eabi-ar\n")
+        f.write("OBJCOPY ?= arm-none-eabi-objcopy\n\n")
 
         f.write(f"TARGET_ARCH := {target_arch}\n\n")
 
-        f.write("# You can change these optimization levels as desired:\n")
         f.write("CORE_OPTIMIZATION_LEVEL     := -Os\n")
         f.write("KERNEL_OPTIMIZATION_LEVEL   := -O2\n")
         f.write("COMMON_FLAGS := \\\n")
@@ -286,12 +280,12 @@ def _generate_module_mk(
         f.write("  -fno-unwind-tables -ffunction-sections -fdata-sections -fmessage-length=0 \\\n")
         f.write("  -DTF_LITE_STATIC_MEMORY -DTF_LITE_DISABLE_X86_NEON\n\n")
 
-        f.write("CXXFLAGS := -std=c++17 -fno-rtti -fno-exceptions $(COMMON_FLAGS)\n")
-        f.write("CFLAGS   := -std=c17 $(COMMON_FLAGS)\n\n")
+        f.write("CXXFLAGS += -std=c++17 -fno-rtti -fno-exceptions $(COMMON_FLAGS)\n")
+        f.write("CFLAGS   += -std=c17 $(COMMON_FLAGS)\n\n")
 
         f.write("# Remove -Werror from CFLAGS and CXXFLAGS\n")
-        f.write("CFLAGS   := $(filter-out -Werror,$(CFLAGS))\n")
-        f.write("CXXFLAGS := $(filter-out -Werror,$(CXXFLAGS))\n\n")
+        f.write("CFLAGS   += $(filter-out -Werror,$(CFLAGS))\n")
+        f.write("CXXFLAGS += $(filter-out -Werror,$(CXXFLAGS))\n\n")
 
         f.write(f"# Set optimized kernel folder name:\n")
         f.write(f"OPTIMIZED_KERNEL_DIR := {optimized_kernel_dir}\n\n")
