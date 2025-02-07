@@ -3,13 +3,15 @@ name: Run-Ambiq
 # This is the entry point for ambiq.yml for scheduled and workflow_dispatch events.
 
 on:
-  # Allow manually triggering of the workflow.
   workflow_call:
       inputs:
         trigger-sha:
           description: "SHA of the commit to test"
           required: true
           type: string
+
+  # Allow manually triggering of the workflow.
+  workflow_dispatch: {}
 
 jobs:
   call-ambiq-presubmit:
