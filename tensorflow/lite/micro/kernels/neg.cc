@@ -48,6 +48,8 @@ TfLiteStatus NegPrepare(TfLiteContext* context, TfLiteNode* node) {
     data->quant_zero_point = input1->params.zero_point;
   }
 
+  micro_context->DeallocateTempTfLiteTensor(input1);
+
   return kTfLiteOk;
 }
 

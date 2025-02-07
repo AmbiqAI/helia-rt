@@ -111,7 +111,7 @@ TfLiteStatus ResizeBilinearEval(TfLiteContext* context, TfLiteNode* node) {
         tflite::micro::GetTensorShape(output),
         tflite::micro::GetTensorData<int8_t>(output));
   } else {
-    MicroPrintf("Output type is %d, requires float or int8.", output->type);
+    MicroPrintf("Output type is %d, requires float, int16, or int8.", output->type);
     return kTfLiteError;
   }
 

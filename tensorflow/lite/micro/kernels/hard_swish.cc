@@ -50,13 +50,13 @@ TfLiteStatus HardSwishEval(TfLiteContext* context, TfLiteNode* node) {
           tflite::micro::GetTensorShape(output),
           tflite::micro::GetTensorData<float>(output));
     } break;
-    case kTfLiteInt16: {
-      tflite::reference_ops::HardSwish<int16_t>(
-          *params, tflite::micro::GetTensorShape(input),
-          tflite::micro::GetTensorData<int16_t>(input),
-          tflite::micro::GetTensorShape(output),
-          tflite::micro::GetTensorData<int16_t>(output));
-    } break;
+    // case kTfLiteInt16: {
+    //   tflite::reference_ops::HardSwish<int16_t>(
+    //       *params, tflite::micro::GetTensorShape(input),
+    //       tflite::micro::GetTensorData<int16_t>(input),
+    //       tflite::micro::GetTensorShape(output),
+    //       tflite::micro::GetTensorData<int16_t>(output));
+    // } break;
     case kTfLiteInt8: {
       tflite::reference_ops::HardSwish<int8_t>(
           *params, tflite::micro::GetTensorShape(input),

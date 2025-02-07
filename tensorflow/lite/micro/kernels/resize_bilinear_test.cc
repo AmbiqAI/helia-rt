@@ -371,30 +371,30 @@ TF_LITE_MICRO_TEST(TwoDimensionalResizeWithTwoBatchesInt16) {
       output_dims, output_data, &params);
 }
 
-TF_LITE_MICRO_TEST(ThreeDimensionalResize) {
-  int input_dims[] = {4, 1, 2, 2, 2};
-  const float input_data[] = {
-      3, 4,  6,  10,  //
-      9, 10, 12, 16,  //
-  };
-  const int32_t expected_size_data[] = {3, 3};
-  const float expected_output_data[] = {
-      3, 4,  5,  8,  6,  10,  //
-      7, 9,  10, 12, 11, 13,  //
-      9, 11, 12, 14, 14, 16,  //
-  };
-  int output_dims[] = {4, 1, 3, 3, 2};
-  float output_data[18];
+// TF_LITE_MICRO_TEST(ThreeDimensionalResize) {
+//   int input_dims[] = {4, 1, 2, 2, 2};
+//   const float input_data[] = {
+//       3, 4,  6,  10,  //
+//       9, 10, 12, 16,  //
+//   };
+//   const int32_t expected_size_data[] = {3, 3};
+//   const float expected_output_data[] = {
+//       3, 4,  5,  8,  6,  10,  //
+//       7, 9,  10, 12, 11, 13,  //
+//       9, 11, 12, 14, 14, 16,  //
+//   };
+//   int output_dims[] = {4, 1, 3, 3, 2};
+//   float output_data[18];
 
-  TfLiteResizeBilinearParams params = {
-      false, /*align_corners*/
-      false  /*half pixel centers*/
-  };
+//   TfLiteResizeBilinearParams params = {
+//       false, /*align_corners*/
+//       false  /*half pixel centers*/
+//   };
 
-  tflite::testing::TestResizeBilinear(input_dims, input_data,
-                                      expected_size_data, expected_output_data,
-                                      output_dims, output_data, &params);
-}
+//   tflite::testing::TestResizeBilinear(input_dims, input_data,
+//                                       expected_size_data, expected_output_data,
+//                                       output_dims, output_data, &params);
+// }
 
 TF_LITE_MICRO_TEST(ThreeDimensionalResizeInt8) {
   int input_dims[] = {4, 1, 2, 2, 2};

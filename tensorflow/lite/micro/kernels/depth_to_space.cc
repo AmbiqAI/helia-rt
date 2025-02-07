@@ -53,8 +53,7 @@ TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, NumDimensions(input), 4);
 
   auto data_type = output->type;
-  TF_LITE_ENSURE(context,
-                 data_type == kTfLiteFloat32 || data_type == kTfLiteInt8);
+  TF_LITE_ENSURE(context, data_type == kTfLiteFloat32 || data_type == kTfLiteInt16 || data_type == kTfLiteInt8);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
 
   const int block_size = params->block_size;

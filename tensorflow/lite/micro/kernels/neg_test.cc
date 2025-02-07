@@ -60,13 +60,15 @@ void TestNegQuantizedInt8(int* input_dims_data, const float* input_data,
                           const int8_t* expected_output_data,
                           int* output_dims_data, int8_t* output_data,
                           float scale, int zero_point) {
+  constexpr int kMaxDims = 128;  // Define a maximum length for the arrays
   TfLiteIntArray* input_dims = IntArrayFromInts(input_dims_data);
   TfLiteIntArray* output_dims = IntArrayFromInts(output_dims_data);
   const int output_dims_count = ElementCount(*output_dims);
+  TFLITE_DCHECK(output_dims_count <= kMaxDims);  // Ensure the length does not exceed the maximum
   constexpr int inputs_size = 1;
   constexpr int outputs_size = 1;
   constexpr int tensors_size = inputs_size + outputs_size;
-  int8_t input_quantized[output_dims_count];
+  int8_t input_quantized[kMaxDims];
   TfLiteTensor tensors[tensors_size] = {
       CreateQuantizedTensor(input_data, input_quantized, input_dims, scale, zero_point),
       CreateQuantizedTensor(output_data, output_dims, scale, zero_point),
@@ -94,13 +96,15 @@ void TestNegQuantizedInt16(int* input_dims_data, const float* input_data,
                            const int16_t* expected_output_data,
                            int* output_dims_data, int16_t* output_data,
                            float scale, int zero_point) {
+  constexpr int kMaxDims = 128;  // Define a maximum length for the arrays
   TfLiteIntArray* input_dims = IntArrayFromInts(input_dims_data);
   TfLiteIntArray* output_dims = IntArrayFromInts(output_dims_data);
   const int output_dims_count = ElementCount(*output_dims);
+  TFLITE_DCHECK(output_dims_count <= kMaxDims);  // Ensure the length does not exceed the maximum
   constexpr int inputs_size = 1;
   constexpr int outputs_size = 1;
   constexpr int tensors_size = inputs_size + outputs_size;
-  int16_t input_quantized[output_dims_count];
+  int16_t input_quantized[kMaxDims];
   TfLiteTensor tensors[tensors_size] = {
       CreateQuantizedTensor(input_data, input_quantized, input_dims, scale, zero_point),
       CreateQuantizedTensor(output_data, output_dims, scale, zero_point),
