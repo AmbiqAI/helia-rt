@@ -33,15 +33,12 @@ jobs:
       - name: Run build script with Bash
         run: bash ./neuralspot/build.sh  # Explicitly using Bash to avoid shell compatibility issues
 
-      # Package the TFLM build outputs as a .zip
+      # Package the TFLM build outputs as zip and tar.gz
       - name: Archive TFLM artifacts (zip)
         run: |
-          zip -r ns-tflm-gcc-${{ github.ref_name }}.zip lib treedir neuralspot/module.mk
-
-      # Package the TFLM build outputs as a .tar.gz
-      - name: Archive TFLM artifacts (tar.gz)
-        run: |
-          tar -czf ns-tflm-gcc-${{ github.ref_name }}.tar.gz lib treedir neuralspot/module.mk
+          cd ./build
+          zip -r ../ns-tflm-gcc-${{ github.ref_name }}.zip *
+          tar -czf ../ns-tflm-gcc-${{ github.ref_name }}.tar.gz *
 
       # Create a full snapshot of the entire repo as .zip + .tar.gz
       - name: Create snapshot archives
