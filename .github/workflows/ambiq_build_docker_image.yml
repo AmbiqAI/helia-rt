@@ -1,8 +1,8 @@
-name: Build and Push Docker Image
+name: Build TFLM CI Docker Image
 
 on:
   workflow_call:
-    
+
 
 jobs:
   build-and-push:

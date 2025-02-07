@@ -15,7 +15,7 @@ jobs:
     uses: ./.github/workflows/ci.yml
     if: |
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'schedule' && github.repository == 'tensorflow/tflite-micro')
+      (github.event_name == 'schedule' && github.repository == 'AmbiqAI/ns-tflm')
     with:
       trigger-sha: ${{ github.sha }}
 
