@@ -63,8 +63,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ns-tflm-gcc-${{ github.ref_name }}.zip
-          asset_name: ns-tflm-gcc-${{ github.ref_name }}.zip
+          asset_path: ns-tflm-${{ github.ref_name }}.zip
+          asset_name: ns-tflm-${{ github.ref_name }}.zip
           asset_content_type: application/zip
 
       - name: Upload TFLM tar.gz
@@ -73,8 +73,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ns-tflm-gcc-${{ github.ref_name }}.tar.gz
-          asset_name: ns-tflm-gcc-${{ github.ref_name }}.tar.gz
+          asset_path: ns-tflm-${{ github.ref_name }}.tar.gz
+          asset_name: ns-tflm-${{ github.ref_name }}.tar.gz
           asset_content_type: application/gzip
 
       # Upload the repo snapshot archives
