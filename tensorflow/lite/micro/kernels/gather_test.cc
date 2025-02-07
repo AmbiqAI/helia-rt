@@ -349,6 +349,83 @@ TF_LITE_MICRO_TEST(GatherOp_Int8Int32) {
       output_data, golden_dims, golden_data);
 }
 
+TF_LITE_MICRO_TEST(GatherOp_Int16Int32) {
+  // For input_dims[], positions_dims[], or output_dims[], element 0 is the
+  // number of dimensions in that array, not the actual dimension data.
+  int input_dims[] = {2, 2, 2};
+  int positions_dims[] = {1, 2};
+  const int32_t positions_data[] = {1, 0};
+  const int16_t input_data[] = {-13, -120, 14, 15};
+  const int16_t golden_data[] = {14, 15, -13, -120};
+  int16_t output_data[4];
+
+  // The kernel under test will fill output_dims[1] onward, to be compared
+  // against golden_dims[0] onward.
+  const int golden_dims[] = {2, 2};
+  int output_dims[] = {2, 0, 0};
+  tflite::testing::TestGather<int16_t, int32_t>(
+      input_dims, input_data, positions_dims, positions_data, output_dims,
+      output_data, golden_dims, golden_data);
+}
+
+TF_LITE_MICRO_TEST(GatherOp_BatchDims1_Int16) {
+  // For input_dims[], positions_dims[], or output_dims[], element 0 is the
+  // number of dimensions in that array, not the actual dimension data.
+  const int axis = 2;
+  const int batch_dims = 1;
+  int input_dims[] = {4, 2, 2, 3, 5};
+  int positions_dims[] = {3, 2, 2, 2};
+  const int32_t positions_data[] = {1, 0, 0, 1, 1, 0, 0, 1};
+  const int16_t input_data[] = {0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11,
+                                12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+                                24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
+                                36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
+                                48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59};
+  const int16_t golden_data[] = {
+      5,  6,  7,  8,  9,  0,  1,  2,  3,  4,  0,  1,  2,  3,  4,  5,
+      6,  7,  8,  9,  20, 21, 22, 23, 24, 15, 16, 17, 18, 19, 15, 16,
+      17, 18, 19, 20, 21, 22, 23, 24, 35, 36, 37, 38, 39, 30, 31, 32,
+      33, 34, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 50, 51, 52, 53,
+      54, 45, 46, 47, 48, 49, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54};
+  int16_t output_data[80];
+
+  // The kernel under test will fill output_dims[1] onward, to be compared
+  // against golden_dims[0] onward.
+  const int golden_dims[] = {2, 2, 2, 2, 5};
+  int output_dims[] = {5, 0, 0, 0, 0, 0};
+  tflite::testing::TestGather<int16_t, int32_t>(
+      input_dims, input_data, positions_dims, positions_data, output_dims,
+      output_data, golden_dims, golden_data, axis, batch_dims);
+}
+
+TF_LITE_MICRO_TEST(GatherOp_BatchDims2_Int16) {
+  // For input_dims[], positions_dims[], or output_dims[], element 0 is the
+  // number of dimensions in that array, not the actual dimension data.
+  const int axis = 2;
+  const int batch_dims = 2;
+  int input_dims[] = {4, 2, 2, 3, 5};
+  int positions_dims[] = {3, 2, 2, 2};
+  const int32_t positions_data[] = {1, 0, 0, 1, 1, 0, 0, 1};
+  const int16_t input_data[] = {0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11,
+                                12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+                                24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
+                                36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
+                                48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59};
+  const int16_t golden_data[] = {5,  6,  7,  8,  9,  0,  1,  2,  3,  4,
+                                 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+                                 35, 36, 37, 38, 39, 30, 31, 32, 33, 34,
+                                 45, 46, 47, 48, 49, 50, 51, 52, 53, 54};
+  int16_t output_data[40];
+
+  // The kernel under test will fill output_dims[1] onward, to be compared
+  // against golden_dims[0] onward.
+  const int golden_dims[] = {2, 2, 2, 5};
+  int output_dims[] = {4, 0, 0, 0, 0};
+  tflite::testing::TestGather<int16_t, int32_t>(
+      input_dims, input_data, positions_dims, positions_data, output_dims,
+      output_data, golden_dims, golden_data, axis, batch_dims);
+}
+
 TF_LITE_MICRO_TEST(GatherOp_BatchDims2) {
   // For input_dims[], positions_dims[], or output_dims[], element 0 is the
   // number of dimensions in that array, not the actual dimension data.

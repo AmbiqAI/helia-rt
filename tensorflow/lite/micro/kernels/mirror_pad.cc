@@ -143,6 +143,14 @@ TfLiteStatus MirrorPadEval(TfLiteContext* context, TfLiteNode* node) {
                 data->offset, input_dims, output_size);
       break;
     }
+    case kTfLiteInt16: {
+      MirrorPad(padding_matrix, input_tensor->dims, output_dims_num_elements,
+                input_dims_num_elements,
+                tflite::micro::GetTensorData<int16_t>(input_tensor),
+                tflite::micro::GetTensorData<int16_t>(output_tensor),
+                data->offset, input_dims, output_size);
+      break;
+    }
     case kTfLiteInt8: {
       MirrorPad(padding_matrix, input_tensor->dims, output_dims_num_elements,
                 input_dims_num_elements,

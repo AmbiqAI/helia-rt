@@ -151,4 +151,18 @@ TF_LITE_MICRO_TEST(SpaceToBatchBasicInt8) {
           tflite::testing::basic_golden, golden_quantized, 1.0f, 0, output));
 }
 
+TF_LITE_MICRO_TEST(SpaceToBatchBasicInt16) {
+  int16_t output[tflite::testing::kBasicInputOutputSize];
+  int16_t input_quantized[tflite::testing::kBasicInputOutputSize];
+  int16_t golden_quantized[tflite::testing::kBasicInputOutputSize];
+  TF_LITE_MICRO_EXPECT_EQ(
+      kTfLiteOk,
+      tflite::testing::TestSpaceToBatchNdQuantized(
+          tflite::testing::basic_input_dims, tflite::testing::basic_input,
+          input_quantized, 1.0f, 0, tflite::testing::basic_block_shape_dims,
+          tflite::testing::basic_block_shape, tflite::testing::basic_crops_dims,
+          tflite::testing::basic_crops, tflite::testing::basic_output_dims,
+          tflite::testing::basic_golden, golden_quantized, 1.0f, 0, output));
+}
+
 TF_LITE_MICRO_TESTS_END

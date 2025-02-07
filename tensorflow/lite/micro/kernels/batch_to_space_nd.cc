@@ -84,6 +84,17 @@ TfLiteStatus BatchToSpaceNDEval(TfLiteContext* context, TfLiteNode* node) {
           tflite::micro::GetTensorShape(output),
           tflite::micro::GetTensorData<float>(output));
       break;
+    case kTfLiteInt16:
+      reference_ops::BatchToSpaceND(
+          tflite::micro::GetTensorShape(input),
+          tflite::micro::GetTensorData<int16_t>(input),
+          tflite::micro::GetTensorShape(block_shape),
+          tflite::micro::GetTensorData<int32_t>(block_shape),
+          tflite::micro::GetTensorShape(crops),
+          tflite::micro::GetTensorData<int32_t>(crops),
+          tflite::micro::GetTensorShape(output),
+          tflite::micro::GetTensorData<int16_t>(output));
+      break;
     case kTfLiteInt8:
       reference_ops::BatchToSpaceND(
           tflite::micro::GetTensorShape(input),

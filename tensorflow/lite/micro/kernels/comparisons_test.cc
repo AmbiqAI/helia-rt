@@ -126,6 +126,29 @@ void TestComparisonQuantizedInt8(const TFLMRegistration& registration,
   TestComparison(registration, tensors, expected_output_data, output_data);
 }
 
+void TestComparisonQuantizedInt16(const TFLMRegistration& registration,
+                                  int* input1_dims_data, float* input1_data,
+                                  int16_t* input1_quantized, float input1_scale,
+                                  int input1_zero_point, int* input2_dims_data,
+                                  float* input2_data, int16_t* input2_quantized,
+                                  float input2_scale, int input2_zero_point,
+                                  bool* expected_output_data,
+                                  int* output_dims_data, bool* output_data) {
+  TfLiteIntArray* input1_dims = IntArrayFromInts(input1_dims_data);
+  TfLiteIntArray* input2_dims = IntArrayFromInts(input2_dims_data);
+  TfLiteIntArray* output_dims = IntArrayFromInts(output_dims_data);
+
+  TfLiteTensor tensors[tensors_size] = {
+      CreateQuantizedTensor(input1_data, input1_quantized, input1_dims,
+                            input1_scale, input1_zero_point),
+      CreateQuantizedTensor(input2_data, input2_quantized, input2_dims,
+                            input2_scale, input2_zero_point),
+      CreateTensor(output_data, output_dims),
+  };
+
+  TestComparison(registration, tensors, expected_output_data, output_data);
+}
+
 }  // namespace
 }  // namespace testing
 }  // namespace tflite
@@ -741,6 +764,156 @@ TF_LITE_MICRO_TEST(LessEqualQuantizedInt8WithBroadcast) {
         input2_data, input2_quantized, input1_scale, input1_zero_point,
         expected_data, expected_dim, output_data);
   }
+}
+
+TF_LITE_MICRO_TEST(EqualQuantizedInt16) {
+  int input1_dim[] = {4, 1, 2, 2, 1};
+  int input2_dim[] = {4, 1, 2, 2, 1};
+
+  float input1_data[] = {1, -9, 7, 3};
+  float input2_data[] = {-1, 2, 7, 5};
+
+  bool expected_data[] = {false, false, true, false};
+  int expected_dim[] = {4, 1, 2, 2, 1};
+
+  const float input1_scale = 0.5;
+  const int input1_zero_point = -5;
+  const float input2_scale = 0.25;
+  const int input2_zero_point = 5;
+  int16_t input1_quantized[4];
+  int16_t input2_quantized[4];
+
+  bool output_data[4];
+  tflite::testing::TestComparisonQuantizedInt16(
+      tflite::Register_EQUAL(), input1_dim, input1_data, input1_quantized,
+      input1_scale, input1_zero_point, input2_dim, input2_data,
+      input2_quantized, input2_scale, input2_zero_point, expected_data,
+      expected_dim, output_data);
+}
+
+TF_LITE_MICRO_TEST(NotEqualQuantizedInt16) {
+  int input1_dim[] = {4, 1, 2, 2, 1};
+  int input2_dim[] = {4, 1, 2, 2, 1};
+
+  float input1_data[] = {1, -9, 7, 3};
+  float input2_data[] = {1, 2, 7, 5};
+
+  bool expected_data[] = {false, true, false, true};
+  int expected_dim[] = {4, 1, 2, 2, 1};
+
+  const float input1_scale = 0.5;
+  const int input1_zero_point = -5;
+  const float input2_scale = 0.25;
+  const int input2_zero_point = 5;
+  int16_t input1_quantized[4];
+  int16_t input2_quantized[4];
+
+  bool output_data[4];
+  tflite::testing::TestComparisonQuantizedInt16(
+      tflite::Register_NOT_EQUAL(), input1_dim, input1_data, input1_quantized,
+      input1_scale, input1_zero_point, input2_dim, input2_data,
+      input2_quantized, input2_scale, input2_zero_point, expected_data,
+      expected_dim, output_data);
+}
+
+TF_LITE_MICRO_TEST(GreaterQuantizedInt16) {
+  int input1_dim[] = {4, 1, 2, 2, 1};
+  int input2_dim[] = {4, 1, 2, 2, 1};
+
+  float input1_data[] = {1, -9, 7, 3};
+  float input2_data[] = {1, 2, 7, 5};
+
+  bool expected_data[] = {false, false, false, false};
+  int expected_dim[] = {4, 1, 2, 2, 1};
+
+  const float input1_scale = 0.5;
+  const int input1_zero_point = -5;
+  const float input2_scale = 0.25;
+  const int input2_zero_point = 5;
+  int16_t input1_quantized[4];
+  int16_t input2_quantized[4];
+
+  bool output_data[4];
+  tflite::testing::TestComparisonQuantizedInt16(
+      tflite::Register_GREATER(), input1_dim, input1_data, input1_quantized,
+      input1_scale, input1_zero_point, input2_dim, input2_data,
+      input2_quantized, input2_scale, input2_zero_point, expected_data,
+      expected_dim, output_data);
+}
+
+TF_LITE_MICRO_TEST(GreaterEqualQuantizedInt16) {
+  int input1_dim[] = {4, 1, 2, 2, 1};
+  int input2_dim[] = {4, 1, 2, 2, 1};
+
+  float input1_data[] = {1, -9, 7, 3};
+  float input2_data[] = {1, 2, 7, 5};
+
+  bool expected_data[] = {true, false, true, false};
+  int expected_dim[] = {4, 1, 2, 2, 1};
+
+  const float input1_scale = 0.5;
+  const int input1_zero_point = -5;
+  const float input2_scale = 0.25;
+  const int input2_zero_point = 5;
+  int16_t input1_quantized[4];
+  int16_t input2_quantized[4];
+
+  bool output_data[4];
+  tflite::testing::TestComparisonQuantizedInt16(
+      tflite::Register_GREATER_EQUAL(), input1_dim, input1_data,
+      input1_quantized, input1_scale, input1_zero_point, input2_dim,
+      input2_data, input2_quantized, input2_scale, input2_zero_point,
+      expected_data, expected_dim, output_data);
+}
+
+TF_LITE_MICRO_TEST(LessQuantizedInt16) {
+  int input1_dim[] = {4, 1, 2, 2, 1};
+  int input2_dim[] = {4, 1, 2, 2, 1};
+
+  float input1_data[] = {1, -9, 7, 3};
+  float input2_data[] = {1, 2, 7, 5};
+
+  bool expected_data[] = {false, true, false, true};
+  int expected_dim[] = {4, 1, 2, 2, 1};
+
+  const float input1_scale = 0.5;
+  const int input1_zero_point = -5;
+  const float input2_scale = 0.25;
+  const int input2_zero_point = 5;
+  int16_t input1_quantized[4];
+  int16_t input2_quantized[4];
+
+  bool output_data[4];
+  tflite::testing::TestComparisonQuantizedInt16(
+      tflite::Register_LESS(), input1_dim, input1_data, input1_quantized,
+      input1_scale, input1_zero_point, input2_dim, input2_data,
+      input2_quantized, input2_scale, input2_zero_point, expected_data,
+      expected_dim, output_data);
+}
+
+TF_LITE_MICRO_TEST(LessEqualQuantizedInt16) {
+  int input1_dim[] = {4, 1, 2, 2, 1};
+  int input2_dim[] = {4, 1, 2, 2, 1};
+
+  float input1_data[] = {1, -9, 7, 3};
+  float input2_data[] = {1, 2, 7, 5};
+
+  bool expected_data[] = {true, true, true, true};
+  int expected_dim[] = {4, 1, 2, 2, 1};
+
+  const float input1_scale = 0.5;
+  const int input1_zero_point = -5;
+  const float input2_scale = 0.25;
+  const int input2_zero_point = 5;
+  int16_t input1_quantized[4];
+  int16_t input2_quantized[4];
+
+  bool output_data[4];
+  tflite::testing::TestComparisonQuantizedInt16(
+      tflite::Register_LESS_EQUAL(), input1_dim, input1_data,
+      input1_quantized, input1_scale, input1_zero_point, input2_dim,
+      input2_data, input2_quantized, input2_scale, input2_zero_point,
+      expected_data, expected_dim, output_data);
 }
 
 TF_LITE_MICRO_TESTS_END

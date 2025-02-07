@@ -55,10 +55,10 @@ TfLiteStatus L2NormPrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE(context, NumDimensions(input) <= 4);
 
   TF_LITE_ENSURE(context,
-                 output->type == kTfLiteFloat32 || output->type == kTfLiteInt8);
+                 output->type == kTfLiteFloat32 || output->type == kTfLiteInt8 || output->type == kTfLiteInt16);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
 
-  if (output->type == kTfLiteInt8) {
+  if (output->type == kTfLiteInt8 || output->type == kTfLiteInt16) {
     data->input_zero_point = input->params.zero_point;
   } else if (output->type == kTfLiteFloat32) {
     data->input_zero_point = 0;
@@ -120,6 +120,18 @@ TfLiteStatus L2NormEval(TfLiteContext* context, TfLiteNode* node) {
         data.input_zero_point, outer_size, depth,
         tflite::micro::GetTensorData<int8_t>(input),
         tflite::micro::GetTensorData<int8_t>(output));
+  // } else if (output->type == kTfLiteInt16) {
+  //   const auto input_shape = tflite::micro::GetTensorShape(input);
+  //   const auto output_shape = tflite::micro::GetTensorShape(output);
+  //   const int trailing_dim = input_shape.DimensionsCount() - 1;
+  //   const int depth =
+  //       MatchingDim(input_shape, trailing_dim, output_shape, trailing_dim);
+  //   const int outer_size =
+  //       MatchingFlatSizeSkipDim(input_shape, trailing_dim, output_shape);
+  //   reference_integer_ops::L2Normalization_s16(
+  //       data.input_zero_point, outer_size, depth,
+  //       tflite::micro::GetTensorData<int16_t>(input),
+  //       tflite::micro::GetTensorData<int16_t>(output));
   } else {
     MicroPrintf("Output type is %s, requires float.",
                 TfLiteTypeGetName(output->type));

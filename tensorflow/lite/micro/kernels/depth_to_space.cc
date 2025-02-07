@@ -53,8 +53,7 @@ TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, NumDimensions(input), 4);
 
   auto data_type = output->type;
-  TF_LITE_ENSURE(context,
-                 data_type == kTfLiteFloat32 || data_type == kTfLiteInt8);
+  TF_LITE_ENSURE(context, data_type == kTfLiteFloat32 || data_type == kTfLiteInt16 || data_type == kTfLiteInt8);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
 
   const int block_size = params->block_size;
@@ -116,6 +115,13 @@ TfLiteStatus DepthToSpaceEval(TfLiteContext* context, TfLiteNode* node) {
                                   tflite::micro::GetTensorData<float>(input),
                                   tflite::micro::GetTensorShape(output),
                                   tflite::micro::GetTensorData<float>(output));
+      break;
+    case kTfLiteInt16:
+      reference_ops::DepthToSpace(op_params,
+                                  tflite::micro::GetTensorShape(input),
+                                  tflite::micro::GetTensorData<int16_t>(input),
+                                  tflite::micro::GetTensorShape(output),
+                                  tflite::micro::GetTensorData<int16_t>(output));
       break;
     case kTfLiteInt8:
       reference_ops::DepthToSpace(op_params,

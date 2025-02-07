@@ -174,6 +174,37 @@ void TestPackTwoInputsQuantized32(
                       1e-5f, output_data);
 }
 
+void TestPackTwoInputsQuantized16(
+    int* input1_dims_data, const int16_t* input1_data, int* input2_dims_data,
+    const int16_t* input2_data, int axis, int* output_dims_data,
+    const int16_t* expected_output_data, int16_t* output_data) {
+  TfLiteIntArray* input1_dims = IntArrayFromInts(input1_dims_data);
+  TfLiteIntArray* input2_dims = IntArrayFromInts(input2_dims_data);
+  TfLiteIntArray* output_dims = IntArrayFromInts(output_dims_data);
+  const int output_dims_count = ElementCount(*output_dims);
+
+  constexpr int input_size = 2;
+  constexpr int output_size = 1;
+  constexpr int tensors_size = input_size + output_size;
+  TfLiteTensor tensors[tensors_size] = {
+      CreateQuantizedTensor(input1_data, input1_dims, 1.0, 128),
+      CreateQuantizedTensor(input2_data, input2_dims, 1.0, 128),
+      CreateQuantizedTensor(output_data, output_dims, 1.0, 128)};
+
+  TfLitePackParams builtin_data = {
+      .values_count = 2,
+      .axis = axis,
+  };
+  int inputs_array_data[] = {2, 0, 1};
+  TfLiteIntArray* inputs_array = IntArrayFromInts(inputs_array_data);
+  int outputs_array_data[] = {1, 2};
+  TfLiteIntArray* outputs_array = IntArrayFromInts(outputs_array_data);
+
+  ValidatePackGoldens(tensors, tensors_size, builtin_data, inputs_array,
+                      outputs_array, expected_output_data, output_dims_count,
+                      1e-5f, output_data);
+}
+
 }  // namespace testing
 }  // namespace tflite
 
@@ -268,6 +299,21 @@ TF_LITE_MICRO_TEST(PackQuantized32MultilDimensions) {
   int32_t output_data[output_dims_count];
 
   tflite::testing::TestPackTwoInputsQuantized32(
+      input_shape, input1_values, input_shape, input2_values, axis,
+      output_shape, golden, output_data);
+}
+
+TF_LITE_MICRO_TEST(PackQuantized16MultilDimensions) {
+  int input_shape[] = {2, 2, 3};
+  int output_shape[] = {3, 2, 2, 3};
+  const int16_t input1_values[] = {1, 2, 3, 4, 5, 6};
+  const int16_t input2_values[] = {7, 8, 9, 10, 11, 12};
+  const int16_t golden[] = {1, 2, 3, 7, 8, 9, 4, 5, 6, 10, 11, 12};
+  const int axis = 1;
+  constexpr int output_dims_count = 12;
+  int16_t output_data[output_dims_count];
+
+  tflite::testing::TestPackTwoInputsQuantized16(
       input_shape, input1_values, input_shape, input2_values, axis,
       output_shape, golden, output_data);
 }

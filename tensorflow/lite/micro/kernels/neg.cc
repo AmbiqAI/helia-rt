@@ -27,19 +27,71 @@ namespace {
 constexpr int kInputTensor = 0;
 constexpr int kOutputTensor = 0;
 
+struct OpData {
+  // Store the zero point and scale for quantized operations.
+  int32_t quant_zero_point;
+};
+
+void* NegInit(TfLiteContext* context, const char* buffer, size_t length) {
+  TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
+  return context->AllocatePersistentBuffer(context, sizeof(OpData));
+}
+
+TfLiteStatus NegPrepare(TfLiteContext* context, TfLiteNode* node) {
+  TFLITE_DCHECK(node->user_data != nullptr);
+
+  OpData* data = static_cast<OpData*>(node->user_data);
+  MicroContext* micro_context = GetMicroContext(context);
+  TfLiteTensor* input1 = micro_context->AllocateTempInputTensor(node, kInputTensor);
+
+  if (input1->type == kTfLiteInt8 || input1->type == kTfLiteInt16) {
+    data->quant_zero_point = input1->params.zero_point;
+  }
+
+  micro_context->DeallocateTempTfLiteTensor(input1);
+
+  return kTfLiteOk;
+}
+
 TfLiteStatus NegEval(TfLiteContext* context, TfLiteNode* node) {
   const TfLiteEvalTensor* input =
       tflite::micro::GetEvalInput(context, node, kInputTensor);
   TfLiteEvalTensor* output =
       tflite::micro::GetEvalOutput(context, node, kOutputTensor);
   switch (input->type) {
-    // TODO(wangtz): handle for kTfLiteInt8
     case kTfLiteFloat32:
-      reference_ops::Negate(tflite::micro::GetTensorShape(input),
-                            tflite::micro::GetTensorData<float>(input),
-                            tflite::micro::GetTensorShape(output),
-                            tflite::micro::GetTensorData<float>(output));
+      reference_ops::Negate(
+        tflite::micro::GetTensorShape(input),
+        tflite::micro::GetTensorData<float>(input),
+        tflite::micro::GetTensorShape(output),
+        tflite::micro::GetTensorData<float>(output)
+      );
       break;
+    case kTfLiteInt16: {
+      TFLITE_DCHECK(node->user_data != nullptr);
+      const OpData* data = static_cast<const OpData*>(node->user_data);
+      reference_ops::NegateQuantized(
+        tflite::micro::GetTensorShape(input),
+        tflite::micro::GetTensorData<int16_t>(input),
+        tflite::micro::GetTensorShape(output),
+        tflite::micro::GetTensorData<int16_t>(output),
+        data->quant_zero_point
+      );
+      break;
+    }
+    case kTfLiteInt8: {
+      TFLITE_DCHECK(node->user_data != nullptr);
+      const OpData* data = static_cast<const OpData*>(node->user_data);
+      reference_ops::NegateQuantized(
+        tflite::micro::GetTensorShape(input),
+        tflite::micro::GetTensorData<int8_t>(input),
+        tflite::micro::GetTensorShape(output),
+        tflite::micro::GetTensorData<int8_t>(output),
+        data->quant_zero_point
+      );
+      break;
+    }
+
     default:
       MicroPrintf("Type %s (%d) not supported.", TfLiteTypeGetName(input->type),
                   input->type);
@@ -51,7 +103,7 @@ TfLiteStatus NegEval(TfLiteContext* context, TfLiteNode* node) {
 }  // namespace
 
 TFLMRegistration Register_NEG() {
-  return tflite::micro::RegisterOp(nullptr, nullptr, NegEval);
+  return tflite::micro::RegisterOp(NegInit, NegPrepare, NegEval);
 }
 
 }  // namespace tflite

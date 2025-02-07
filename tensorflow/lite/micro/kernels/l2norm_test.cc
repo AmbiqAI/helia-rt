@@ -188,4 +188,45 @@ TF_LITE_MICRO_TEST(MultipleBatchInt8Test) {
                                                expected_output, output_data);
 }
 
+// TF_LITE_MICRO_TEST(SimpleInt16Test) {
+//   int input_dims[] = {4, 1, 1, 1, 6};
+//   constexpr int data_length = 6;
+//   const int16_t input_data[data_length] = {-32768, 16384, 20480, 32767, -20480, 4096};
+//   const int16_t expected_output[data_length] = {-23170, 11585, 14481, 23170, -14481, 2896};
+//   int16_t output_data[data_length];
+
+//   tflite::testing::TestL2Normalization<int16_t>(input_dims, input_data,
+//                                                 expected_output, output_data);
+// }
+
+// TF_LITE_MICRO_TEST(ZerosVectorInt16Test) {
+//   int input_dims[] = {4, 1, 1, 1, 6};
+//   constexpr int data_length = 6;
+//   const int16_t input_data[data_length] = {0, 0, 0, 0, 0, 0};
+//   const int16_t expected_output[data_length] = {0, 0, 0, 0, 0, 0};
+//   int16_t output_data[data_length];
+
+//   tflite::testing::TestL2Normalization<int16_t>(input_dims, input_data,
+//                                                 expected_output, output_data);
+// }
+
+// TF_LITE_MICRO_TEST(MultipleBatchInt16Test) {
+//   int input_dims[] = {2, 3, 6};
+//   constexpr int data_length = 18;
+//   const int16_t input_data[data_length] = {
+//       -32768, 16384, 20480, 32767, -20480, 4096,  // batch 1
+//       -32768, 16384, 20480, 32767, -20480, 4096,  // batch 2
+//       -32768, 16384, 20480, 32767, -20480, 4096,  // batch 3
+//   };
+//   const int16_t expected_output[data_length] = {
+//       -23170, 11585, 14481, 23170, -14481, 2896,  // batch 1
+//       -23170, 11585, 14481, 23170, -14481, 2896,  // batch 2
+//       -23170, 11585, 14481, 23170, -14481, 2896,  // batch 3
+//   };
+//   int16_t output_data[data_length];
+
+//   tflite::testing::TestL2Normalization<int16_t>(input_dims, input_data,
+//                                                 expected_output, output_data);
+// }
+
 TF_LITE_MICRO_TESTS_END

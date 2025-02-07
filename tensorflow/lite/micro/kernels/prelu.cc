@@ -51,6 +51,16 @@ TfLiteStatus PreluEval(TfLiteContext* context, TfLiteNode* node) {
                                 tflite::micro::GetTensorData<float>(output));
       return kTfLiteOk;
     } break;
+    case kTfLiteInt16: {
+      reference_ops::BroadcastPrelu4DSlow(
+          params, tflite::micro::GetTensorShape(input),
+          tflite::micro::GetTensorData<int16_t>(input),
+          tflite::micro::GetTensorShape(alpha),
+          tflite::micro::GetTensorData<int16_t>(alpha),
+          tflite::micro::GetTensorShape(output),
+          tflite::micro::GetTensorData<int16_t>(output));
+      return kTfLiteOk;
+    } break;
     case kTfLiteInt8: {
       reference_ops::BroadcastPrelu4DSlow(
           params, tflite::micro::GetTensorShape(input),
@@ -62,7 +72,7 @@ TfLiteStatus PreluEval(TfLiteContext* context, TfLiteNode* node) {
       return kTfLiteOk;
     } break;
     default:
-      MicroPrintf("Only float32 and uint8_t are supported currently, got %d.",
+      MicroPrintf("Only float32, int16, & int8 are supported currently, got %d.",
                   TfLiteTypeGetName(input->type));
       return kTfLiteError;
   }
