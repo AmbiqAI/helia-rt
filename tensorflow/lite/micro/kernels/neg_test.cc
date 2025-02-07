@@ -56,6 +56,74 @@ void TestNegFloat(int* input_dims_data, const float* input_data,
   }
 }
 
+void TestNegQuantizedInt8(int* input_dims_data, const float* input_data,
+                          const int8_t* expected_output_data,
+                          int* output_dims_data, int8_t* output_data,
+                          float scale, int zero_point) {
+  TfLiteIntArray* input_dims = IntArrayFromInts(input_dims_data);
+  TfLiteIntArray* output_dims = IntArrayFromInts(output_dims_data);
+  const int output_dims_count = ElementCount(*output_dims);
+  constexpr int inputs_size = 1;
+  constexpr int outputs_size = 1;
+  constexpr int tensors_size = inputs_size + outputs_size;
+  int8_t input_quantized[output_dims_count];
+  TfLiteTensor tensors[tensors_size] = {
+      CreateQuantizedTensor(input_data, input_quantized, input_dims, scale, zero_point),
+      CreateQuantizedTensor(output_data, output_dims, scale, zero_point),
+  };
+
+  int inputs_array_data[] = {1, 0};
+  TfLiteIntArray* inputs_array = IntArrayFromInts(inputs_array_data);
+  int outputs_array_data[] = {1, 1};
+  TfLiteIntArray* outputs_array = IntArrayFromInts(outputs_array_data);
+
+  const TFLMRegistration registration = Register_NEG();
+  micro::KernelRunner runner(registration, tensors, tensors_size, inputs_array,
+                             outputs_array,
+                             /*builtin_data=*/nullptr);
+
+  TF_LITE_MICRO_EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  TF_LITE_MICRO_EXPECT_EQ(kTfLiteOk, runner.Invoke());
+
+  for (int i = 0; i < output_dims_count; ++i) {
+    TF_LITE_MICRO_EXPECT_EQ(expected_output_data[i], output_data[i]);
+  }
+}
+
+void TestNegQuantizedInt16(int* input_dims_data, const float* input_data,
+                           const int16_t* expected_output_data,
+                           int* output_dims_data, int16_t* output_data,
+                           float scale, int zero_point) {
+  TfLiteIntArray* input_dims = IntArrayFromInts(input_dims_data);
+  TfLiteIntArray* output_dims = IntArrayFromInts(output_dims_data);
+  const int output_dims_count = ElementCount(*output_dims);
+  constexpr int inputs_size = 1;
+  constexpr int outputs_size = 1;
+  constexpr int tensors_size = inputs_size + outputs_size;
+  int16_t input_quantized[output_dims_count];
+  TfLiteTensor tensors[tensors_size] = {
+      CreateQuantizedTensor(input_data, input_quantized, input_dims, scale, zero_point),
+      CreateQuantizedTensor(output_data, output_dims, scale, zero_point),
+  };
+
+  int inputs_array_data[] = {1, 0};
+  TfLiteIntArray* inputs_array = IntArrayFromInts(inputs_array_data);
+  int outputs_array_data[] = {1, 1};
+  TfLiteIntArray* outputs_array = IntArrayFromInts(outputs_array_data);
+
+  const TFLMRegistration registration = Register_NEG();
+  micro::KernelRunner runner(registration, tensors, tensors_size, inputs_array,
+                             outputs_array,
+                             /*builtin_data=*/nullptr);
+
+  TF_LITE_MICRO_EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  TF_LITE_MICRO_EXPECT_EQ(kTfLiteOk, runner.Invoke());
+
+  for (int i = 0; i < output_dims_count; ++i) {
+    TF_LITE_MICRO_EXPECT_EQ(expected_output_data[i], output_data[i]);
+  }
+}
+
 }  // namespace
 }  // namespace testing
 }  // namespace tflite
@@ -78,6 +146,28 @@ TF_LITE_MICRO_TEST(NegOpFloat) {
   float output_data[6];
 
   tflite::testing::TestNegFloat(dims, input_data, golden, dims, output_data);
+}
+
+TF_LITE_MICRO_TEST(NegOpQuantizedInt8) {
+  int dims[] = {2, 2, 3};
+  const float input_data[] = {-2.0f, -1.0f, 0.f, 1.0f, 2.0f, 3.0f};
+  const int8_t golden[] = {4, 2, 0, -2, -4, -6};
+  int8_t output_data[6];
+  const float scale = 0.5f;
+  const int zero_point = 0;
+
+  tflite::testing::TestNegQuantizedInt8(dims, input_data, golden, dims, output_data, scale, zero_point);
+}
+
+TF_LITE_MICRO_TEST(NegOpQuantizedInt16) {
+  int dims[] = {2, 2, 3};
+  const float input_data[] = {-2.0f, -1.0f, 0.f, 1.0f, 2.0f, 3.0f};
+  const int16_t golden[] = {4, 2, 0, -2, -4, -6};
+  int16_t output_data[6];
+  const float scale = 0.5f;
+  const int zero_point = 0;
+
+  tflite::testing::TestNegQuantizedInt16(dims, input_data, golden, dims, output_data, scale, zero_point);
 }
 
 TF_LITE_MICRO_TESTS_END

@@ -156,4 +156,35 @@ TF_LITE_MICRO_TEST(QuantizedInt8PreluActivationsOpTest) {
       alpha_shape, alpha_values, alpha_quantized, scale, zero_point, golden,
       golden_quantized, scale, zero_point, output_shape, output_data);
 }
+
+TF_LITE_MICRO_TEST(QuantizedInt16PreluActivationsOpTest) {
+  int input_shape[] = {3, 2, 2, 3};
+  const float input_values[] = {
+      0.0f,   0.0f,   0.0f,    // Row 1, Column 1
+      0.5f,   0.5f,   0.5f,    // Row 1, Column 2
+      -1.0f,  -1.0f,  -1.0f,   // Row 2, Column 1
+      -0.25f, -0.25f, -0.25f,  // Row 1, Column 2
+  };
+  int alpha_shape[] = {3, 1, 1, 3};
+  const float alpha_values[] = {0.0f, 0.5f, -0.5f};
+  int output_shape[] = {3, 2, 2, 3};
+  const float golden[] = {
+      0.0f, 0.0f,    0.0f,    // Row 1, Column 1
+      0.5f, 0.5f,    0.5f,    // Row 1, Column 2
+      0.0f, -0.5f,   0.5f,    // Row 2, Column 1
+      0.0f, -0.125f, 0.125f,  // Row 1, Column 2
+  };
+  const int dims_count = 12;
+  int16_t input_quantized[dims_count];
+  int16_t alpha_quantized[3];
+  int16_t golden_quantized[dims_count];
+  float scale = 2.0 / 32767.0;
+  int zero_point = 0;
+  int16_t output_data[dims_count];
+  tflite::testing::TestPreluQuantized(
+      input_shape, input_values, input_quantized, scale, zero_point,
+      alpha_shape, alpha_values, alpha_quantized, scale, zero_point, golden,
+      golden_quantized, scale, zero_point, output_shape, output_data);
+}
+
 TF_LITE_MICRO_TESTS_END

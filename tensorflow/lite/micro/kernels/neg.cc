@@ -57,7 +57,6 @@ TfLiteStatus NegEval(TfLiteContext* context, TfLiteNode* node) {
   TfLiteEvalTensor* output =
       tflite::micro::GetEvalOutput(context, node, kOutputTensor);
   switch (input->type) {
-    // TODO(wangtz): handle for kTfLiteInt8
     case kTfLiteFloat32:
       reference_ops::Negate(
         tflite::micro::GetTensorShape(input),

@@ -290,4 +290,31 @@ TF_LITE_MICRO_TEST(SimpleHardSwishTestInt8) {
   }
 }
 
+TF_LITE_MICRO_TEST(SimpleHardSwishTestInt16) {
+  std::minstd_rand random_engine;
+  constexpr int pairs = 4, one_pair = 2;
+  constexpr int size = 101;
+  constexpr float minmax_pairs[pairs][one_pair] = {
+      {0.f, 1.f}, {-2.f, 1.f}, {-5.f, 10.f}, {-40.f, 60.f}};
+  int16_t output_data[size] = {0};
+  int16_t input_data_quantized[size] = {0};
+  float dequantized_output[size] = {0.f};
+  float input_values[size] = {0.f};
+  float output_values[size] = {0.f};
+
+  for (int x = 0; x < pairs; x++) {
+    for (int y = 0; y < pairs; y++) {
+      float input_min = minmax_pairs[x][0];
+      float input_max = minmax_pairs[x][1];
+      float output_min = minmax_pairs[y][0];
+      float output_max = minmax_pairs[y][1];
+
+      tflite::testing::TestHardSwishQuantized<int16_t>(
+          size, output_data, input_data_quantized, dequantized_output,
+          input_min, input_max, output_min, output_max, &random_engine,
+          input_values, output_values);
+    }
+  }
+}
+
 TF_LITE_MICRO_TESTS_END
