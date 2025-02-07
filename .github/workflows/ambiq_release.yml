@@ -37,8 +37,8 @@ jobs:
       - name: Archive TFLM artifacts (zip)
         run: |
           cd ./build
-          zip -r ../ns-tflm-gcc-${{ github.ref_name }}.zip *
-          tar -czf ../ns-tflm-gcc-${{ github.ref_name }}.tar.gz *
+          zip -r ../ns-tflm-${{ github.ref_name }}.zip *
+          tar -czf ../ns-tflm-${{ github.ref_name }}.tar.gz *
 
       # Create a full snapshot of the entire repo as .zip + .tar.gz
       - name: Create snapshot archives
