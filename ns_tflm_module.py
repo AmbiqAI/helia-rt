@@ -323,56 +323,9 @@ def _generate_module_mk(
         for sf in filtered_srcs:
             f.write(f"  {sf} \\\n")
         f.write("\n")
-        f.write("BUILD_DIR := bin\n\n")
-
-        f.write("# 6) Convert TFLM_SRC_FILES into object file paths under bin/\n")
-        f.write("#    e.g. \"tensorflow/lite/micro/debug_log.cc\" => \"bin/tensorflow/lite/micro/debug_log.o\"\n")
-        f.write("TFLM_OBJS := $(patsubst %.cc, $(BUILD_DIR)/%.o, \\\n")
-        f.write("  $(patsubst %.c, $(BUILD_DIR)/%.o, \\\n")
-        f.write("  $(patsubst %.S, $(BUILD_DIR)/%.o, \\\n")
-        f.write("  $(TFLM_SRC_FILES))))\n\n")
-
-        f.write("# 7) Archive name for your custom kernels (only!).\n")
-        f.write("#    If you want the final .a in bin/, you can do:\n")
-        f.write("#    AMBIQ_TFLM_CUSTOM_OP_LIB := $(BUILD_DIR)/ambiq_tflm_custom_ops.a\n")
-        f.write("AMBIQ_TFLM_CUSTOM_OP_LIB := ambiq_tflm_custom_ops.a\n\n")
-
-        f.write("# 8) Default target: build everything.\n")
-        f.write(".PHONY: all\n")
-        f.write("all: $(AMBIQ_TFLM_CUSTOM_OP_LIB)\n\n")
-
-        f.write("# 9) Pattern rules: compile .cc -> bin/path/xyz.o, etc.\n\n")
-
-        f.write("# For C++ files:\n")
-        f.write("$(BUILD_DIR)/%.o: %.cc\n")
-        f.write("\t@mkdir -p $(dir $@)\n")
-        f.write("\t$(CXX) $(CXXFLAGS) $(KERNEL_OPTIMIZATION_LEVEL) $(INCLUDES) -MMD -MP -c $< -o $@\n\n")
-
-        f.write("# For C files:\n")
-        f.write("$(BUILD_DIR)/%.o: %.c\n")
-        f.write("\t@mkdir -p $(dir $@)\n")
-        f.write("\t$(CC) $(CFLAGS) $(CORE_OPTIMIZATION_LEVEL) $(INCLUDES) -MMD -MP -c $< -o $@\n\n")
-
-        f.write("# For assembly files:\n")
-        f.write("$(BUILD_DIR)/%.o: %.S\n")
-        f.write("\t@mkdir -p $(dir $@)\n")
-        f.write("\t$(CC) $(CFLAGS) $(CORE_OPTIMIZATION_LEVEL) $(INCLUDES) -MMD -MP -c $< -o $@\n\n")
-
-        f.write("# 10) Create a static archive from your custom ops.\n")
-        f.write("$(AMBIQ_TFLM_CUSTOM_OP_LIB): $(TFLM_OBJS)\n")
-        f.write("\t@echo \"Archiving custom ops into $@\"\n")
-        f.write("\t$(AR) rcs $@ $(TFLM_OBJS)\n\n")
 
         f.write("# Include the Cortex M generic makefile\n")
         f.write("include cortex_m_generic_makefile.inc\n\n")
-
-        f.write("# 11) Optional 'clean' target.\n")
-        f.write(".PHONY: clean\n")
-        f.write("clean:\n")
-        f.write("\t-rm -f $(TFLM_OBJS) $(AMBIQ_TFLM_CUSTOM_OP_LIB) $(TFLM_OBJS:.o=.d)\n\n")
-
-        f.write("# 12) Auto-include the .d (dependency) files\n")
-        f.write("-include $(TFLM_OBJS:.o=.d)\n")
 
     print(f"Generated {module_mk_path} with {len(filtered_srcs)} files.")
 
@@ -395,6 +348,7 @@ def main():
                         default="",
                         help="Additional TFLM Makefile options. For example: "
                         "--makefile_options=\"TARGET=<target> "
+                        "TENSORFLOW_ROOT=<tensorflow_root> "
                         "OPTIMIZED_KERNEL_DIR=<optimized_kernel_dir> "
                         "TARGET_ARCH=cortex-m4\"")
     parser.add_argument("--examples",
