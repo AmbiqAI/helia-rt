@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest-md
     container:
       image: ghcr.io/ambiqai/ns-tflm-ci:latest
@@ -34,6 +34,27 @@ jobs:
         run: |
           git archive --format zip    --output repo-snapshot-$tag.zip HEAD
           git archive --format tar.gz --output repo-snapshot-$tag.tar.gz HEAD
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-artifacts
+          path: |
+            ns-tflm-$tag.zip
+            ns-tflm-$tag.tar.gz
+            repo-snapshot-$tag.zip
+            repo-snapshot-$tag.tar.gz
+
+  release:
+    runs-on: ubuntu-latest
+    needs: build
+    env:
+      tag: ${{ github.ref_name }}
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: release-artifacts
 
       - name: Create release
         id: create_release
