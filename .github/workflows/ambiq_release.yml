@@ -47,4 +47,4 @@ jobs:
             repo-snapshot-$tag.tar.gz \
             -R "$GITHUB_REPOSITORY" \
             -t "Release $tag" \
-            --generate-notes
+            --notes "Automated release for tag $tag"
