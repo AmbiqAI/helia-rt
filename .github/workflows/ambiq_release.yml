@@ -3,15 +3,18 @@ name: Ambiq Release
 on:
   push:
     tags:
-      - 'v*.*.*'  # e.g., v1.0.0
+      - 'v*.*.*'
+
 permissions:
-  contents: write  # Allows write access to contents, which includes release creation
+  contents: write
 
 jobs:
   release:
     runs-on: ubuntu-latest-md
     container:
       image: ghcr.io/ambiqai/ns-tflm-ci:latest
+    env:
+      tag: ${{ github.ref_name }}
 
     steps:
       - name: Check out code
@@ -20,80 +23,28 @@ jobs:
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
 
-      # Restore cache
-      - name: Cache third-party downloads
-        uses: actions/cache@v3
-        with:
-          path: |
-            tensorflow/lite/micro/tools/make/downloads
-          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile') }}
-          restore-keys: |
-            ${{ runner.os }}-third-party-downloads-
-
-      - name: Run build script with Bash
-        run: bash ./neuralspot/build.sh  # Explicitly using Bash to avoid shell compatibility issues
-
-      # Package the TFLM build outputs as zip and tar.gz
-      - name: Archive TFLM artifacts (zip)
+      - name: Create neuralSPOT module
         run: |
+          bash ./neuralspot/build.sh
           cd ./build
-          zip -r ../ns-tflm-${{ github.ref_name }}.zip *
-          tar -czf ../ns-tflm-${{ github.ref_name }}.tar.gz *
+          zip -r ../ns-tflm-$tag.zip *
+          tar -czf ../ns-tflm-$tag.tar.gz *
 
-      # Create a full snapshot of the entire repo as .zip + .tar.gz
       - name: Create snapshot archives
         run: |
-          git archive --format zip    --output repo-snapshot-${{ github.ref_name }}.zip HEAD
-          git archive --format tar.gz --output repo-snapshot-${{ github.ref_name }}.tar.gz HEAD
+          git archive --format zip    --output repo-snapshot-$tag.zip HEAD
+          git archive --format tar.gz --output repo-snapshot-$tag.tar.gz HEAD
 
-      - name: Create Release
+      - name: Create release
         id: create_release
-        uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: false
-
-      - name: Upload TFLM zip
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ns-tflm-${{ github.ref_name }}.zip
-          asset_name: ns-tflm-${{ github.ref_name }}.zip
-          asset_content_type: application/zip
-
-      - name: Upload TFLM tar.gz
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ns-tflm-${{ github.ref_name }}.tar.gz
-          asset_name: ns-tflm-${{ github.ref_name }}.tar.gz
-          asset_content_type: application/gzip
-
-      # Upload the repo snapshot archives
-      - name: Upload repo snapshot (zip)
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: repo-snapshot-${{ github.ref_name }}.zip
-          asset_name: repo-snapshot-${{ github.ref_name }}.zip
-          asset_content_type: application/zip
-
-      - name: Upload repo snapshot (tar.gz)
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: repo-snapshot-${{ github.ref_name }}.tar.gz
-          asset_name: repo-snapshot-${{ github.ref_name }}.tar.gz
-          asset_content_type: application/gzip
+        run: |
+          gh release create "$tag" \
+            ns-tflm-$tag.zip \
+            ns-tflm-$tag.tar.gz \
+            repo-snapshot-$tag.zip \
+            repo-snapshot-$tag.tar.gz \
+            -R "$GITHUB_REPOSITORY" \
+            -t "Release $tag" \
+            --generate-notes
