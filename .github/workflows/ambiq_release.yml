@@ -27,7 +27,7 @@ jobs:
       - name: Create neuralSPOT module
         run: |
           # bash ./neuralspot/build.sh
-          cd ${GITHUB_WORKSPACE}/build
+          # cd ${GITHUB_WORKSPACE}/build
           zip ../ns-tflm-$tag.zip
           tar -czf ../ns-tflm-$tag.tar.gz --files-from /dev/null
           # zip -r ../ns-tflm-$tag.zip *
