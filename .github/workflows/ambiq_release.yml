@@ -15,7 +15,7 @@ jobs:
     container:
       image: ghcr.io/ambiqai/ns-tflm-ci:latest
     env:
-      # tag: ${{ github.ref_name }}
+      tag: ${{ github.ref_name }}
 
     steps:
       - name: Check out code
