@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -14,7 +15,7 @@ jobs:
     container:
       image: ghcr.io/ambiqai/ns-tflm-ci:latest
     env:
-      tag: ${{ github.ref_name }}
+      # tag: ${{ github.ref_name }}
 
     steps:
       - name: Check out code
@@ -25,10 +26,12 @@ jobs:
 
       - name: Create neuralSPOT module
         run: |
-          bash ./neuralspot/build.sh
-          cd ./build
-          zip -r ../ns-tflm-$tag.zip *
-          tar -czf ../ns-tflm-$tag.tar.gz *
+          # bash ./neuralspot/build.sh
+          cd ${GITHUB_WORKSPACE}/build
+          zip ../ns-tflm-$tag.zip
+          tar -czf ../ns-tflm-$tag.tar.gz --files-from /dev/null
+          # zip -r ../ns-tflm-$tag.zip *
+          # tar -czf ../ns-tflm-$tag.tar.gz *
 
       - name: Create snapshot archives
         run: |
@@ -40,10 +43,10 @@ jobs:
         with:
           name: release-artifacts
           path: |
-            ns-tflm-$tag.zip
-            ns-tflm-$tag.tar.gz
-            repo-snapshot-$tag.zip
-            repo-snapshot-$tag.tar.gz
+            ns-tflm-${{ env.tag }}.zip
+            ns-tflm-${{ env.tag }}.tar.gz
+            repo-snapshot-${{ env.tag }}.zip
+            repo-snapshot-${{ env.tag }}.tar.gz
 
   release:
     runs-on: ubuntu-latest
