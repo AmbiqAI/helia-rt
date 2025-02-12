@@ -27,15 +27,11 @@ jobs:
       - name: Create artifacts
         run: |
           mkdir -p artifacts
-          # WIP
-          touch empty_file
-          zip artifacts/ns-tflm-$tag.zip empty_file
-          tar -czf artifacts/ns-tflm-$tag.tar.gz empty_file
           # Create neuralSPOT module
-          # bash ./neuralspot/build.sh
-          # cd ${GITHUB_WORKSPACE}/build
-          # zip -r ../artifacts/ns-tflm-$tag.zip *
-          # tar -czf ../artifacts/ns-tflm-$tag.tar.gz *
+          bash ./neuralspot/build.sh
+          cd ${GITHUB_WORKSPACE}/build
+          zip -r ../artifacts/ns-tflm-$tag.zip *
+          tar -czf ../artifacts/ns-tflm-$tag.tar.gz *
           # Create a snapshot of the repository
           cd ${GITHUB_WORKSPACE}
           git archive --format zip    --output artifacts/repo-snapshot-$tag.zip HEAD
