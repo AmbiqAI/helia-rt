@@ -24,30 +24,35 @@ jobs:
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
 
-      - name: Create neuralSPOT module
+      - name: Create artifacts
         run: |
-          # bash ./neuralspot/build.sh
-          # cd ${GITHUB_WORKSPACE}/build
           touch empty_file
           zip ../ns-tflm-$tag.zip empty_file
           tar -czf ../ns-tflm-$tag.tar.gz empty_file
+          # bash ./neuralspot/build.sh
+          # cd ${GITHUB_WORKSPACE}/build
+          # Create neuralSPOT module
           # zip -r ../ns-tflm-$tag.zip *
           # tar -czf ../ns-tflm-$tag.tar.gz *
+          # Create a snapshot of the repository
+          git archive --format zip    --output repo-snapshot-$tag.zip HEAD
+          git archive --format tar.gz --output repo-snapshot-$tag.tar.gz HEAD
+          # Place files into artifacts directory
+          mkdir -p ./artifacts
+          mv ns-tflm-$tag.zip \
+            ns-tflm-$tag.tar.gz \
+            repo-snapshot-$tag.zip \
+            repo-snapshot-$tag.tar.gz \
+            ./artifacts
 
       - name: Create snapshot archives
         run: |
-          git archive --format zip    --output repo-snapshot-$tag.zip HEAD
-          git archive --format tar.gz --output repo-snapshot-$tag.tar.gz HEAD
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: release-artifacts
-          path: |
-            ns-tflm-${{ env.tag }}.zip
-            ns-tflm-${{ env.tag }}.tar.gz
-            repo-snapshot-${{ env.tag }}.zip
-            repo-snapshot-${{ env.tag }}.tar.gz
+          path: ./artifacts
 
   release:
     runs-on: ubuntu-latest
@@ -65,7 +70,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          cd ./artifacts
           gh release create "$tag" \
+            ns-tflm-$tag.zip \
             ns-tflm-$tag.zip \
             ns-tflm-$tag.tar.gz \
             repo-snapshot-$tag.zip \
