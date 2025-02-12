@@ -304,7 +304,7 @@ def _generate_module_mk(
         f.write("lib_prebuilt += ns-tflm/treedir/libtensorflow-microlite.a\n\n")
 
         f.write("# 5) Dynamic collection of TFLM source files (skips anything with 'third_party').\n")
-        f.write("TFLM_SRC_FILES := \\\n")
+        f.write("local_src := \\\n")
         for sf in filtered_srcs:
             f.write("ns-tflm/treedir/" + f"{sf} \\\n")
         f.write("\n")
@@ -312,6 +312,7 @@ def _generate_module_mk(
         f.write("# Include the Cortex M generic makefile\n")
         f.write("include ns-tflm/treedir/cortex_m_generic_makefile.inc\n\n")
 
+        f.write("$(eval $(call make-library, $(local_bin)/ns-tflm.a, $(local_src)))")
     print(f"Generated {module_mk_path} with {len(filtered_srcs)} files.")
 
 def main():
@@ -433,8 +434,13 @@ def main():
     shutil.copy(system_cm4_h_src, system_cm4_h_dst)
     dest_files.append(system_cm4_h_dst)
 
+    lib_prebuilt_src = os.path.join(tensorflow_root, "neuralspot/libtensorflow-microlite.a")
+    lib_prebuilt_dst = os.path.join(args.output_dir, "libtensorflow-microlite.a")
+    os.makedirs(os.path.dirname(lib_prebuilt_dst), exist_ok=True)
+    shutil.copy(lib_prebuilt_src, lib_prebuilt_dst)
+    dest_files.append(lib_prebuilt_dst)
 
-        # Add xtensa.h and xtensa_pad.h to the output directory. These files are needed by ambiq/pad.cc
+    # Add xtensa.h and xtensa_pad.h to the output directory. These files are needed by ambiq/pad.cc
     xtensa_pad_src = os.path.join(tensorflow_root, "tensorflow/lite/micro/kernels/xtensa/xtensa_pad.h")
     xtensa_h_src = os.path.join(tensorflow_root, "tensorflow/lite/micro/kernels/xtensa/xtensa.h")
 
