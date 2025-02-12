@@ -28,8 +28,9 @@ jobs:
         run: |
           # bash ./neuralspot/build.sh
           # cd ${GITHUB_WORKSPACE}/build
-          zip ../ns-tflm-$tag.zip
-          tar -czf ../ns-tflm-$tag.tar.gz --files-from /dev/null
+          touch empty_file
+          zip ../ns-tflm-$tag.zip empty_file
+          tar -czf ../ns-tflm-$tag.tar.gz empty_file
           # zip -r ../ns-tflm-$tag.zip *
           # tar -czf ../ns-tflm-$tag.tar.gz *
 
