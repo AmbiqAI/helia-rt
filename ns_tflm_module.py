@@ -74,6 +74,16 @@ def _third_party_src_and_dest_files(prefix_dir, makefile_options,
   tflm_download_path = os.path.join(tensorflow_root,
                                     "tensorflow/lite/micro/tools/make/downloads")
   dest_files = []
+
+  m_profile_dir = os.path.join(tflm_download_path, "cmsis/CMSIS/Core/Include/m-profile")
+  # or whichever path you actually need
+  m_profile_headers = []
+  for root, _, files in os.walk(m_profile_dir):
+      for file in files:
+        full_path = os.path.join(root, file)
+        m_profile_headers.append(full_path)
+  src_files.extend(m_profile_headers)
+
   third_party_path = os.path.join(prefix_dir, "third_party")
 
   for f in src_files:
@@ -256,6 +266,9 @@ def _generate_module_mk(
 
         f.write("CFLAGS   += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/ruy\n")
         f.write("CXXFLAGS += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/ruy\n\n")
+
+        f.write("CFLAGS   += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/cmsis/CMSIS/Core/Include\n")
+        f.write("CXXFLAGS += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/cmsis/CMSIS/Core/Include\n\n")
 
         f.write("# Paths to precompiled third-party libraries.\n")
         f.write("lib_prebuilt += ns-tflm/treedir/libtensorflow-microlite.a\n\n")

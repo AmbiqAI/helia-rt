@@ -38,6 +38,9 @@ CXXFLAGS += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/kissfft
 CFLAGS   += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/ruy
 CXXFLAGS += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/ruy
 
+CFLAGS   += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/cmsis/CMSIS/Core/Include
+CXXFLAGS += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/cmsis/CMSIS/Core/Include
+
 # Paths to precompiled third-party libraries.
 lib_prebuilt += ns-tflm/treedir/libtensorflow-microlite.a
 
