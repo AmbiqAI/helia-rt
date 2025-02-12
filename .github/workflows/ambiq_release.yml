@@ -65,13 +65,12 @@ jobs:
         id: create_release
         run: |
           ls -R artifacts
-          # cd ./artifacts
-          # gh release create "$tag" \
-          #   ns-tflm-$tag.zip \
-          #   ns-tflm-$tag.zip \
-          #   ns-tflm-$tag.tar.gz \
-          #   repo-snapshot-$tag.zip \
-          #   repo-snapshot-$tag.tar.gz \
-          #   -R "$GITHUB_REPOSITORY" \
-          #   -t "Release $tag" \
-          #   --notes "Automated release for tag $tag"
+          cd artifacts
+          gh release create "$tag" \
+            ns-tflm-$tag.zip \
+            ns-tflm-$tag.tar.gz \
+            repo-snapshot-$tag.zip \
+            repo-snapshot-$tag.tar.gz \
+            -R "$GITHUB_REPOSITORY" \
+            -t "Release $tag" \
+            --notes "Automated release for tag $tag"
