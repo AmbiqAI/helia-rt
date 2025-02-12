@@ -26,11 +26,11 @@ jobs:
 
       - name: Create artifacts
         run: |
-          mkdir -p ./artifacts
+          mkdir -p artifacts
           # WIP
           touch empty_file
-          zip ./artifacts/ns-tflm-$tag.zip empty_file
-          tar -czf ./artifacts/ns-tflm-$tag.tar.gz empty_file
+          zip artifacts/ns-tflm-$tag.zip empty_file
+          tar -czf artifacts/ns-tflm-$tag.tar.gz empty_file
           # Create neuralSPOT module
           # bash ./neuralspot/build.sh
           # cd ${GITHUB_WORKSPACE}/build
@@ -38,12 +38,8 @@ jobs:
           # tar -czf ../artifacts/ns-tflm-$tag.tar.gz *
           # Create a snapshot of the repository
           cd ${GITHUB_WORKSPACE}
-          git archive --format zip    --output ./artifacts/repo-snapshot-$tag.zip HEAD
-          git archive --format tar.gz --output ./artifacts/repo-snapshot-$tag.tar.gz HEAD
-
-
-      - name: Create snapshot archives
-        run: |
+          git archive --format zip    --output artifacts/repo-snapshot-$tag.zip HEAD
+          git archive --format tar.gz --output artifacts/repo-snapshot-$tag.tar.gz HEAD
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -56,18 +52,19 @@ jobs:
     needs: build
     env:
       tag: ${{ github.ref_name }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           name: release-artifacts
-          path: ./artifacts
+          path: artifacts
+          merge-multiple: true
 
       - name: Create release
         id: create_release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          ls -R artifacts
           cd ./artifacts
           gh release create "$tag" \
             ns-tflm-$tag.zip \
