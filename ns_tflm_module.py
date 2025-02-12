@@ -261,31 +261,18 @@ def _generate_module_mk(
     filtered_srcs = [sf for sf in filtered_srcs if "test" not in sf]
   
     with open(module_mk_path, "w") as f:
-        f.write("# Toolchain commands (for GCC on ARM)\n")
-        f.write("TOOLCHAIN_PATH ?= ../tensorflow/lite/micro/tools/make/downloads/gcc_embedded\n\n")
-
-        f.write("CC ?= $(TOOLCHAIN_PATH)/bin/arm-none-eabi-gcc\n")
-        f.write("CXX ?= $(TOOLCHAIN_PATH)/bin/arm-none-eabi-g++\n")
-        f.write("AR ?= $(TOOLCHAIN_PATH)/bin/arm-none-eabi-ar\n")
-        f.write("OBJCOPY ?= arm-none-eabi-objcopy\n\n")
-
         f.write(f"TARGET_ARCH := {target_arch}\n\n")
 
         f.write("CORE_OPTIMIZATION_LEVEL     := -Os\n")
         f.write("KERNEL_OPTIMIZATION_LEVEL   := -O2\n")
         f.write("COMMON_FLAGS := \\\n")
-        f.write("  -Werror \\\n")
         f.write("  -Wall -Wextra -Wno-unused-parameter \\\n")
         f.write("  -Wsign-compare -Wdouble-promotion -Wunused-variable -Wswitch -Wvla \\\n")
         f.write("  -fno-unwind-tables -ffunction-sections -fdata-sections -fmessage-length=0 \\\n")
         f.write("  -DTF_LITE_STATIC_MEMORY -DTF_LITE_DISABLE_X86_NEON\n\n")
 
         f.write("CXXFLAGS += -std=c++17 -fno-rtti -fno-exceptions $(COMMON_FLAGS)\n")
-        f.write("CFLAGS   += -std=c17 $(COMMON_FLAGS)\n\n")
-
-        f.write("# Remove -Werror from CFLAGS and CXXFLAGS\n")
-        f.write("CFLAGS   += $(filter-out -Werror,$(CFLAGS))\n")
-        f.write("CXXFLAGS += $(filter-out -Werror,$(CXXFLAGS))\n\n")
+        f.write("CFLAGS   += $(COMMON_FLAGS)\n\n")
 
         f.write(f"# Set optimized kernel folder name:\n")
         f.write(f"OPTIMIZED_KERNEL_DIR := {optimized_kernel_dir}\n\n")
@@ -298,34 +285,32 @@ def _generate_module_mk(
         f.write("CXXFLAGS += $(ADDITIONAL_DEFINES)\n\n")
 
         f.write("# 3) Include paths.\n")
-        f.write("CFLAGS   += -I. -I./third_party/$(OPTIMIZED_KERNEL_DIR)\n")
-        f.write("CXXFLAGS += -I. -I./third_party/$(OPTIMIZED_KERNEL_DIR)\n\n")
+        f.write("CFLAGS   += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/$(OPTIMIZED_KERNEL_DIR)\n")
+        f.write("CXXFLAGS += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/$(OPTIMIZED_KERNEL_DIR)\n\n")
 
-        f.write("CFLAGS   += -I. -I./third_party/flatbuffers/include\n")
-        f.write("CXXFLAGS += -I. -I./third_party/flatbuffers/include\n\n")
+        f.write("CFLAGS   += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/flatbuffers/include\n")
+        f.write("CXXFLAGS += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/flatbuffers/include\n\n")
 
-        f.write("CFLAGS   += -I. -I./third_party/gemmlowp\n")
-        f.write("CXXFLAGS += -I. -I./third_party/gemmlowp\n\n")
+        f.write("CFLAGS   += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/gemmlowp\n")
+        f.write("CXXFLAGS += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/gemmlowp\n\n")
 
-        f.write("CFLAGS   += -I. -I./third_party/kissfft\n")
-        f.write("CXXFLAGS += -I. -I./third_party/kissfft\n\n")
+        f.write("CFLAGS   += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/kissfft\n")
+        f.write("CXXFLAGS += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/kissfft\n\n")
 
-        f.write("CFLAGS   += -I. -I./third_party/ruy\n")
-        f.write("CXXFLAGS += -I. -I./third_party/ruy\n\n")
+        f.write("CFLAGS   += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/ruy\n")
+        f.write("CXXFLAGS += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/ruy\n\n")
 
         f.write("# 4) Paths to precompiled third-party libraries (adjust as needed).\n")
-        f.write("PRECOMPILED_LIB_DIR := ../neuralspot\n\n")
-        f.write("THIRD_PARTY_STATIC_LIBS := \\\n")
-        f.write("  $(PRECOMPILED_LIB_DIR)/libtensorflow-microlite.a\n\n")
+        f.write("lib_prebuilt += ns-tflm/treedir/libtensorflow-microlite.a\n\n")
 
         f.write("# 5) Dynamic collection of TFLM source files (skips anything with 'third_party').\n")
         f.write("TFLM_SRC_FILES := \\\n")
         for sf in filtered_srcs:
-            f.write(f"  {sf} \\\n")
+            f.write("ns-tflm/treedir/" + f"{sf} \\\n")
         f.write("\n")
 
         f.write("# Include the Cortex M generic makefile\n")
-        f.write("include cortex_m_generic_makefile.inc\n\n")
+        f.write("include ns-tflm/treedir/cortex_m_generic_makefile.inc\n\n")
 
     print(f"Generated {module_mk_path} with {len(filtered_srcs)} files.")
 
@@ -424,7 +409,32 @@ def main():
     os.makedirs(os.path.dirname(makefile_inc_dst), exist_ok=True)
     shutil.copy(makefile_inc_src, makefile_inc_dst)
 
-    # Add xtensa.h and xtensa_pad.h to the output directory. These files are needed by ambiq/pad.cc
+    armcm55_h_src = os.path.join(tensorflow_root, "tensorflow/lite/micro/tools/make/downloads/cmsis/Cortex_DFP/Device/ARMCM55/Include/ARMCM55.h")
+    armcm55_h_dst = os.path.join(args.output_dir, "ARMCM55.h")
+    os.makedirs(os.path.dirname(armcm55_h_dst), exist_ok=True)
+    shutil.copy(armcm55_h_src, armcm55_h_dst)
+    dest_files.append(armcm55_h_dst)
+
+    system_cm55_h_src = os.path.join(tensorflow_root, "tensorflow/lite/micro/tools/make/downloads/cmsis/Cortex_DFP/Device/ARMCM55/Include/system_ARMCM55.h")
+    system_cm55_h_dst = os.path.join(args.output_dir, "system_ARMCM55.h")
+    os.makedirs(os.path.dirname(system_cm55_h_dst), exist_ok=True)
+    shutil.copy(system_cm55_h_src, system_cm55_h_dst)
+    dest_files.append(system_cm55_h_dst)
+    
+    armcm4_h_src = os.path.join(tensorflow_root, "tensorflow/lite/micro/tools/make/downloads/cmsis/Cortex_DFP/Device/ARMCM4/Include/ARMCM4.h")
+    armcm4_h_dst = os.path.join(args.output_dir, "ARMCM4.h")
+    os.makedirs(os.path.dirname(armcm4_h_dst), exist_ok=True)
+    shutil.copy(armcm4_h_src, armcm4_h_dst)
+    dest_files.append(armcm4_h_dst)
+
+    system_cm4_h_src = os.path.join(tensorflow_root, "tensorflow/lite/micro/tools/make/downloads/cmsis/Cortex_DFP/Device/ARMCM4/Include/system_ARMCM4.h")
+    system_cm4_h_dst = os.path.join(args.output_dir, "system_ARMCM4.h")
+    os.makedirs(os.path.dirname(system_cm4_h_dst), exist_ok=True)
+    shutil.copy(system_cm4_h_src, system_cm4_h_dst)
+    dest_files.append(system_cm4_h_dst)
+
+
+        # Add xtensa.h and xtensa_pad.h to the output directory. These files are needed by ambiq/pad.cc
     xtensa_pad_src = os.path.join(tensorflow_root, "tensorflow/lite/micro/kernels/xtensa/xtensa_pad.h")
     xtensa_h_src = os.path.join(tensorflow_root, "tensorflow/lite/micro/kernels/xtensa/xtensa.h")
 
