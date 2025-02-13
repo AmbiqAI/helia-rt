@@ -40,7 +40,7 @@ jobs:
         run: |
           ./ci/sync_from_upstream_tf.sh
           git config --local user.name "TFLM-bot"
-          git config --local user.email "tflm-github-bot@google.com"
+          git config --local user.email "tflm-github-bot@ambiq.com"
           git add *
 
           if [[ $(git status --porcelain | wc -l) == 0 ]]; then
@@ -58,8 +58,8 @@ jobs:
           token: ${{ secrets.TFLM_BOT_REPO_TOKEN }}
           title: Automated sync from github.com/tensorflow/tensorflow
           commit-message: Automated sync from github.com/tensorflow/tensorflow
-          committer: TFLM-bot <tflm-github-bot@google.com>
-          author: TFLM-bot <tflm-github-bot@google.com>
+          committer: TFLM-bot <tflm-github-bot@ambiq.com>
+          author: TFLM-bot <tflm-github-bot@ambiq.com>
           body: "BUG=automated sync from upstream\nNO_CHECK_TFLITE_FILES=automated sync from upstream"
           labels: bot:sync-tf, ci:run
-          reviewers: suleshahid
+          reviewers: apage224
