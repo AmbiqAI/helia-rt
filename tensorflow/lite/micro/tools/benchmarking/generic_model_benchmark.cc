@@ -272,13 +272,13 @@ int Benchmark(const uint8_t* model_data, tflite::PrettyPrintType print_type) {
   profiler.LogTicksPerTagCsv();
   profiler.ClearEvents();
 
-  if (using_compression) {
-    status = interpreter.SetAlternateProfiler(&profiler2);
-    if (status != kTfLiteOk) {
-      MicroPrintf("tflite::MicroInterpreter::SetAlternateProfiler failed");
-      return -1;
-    }
-  }
+  // if (using_compression) {
+  //   status = interpreter.SetAlternateProfiler(&profiler2);
+  //   if (status != kTfLiteOk) {
+  //     MicroPrintf("tflite::MicroInterpreter::SetAlternateProfiler failed");
+  //     return -1;
+  //   }
+  // }
 
   MicroPrintf("");  // null MicroPrintf serves as a newline.
 
