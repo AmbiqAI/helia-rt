@@ -432,13 +432,6 @@ def main():
         shutil.copy(system_cm4_h_src, system_cm4_h_dst)
         dest_files.append(system_cm4_h_dst)
 
-        # Copy libtensorflow-microlite.a
-        lib_prebuilt_src = os.path.join(tensorflow_root, "neuralspot/libtensorflow-microlite.a")
-        lib_prebuilt_dst = os.path.join(args.output_dir, "libtensorflow-microlite.a")
-        os.makedirs(os.path.dirname(lib_prebuilt_dst), exist_ok=True)
-        shutil.copy(lib_prebuilt_src, lib_prebuilt_dst)
-        dest_files.append(lib_prebuilt_dst)
-
         # Copy xtensa headers, needed by Ambiq pad.cc
         xtensa_pad_src = os.path.join(tensorflow_root,
                                       "tensorflow/lite/micro/kernels/xtensa/xtensa_pad.h")
