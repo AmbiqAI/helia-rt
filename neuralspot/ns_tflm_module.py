@@ -116,6 +116,7 @@ def _get_src_and_dest_files(prefix_dir, makefile_options, tensorflow_root):
 
   all_src_files = tflm_src_files + third_party_srcs
   all_dest_files = tflm_dest_files + third_party_dests
+
   return all_src_files, all_dest_files
 
 def _copy(src_files, dest_files):
