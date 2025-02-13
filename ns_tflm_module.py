@@ -225,8 +225,7 @@ def _generate_module_mk(
             source_files.append(rel_path)
 
     # Filter out any 'third_party' or test files
-    filtered_srcs = [sf for sf in source_files
-                     if ("third_party" not in sf and "test" not in sf)]
+    filtered_srcs = [sf for sf in source_files if ("test" not in sf)]
 
     with open(module_mk_path, "w") as f:
         f.write(f"TARGET_ARCH := {target_arch}\n\n")
@@ -255,6 +254,9 @@ def _generate_module_mk(
         f.write("CFLAGS   += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/$(OPTIMIZED_KERNEL_DIR)\n")
         f.write("CXXFLAGS += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/$(OPTIMIZED_KERNEL_DIR)\n\n")
 
+        f.write("CFLAGS   += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/$(OPTIMIZED_KERNEL_DIR)/Include\n")
+        f.write("CXXFLAGS += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/$(OPTIMIZED_KERNEL_DIR)/Include\n\n")
+
         f.write("CFLAGS   += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/flatbuffers/include\n")
         f.write("CXXFLAGS += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/flatbuffers/include\n\n")
 
@@ -270,10 +272,6 @@ def _generate_module_mk(
         f.write("CFLAGS   += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/cmsis/CMSIS/Core/Include\n")
         f.write("CXXFLAGS += -Ins-tflm/treedir -Ins-tflm/treedir/third_party/cmsis/CMSIS/Core/Include\n\n")
 
-        f.write("# Paths to precompiled third-party libraries.\n")
-        f.write("lib_prebuilt += ns-tflm/treedir/libtensorflow-microlite.a\n\n")
-
-        f.write("# Dynamic collection of TFLM source files (skips 'third_party').\n")
         f.write("local_src := \\\n")
         for sf in filtered_srcs:
             f.write("ns-tflm/treedir/" + f"{sf} \\\n")
