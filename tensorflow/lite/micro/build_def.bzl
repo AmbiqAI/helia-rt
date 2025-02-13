@@ -32,10 +32,7 @@ def tflm_defines():
     overriding the defaults for a particular target.
     """
 
-    defines = [
-        # Exclude dynamic memory use in shared TFLite code.
-        "TF_LITE_STATIC_MEMORY=1",
-    ]
+    defines = ["TF_LITE_STATIC_MEMORY=1"]
 
     defines += select({
         # Include code for the compression feature.
