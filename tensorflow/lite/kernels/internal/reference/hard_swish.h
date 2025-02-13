@@ -57,7 +57,6 @@ inline void HardSwish(const RuntimeShape& input_shape, const T* input_data,
   }
 }
 
-
 template <typename T>
 inline void HardSwish(const HardSwishParams& params,
                       const RuntimeShape& input_shape, const T* input_data,

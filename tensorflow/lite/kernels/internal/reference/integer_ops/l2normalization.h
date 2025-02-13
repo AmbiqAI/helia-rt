@@ -61,47 +61,6 @@ inline void L2Normalization(int32_t input_zero_point, int32_t outer_size,
     }
   }
 }
-
-inline void L2Normalization_s16(int32_t input_zero_point, int32_t outer_size,
-                                int32_t depth, const int16_t* input_data,
-                                int16_t* output_data) {
-  static constexpr int16_t kMinInt16 = std::numeric_limits<int16_t>::min();
-  static constexpr int16_t kMaxInt16 = std::numeric_limits<int16_t>::max();
-  // The output scale must be in sync with Prepare().
-  // Output is in 1/32768 scale so the actual output range is nudged from [-1, 1]
-  // to [-1, 32767/32768].
-  static constexpr int32_t kOutputScale = 15;
-  for (int outer_index = 0; outer_index < outer_size; ++outer_index) {
-    // int32_t = (int16_t - int16_t) ^ 2.
-    // ([-32768, 32767] - [-32768, 32767]) ^ 2 = [0, (2^16 - 1)^2] so the accumulator is
-    // safe from overflowing in at least 2^32 steps.
-    int32_t acc = 0;
-    for (int inner_index = 0; inner_index < depth; ++inner_index) {
-      int32_t input =
-          input_data[depth * outer_index + inner_index] - input_zero_point;
-      acc += input * input;
-    }
-    int32_t inv_l2norm_multiplier;
-    int inv_l2norm_shift;
-    GetInvSqrtQuantizedMultiplierExp(acc, kReverseShift, &inv_l2norm_multiplier,
-                                     &inv_l2norm_shift);
-
-    for (int inner_index = 0; inner_index < depth; ++inner_index) {
-      int32_t input =
-          input_data[depth * outer_index + inner_index] - input_zero_point;
-
-      // Rescale and downcast. Rescale is folded into the division.
-      int32_t output_in_q24 = MultiplyByQuantizedMultiplier(
-          input, inv_l2norm_multiplier, inv_l2norm_shift + kOutputScale);
-      output_in_q24 =
-          std::min(static_cast<int32_t>(kMaxInt16),
-                   std::max(static_cast<int32_t>(kMinInt16), output_in_q24));
-      output_data[depth * outer_index + inner_index] =
-          static_cast<int16_t>(output_in_q24);
-    }
-  }
-}
-
 }  // namespace reference_integer_ops
 }  // namespace tflite
 

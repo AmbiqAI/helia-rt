@@ -13,9 +13,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#include <cstdint>
+#include <limits>
+
 #include "tensorflow/lite/kernels/internal/reference/neg.h"
 
 #include "tensorflow/lite/c/common.h"
+#include "tensorflow/lite/kernels/internal/types.h"
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_log.h"
@@ -31,6 +35,34 @@ struct OpData {
   // Store the zero point and scale for quantized operations.
   int32_t quant_zero_point;
 };
+
+
+template <typename T>
+T NegateSaturateQuantized(int32_t value) {
+  if (value > std::numeric_limits<T>::max()) {
+    return std::numeric_limits<T>::max();
+  }
+  if (value < std::numeric_limits<T>::min()) {
+    return std::numeric_limits<T>::min();
+  }
+  return static_cast<T>(value);
+}
+
+template <typename T>
+void NegateQuantized(
+  const RuntimeShape& input_shape, const T* input_data,
+  const RuntimeShape& output_shape, T* output_data,
+  int32_t zero_point
+) {
+
+  const int flat_size = MatchingFlatSize(input_shape, output_shape);
+
+  for (int i = 0; i < flat_size; ++i) {
+    int32_t unclamped = 2 * zero_point - static_cast<int32_t>(input_data[i]);
+    output_data[i] = NegateSaturateQuantized<T>(unclamped);
+  }
+}
+
 
 void* NegInit(TfLiteContext* context, const char* buffer, size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
@@ -70,7 +102,7 @@ TfLiteStatus NegEval(TfLiteContext* context, TfLiteNode* node) {
     case kTfLiteInt16: {
       TFLITE_DCHECK(node->user_data != nullptr);
       const OpData* data = static_cast<const OpData*>(node->user_data);
-      reference_ops::NegateQuantized(
+      NegateQuantized(
         tflite::micro::GetTensorShape(input),
         tflite::micro::GetTensorData<int16_t>(input),
         tflite::micro::GetTensorShape(output),
@@ -82,7 +114,7 @@ TfLiteStatus NegEval(TfLiteContext* context, TfLiteNode* node) {
     case kTfLiteInt8: {
       TFLITE_DCHECK(node->user_data != nullptr);
       const OpData* data = static_cast<const OpData*>(node->user_data);
-      reference_ops::NegateQuantized(
+      NegateQuantized(
         tflite::micro::GetTensorShape(input),
         tflite::micro::GetTensorData<int8_t>(input),
         tflite::micro::GetTensorShape(output),
