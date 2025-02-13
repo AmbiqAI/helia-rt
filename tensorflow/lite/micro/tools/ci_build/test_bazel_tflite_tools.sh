@@ -14,13 +14,15 @@
 # limitations under the License.
 # ==============================================================================
 
-set -e
+set -x
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR=${SCRIPT_DIR}/../../../../..
+
 cd "${ROOT_DIR}"
 
 source tensorflow/lite/micro/tools/ci_build/helper_functions.sh
 
 readable_run bazel test tensorflow/lite/tools/... \
+  --config=ci \
   --test_output=errors

@@ -70,3 +70,6 @@ jobs:
             -R "$GITHUB_REPOSITORY" \
             -t "Release $tag" \
             --notes "Automated release for tag $tag"
+          if [[ "$tag" == *"-rc"* ]]; then
+            gh release edit "$tag" --prerelease
+          fi

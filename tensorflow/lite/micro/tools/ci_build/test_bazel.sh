@@ -14,10 +14,11 @@
 # limitations under the License.
 # ==============================================================================
 
-set -e
+set -x
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR=${SCRIPT_DIR}/../../../../..
+
 cd "${ROOT_DIR}"
 
 source tensorflow/lite/micro/tools/ci_build/helper_functions.sh
@@ -27,11 +28,12 @@ source tensorflow/lite/micro/tools/ci_build/helper_functions.sh
 # having build_test but that was removed with #194.
 
 CC=clang readable_run bazel build ... \
+  --config=ci \
   --build_tag_filters=-no_oss
 CC=clang readable_run bazel test ... \
+  --config=ci \
   --test_tag_filters=-no_oss --build_tag_filters=-no_oss \
   --test_output=errors
 
 # TODO(b/178621680): enable ubsan once bazel + clang + ubsan errors are fixed.
 #CC=clang readable_run bazel test tensorflow/lite/micro/... --config=ubsan --test_tag_filters=-no_oss,-noubsan --build_tag_filters=-no_oss,-noubsan
-

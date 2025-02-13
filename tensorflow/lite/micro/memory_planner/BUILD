@@ -1,6 +1,6 @@
 load(
     "//tensorflow/lite/micro:build_def.bzl",
-    "micro_copts",
+    "tflm_cc_library",
 )
 
 package(

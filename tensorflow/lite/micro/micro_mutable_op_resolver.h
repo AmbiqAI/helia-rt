@@ -28,6 +28,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/kernels/depthwise_conv.h"
 #include "tensorflow/lite/micro/kernels/ethosu.h"
 #include "tensorflow/lite/micro/kernels/fully_connected.h"
+#include "tensorflow/lite/micro/kernels/maximum_minimum.h"
 #include "tensorflow/lite/micro/kernels/micro_ops.h"
 #include "tensorflow/lite/micro/kernels/mul.h"
 #include "tensorflow/lite/micro/kernels/pooling.h"
@@ -414,9 +415,10 @@ class MicroMutableOpResolver : public MicroOpResolver {
                       tflite::Register_LOG_SOFTMAX(), ParseLogSoftmax);
   }
 
-  TfLiteStatus AddMaximum() {
-    return AddBuiltin(BuiltinOperator_MAXIMUM, Register_MAXIMUM(),
-                      ParseMaximum);
+  TfLiteStatus AddMaximum(
+    const TFLMRegistration& registration = Register_MAXIMUM()
+  ) {
+    return AddBuiltin(BuiltinOperator_MAXIMUM, registration, ParseMaximum);
   }
 
   TfLiteStatus AddMaxPool2D(
@@ -433,10 +435,11 @@ class MicroMutableOpResolver : public MicroOpResolver {
     return AddBuiltin(BuiltinOperator_MEAN, Register_MEAN(), ParseReducer);
   }
 
-  TfLiteStatus AddMinimum() {
-    return AddBuiltin(BuiltinOperator_MINIMUM, Register_MINIMUM(),
-                      ParseMinimum);
-  }
+  TfLiteStatus AddMinimum(
+    const TFLMRegistration& registration = Register_MINIMUM()
+  ) {
+    return AddBuiltin(BuiltinOperator_MINIMUM, registration, ParseMinimum);
+}
 
   TfLiteStatus AddMul(const TFLMRegistration& registration = Register_MUL()) {
     return AddBuiltin(BuiltinOperator_MUL, registration, ParseMul);

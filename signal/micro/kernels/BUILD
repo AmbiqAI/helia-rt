@@ -1,11 +1,11 @@
 load(
     "//tensorflow/lite/micro:build_def.bzl",
-    "micro_copts",
+    "tflm_cc_library",
 )
 
 package(licenses = ["notice"])
 
-cc_library(
+tflm_cc_library(
     name = "register_signal_ops",
     srcs = [
         "delay.cc",
@@ -31,7 +31,6 @@ cc_library(
         "irfft.h",
         "rfft.h",
     ],
-    copts = micro_copts(),
     visibility = [
         "//tensorflow/lite/micro",
     ],
@@ -61,7 +60,7 @@ cc_library(
     ],
 )
 
-cc_library(
+tflm_cc_library(
     name = "fft_flexbuffers_generated_data",
     srcs = [
         "fft_flexbuffers_generated_data.cc",
@@ -88,7 +87,7 @@ cc_test(
     ],
 )
 
-cc_library(
+tflm_cc_library(
     name = "window_flexbuffers_generated_data",
     srcs = [
         "window_flexbuffers_generated_data.cc",
@@ -114,7 +113,7 @@ cc_test(
     ],
 )
 
-cc_library(
+tflm_cc_library(
     name = "framer_flexbuffers_generated_data",
     srcs = [
         "framer_flexbuffers_generated_data.cc",
@@ -140,7 +139,7 @@ cc_test(
     ],
 )
 
-cc_library(
+tflm_cc_library(
     name = "overlap_add_flexbuffers_generated_data",
     srcs = [
         "overlap_add_flexbuffers_generated_data.cc",
@@ -166,7 +165,7 @@ cc_test(
     ],
 )
 
-cc_library(
+tflm_cc_library(
     name = "delay_flexbuffers_generated_data",
     srcs = [
         "delay_flexbuffers_generated_data.cc",
@@ -191,7 +190,7 @@ cc_test(
     ],
 )
 
-cc_library(
+tflm_cc_library(
     name = "stacker_flexbuffers_generated_data",
     srcs = [
         "stacker_flexbuffers_generated_data.cc",
@@ -217,7 +216,7 @@ cc_test(
     ],
 )
 
-cc_library(
+tflm_cc_library(
     name = "energy_flexbuffers_generated_data",
     srcs = [
         "energy_flexbuffers_generated_data.cc",
@@ -243,7 +242,7 @@ cc_test(
     ],
 )
 
-cc_library(
+tflm_cc_library(
     name = "filter_bank_flexbuffers_generated_data",
     srcs = [
         "filter_bank_flexbuffers_generated_data.cc",
@@ -253,7 +252,7 @@ cc_library(
     ],
 )
 
-cc_library(
+tflm_cc_library(
     name = "filter_bank_log_flexbuffers_generated_data",
     srcs = [
         "filter_bank_log_flexbuffers_generated_data.cc",
@@ -263,7 +262,7 @@ cc_library(
     ],
 )
 
-cc_library(
+tflm_cc_library(
     name = "filter_bank_spectral_subtraction_flexbuffers_generated_data",
     srcs = [
         "filter_bank_spectral_subtraction_flexbuffers_generated_data.cc",
@@ -332,7 +331,7 @@ cc_test(
     ],
 )
 
-cc_library(
+tflm_cc_library(
     name = "pcan_flexbuffers_generated_data",
     srcs = [
         "pcan_flexbuffers_generated_data.cc",

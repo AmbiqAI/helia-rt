@@ -14,24 +14,24 @@
 # =============================================================================
 """An experimental tool to requantize a int8 activation, int8 weight LSTM based model to int16 activation, int8 weight
 
-Steps: 
+Steps:
 1. Convert the trained model to int8 using the TFLite converter. See https://www.tensorflow.org/lite/performance/post_training_quantization#full_integer_quantization
 2. Use this tool to requantize the int8 model to int16.
 3. Check if the requantized model match the expectation (e.g., read the conversion printout, perform inference tests)
 
-The conversion process: 
-1. Requantize the ops specified in _COMPLEX_OP_REQUANTIZE_REGISTRATION using the registered function. Bias type conversion (int32 to int64) only happens here. 
+The conversion process:
+1. Requantize the ops specified in _COMPLEX_OP_REQUANTIZE_REGISTRATION using the registered function. Bias type conversion (int32 to int64) only happens here.
 2. Requantize all non-constant tensors with int8 type to int16 (and fix the quantization parameters)
 
 Run:
 bazel build tensorflow/lite/micro/tools:requantize_flatbuffer
 bazel-bin/tensorflow/lite/micro/tools/requantize_flatbuffer --int8_model_path=".tflite file path"` --save_path="save path"
 
-CAVEAT: 
+CAVEAT:
 1. Use this tool ONLY for models that contain the LSTM layer. All other models should use the standard tflite conversion process.
 2. This is an experimental tool. ALWAYS check if the converted model matches your expectation
-3. Add the custom op requantization function for complex ops (e.g., convolution). 
-4. We assume ops not in _COMPLEX_OP_REQUANTIZE_REGISTRATION only have activation tensors (i.e. no weights and bias). Check the quantized model performance if you add additional ops to _TESTED_SIMPLE_OPS 
+3. Add the custom op requantization function for complex ops (e.g., convolution).
+4. We assume ops not in _COMPLEX_OP_REQUANTIZE_REGISTRATION only have activation tensors (i.e. no weights and bias). Check the quantized model performance if you add additional ops to _TESTED_SIMPLE_OPS
 
 """
 import os
@@ -86,6 +86,7 @@ _TESTED_SIMPLE_OPS = [
     schema_py_generated.BuiltinOperator.QUANTIZE,
     schema_py_generated.BuiltinOperator.RESHAPE,
     schema_py_generated.BuiltinOperator.RSQRT,
+    schema_py_generated.BuiltinOperator.SQRT,
     schema_py_generated.BuiltinOperator.SQUARED_DIFFERENCE,
     schema_py_generated.BuiltinOperator.STRIDED_SLICE,
     schema_py_generated.BuiltinOperator.SUB,
@@ -188,7 +189,7 @@ class Requantizer:
   def requantize_8to16(self):
     '''
     The requantize process has two phase:
-    1. Go through the registered ops and perform the custom op transformation 
+    1. Go through the registered ops and perform the custom op transformation
     2. Go through the rest of tensors and convert int8 non-const tensor to int16
     '''
 

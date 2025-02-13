@@ -11,8 +11,6 @@
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/op_macros.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
-#include "tensorflow/lite/micro/kernels/xtensa/xtensa.h"
-#include "tensorflow/lite/micro/kernels/xtensa/xtensa_pad.h"
 #include "tensorflow/lite/micro/micro_log.h"
 
 namespace tflite
