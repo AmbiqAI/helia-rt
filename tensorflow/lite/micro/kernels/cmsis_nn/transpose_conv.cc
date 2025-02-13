@@ -221,6 +221,20 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
 #if defined(KERNELS_OPTIMIZED_FOR_SPEED)
     const int input_depth = MatchingDim(input_shape, 3, filter_shape, 3);
 
+    cmsis_nn_transpose_conv_params conv_params;
+    conv_params.dilation.h = 1;
+    conv_params.dilation.w = 1;
+    conv_params.input_offset = data->params.input_offset;
+    conv_params.output_offset = data->params.output_offset;
+    conv_params.stride.h = params->stride_height;
+    conv_params.stride.w = params->stride_width;
+    conv_params.padding.h = data->params.padding_values.height;
+    conv_params.padding.w = data->params.padding_values.width;
+    conv_params.padding_offsets.h = data->params.padding_values.height_offset;
+    conv_params.padding_offsets.w = data->params.padding_values.width_offset;
+    conv_params.activation.min = data->params.quantized_activation_min;
+    conv_params.activation.max = data->params.quantized_activation_max;
+
     cmsis_nn_dims input_dims;
     input_dims.n = batch_size;
     input_dims.h = input_shape.Dims(1);
@@ -234,7 +248,8 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     filter_dims.c = input_depth;
 
     const size_t buf_size = arm_transpose_conv_s8_get_buffer_size(
-        &input_dims, &filter_dims, &output_dims);
+      &conv_params, &input_dims, &filter_dims, &output_dims
+    );
     TFLITE_DCHECK(context->RequestScratchBufferInArena(
                       context, buf_size, &(data->scratch_buffer_index)) ==
                   kTfLiteOk);

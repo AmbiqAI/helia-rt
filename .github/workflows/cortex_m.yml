@@ -35,7 +35,7 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'schedule' &&
-       github.repository == 'tensorflow/tflite-micro') ||
+       github.repository == 'AmbiqAI/ns-tflm') ||
       (github.event.action == 'labeled' &&
        github.event.label.name == 'ci:run_full')
 
@@ -59,7 +59,7 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'schedule' &&
-       github.repository == 'tensorflow/tflite-micro') ||
+       github.repository == 'AmbiqAI/ns-tflm') ||
       (github.event.action == 'labeled' &&
        github.event.label.name == 'ci:run_full')
 

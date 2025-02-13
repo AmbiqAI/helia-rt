@@ -2,11 +2,37 @@ name: Run-Ambiq
 
 # This is the entry point for ambiq.yml for scheduled and workflow_dispatch events.
 
+
 on:
+  # schedule:
+  #   # 10am UTC is 3am or 4am PT depending on daylight savings.
+  #   - cron: '0 10 * * *'
+
   # Allow manually triggering of the workflow.
   workflow_dispatch: {}
 
 jobs:
-
   call-ambiq-presubmit:
     uses: ./.github/workflows/ambiq_presubmit.yml
+    if: github.repository == 'AmbiqAI/ns-tflm'
+    with:
+      trigger-sha: ${{ github.sha }}
+
+  call-ambiq-postmerge:
+    uses: ./.github/workflows/ambiq_postmerge.yml
+    if: github.repository == 'AmbiqAI/ns-tflm'
+    with:
+      trigger-sha: ${{ github.sha }}
+
+  issue-on-error:
+    needs: [call-ambiq-presubmit,call-ambiq-postmerge]
+    if: ${{ always() && contains(needs.*.result, 'failure') }}
+    uses: ./.github/workflows/issue_on_error.yml
+    with:
+      repo: ${{ github.repository }}
+      workflow: ${{ github.workflow }}
+      run_id: ${{ github.run_id }}
+      run_number: ${{ github.run_number }}
+      flag_label: ci:bot_issue
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}

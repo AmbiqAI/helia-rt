@@ -8,7 +8,7 @@ on:
         type: string
 
 jobs:
-  ambiq_presubmit:
+  ambiq_postmerge:
     runs-on: ubuntu-latest-md
 
     name: ambiq_unit_tests
