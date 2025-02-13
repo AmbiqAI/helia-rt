@@ -3,7 +3,6 @@
 load(
     "//tensorflow/lite/micro:build_def.bzl",
     "generate_cc_arrays",
-    "tflm_library",
     "tflm_cc_library",
     "tflm_cc_test",
 )
