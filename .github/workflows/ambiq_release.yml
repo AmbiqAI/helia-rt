@@ -3,15 +3,19 @@ name: Ambiq Release
 on:
   push:
     tags:
-      - 'v*.*.*'  # e.g., v1.0.0
+      - 'v*.*.*'
+  workflow_dispatch:
+
 permissions:
-  contents: write  # Allows write access to contents, which includes release creation
+  contents: write
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest-md
     container:
       image: ghcr.io/ambiqai/ns-tflm-ci:latest
+    env:
+      tag: ${{ github.ref_name }}
 
     steps:
       - name: Check out code
@@ -20,83 +24,53 @@ jobs:
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
 
-      # Restore cache
-      - name: Cache third-party downloads
-        uses: actions/cache@v3
+      - name: Create artifacts
+        run: |
+          mkdir -p artifacts
+          # WIP
+          touch empty_file
+          zip artifacts/ns-tflm-$tag.zip empty_file
+          tar -czf artifacts/ns-tflm-$tag.tar.gz empty_file
+          # Create neuralSPOT module
+          # bash ./neuralspot/build.sh
+          # cd ${GITHUB_WORKSPACE}/build
+          # zip -r ../artifacts/ns-tflm-$tag.zip *
+          # tar -czf ../artifacts/ns-tflm-$tag.tar.gz *
+          # Create a snapshot of the repository
+          cd ${GITHUB_WORKSPACE}
+          git archive --format zip    --output artifacts/repo-snapshot-$tag.zip HEAD
+          git archive --format tar.gz --output artifacts/repo-snapshot-$tag.tar.gz HEAD
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
-          path: |
-            tensorflow/lite/micro/tools/make/downloads
-          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile') }}
-          restore-keys: |
-            ${{ runner.os }}-third-party-downloads-
+          name: release-artifacts
+          path: ./artifacts
 
-      - name: Run build script with Bash
-        run: bash ./neuralspot/build.sh  # Explicitly using Bash to avoid shell compatibility issues
+  release:
+    runs-on: ubuntu-latest
+    needs: build
+    env:
+      tag: ${{ github.ref_name }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+          path: artifacts
+          merge-multiple: true
 
-      # Package the TFLM build outputs as a .zip
-      - name: Archive TFLM artifacts (zip)
-        run: |
-          zip -r ns-tflm-gcc-${{ github.ref_name }}.zip lib treedir neuralspot/module.mk
-
-      # Package the TFLM build outputs as a .tar.gz
-      - name: Archive TFLM artifacts (tar.gz)
-        run: |
-          tar -czf ns-tflm-gcc-${{ github.ref_name }}.tar.gz lib treedir neuralspot/module.mk
-
-      # Create a full snapshot of the entire repo as .zip + .tar.gz
-      - name: Create snapshot archives
-        run: |
-          git archive --format zip    --output repo-snapshot-${{ github.ref_name }}.zip HEAD
-          git archive --format tar.gz --output repo-snapshot-${{ github.ref_name }}.tar.gz HEAD
-
-      - name: Create Release
+      - name: Create release
         id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: false
-
-      - name: Upload TFLM zip
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ns-tflm-gcc-${{ github.ref_name }}.zip
-          asset_name: ns-tflm-gcc-${{ github.ref_name }}.zip
-          asset_content_type: application/zip
-
-      - name: Upload TFLM tar.gz
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ns-tflm-gcc-${{ github.ref_name }}.tar.gz
-          asset_name: ns-tflm-gcc-${{ github.ref_name }}.tar.gz
-          asset_content_type: application/gzip
-
-      # Upload the repo snapshot archives
-      - name: Upload repo snapshot (zip)
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: repo-snapshot-${{ github.ref_name }}.zip
-          asset_name: repo-snapshot-${{ github.ref_name }}.zip
-          asset_content_type: application/zip
-
-      - name: Upload repo snapshot (tar.gz)
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: repo-snapshot-${{ github.ref_name }}.tar.gz
-          asset_name: repo-snapshot-${{ github.ref_name }}.tar.gz
-          asset_content_type: application/gzip
+        run: |
+          ls -R artifacts
+          cd artifacts
+          gh release create "$tag" \
+            ns-tflm-$tag.zip \
+            ns-tflm-$tag.tar.gz \
+            repo-snapshot-$tag.zip \
+            repo-snapshot-$tag.tar.gz \
+            -R "$GITHUB_REPOSITORY" \
+            -t "Release $tag" \
+            --notes "Automated release for tag $tag"
