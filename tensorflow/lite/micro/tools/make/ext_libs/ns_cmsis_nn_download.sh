@@ -32,29 +32,17 @@
 
 set -e
 
-# Add GitHub to known hosts to avoid host key verification error
-mkdir -p ~/.ssh
-ssh-keyscan github.com >> ~/.ssh/known_hosts
-echo "Added GitHub to known hosts" >&2
-
-# Check if NS_CMSIS_NN_SSH_KEY is set
-if [ -n "${NS_CMSIS_NN_SSH_KEY}" ]; then
-  echo >&2 "Registering NS_CMSIS_NN_SSH_KEY..."
-  eval `ssh-agent -s` 2>&1
-  ssh-add - <<< $NS_CMSIS_NN_SSH_KEY
-  echo "SSH key added" >&2
-fi
-
-# Test SSH connection to GitHub
-ssh -T git@github.com || { echo "SSH connection to GitHub failed" >&2; exit 1; }
-
 TENSORFLOW_ROOT=${2}
 source ${TENSORFLOW_ROOT}tensorflow/lite/micro/tools/make/bash_helpers.sh
 
 DOWNLOADS_DIR=${1}
 DOWNLOADED_NS_CMSIS_NN_PATH=${DOWNLOADS_DIR}/ns_cmsis_nn
 
-NS_CMSIS_NN_URL="git@github.com:AmbiqAI/ns-cmsis-nn.git"
+if [ -n "${NS_CMSIS_NN_SSH_KEY}" ]; then
+  NS_CMSIS_NN_URL="https://${NS_CMSIS_NN_SSH_KEY}@github.com/AmbiqAI/ns-cmsis-nn.git"
+else
+  NS_CMSIS_NN_URL="git@github.com:AmbiqAI/ns-cmsis-nn.git"
+fi
 GIT_COMMIT="22080c68d040c98139e6cb1549473e3149735f4d"
 
 should_download=$(check_should_download ${DOWNLOADS_DIR})
