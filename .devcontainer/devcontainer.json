@@ -25,5 +25,11 @@
             ]
         }
     },
-    "postCreateCommand": "./.devcontainer/install.sh"
+    "postCreateCommand": "./.devcontainer/install.sh",
+    "features": {
+        "ghcr.io/devcontainers/features/github-cli:1": {
+            "installDirectlyFromGitHubRelease": true,
+            "version": "latest"
+        }
+    }
 }
