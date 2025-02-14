@@ -32,9 +32,13 @@
 
 set -e
 
+# Add GitHub to known hosts to avoid host key verification error
+mkdir -p ~/.ssh
+ssh-keyscan github.com >> ~/.ssh/known_hosts
+
 # Check if NS_CMSIS_NN_SSH_KEY is set
 if [ -n "${NS_CMSIS_NN_SSH_KEY}" ]; then
-  echo >&2 "Registering NS_CMSIS_NN_SSH_KEY...$NS_CMSIS_NN_SSH_KEY"
+  echo >&2 "Registering NS_CMSIS_NN_SSH_KEY..."
   eval `ssh-agent -s` 2>&1
   ssh-add - <<< $NS_CMSIS_NN_SSH_KEY
 fi
