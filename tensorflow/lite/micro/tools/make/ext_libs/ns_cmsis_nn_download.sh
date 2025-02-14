@@ -34,7 +34,7 @@ set -e
 
 # Check if NS_CMSIS_NN_SSH_KEY is set
 if [ -n "${NS_CMSIS_NN_SSH_KEY}" ]; then
-  # echo "Registering NS_CMSIS_NN_SSH_KEY..."
+  echo >&2 "Registering NS_CMSIS_NN_SSH_KEY..."
   mkdir -p ~/.ssh
   echo "${NS_CMSIS_NN_SSH_KEY}" > ~/.ssh/id_cmsis_rsa
   chmod 600 ~/.ssh/id_cmsis_rsa
@@ -64,9 +64,9 @@ elif [ -d ${DOWNLOADED_NS_CMSIS_NN_PATH} ]; then
   echo >&2 "${DOWNLOADED_NS_CMSIS_NN_PATH} already exists, skipping the download."
 else
   rm -rf /tmp/ns-cmsis-nn
-  git clone ${NS_CMSIS_NN_URL} /tmp/ns-cmsis-nn >&2
+  git clone ${NS_CMSIS_NN_URL} /tmp/ns-cmsis-nn 2>&1
   cd /tmp/ns-cmsis-nn
-  git checkout ${GIT_COMMIT} >&2
+  git checkout ${GIT_COMMIT} 2>&1
   rm -rf .git
   cd -
   mv /tmp/ns-cmsis-nn ${DOWNLOADED_NS_CMSIS_NN_PATH}
