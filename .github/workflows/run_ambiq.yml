@@ -16,15 +16,17 @@ jobs:
     uses: ./.github/workflows/ambiq_presubmit.yml
     if: github.repository == 'AmbiqAI/ns-tflm'
     with:
-      NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
       trigger-sha: ${{ github.sha }}
+    secrets:
+      NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
 
   call-ambiq-postmerge:
     uses: ./.github/workflows/ambiq_postmerge.yml
     if: github.repository == 'AmbiqAI/ns-tflm'
     with:
-      NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
       trigger-sha: ${{ github.sha }}
+    secrets:
+      NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
 
   issue-on-error:
     needs: [call-ambiq-presubmit,call-ambiq-postmerge]
