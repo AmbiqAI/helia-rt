@@ -89,7 +89,7 @@ const char* target_info_strings[] = {
     // %%%_target_info_strings_%%%
 };
 
-#if defined(CMSIS_NN) || defined(HIFI3) || defined(HIFI4) || defined(HIFI5) || \
+#if defined(CMSIS_NN) || defined(AMBIQ) || defined(HIFI3) || defined(HIFI4) || defined(HIFI5) || \
     defined(VISION_P6)
 const char* nn_library_url_strings[] = {
     // %%%_nn_library_url_strings_%%%
@@ -98,7 +98,7 @@ const char* nn_library_url_strings[] = {
 const char* nn_library_md5_strings[] = {
     // %%%_nn_library_md5_strings_%%%
 };
-#endif  // defined(CMSIS_NN) || defined(HIFI3) || defined(HIFI4) ||
+#endif  // defined(CMSIS_NN) || defined(AMBIQ) || defined(HIFI3) || defined(HIFI4) ||
         // defined(HIFI5) || defined(VISION_P6)
 
 void ShowStrings(const char* title, const char** str, const size_t count) {
@@ -143,14 +143,14 @@ void GenericBenchmarkShowMetaData() {
   ShowStrings("Target information:\n\n", target_info_strings,
               std::extent<decltype(target_info_strings)>::value);
 
-#if defined(CMSIS_NN) || defined(HIFI3) || defined(HIFI4) || defined(HIFI5) || \
+#if defined(CMSIS_NN) || defined(AMBIQ) || defined(HIFI3) || defined(HIFI4) || defined(HIFI5) || \
     defined(VISION_P6)
   ShowSeparator();
   ShowStrings("NN library download URLs:\n\n", nn_library_url_strings,
               std::extent<decltype(nn_library_url_strings)>::value);
   ShowStrings("\nNN library MD5 checksums:\n\n", nn_library_md5_strings,
               std::extent<decltype(nn_library_md5_strings)>::value);
-#endif  // defined(CMSIS_NN) || defined(HIFI3) || defined(HIFI4) ||
+#endif  // defined(CMSIS_NN) || defined(AMBIQ) || defined(HIFI3) || defined(HIFI4) ||
         // defined(HIFI5) || defined(VISION_P6)
 
 #if defined(HIFI3) || defined(HIFI4) || defined(HIFI5)

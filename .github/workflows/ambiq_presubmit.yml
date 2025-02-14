@@ -34,6 +34,8 @@ jobs:
 
       - name: Test
         uses: docker://ghcr.io/ambiqai/ns-tflm-ci:latest
+        env:
+          NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
         with:
           args: /bin/sh -c tensorflow/lite/micro/tools/ci_build/test_ambiq_corstone_300.sh
 
