@@ -37,14 +37,6 @@ if [ -n "${NS_CMSIS_NN_SSH_KEY}" ]; then
   echo >&2 "Registering NS_CMSIS_NN_SSH_KEY...$NS_CMSIS_NN_SSH_KEY"
   eval `ssh-agent -s` 2>&1
   ssh-add - <<< $NS_CMSIS_NN_SSH_KEY
-  ssh-keyscan github.com >> ~/.ssh/known_hosts
-  # mkdir -p ~/.ssh
-  # echo "${NS_CMSIS_NN_SSH_KEY}" > ~/.ssh/id_cmsis_rsa
-  # chmod 600 ~/.ssh/id_cmsis_rsa
-  # ssh-keyscan github.com >> ~/.ssh/known_hosts
-  # echo "Host github.com
-  #   IdentityFile ~/.ssh/id_cmsis_rsa
-  #   IdentitiesOnly yes" >> ~/.ssh/config
 fi
 
 TENSORFLOW_ROOT=${2}
@@ -76,9 +68,3 @@ else
 fi
 
 echo "SUCCESS"
-
-# Clean up SSH key and config
-if [ -n "${NS_CMSIS_NN_SSH_KEY}" ]; then
-  rm -f ~/.ssh/id_cmsis_rsa
-  sed -i.bak '/^Host github\.com/,+2d' ~/.ssh/config
-fi
