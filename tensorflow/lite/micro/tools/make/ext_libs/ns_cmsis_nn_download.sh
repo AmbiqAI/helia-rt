@@ -36,7 +36,7 @@ set -e
 if [ -n "${NS_CMSIS_NN_SSH_KEY}" ]; then
   echo >&2 "Registering NS_CMSIS_NN_SSH_KEY..."
   eval `ssh-agent -s` 2>&1
-  ssh-add - <<< "${NS_CMSIS_NN_SSH_KEY}" 2>&1
+  ssh-add - <<< "${NS_CMSIS_NN_SSH_KEY}"
   ssh-keyscan github.com >> ~/.ssh/known_hosts
   # mkdir -p ~/.ssh
   # echo "${NS_CMSIS_NN_SSH_KEY}" > ~/.ssh/id_cmsis_rsa
