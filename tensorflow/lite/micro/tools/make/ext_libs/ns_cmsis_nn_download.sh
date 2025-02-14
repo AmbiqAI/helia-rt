@@ -56,12 +56,11 @@ elif [ -d ${DOWNLOADED_NS_CMSIS_NN_PATH} ]; then
   echo >&2 "${DOWNLOADED_NS_CMSIS_NN_PATH} already exists, skipping the download."
 else
   rm -rf /tmp/ns-cmsis-nn
-  git clone ${NS_CMSIS_NN_URL} /tmp/ns-cmsis-nn 2>&1
-  cd /tmp/ns-cmsis-nn
-  git checkout ${GIT_COMMIT} 2>&1
+  git clone ${NS_CMSIS_NN_URL} ${DOWNLOADED_NS_CMSIS_NN_PATH} >&2
+  pushd ${DOWNLOADED_ETHOS_U_CORE_PLATFORM_PATH} > /dev/null
+  git checkout ${GIT_COMMIT} >&2
   rm -rf .git
-  cd -
-  mv /tmp/ns-cmsis-nn ${DOWNLOADED_NS_CMSIS_NN_PATH}
+  popd > /dev/null
 fi
 
 echo "SUCCESS"
