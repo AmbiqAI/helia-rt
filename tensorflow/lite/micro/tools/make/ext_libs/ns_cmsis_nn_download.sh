@@ -35,13 +35,18 @@ set -e
 # Add GitHub to known hosts to avoid host key verification error
 mkdir -p ~/.ssh
 ssh-keyscan github.com >> ~/.ssh/known_hosts
+echo "Added GitHub to known hosts" >&2
 
 # Check if NS_CMSIS_NN_SSH_KEY is set
 if [ -n "${NS_CMSIS_NN_SSH_KEY}" ]; then
   echo >&2 "Registering NS_CMSIS_NN_SSH_KEY..."
   eval `ssh-agent -s` 2>&1
   ssh-add - <<< $NS_CMSIS_NN_SSH_KEY
+  echo "SSH key added" >&2
 fi
+
+# Test SSH connection to GitHub
+ssh -T git@github.com || { echo "SSH connection to GitHub failed" >&2; exit 1; }
 
 TENSORFLOW_ROOT=${2}
 source ${TENSORFLOW_ROOT}tensorflow/lite/micro/tools/make/bash_helpers.sh
