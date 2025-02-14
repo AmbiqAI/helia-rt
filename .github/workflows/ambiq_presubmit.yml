@@ -6,6 +6,9 @@ on:
       trigger-sha:
         required: true
         type: string
+    secrets:
+      NS_CMSIS_NN_SSH_KEY:
+        required: true
 
 jobs:
   ambiq_presubmit:
