@@ -34,7 +34,7 @@ set -e
 
 # Check if NS_CMSIS_NN_SSH_KEY is set
 if [ -n "${NS_CMSIS_NN_SSH_KEY}" ]; then
-  echo "Registering NS_CMSIS_NN_SSH_KEY..."
+  # echo "Registering NS_CMSIS_NN_SSH_KEY..."
   mkdir -p ~/.ssh
   echo "${NS_CMSIS_NN_SSH_KEY}" > ~/.ssh/id_cmsis_rsa
   chmod 600 ~/.ssh/id_cmsis_rsa
@@ -76,8 +76,6 @@ echo "SUCCESS"
 
 # Clean up SSH key and config
 if [ -n "${NS_CMSIS_NN_SSH_KEY}" ]; then
-  echo "Cleaning up SSH key and config..."
   rm -f ~/.ssh/id_cmsis_rsa
-  sed -i '/IdentityFile ~/.ssh\/id_cmsis_rsa/d' ~/.ssh/config
-  sed -i '/IdentitiesOnly yes/d' ~/.ssh/config
+  sed -i.bak '/^Host github\.com/,+2d' ~/.ssh/config
 fi
