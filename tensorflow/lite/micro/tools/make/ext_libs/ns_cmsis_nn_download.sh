@@ -35,13 +35,16 @@ set -e
 # Check if NS_CMSIS_NN_SSH_KEY is set
 if [ -n "${NS_CMSIS_NN_SSH_KEY}" ]; then
   echo >&2 "Registering NS_CMSIS_NN_SSH_KEY..."
-  mkdir -p ~/.ssh
-  echo "${NS_CMSIS_NN_SSH_KEY}" > ~/.ssh/id_cmsis_rsa
-  chmod 600 ~/.ssh/id_cmsis_rsa
+  eval `ssh-agent -s` 2>&1
+  ssh-add - <<< "${NS_CMSIS_NN_SSH_KEY}" 2>&1
   ssh-keyscan github.com >> ~/.ssh/known_hosts
-  echo "Host github.com
-    IdentityFile ~/.ssh/id_cmsis_rsa
-    IdentitiesOnly yes" >> ~/.ssh/config
+  # mkdir -p ~/.ssh
+  # echo "${NS_CMSIS_NN_SSH_KEY}" > ~/.ssh/id_cmsis_rsa
+  # chmod 600 ~/.ssh/id_cmsis_rsa
+  # ssh-keyscan github.com >> ~/.ssh/known_hosts
+  # echo "Host github.com
+  #   IdentityFile ~/.ssh/id_cmsis_rsa
+  #   IdentitiesOnly yes" >> ~/.ssh/config
 fi
 
 TENSORFLOW_ROOT=${2}
