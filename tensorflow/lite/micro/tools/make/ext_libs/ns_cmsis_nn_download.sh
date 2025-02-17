@@ -43,7 +43,7 @@ if [ -n "${NS_CMSIS_NN_SSH_KEY}" ]; then
 else
   NS_CMSIS_NN_URL="git@github.com:AmbiqAI/ns-cmsis-nn.git"
 fi
-GIT_COMMIT="22080c68d040c98139e6cb1549473e3149735f4d"
+GIT_COMMIT="6bdbe8b1cf910c96699c0d084e9bbafcc73b914d"
 
 should_download=$(check_should_download ${DOWNLOADS_DIR})
 
