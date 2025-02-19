@@ -62,22 +62,25 @@ TfLiteStatus EvalMaximum(TfLiteContext* context, TfLiteNode* node) {
   cmsis_nn_dims output_dims = FillVariableShape(output_shape.DimensionsCount(),
                                                 output_shape.DimsData());
 
-  switch (op_context.output->type) {
-    case kTfLiteInt8:
-      cmsis_nn_context ctx;
-      ctx.buf = nullptr;
-      ctx.size = 0;
+  cmsis_nn_context ctx;
+  ctx.buf = nullptr;
+  ctx.size = 0;
 
+  switch (op_context.output->type) {
+    case kTfLiteFloat32:
+      TFLiteOperation<float, MaximumOp>(context, node, op_context);
+      break;
+    case kTfLiteInt8:
       arm_maximum_s8(
           &ctx, tflite::micro::GetTensorData<int8_t>(input1), &input_1_dims,
           tflite::micro::GetTensorData<int8_t>(input2), &input_2_dims,
           tflite::micro::GetTensorData<int8_t>(output), &output_dims);
       break;
-    case kTfLiteFloat32:
-      TFLiteOperation<float, MaximumOp>(context, node, op_context);
-      break;
     case kTfLiteInt16:
-      TFLiteOperation<int16_t, MaximumOp>(context, node, op_context);
+      arm_maximum_s16(
+          &ctx, tflite::micro::GetTensorData<int16_t>(input1), &input_1_dims,
+          tflite::micro::GetTensorData<int16_t>(input2), &input_2_dims,
+          tflite::micro::GetTensorData<int16_t>(output), &output_dims);
       break;
     case kTfLiteInt32:
       TFLiteOperation<int32_t, MaximumOp>(context, node, op_context);
@@ -154,22 +157,26 @@ TfLiteStatus EvalMinimum(TfLiteContext* context, TfLiteNode* node) {
   cmsis_nn_dims output_dims = FillVariableShape(output_shape.DimensionsCount(),
                                                 output_shape.DimsData());
 
-  switch (op_context.output->type) {
-    case kTfLiteInt8:
-      cmsis_nn_context ctx;
-      ctx.buf = nullptr;
-      ctx.size = 0;
+  cmsis_nn_context ctx;
+  ctx.buf = nullptr;
+  ctx.size = 0;
 
+  switch (op_context.output->type) {
+    case kTfLiteFloat32:
+      TFLiteOperation<float, MinimumOp>(context, node, op_context);
+      break;
+    case kTfLiteInt8:
       arm_minimum_s8(
           &ctx, tflite::micro::GetTensorData<int8_t>(input1), &input_1_dims,
           tflite::micro::GetTensorData<int8_t>(input2), &input_2_dims,
           tflite::micro::GetTensorData<int8_t>(output), &output_dims);
       break;
-    case kTfLiteFloat32:
-      TFLiteOperation<float, MinimumOp>(context, node, op_context);
-      break;
+
     case kTfLiteInt16:
-      TFLiteOperation<int16_t, MinimumOp>(context, node, op_context);
+      arm_minimum_s16(
+          &ctx, tflite::micro::GetTensorData<int16_t>(input1), &input_1_dims,
+          tflite::micro::GetTensorData<int16_t>(input2), &input_2_dims,
+          tflite::micro::GetTensorData<int16_t>(output), &output_dims);
       break;
     case kTfLiteInt32:
       TFLiteOperation<int32_t, MinimumOp>(context, node, op_context);

@@ -43,7 +43,7 @@ if [ -n "${NS_CMSIS_NN_SSH_KEY}" ]; then
 else
   NS_CMSIS_NN_URL="git@github.com:AmbiqAI/ns-cmsis-nn.git"
 fi
-GIT_COMMIT="6bdbe8b1cf910c96699c0d084e9bbafcc73b914d"
+GIT_COMMIT="db0eacba5406b2a2b68d6cb0f41acf17dfca7c7b" # canary
 
 should_download=$(check_should_download ${DOWNLOADS_DIR})
 

@@ -36,8 +36,8 @@ This directory contains custom kernel operations for TFLM optimized for Ambiq So
 | log_softmax       | Yes         | No         | No         | No          | No           | No           | No          | No           | No           |
 | logistic          | Yes         | Yes        | No         | Yes         | No           | No           | Yes         | No           | No           |
 | lstm              | Yes         | Yes        | No         | Yes         | Yes          | No           | Yes         | Yes          | No           |
-| minimum           | Yes         | No         | N/A        | No          | No           | N/A          | Yes         | No           | N/A          |
-| maximum           | Yes         | No         | N/A        | No          | No           | N/A          | Yes         | No           | N/A          |
+| minimum           | Yes         | Yes        | N/A        | No          | No           | N/A          | Yes         | Yes          | N/A          |
+| maximum           | Yes         | Yes        | N/A        | No          | No           | N/A          | Yes         | Yes          | N/A          |
 | mirror_pad        | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | mul               | Yes         | Yes        | N/A        | Yes         | Yes          | N/A          | Yes         | Yes          | N/A          |
 | neg               | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
@@ -49,7 +49,7 @@ This directory contains custom kernel operations for TFLM optimized for Ambiq So
 | resize_bilinear   | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | select            | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | slice             | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| softmax           | Yes         | Yes        | No         | Yes         | Yes          | No           | Yes         | No           | No           |
+| softmax           | Yes         | Yes        | No         | Yes         | Yes          | No           | Yes         | Yes          | No           |
 | space_to_batch_nd | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | space_to_depth    | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | split             | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
