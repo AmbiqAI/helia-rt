@@ -15,7 +15,8 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/reference/concatenation.h"
 
 #include <cstdint>
-
+#include "Include/arm_nnfunctions.h"
+#include "Include/arm_nnsupportfunctions.h"
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
@@ -82,25 +83,62 @@ inline void GetAllInputTensorData(const TfLiteContext* context,
   }
 }
 
+
 template <typename data_type>
 void EvalUnquantized(TfLiteContext* context, TfLiteNode* node) {
   // Collect the shapes and data pointer of input tensors
   RuntimeShape inputs_shape[kMaxInputNum];
+  int32_t input_concat_dims[kMaxInputNum];
+  int32_t concat_shape[kMaxInputNum];
   const RuntimeShape* inputs_shape_ptr[kMaxInputNum];
   const data_type* inputs_data[kMaxInputNum];
   GetAllInputTensorShapes(context, node, inputs_shape);
   GetShapesPointers(inputs_shape, node->inputs->size, inputs_shape_ptr);
   GetAllInputTensorData(context, node, inputs_data);
 
-  TfLiteEvalTensor* output =
-      tflite::micro::GetEvalOutput(context, node, kOutputTensor);
+  TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, kOutputTensor);
+    RuntimeShape output_shape = tflite::micro::GetTensorShape(output);
+    data_type* output_data = tflite::micro::GetTensorData<data_type>(output);
 
   TFLITE_DCHECK(node->user_data != nullptr);
   const OpData* data = static_cast<const OpData*>(node->user_data);
 
-  reference_ops::Concatenation(data->params, inputs_shape_ptr, inputs_data,
-                               tflite::micro::GetTensorShape(output),
-                               tflite::micro::GetTensorData<data_type>(output));
+  // Set input_concat_dims
+  for (int i = 0; i < data->params.inputs_count; i++) {
+    input_concat_dims[i] = inputs_shape_ptr[i]->Dims(data->params.axis);
+  }
+  // Set concat_shape
+  for (int i = 0; i < output_shape.DimensionsCount(); i++) {
+    concat_shape[i] = output_shape.Dims(i);
+  }
+
+  if constexpr (std::is_same_v<data_type, int8_t>) {
+    arm_concatenation_s8(
+      inputs_data,
+      data->params.inputs_count,
+      input_concat_dims,
+      data->params.axis,
+      output_data,
+      output_shape.DimensionsCount(),
+      concat_shape
+    );
+  } else if constexpr (std::is_same_v<data_type, int16_t>) {
+    arm_concatenation_s16(
+      inputs_data,
+      data->params.inputs_count,
+      input_concat_dims,
+      data->params.axis,
+      output_data,
+      output_shape.DimensionsCount(),
+      concat_shape
+    );
+  } else {
+    reference_ops::Concatenation(
+      data->params, inputs_shape_ptr, inputs_data,
+      output_shape,
+      output_data
+    );
+  }
 }
 
 void* ConcatenationInit(TfLiteContext* context, const char* buffer,
@@ -229,6 +267,7 @@ TfLiteStatus ConcatenationEval(TfLiteContext* context, TfLiteNode* node) {
       EvalUnquantized<int32_t>(context, node);
       break;
     case kTfLiteInt8:
+      // concatenation_int8(context, node);
       EvalUnquantized<int8_t>(context, node);
       break;
     case kTfLiteInt64:
