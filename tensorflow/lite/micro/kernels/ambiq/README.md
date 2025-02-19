@@ -4,20 +4,64 @@ This directory contains custom kernel operations for TFLM optimized for Ambiq So
 
 ## Target SoCs
 
+# Apollo4 Plus
 * Apollo510 w/ Cortex-M55
 
-## Completed Operations
+## Operator Support Status
 
-* Tanh
-* Logistic
-* Leaky ReLU
-* Pad
-
-## In Progress Operations
-
-* Sub: Should be essentially duplicate of Add
-* AvgPool: Already implemented but we might be able to further optimize core loop
-* Conv2D: Already implemented but look to optimize 1D convolutions w/ dilations
+| Operator          | C <br> int8 | C<br>int16 | C<br>int4* | DSP<br>int8 | DSP<br>int16 | DSP<br>int4* | MVE<br>int8 | MVE<br>int16 | MVE<br>int4* |
+| ----------------- | ----------- | ---------- |------------|-------------| -------------|--------------|-------------| -------------|--------------|
+| add               | Yes         | Yes        | N/A        | Yes         | Yes          | N/A          | Yes         | Yes          | N/A          |
+| batch_matmul      | Yes         | Yes        | No         | Yes         | Yes          | No           | Yes         | Yes          | No           |
+| batch_to_space_nd | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| cast              | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| comparisons       | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| concatenation     | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| conv              | Yes         | Yes        | Yes        | Yes         | Yes          | Yes          | Yes         | Yes          | Yes          |
+| cumsum            | Yes         | No         | No         | No          | No           | No           | No          | No           | No           |
+| depth_to_space    | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| depthwise_conv    | Yes         | Yes        | Yes        | Yes         | Yes          | Yes          | Yes         | Yes          | Yes          |
+| dequantize        | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| elementwise       | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| elu               | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| embedding_lookup  | Yes         | No         | No         | No          | No           | No           | No          | No           | No           |
+| expand_dims       | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| fill              | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| fully_ connected  | Yes         | Yes        | Yes        | Yes         | Yes          | Yes          | Yes         | Yes          | Yes          |
+| gather_nd         | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| gather            | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| hard_swish        | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| l2norm            | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| leaky_relu        | Yes         | Yes        | No         | Yes         | No           | No           | Yes         | No           | No           |
+| log_softmax       | Yes         | No         | No         | No          | No           | No           | No          | No           | No           |
+| logistic          | Yes         | Yes        | No         | Yes         | No           | No           | Yes         | No           | No           |
+| lstm              | Yes         | Yes        | No         | Yes         | Yes          | No           | Yes         | Yes          | No           |
+| minimum           | Yes         | No         | N/A        | No          | No           | N/A          | Yes         | No           | N/A          |
+| maximum           | Yes         | No         | N/A        | No          | No           | N/A          | Yes         | No           | N/A          |
+| mirror_pad        | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| mul               | Yes         | Yes        | N/A        | Yes         | Yes          | N/A          | Yes         | Yes          | N/A          |
+| neg               | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| pack              | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| pad               | Yes         | Yes        | N/A        | No          | No           | N/A          | Yes         | No           | N/A          |
+| max_pooling       | Yes         | Yes        | N/A        | Yes         | Yes          | N/A          | Yes         | Yes          | N/A          |
+| avg_pooling       | Yes         | Yes        | N/A        | Yes         | Yes          | N/A          | Yes         | Yes          | N/A          |
+| prelu             | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| resize_bilinear   | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| select            | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| slice             | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| softmax           | Yes         | Yes        | No         | Yes         | Yes          | No           | Yes         | No           | No           |
+| space_to_batch_nd | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| space_to_depth    | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| split             | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| square_difference | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| strided_slice     | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| sub               | Yes         | Yes        | No         | Yes         | No           | N/A          | No          | No           | No           |
+| svdf              | Yes         | Yes        | No         | Yes         | Yes          | No           | Yes         | Yes          | No           |
+| tanh              | Yes         | Yes        | No         | Yes         | No           | No           | Yes         | No           | No           |
+| transpose_conv    | Yes         | No         | No         | Yes         | No           | No           | Yes         | No           | No           |
+| tranpose          | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| unpack            | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| zeros_like        | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 
 
 ## Notes

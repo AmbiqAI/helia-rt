@@ -131,6 +131,7 @@ TfLiteStatus GatherPrepare(TfLiteContext* context, TfLiteNode* node) {
   // Check conditions for different types.
   switch (input->type) {
     case kTfLiteFloat32:
+    case kTfLiteInt16:
     case kTfLiteInt8:
       break;
     default:
@@ -202,6 +203,9 @@ TfLiteStatus GatherEval(TfLiteContext* context, TfLiteNode* node) {
     switch (input->type) {
       case kTfLiteFloat32:
         return Gather<float, int32_t>(params, input, coords, output);
+        break;
+      case kTfLiteInt16:
+        return Gather<int16_t, int32_t>(params, input, coords, output);
         break;
       case kTfLiteInt8:
         return Gather<int8_t, int32_t>(params, input, coords, output);

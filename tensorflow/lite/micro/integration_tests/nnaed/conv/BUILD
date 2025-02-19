@@ -3,7 +3,8 @@
 load(
     "//tensorflow/lite/micro:build_def.bzl",
     "generate_cc_arrays",
-    "micro_copts",
+    "tflm_cc_library",
+    "tflm_cc_test",
 )
 
 package(
@@ -690,7 +691,7 @@ generate_cc_arrays(
   out = "conv26_golden_int8_test_data.h",
 )
 
-cc_library(
+tflm_cc_library(
     name = "models_and_testdata",
     srcs = [
         "generated_conv0_model_data_cc",
@@ -858,15 +859,13 @@ cc_library(
         "generated_conv26_input0_int8_test_data_hdr",
         "generated_conv26_golden_int8_test_data_hdr",
     ],
-    copts = micro_copts(),
 )
 
-cc_test(
+tflm_cc_test(
     name = "integration_test",
     srcs = [
         "integration_tests.cc",
     ],
-    copts = micro_copts(),
     deps = [
         ":models_and_testdata",
         "//tensorflow/lite/micro:micro_framework",

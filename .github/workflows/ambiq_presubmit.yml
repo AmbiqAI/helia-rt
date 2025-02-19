@@ -2,17 +2,25 @@ name: Ambiq Presubmit
 
 on:
   workflow_call:
+    inputs:
+      trigger-sha:
+        required: true
+        type: string
 
 jobs:
-  mve_unit_tests:
+  ambiq_presubmit:
     runs-on: ubuntu-latest-md
 
-    name: MVE Unit Tests (presubmit)
+    name: ambiq_unit_tests
     steps:
+
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
+
       - uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.trigger-sha }}
 
       # Restore cache
       - name: Cache third-party downloads
@@ -28,7 +36,6 @@ jobs:
         uses: docker://ghcr.io/ambiqai/ns-tflm-ci:latest
         with:
           args: /bin/sh -c tensorflow/lite/micro/tools/ci_build/test_ambiq_corstone_300.sh
-
 
       # Save cache
       - name: Save third-party downloads cache

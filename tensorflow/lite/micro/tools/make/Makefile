@@ -169,6 +169,7 @@ endif
 COMMON_FLAGS := \
   -Werror \
   -fno-unwind-tables \
+  -fno-asynchronous-unwind-tables \
   -ffunction-sections \
   -fdata-sections \
   -fmessage-length=0 \
@@ -265,6 +266,17 @@ endif
 # runtime that can be linked in to other programs.
 MICROLITE_LIB_NAME := libtensorflow-microlite.a
 
+# TFLM optional compression support (default disabled)
+ENABLE_COMPRESSION := no
+ifneq ($(USE_TFLM_COMPRESSION),)
+  # currently only Linux (x86), Xtensa targets supported
+  ifeq ($(TARGET), $(filter $(TARGET), linux xtensa))
+    CXXFLAGS += -DUSE_TFLM_COMPRESSION
+    CCFLAGS += -DUSE_TFLM_COMPRESSION
+    ENABLE_COMPRESSION := yes
+  endif
+endif
+
 # Where compiled objects are stored.
 BASE_GENDIR := gen
 GENDIR := $(BASE_GENDIR)/$(TARGET)_$(TARGET_ARCH)_$(BUILD_TYPE)
@@ -273,6 +285,9 @@ ifneq ($(OPTIMIZED_KERNEL_DIR),)
 endif
 ifneq ($(CO_PROCESSOR),)
   GENDIR := $(GENDIR)_$(CO_PROCESSOR)
+endif
+ifeq ($(ENABLE_COMPRESSION), yes)
+  GENDIR := $(GENDIR)_compression
 endif
 GENDIR := $(GENDIR)_$(TOOLCHAIN)/
 
@@ -350,6 +365,7 @@ $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/add_n.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/arg_min_max.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/assign_variable.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/batch_matmul.cc \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/batch_matmul_common.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/batch_to_space_nd.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/broadcast_args.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/broadcast_to.cc \

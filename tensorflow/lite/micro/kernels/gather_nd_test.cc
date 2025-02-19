@@ -299,6 +299,23 @@ TF_LITE_MICRO_TEST(GatherNd_Int8Int32) {
       golden_data);
 }
 
+TF_LITE_MICRO_TEST(GatherNd_Int16Int32) {
+  // For input_dims[], index_dims[], or output_dims[], element 0 is the
+  // number of dimensions in that array, not the actual dimension data.
+  int input_dims[] = {3, 3, 2, 3};
+  int index_dims[] = {2, 2, 2};
+  const int32_t index_data[] = {0, 1, 1, 0};
+  const int16_t input_data[] = {1, -1, 1,  -2, 2,  2,  //
+                                3, 3,  -3, -4, -4, 4,  //
+                                5, -5, 5,  6,  -6, 6};
+  const int16_t golden_data[] = {-2, 2, 2, 3, 3, -3};
+  int16_t output_data[6];
+  int output_dims[] = {2, 0, 0};
+  tflite::testing::TestGatherNd<int16_t, int32_t>(
+      input_dims, input_data, index_dims, index_data, output_dims, output_data,
+      golden_data);
+}
+
 TF_LITE_MICRO_TEST(GatherNd_ReadOOB) {
   // For input_dims[], index_dims[], or output_dims[], element 0 is the
   // number of dimensions in that array, not the actual dimension data.
@@ -313,6 +330,20 @@ TF_LITE_MICRO_TEST(GatherNd_ReadOOB) {
       nullptr, kTfLiteError);
 }
 
+TF_LITE_MICRO_TEST(GatherNd_ReadOOBInt16) {
+  // For input_dims[], index_dims[], or output_dims[], element 0 is the
+  // number of dimensions in that array, not the actual dimension data.
+  int input_dims[] = {2, 2, 2};
+  int index_dims[] = {2, 2, 2};
+  const int32_t index_data[] = {0, 1, 2, 0};
+  const int16_t input_data[] = {1, -1, 1, -2};
+  int16_t output_data;
+  int output_dims[] = {1, 0, 0};
+  tflite::testing::TestGatherNd<int16_t, int32_t>(
+      input_dims, input_data, index_dims, index_data, output_dims, &output_data,
+      nullptr, kTfLiteError);
+}
+
 TF_LITE_MICRO_TEST(GatherNd_ReadOOBNegative) {
   // For input_dims[], index_dims[], or output_dims[], element 0 is the
   // number of dimensions in that array, not the actual dimension data.
@@ -323,6 +354,20 @@ TF_LITE_MICRO_TEST(GatherNd_ReadOOBNegative) {
   int8_t output_data;
   int output_dims[] = {1, 0, 0};
   tflite::testing::TestGatherNd<int8_t, int32_t>(
+      input_dims, input_data, index_dims, index_data, output_dims, &output_data,
+      nullptr, kTfLiteError);
+}
+
+TF_LITE_MICRO_TEST(GatherNd_ReadOOBNegativeInt16) {
+  // For input_dims[], index_dims[], or output_dims[], element 0 is the
+  // number of dimensions in that array, not the actual dimension data.
+  int input_dims[] = {2, 2, 2};
+  int index_dims[] = {2, 2, 2};
+  const int32_t index_data[] = {0, -1, 1, 0};
+  const int16_t input_data[] = {1, -1, 1, -2};
+  int16_t output_data;
+  int output_dims[] = {1, 0, 0};
+  tflite::testing::TestGatherNd<int16_t, int32_t>(
       input_dims, input_data, index_dims, index_data, output_dims, &output_data,
       nullptr, kTfLiteError);
 }

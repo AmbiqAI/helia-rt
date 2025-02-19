@@ -181,16 +181,57 @@ TfLiteStatus FullyConnectedEval(TfLiteContext* context, TfLiteNode* node) {
     case kTfLiteInt16: {
       switch (filter->type) {
         case kTfLiteInt8: {
-          tflite::reference_integer_ops::FullyConnected(
-              FullyConnectedParamsQuantized(data),
-              tflite::micro::GetTensorShape(input),
-              tflite::micro::GetTensorData<int16_t>(input),
-              tflite::micro::GetTensorShape(filter),
-              tflite::micro::GetTensorData<int8_t>(filter),
-              tflite::micro::GetTensorShape(bias),
-              tflite::micro::GetOptionalTensorData<int64_t>(bias),
-              tflite::micro::GetTensorShape(output),
-              tflite::micro::GetTensorData<int16_t>(output));
+          if (bias == nullptr || bias->type == kTfLiteInt32) {
+            data.is_per_channel
+                ? tflite::reference_integer_ops::FullyConnectedPerChannel(
+                      FullyConnectedParamsQuantized(data),
+                      data.per_channel_output_multiplier,
+                      reinterpret_cast<const int*>(
+                          data.per_channel_output_shift),
+                      tflite::micro::GetTensorShape(input),
+                      tflite::micro::GetTensorData<int16_t>(input),
+                      tflite::micro::GetTensorShape(filter),
+                      tflite::micro::GetTensorData<int8_t>(filter),
+                      tflite::micro::GetTensorShape(bias),
+                      tflite::micro::GetOptionalTensorData<int32_t>(bias),
+                      tflite::micro::GetTensorShape(output),
+                      tflite::micro::GetTensorData<int16_t>(output))
+                : tflite::reference_integer_ops::FullyConnected(
+                      FullyConnectedParamsQuantized(data),
+                      tflite::micro::GetTensorShape(input),
+                      tflite::micro::GetTensorData<int16_t>(input),
+                      tflite::micro::GetTensorShape(filter),
+                      tflite::micro::GetTensorData<int8_t>(filter),
+                      tflite::micro::GetTensorShape(bias),
+                      tflite::micro::GetOptionalTensorData<int32_t>(bias),
+                      tflite::micro::GetTensorShape(output),
+                      tflite::micro::GetTensorData<int16_t>(output));
+          } else if (bias->type == kTfLiteInt64) {
+            data.is_per_channel
+                ? tflite::reference_integer_ops::FullyConnectedPerChannel(
+                      FullyConnectedParamsQuantized(data),
+                      data.per_channel_output_multiplier,
+                      reinterpret_cast<const int*>(
+                          data.per_channel_output_shift),
+                      tflite::micro::GetTensorShape(input),
+                      tflite::micro::GetTensorData<int16_t>(input),
+                      tflite::micro::GetTensorShape(filter),
+                      tflite::micro::GetTensorData<int8_t>(filter),
+                      tflite::micro::GetTensorShape(bias),
+                      tflite::micro::GetOptionalTensorData<int64_t>(bias),
+                      tflite::micro::GetTensorShape(output),
+                      tflite::micro::GetTensorData<int16_t>(output))
+                : tflite::reference_integer_ops::FullyConnected(
+                      FullyConnectedParamsQuantized(data),
+                      tflite::micro::GetTensorShape(input),
+                      tflite::micro::GetTensorData<int16_t>(input),
+                      tflite::micro::GetTensorShape(filter),
+                      tflite::micro::GetTensorData<int8_t>(filter),
+                      tflite::micro::GetTensorShape(bias),
+                      tflite::micro::GetOptionalTensorData<int64_t>(bias),
+                      tflite::micro::GetTensorShape(output),
+                      tflite::micro::GetTensorData<int16_t>(output));
+          }
           break;
         }
         default: {
@@ -201,6 +242,7 @@ TfLiteStatus FullyConnectedEval(TfLiteContext* context, TfLiteNode* node) {
       }
       break;
     }
+
 
     default: {
       MicroPrintf("Input type %s (%d) not supported.",

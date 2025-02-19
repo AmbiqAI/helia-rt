@@ -20,7 +20,7 @@ jobs:
 
     if: |
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'schedule' && github.repository == 'tensorflow/tflite-micro')
+      (github.event_name == 'schedule' && github.repository == 'AmbiqAI/ns-tflm')
     name: Generate Integration Tests
     steps:
       - uses: actions/setup-python@v4

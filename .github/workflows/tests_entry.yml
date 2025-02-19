@@ -2,7 +2,6 @@
 # Entry point to the test suites
 #
 # - If neither ci:run, ci:run_full or ci:ready_to_merge labels are on PR, fail and exit.
-# - If the PR comment body doesn't contain 'BUG=' fail and exit.
 # - If ci:run or ci:run_full label is on PR, remove label and run the test scripts.
 # - If ci:ready_to_merge is on the PR and the pull_request_target type is synchronize not triggered
 #   by the mergify[bot] user, remove label and fail job.
@@ -25,10 +24,11 @@ on:
 
 jobs:
   no-labels:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-md
     steps:
       - name: fail-without-labels
-        if: github.event.action == 'labeled' &&
+        if: >
+          github.event.action == 'labeled' &&
           !(github.event.label.name == 'ci:run' ||
             github.event.label.name == 'ci:ready_to_merge' ||
             github.event.label.name == 'ci:run_full')
@@ -94,46 +94,8 @@ jobs:
             })
         continue-on-error: true
 
-  pr-has-bug:
-    runs-on: ubuntu-latest
-    needs: ci-run-full
-    name: PR has Bug
-    steps:
-      - name: Check for BUG=
-        if: ${{ !contains(github.event.pull_request.body, 'BUG=') }}
-        run: |
-          echo "PR description requires a BUG= line with issue number."
-          echo "See https://testing.googleblog.com/2017/09/code-health-providing-context-with.html for additional context"
-          exit 1
-
-  call-ci:
+  call-ambiq:
     needs: ci-run
-    uses: ./.github/workflows/ci.yml
+    uses: ./.github/workflows/run_ambiq.yml
     with:
       trigger-sha: ${{ github.event.pull_request.head.sha }}
-
-  call-hexagon:
-    needs: ci-run
-    uses: ./.github/workflows/hexagon.yml
-    with:
-      trigger-sha: ${{ github.event.pull_request.head.sha }}
-    secrets:
-      tflm-bot-token: ${{ secrets.TFLM_BOT_PACKAGE_READ_TOKEN }}
-
-  call-xtensa-presubmit:
-    needs: ci-run
-    uses: ./.github/workflows/xtensa_presubmit.yml
-    with:
-      trigger-sha: ${{ github.event.pull_request.head.sha }}
-    secrets:
-      tflm-bot-token: ${{ secrets.TFLM_BOT_PACKAGE_READ_TOKEN }}
-
-  call-check-tflite-files:
-    needs: ci-run
-    uses: ./.github/workflows/check_tflite_files.yml
-    with:
-      trigger-sha: ${{ github.event.pull_request.head.sha }}
-      pr-number: ${{ github.event.pull_request.number }}
-      pr-body: ${{ github.event.pull_request.body }}
-    secrets:
-      tflm-bot-token: ${{ secrets.TFLM_BOT_PACKAGE_READ_TOKEN }}
