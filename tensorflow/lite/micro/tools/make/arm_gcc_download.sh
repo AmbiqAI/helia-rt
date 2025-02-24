@@ -63,26 +63,26 @@ else
     # host architechture
     UNAME_M=`uname -m`
     if [ "${UNAME_M}" == "x86_64" ]; then
-      GCC_URL="https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-x86_64-arm-none-eabi.tar.xz"
-      EXPECTED_MD5="791754852f8c18ea04da7139f153a5b7"
+      GCC_URL="https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi.tar.xz"
+      EXPECTED_MD5="fcdcd7c8d5b22d2d0cc6bf3721686e69"
     elif [ "${UNAME_M}" == "aarch64" ]; then
-      GCC_URL="https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-aarch64-arm-none-eabi.tar.xz"
-      EXPECTED_MD5="5a08122e6d4caf97c6ccd1d29e62599c"
+      GCC_URL="https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-aarch64-arm-none-eabi.tar.xz"
+      EXPECTED_MD5="342d6d9dc75e6d4c05a748f2cecc96a6"
     fi
 
   elif [ "${HOST_OS}" == "osx" ]; then
     # host architechture
     UNAME_M=`uname -m`
     if [ "${UNAME_M}" == "arm64" ]; then
-      GCC_URL="https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-darwin-arm64-arm-none-eabi.tar.xz"
-      EXPECTED_MD5="2c43e9d72206c1f81227b0a685df5ea6"
+      GCC_URL="https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-darwin-arm64-arm-none-eabi.tar.xz"
+      EXPECTED_MD5="40d1c9208aed7fab08b0f27e5383dcef"
     else
-      GCC_URL="https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-darwin-x86_64-arm-none-eabi.tar.xz"
-      EXPECTED_MD5="41d49840b0fc676d2ae35aab21a58693"
+      GCC_URL="https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-darwin-x86_64-arm-none-eabi.tar.xz"
+      EXPECTED_MD5="d5fb1ae60e4d67eb2986837dbcd6a066"
     fi
   elif [ "${HOST_OS}" == "windows" ]; then
-    GCC_URL="https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-mingw-w64-i686-arm-none-eabi.zip"
-    EXPECTED_MD5="7fd677088038cdf82f33f149e2e943ee"
+    GCC_URL="https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-mingw-w64-i686-arm-none-eabi.zip"
+    EXPECTED_MD5="42ab20ec8d5c52cbcb07e3fb27791ecd"
   else
     echo "OS type ${HOST_OS} not supported."
     exit 1

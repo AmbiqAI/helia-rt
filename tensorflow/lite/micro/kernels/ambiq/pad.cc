@@ -225,9 +225,23 @@ TfLiteStatus Eval(TfLiteContext *context, TfLiteNode *node)
   case kTfLiteInt16:
   {
     int16_t pad_value = constant_values == nullptr ? 0 : *tflite::micro::GetTensorData<int16_t>(constant_values);
-    reference_ops::Pad(
-        data->params, tflite::micro::GetTensorShape(input), tflite::micro::GetTensorData<int16_t>(input), &pad_value,
-        tflite::micro::GetTensorShape(output), tflite::micro::GetTensorData<int16_t>(output));
+    if (tflite::micro::GetTensorShape(input).DimensionsCount() == 4)
+    {
+      cmsis_nn_dims input_size;
+      cmsis_nn_dims pre_pad;
+      cmsis_nn_dims post_pad;
+      PopulateCommonParams(&input_size, &pre_pad, &post_pad, data, tflite::micro::GetTensorShape(input));
+      arm_pad_s16(
+          tflite::micro::GetTensorData<int16_t>(input),
+          tflite::micro::GetTensorData<int16_t>(output),
+          pad_value, &input_size, &pre_pad, &post_pad
+      );
+    }
+    else {
+      reference_ops::Pad(
+          data->params, tflite::micro::GetTensorShape(input), tflite::micro::GetTensorData<int16_t>(input), &pad_value,
+          tflite::micro::GetTensorShape(output), tflite::micro::GetTensorData<int16_t>(output));
+    }
   }
   break;
 

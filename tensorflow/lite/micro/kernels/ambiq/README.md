@@ -4,10 +4,10 @@ This directory contains custom kernel operations for TFLM optimized for Ambiq So
 
 ## Target SoCs
 
-# Apollo4 Plus
+* Apollo4 Plus w/ Cortex-M4
 * Apollo510 w/ Cortex-M55
 
-## Operator Support Status
+## Operator Support Matrix
 
 | Operator          | C <br> int8 | C<br>int16 | C<br>int4* | DSP<br>int8 | DSP<br>int16 | DSP<br>int4* | MVE<br>int8 | MVE<br>int16 | MVE<br>int4* |
 | ----------------- | ----------- | ---------- |------------|-------------| -------------|--------------|-------------| -------------|--------------|
@@ -16,7 +16,7 @@ This directory contains custom kernel operations for TFLM optimized for Ambiq So
 | batch_to_space_nd | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | cast              | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | comparisons       | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| concatenation     | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| concatenation     | Yes         | Yes        | No         | Yes         | Yes          | No           | Yes         | Yes          | No           |
 | conv              | Yes         | Yes        | Yes        | Yes         | Yes          | Yes          | Yes         | Yes          | Yes          |
 | cumsum            | Yes         | No         | No         | No          | No           | No           | No          | No           | No           |
 | depth_to_space    | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
@@ -27,29 +27,29 @@ This directory contains custom kernel operations for TFLM optimized for Ambiq So
 | embedding_lookup  | Yes         | No         | No         | No          | No           | No           | No          | No           | No           |
 | expand_dims       | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | fill              | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| fully_ connected  | Yes         | Yes        | Yes        | Yes         | Yes          | Yes          | Yes         | Yes          | Yes          |
+| fully_connected   | Yes         | Yes        | Yes        | Yes         | Yes          | Yes          | Yes         | Yes          | Yes          |
 | gather_nd         | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | gather            | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | hard_swish        | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | l2norm            | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| leaky_relu        | Yes         | Yes        | No         | Yes         | No           | No           | Yes         | No           | No           |
+| leaky_relu        | Yes         | Yes        | No         | Yes         | No           | No           | Yes         | Yes          | No           |
 | log_softmax       | Yes         | No         | No         | No          | No           | No           | No          | No           | No           |
-| logistic          | Yes         | Yes        | No         | Yes         | No           | No           | Yes         | No           | No           |
+| logistic          | Yes         | Yes        | No         | Yes         | No           | No           | Yes         | Yes          | No           |
 | lstm              | Yes         | Yes        | No         | Yes         | Yes          | No           | Yes         | Yes          | No           |
-| minimum           | Yes         | No         | N/A        | No          | No           | N/A          | Yes         | No           | N/A          |
-| maximum           | Yes         | No         | N/A        | No          | No           | N/A          | Yes         | No           | N/A          |
+| minimum           | Yes         | Yes        | N/A        | No          | No           | N/A          | Yes         | Yes          | N/A          |
+| maximum           | Yes         | Yes        | N/A        | No          | No           | N/A          | Yes         | Yes          | N/A          |
 | mirror_pad        | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | mul               | Yes         | Yes        | N/A        | Yes         | Yes          | N/A          | Yes         | Yes          | N/A          |
 | neg               | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | pack              | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| pad               | Yes         | Yes        | N/A        | No          | No           | N/A          | Yes         | No           | N/A          |
+| pad               | Yes         | Yes        | N/A        | No          | No           | N/A          | Yes         | Yes          | N/A          |
 | max_pooling       | Yes         | Yes        | N/A        | Yes         | Yes          | N/A          | Yes         | Yes          | N/A          |
 | avg_pooling       | Yes         | Yes        | N/A        | Yes         | Yes          | N/A          | Yes         | Yes          | N/A          |
 | prelu             | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | resize_bilinear   | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | select            | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | slice             | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| softmax           | Yes         | Yes        | No         | Yes         | Yes          | No           | Yes         | No           | No           |
+| softmax           | Yes         | Yes        | No         | Yes         | Yes          | No           | Yes         | Yes          | No           |
 | space_to_batch_nd | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | space_to_depth    | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | split             | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
