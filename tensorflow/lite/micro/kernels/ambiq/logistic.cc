@@ -15,6 +15,9 @@ limitations under the License.
 
 #include "tensorflow/lite/kernels/internal/reference/integer_ops/logistic.h"
 
+#include "Include/arm_nnsupportfunctions.h"
+#include "Include/arm_nnactivations.h"
+
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/kernels/internal/common.h"
@@ -75,11 +78,11 @@ TfLiteStatus LogisticEval(TfLiteContext* context, TfLiteNode* node) {
   } else if (input->type == kTfLiteInt16) {
     switch (output->type) {
       case kTfLiteInt16: {
-        reference_integer_ops::Logistic(
-            data->input_multiplier, data->input_left_shift,
+        arm_logistic_s16(
+          const_cast<int16_t*>(tflite::micro::GetTensorData<int16_t>(input)),
+          const_cast<int16_t*>(tflite::micro::GetTensorData<int16_t>(output)),
             NumElements(input->dims),
-            tflite::micro::GetTensorData<int16_t>(input),
-            tflite::micro::GetTensorData<int16_t>(output));
+            data->input_multiplier, data->input_left_shift);
         return kTfLiteOk;
       }
       default:
