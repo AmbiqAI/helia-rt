@@ -33,8 +33,8 @@ fi
 
 TARGET=cortex_m_corstone_300
 TARGET_ARCH=cortex-m55
-CO_PROCESSOR=ambiq
-OPTIMIZED_KERNEL_DIR=cmsis_nn
+CO_PROCESSOR=
+OPTIMIZED_KERNEL_DIR=ambiq
 TOOLCHAINS=(gcc armclang)
 
 # TODO(b/143715361): downloading first to allow for parallel builds.

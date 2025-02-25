@@ -25,6 +25,8 @@ jobs:
         run: git config --global --add safe.directory '*'
 
       - name: Create artifacts
+        env:
+          NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
         run: |
           mkdir -p artifacts
           # Create neuralSPOT module
