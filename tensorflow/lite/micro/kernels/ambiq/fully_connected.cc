@@ -15,8 +15,6 @@ limitations under the License.
 
 #include "tensorflow/lite/kernels/internal/reference/fully_connected.h"
 
-#include <arm_mve.h>
-#include <arm_fp16.h>
 #include "Include/arm_nnfunctions.h"
 #include "Include/arm_nnsupportfunctions.h"
 #include "tensorflow/lite/c/builtin_op_data.h"
@@ -81,7 +79,6 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_MSG(
     context, (
       input->type == kTfLiteFloat32 ||
-      input->type == kTfLiteFloat16 ||
       input->type == kTfLiteInt16 ||
       input->type == kTfLiteInt8
     ),
@@ -90,7 +87,6 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_MSG(
       context,
       (input->type == kTfLiteFloat32 && filter->type == kTfLiteFloat32) ||
-      (input->type == kTfLiteFloat16 && filter->type == kTfLiteFloat16) ||
           (input->type == kTfLiteInt16 &&
           (filter->type == kTfLiteInt16 || filter->type == kTfLiteInt8)) ||
           (input->type == kTfLiteInt8 &&
