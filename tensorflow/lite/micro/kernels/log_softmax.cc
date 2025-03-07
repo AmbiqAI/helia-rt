@@ -62,9 +62,9 @@ inline void LogSoftmaxQuantizedInt16(
   static constexpr int16_t kMaxT16 = std::numeric_limits<int16_t>::max();  // +32767
   static constexpr int32_t kMinInt32 = std::numeric_limits<int32_t>::min();
 
-  static constexpr int kInputIntegerBits = 4;
+  static constexpr int kInputIntegerBits = 5;
   static constexpr int kAccumulationIntegerBits = 12;
-  static constexpr int kOutputIntegerBits = 14;
+  static constexpr int kOutputIntegerBits = 13;
 
   using F5 = gemmlowp::FixedPoint<int32_t, kInputIntegerBits>;
   using F12 = gemmlowp::FixedPoint<int32_t, kAccumulationIntegerBits>;
@@ -102,7 +102,7 @@ inline void LogSoftmaxQuantizedInt16(
     }
 
     // Log(sum_of_exps) in Q5.26
-    const int32_t log_sum_of_exps_in_q5 =log_x_for_x_greater_than_or_equal_to_1<kInputIntegerBits>(
+    const int32_t log_sum_of_exps_in_q5 =log_x_for_x_greater_than_or_equal_to_1<kInputIntegerBits, kAccumulationIntegerBits>(
             sum_of_exps_in_q12)
             .raw();
     // Adjust for large negative boundary checks
@@ -209,28 +209,25 @@ else if (input->type == kTfLiteInt16) {
         context->AllocatePersistentBuffer(context, sizeof(LogSoftmaxOpData));
     auto data = static_cast<LogSoftmaxOpData*>(node->user_data);
 
-    // If your int16 data has some known scale or zero point (like -32768..32767),
-    // fill out input_multiplier, input_left_shift, etc. 
-    // If you're re-using the int8 approach with the same numeric assumptions,
-    // you could do that. For example:
+    constexpr int32_t kOutputZeroPoint = 32767;
+    constexpr float kOutputScale =  1.0f / (1 << 13);
     constexpr double kBeta = 1.0;
     constexpr int kScaledDiffIntegerBits = 5;
-    // Suppose your scale is the same as int8, or a different one:
-    double scale = static_cast<double>(input->params.scale);
+
+    TF_LITE_ENSURE(context, output->params.scale == kOutputScale);
+    TF_LITE_ENSURE(context, output->params.zero_point == kOutputZeroPoint);
 
     int input_left_shift;
     int reverse_scaling_right_shift;
     tflite::PreprocessLogSoftmaxScalingExp(
-        kBeta, scale, kScaledDiffIntegerBits,
+        kBeta, static_cast<double>(input->params.scale), kScaledDiffIntegerBits,
         &data->input_multiplier, &input_left_shift,
         &data->reverse_scaling_divisor, &reverse_scaling_right_shift);
 
     data->input_left_shift = static_cast<int32_t>(input_left_shift);
-    data->reverse_scaling_right_shift = 
-        static_cast<int32_t>(-reverse_scaling_right_shift);
+    data->reverse_scaling_right_shift = static_cast<int32_t>(-reverse_scaling_right_shift);
 
-    data->diff_min =
-        -tflite::CalculateInputRadius(kScaledDiffIntegerBits, input_left_shift);
+    data->diff_min = -tflite::CalculateInputRadius(kScaledDiffIntegerBits, input_left_shift);
 
     RuntimeShape input_shape = GetTensorShape(input);
     const int trailing_dim = input_shape.DimensionsCount() - 1;

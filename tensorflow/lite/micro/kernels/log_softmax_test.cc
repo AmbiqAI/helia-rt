@@ -264,11 +264,14 @@ TF_LITE_MICRO_TEST(ExtraTestLogSoftmaxInt8) {
 TF_LITE_MICRO_TEST(QuantizedActivationsOpTestLogSoftmaxInt16) {
   int kDims[] = {2, 2, 4};
   constexpr float kInput[] = {
-      0, -6, 2, 4, 3, -2, 10, 1,
+      0.f,  -1.f, 2.f,  -2.f,
+      3.f,   2.f, 1.f,  -1.f,
   };
+
+  // float reference (approx):
   constexpr float kExpect[] = {
-      -4.14297, -10.14297, -2.14297,   -.142971,
-      -7.00104, -12.00104, -.00104087, -9.00104,
+      -2.1840f, -3.1840f, -0.1840f, -4.1840f,
+      -0.4209f, -1.4209f, -2.4209f, -4.4209f,
   };
   constexpr int kOutputCount = 8;
   float output_data[kOutputCount];
@@ -278,7 +281,7 @@ TF_LITE_MICRO_TEST(QuantizedActivationsOpTestLogSoftmaxInt16) {
   int16_t q_input_data[kOutputCount];
   constexpr float kMin = -10;
   constexpr float kMax = 10;
-  constexpr float kLogSoftmaxQuantizedTolerance = 0.8;
+  constexpr float kLogSoftmaxQuantizedTolerance = 0.06;
   tflite::testing::TestLogSoftmaxParams<int16_t> params = {};
   params.data_min = kMin;
   params.data_max = kMax;
