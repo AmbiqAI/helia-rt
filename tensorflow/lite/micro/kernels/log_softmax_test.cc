@@ -108,6 +108,38 @@ void TestLogSoftmaxQuantized(const TestLogSoftmaxParams<T>& params,
   }
 }
 
+template <typename T>
+void TestLogSoftmaxQuantizedint16(const TestLogSoftmaxParams<T>& params,
+                             int* input_dims_data, const float* input_data,
+                             int* expected_dims, const float* expected_data, 
+                             float* output_data) {
+  TfLiteIntArray* input_dims = IntArrayFromInts(input_dims_data);
+  TfLiteIntArray* output_dims = IntArrayFromInts(expected_dims);
+  const int output_count = ElementCount(*output_dims);
+
+  constexpr float kOutputScale = 1.0f / (1 << 13);
+  constexpr int kOutputZeroPoint = 32767;
+  const int zero_point =
+      ZeroPointFromMinMax<T>(params.data_min, params.data_max);
+  const float scale = ScaleFromMinMax<T>(params.data_min, params.data_max);
+
+  TfLiteTensor tensors[] = {
+      CreateQuantizedTensor<int16_t>(input_data, params.input_data, input_dims, scale,
+                            zero_point),
+      CreateQuantizedTensor<int16_t>(params.output_data, output_dims, kOutputScale,
+                            kOutputZeroPoint),
+  };
+  constexpr int kTensorsCount = std::extent<decltype(tensors)>::value;
+
+  ExecuteLogSoftmaxTest(kTensorsCount, tensors);
+  Dequantize(params.output_data, output_count, kOutputScale, kOutputZeroPoint,
+             output_data);
+  for (int i = 0; i < output_count; i++) {
+    TF_LITE_MICRO_EXPECT_NEAR(expected_data[i], output_data[i],
+                              params.tolerance);
+  }
+}
+
 }  // namespace
 }  // namespace testing
 }  // namespace tflite
@@ -225,6 +257,36 @@ TF_LITE_MICRO_TEST(ExtraTestLogSoftmaxInt8) {
 
   tflite::testing::TestLogSoftmaxQuantized(
       params, kDims, kInput, kDims, kExpect, kExpectQuantized, output_data);
+}
+
+
+
+TF_LITE_MICRO_TEST(QuantizedActivationsOpTestLogSoftmaxInt16) {
+  int kDims[] = {2, 2, 4};
+  constexpr float kInput[] = {
+      0, -6, 2, 4, 3, -2, 10, 1,
+  };
+  constexpr float kExpect[] = {
+      -4.14297, -10.14297, -2.14297,   -.142971,
+      -7.00104, -12.00104, -.00104087, -9.00104,
+  };
+  constexpr int kOutputCount = 8;
+  float output_data[kOutputCount];
+
+  // setup quantization storage and parameters
+  int16_t q_output_data[kOutputCount];
+  int16_t q_input_data[kOutputCount];
+  constexpr float kMin = -10;
+  constexpr float kMax = 10;
+  constexpr float kLogSoftmaxQuantizedTolerance = 0.8;
+  tflite::testing::TestLogSoftmaxParams<int16_t> params = {};
+  params.data_min = kMin;
+  params.data_max = kMax;
+  params.input_data = q_input_data;
+  params.output_data = q_output_data;
+  params.tolerance = kLogSoftmaxQuantizedTolerance;
+  tflite::testing::TestLogSoftmaxQuantizedint16<int16_t>(
+      params, kDims, kInput, kDims, kExpect, output_data);
 }
 
 TF_LITE_MICRO_TESTS_END
