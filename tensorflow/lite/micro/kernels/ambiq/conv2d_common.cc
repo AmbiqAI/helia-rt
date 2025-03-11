@@ -1,4 +1,3 @@
-#include <arm_mve.h>
 #include <stdint.h>
 #include "Include/arm_nnfunctions.h"
 #include "Include/arm_nnsupportfunctions.h"
