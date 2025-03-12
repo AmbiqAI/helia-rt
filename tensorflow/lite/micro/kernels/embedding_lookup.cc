@@ -48,6 +48,35 @@ struct OpData {
   size_t num_columns;  // number of columns after flattening tensor 1 into 2D
 };
 
+TfLiteStatus EvalHybrid_s16(const OpData& op_data,
+                             const TfLiteEvalTensor* lookup,
+                             const TfLiteEvalTensor* value,
+                             TfLiteEvalTensor* output) {
+  const int num_rows = value->dims->data[0];
+  const int num_columns = op_data.num_columns;
+
+  float* output_ptr = tflite::micro::GetTensorData<float>(output);
+  const int16_t* value_ptr = tflite::micro::GetTensorData<int16_t>(value);
+  const int32_t* lookup_data = tflite::micro::GetTensorData<int32_t>(lookup);
+  for (int i = 0; i < lookup->dims->data[0]; i++) {
+    int32_t idx = lookup_data[i];
+    if (idx < 0 || idx >= num_rows) {
+      MicroPrintf(
+          "EMBEDDING_LOOKUP (int16->float32): index out of bounds. "
+          "Got %d, valid range [0..%d]",
+          idx, num_rows - 1);
+      return kTfLiteError;
+    }
+    // Dequantize row
+    const int16_t* src_row = &value_ptr[idx * num_columns];
+    float* dst_row = &output_ptr[i * num_columns];
+    for (int c = 0; c < num_columns; c++) {
+      dst_row[c] = src_row[c] * op_data.scale;
+    }
+  }
+  return kTfLiteOk;
+}
+
 TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteNode* node,
                              const TfLiteTensor* tensor_1,
                              const TfLiteTensor* output) {
@@ -56,6 +85,11 @@ TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteNode* node,
   TF_LITE_ENSURE(context, op_data != nullptr);
 
   if (tensor_1->type == kTfLiteInt8 && output->type == kTfLiteFloat32) {
+    TF_LITE_ENSURE_EQ(context, tensor_1->params.zero_point, 0);
+    op_data->scale = tensor_1->params.scale;
+  }
+  // int16 -> float32 path:
+  if (tensor_1->type == kTfLiteInt16 && output->type == kTfLiteFloat32) {
     TF_LITE_ENSURE_EQ(context, tensor_1->params.zero_point, 0);
     op_data->scale = tensor_1->params.scale;
   }
@@ -82,7 +116,7 @@ TfLiteStatus EmbeddingLookUpPrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE(context, value != nullptr);
   TF_LITE_ENSURE(context, NumDimensions(value) >= 2);
   TF_LITE_ENSURE(context,
-                 value->type == kTfLiteFloat32 || value->type == kTfLiteInt8);
+                 value->type == kTfLiteFloat32 || value->type == kTfLiteInt8 || value->type == kTfLiteInt16);
 
   TfLiteTensor* output =
       micro_context->AllocateTempOutputTensor(node, kOutputTensor);
@@ -91,7 +125,7 @@ TfLiteStatus EmbeddingLookUpPrepare(TfLiteContext* context, TfLiteNode* node) {
     TF_LITE_ENSURE(context, output->type == kTfLiteFloat32);
   } else {
     TF_LITE_ENSURE(
-        context, output->type == kTfLiteFloat32 || output->type == kTfLiteInt8);
+        context, (output->type == kTfLiteFloat32 || output->type == kTfLiteInt8 || output->type == kTfLiteInt16));
   }
 
   // make sure output dimensions size can hold the new dimension data
@@ -155,7 +189,6 @@ TfLiteStatus EvalHybrid(const OpData& op_data, const TfLiteEvalTensor* lookup,
                         TfLiteEvalTensor* output) {
   const int num_rows = value->dims->data[0];
   const size_t num_colums = op_data.num_columns;
-
   float* output_ptr = tflite::micro::GetTensorData<float>(output);
   const int8_t* value_ptr = tflite::micro::GetTensorData<int8_t>(value);
   const int32_t* lookup_data = tflite::micro::GetTensorData<int32_t>(lookup);
@@ -196,6 +229,19 @@ TfLiteStatus EmbeddingLookUpEval(TfLiteContext* context, TfLiteNode* node) {
         return EvalHybrid(op_data, lookup, value, output);
       } else {
         return EvalSimple(op_data, lookup, value, output);
+      }
+    case kTfLiteInt16:
+      if (output->type == kTfLiteFloat32) {
+        // int16 -> float32 dequant
+        return EvalHybrid_s16(op_data, lookup, value, output);
+      } else if (output->type == kTfLiteInt16) {
+        // int16 -> int16 copy
+        return EvalSimple(op_data, lookup, value, output);
+      } else {
+        MicroPrintf(
+            "EMBEDDING_LOOKUP int16: output type %s not supported.",
+            TfLiteTypeGetName(output->type));
+        return kTfLiteError;
       }
     default:
       MicroPrintf("EMBEDDING_LOOKUP only supports FLOAT32 and INT8, got %s.",
