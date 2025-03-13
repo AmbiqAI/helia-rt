@@ -347,4 +347,125 @@ TF_LITE_MICRO_TEST(CumSumOpTestSimpleReverseExclusiveTestInt8) {
   tflite::testing::TestCumSumQuantized<int8_t, kOutputCount>(
       test_params, &params, kDims, kInput, kDims, kExpect, output_data);
 }
+
+
+TF_LITE_MICRO_TEST(CumSumOpTestSimpleTestInt16) {
+  int kDims[] = {2, 2, 4};
+  constexpr float kInput[] = {1, 2, 3, 4, 5, 6, 7, 8};
+  constexpr float kExpect[] = {1, 3, 6, 10, 5, 11, 18, 26};
+
+  constexpr int kOutputCount = std::extent<decltype(kExpect)>::value;
+  float output_data[kOutputCount];
+
+  tflite::testing::CumSumTestParams test_params;
+  test_params.axis = 1;
+
+  tflite::testing::TestQuantParams<int16_t, kOutputCount> params = {};
+  params.data_min = -40.0f;
+  params.data_max = 40.0f;
+
+  tflite::testing::TestCumSumQuantized<int16_t, kOutputCount>(
+      test_params, &params, kDims, kInput, kDims, kExpect, output_data);
+}
+
+TF_LITE_MICRO_TEST(CumSumOpTestSimpleAxis0TestInt16) {
+  int kDims[] = {2, 2, 4};
+  constexpr float kInput[] = {1, 2, 3, 4, 5, 6, 7, 8};
+  constexpr float kExpect[] = {1, 2, 3, 4, 6, 8, 10, 12};
+
+  constexpr int kOutputCount = std::extent<decltype(kExpect)>::value;
+  float output_data[kOutputCount];
+
+  tflite::testing::CumSumTestParams test_params;
+  test_params.axis = 0;
+
+  tflite::testing::TestQuantParams<int16_t, kOutputCount> params = {};
+  params.data_min = -40.0f;
+  params.data_max = 40.0f;
+
+  tflite::testing::TestCumSumQuantized<int16_t, kOutputCount>(
+      test_params, &params, kDims, kInput, kDims, kExpect, output_data);
+}
+
+TF_LITE_MICRO_TEST(CumSumOpTestSimple1DTestInt16) {
+  int kDims[] = {1, 8};
+  constexpr float kInput[] = {1, 2, 3, 4, 5, 6, 7, 8};
+  constexpr float kExpect[] = {1, 3, 6, 10, 15, 21, 28, 36};
+
+  constexpr int kOutputCount = std::extent<decltype(kExpect)>::value;
+  float output_data[kOutputCount];
+
+  tflite::testing::CumSumTestParams test_params;
+  test_params.axis = 0;
+
+  tflite::testing::TestQuantParams<int16_t, kOutputCount> params = {};
+  params.data_min = -40.0f;
+  params.data_max = 40.0f;
+
+  tflite::testing::TestCumSumQuantized<int16_t, kOutputCount>(
+      test_params, &params, kDims, kInput, kDims, kExpect, output_data);
+}
+
+TF_LITE_MICRO_TEST(CumSumOpTestSimpleReverseTestInt16) {
+  int kDims[] = {2, 2, 4};
+  constexpr float kInput[] = {1, 2, 3, 4, 5, 6, 7, 8};
+  constexpr float kExpect[] = {10, 9, 7, 4, 26, 21, 15, 8};
+
+  constexpr int kOutputCount = std::extent<decltype(kExpect)>::value;
+  float output_data[kOutputCount];
+
+  tflite::testing::CumSumTestParams test_params;
+  test_params.axis = 1;
+  test_params.reverse = true;
+
+  tflite::testing::TestQuantParams<int16_t, kOutputCount> params = {};
+  params.data_min = -40.0f;
+  params.data_max = 40.0f;
+
+  tflite::testing::TestCumSumQuantized<int16_t, kOutputCount>(
+      test_params, &params, kDims, kInput, kDims, kExpect, output_data);
+}
+
+TF_LITE_MICRO_TEST(CumSumOpTestSimpleExclusiveTestInt16) {
+  int kDims[] = {2, 2, 4};
+  constexpr float kInput[] = {1, 2, 3, 4, 5, 6, 7, 8};
+  constexpr float kExpect[] = {0, 1, 3, 6, 0, 5, 11, 18};
+
+  constexpr int kOutputCount = std::extent<decltype(kExpect)>::value;
+  float output_data[kOutputCount];
+
+  tflite::testing::CumSumTestParams test_params;
+  test_params.axis = 1;
+  test_params.exclusive = true;
+
+  tflite::testing::TestQuantParams<int16_t, kOutputCount> params = {};
+  params.data_min = -40.0f;
+  params.data_max = 40.0f;
+
+  tflite::testing::TestCumSumQuantized<int16_t, kOutputCount>(
+      test_params, &params, kDims, kInput, kDims, kExpect, output_data);
+}
+
+TF_LITE_MICRO_TEST(CumSumOpTestSimpleReverseExclusiveTestInt16) {
+  int kDims[] = {2, 2, 4};
+  constexpr float kInput[] = {1, 2, 3, 4, 5, 6, 7, 8};
+  constexpr float kExpect[] = {9, 7, 4, 0, 21, 15, 8, 0};
+
+  constexpr int kOutputCount = std::extent<decltype(kExpect)>::value;
+  float output_data[kOutputCount];
+
+  tflite::testing::CumSumTestParams test_params;
+  test_params.axis = -1;
+  test_params.exclusive = true;
+  test_params.reverse = true;
+
+  tflite::testing::TestQuantParams<int16_t, kOutputCount> params = {};
+  params.data_min = -40.0f;
+  params.data_max = 40.0f;
+
+  tflite::testing::TestCumSumQuantized<int16_t, kOutputCount>(
+      test_params, &params, kDims, kInput, kDims, kExpect, output_data);
+}
+
+
 TF_LITE_MICRO_TESTS_END
