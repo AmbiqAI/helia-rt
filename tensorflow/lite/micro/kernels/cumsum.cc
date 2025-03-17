@@ -30,7 +30,7 @@ constexpr int kAxisTensor = 1;
 constexpr int kOutputTensor = 0;
 
 constexpr int kCumSumIntegerShift = 20;
-
+constexpr int kCumSumIntegerShift_s16 = 10;
 // only used with INT8 and INT16 tensors
 struct OpData {
   int32_t output_activation_min;
@@ -185,7 +185,7 @@ TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteNode* node) {
 
     data->input_offset = -input->params.zero_point;
     data->output_offset = output->params.zero_point;
-    data->left_shift = 10;
+    data->left_shift = kCumSumIntegerShift_s16;
     const double twice_max_input_scale =
         2 * static_cast<double>(input->params.scale);
     const double real_input_multiplier =
