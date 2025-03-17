@@ -43,7 +43,7 @@ struct LogSoftmaxOpData {
 constexpr int kInputTensor = 0;
 constexpr int kOutputTensor = 0;
 
-inline void LogSoftmaxQuantizedInt16(
+inline void LogSoftmax_s16(
     const SoftmaxParams& params,
     const size_t outer_size,
     const size_t depth,
@@ -281,7 +281,7 @@ TfLiteStatus LogSoftmaxEval(TfLiteContext* context, TfLiteNode* node) {
       op_params.reverse_scaling_divisor = data->reverse_scaling_divisor;
       op_params.reverse_scaling_right_shift = data->reverse_scaling_right_shift;
       op_params.diff_min = data->diff_min;
-      LogSoftmaxQuantizedInt16(op_params, data->outer_size, data->depth,
+      LogSoftmax_s16(op_params, data->outer_size, data->depth,
                                       tflite::micro::GetTensorShape(input),
                                       tflite::micro::GetTensorData<int16_t>(input),
                                       tflite::micro::GetTensorShape(output),

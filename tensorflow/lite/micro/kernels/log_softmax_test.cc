@@ -292,4 +292,30 @@ TF_LITE_MICRO_TEST(QuantizedActivationsOpTestLogSoftmaxInt16) {
       params, kDims, kInput, kDims, kExpect, output_data);
 }
 
+
+TF_LITE_MICRO_TEST(ExtraTestLogSoftmaxInt16) {
+  int kDims[] = {2, 3, 1};
+  constexpr float kInput[] = {0, -1, 1};
+  constexpr float kExpect[] = {0, 0, 0};
+  constexpr int kOutputCount = std::extent<decltype(kExpect)>::value;
+  float output_data[kOutputCount];
+
+  // setup quantization storage and parameters
+  int16_t q_output_data[kOutputCount];
+  int16_t q_input_data[kOutputCount];
+  constexpr float kMin = -1;
+  constexpr float kMax = 1;
+  constexpr float kLogSoftmaxQuantizedTolerance = 0.06355;
+  tflite::testing::TestLogSoftmaxParams<int16_t> params = {};
+  params.data_min = kMin;
+  params.data_max = kMax;
+  params.input_data = q_input_data;
+  params.output_data = q_output_data;
+  params.tolerance = kLogSoftmaxQuantizedTolerance;
+
+  tflite::testing::TestLogSoftmaxQuantizedint16<int16_t>(
+      params, kDims, kInput, kDims, kExpect, output_data);
+}
+
+
 TF_LITE_MICRO_TESTS_END
