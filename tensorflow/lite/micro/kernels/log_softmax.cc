@@ -64,7 +64,7 @@ inline void LogSoftmax_s16(
 
   static constexpr int kInputIntegerBits = 5;
   static constexpr int kAccumulationIntegerBits = 12;
-  static constexpr int kOutputIntegerBits = 13;
+  static constexpr int kOutputIntegerBits = 12;
 
   using F5 = gemmlowp::FixedPoint<int32_t, kInputIntegerBits>;
   using F12 = gemmlowp::FixedPoint<int32_t, kAccumulationIntegerBits>;
@@ -210,7 +210,7 @@ else if (input->type == kTfLiteInt16) {
     auto data = static_cast<LogSoftmaxOpData*>(node->user_data);
 
     constexpr int32_t kOutputZeroPoint = 32767;
-    constexpr float kOutputScale =  1.0f / (1 << 13);
+    constexpr float kOutputScale =  1.0f / (1 << 12);
     constexpr double kBeta = 1.0;
     constexpr int kScaledDiffIntegerBits = 5;
 

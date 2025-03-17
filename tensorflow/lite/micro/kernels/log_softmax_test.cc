@@ -117,7 +117,7 @@ void TestLogSoftmaxQuantizedint16(const TestLogSoftmaxParams<T>& params,
   TfLiteIntArray* output_dims = IntArrayFromInts(expected_dims);
   const int output_count = ElementCount(*output_dims);
 
-  constexpr float kOutputScale = 1.0f / (1 << 13);
+  constexpr float kOutputScale = 1.0f / (1 << 12);
   constexpr int kOutputZeroPoint = 32767;
   const int zero_point =
       ZeroPointFromMinMax<T>(params.data_min, params.data_max);
