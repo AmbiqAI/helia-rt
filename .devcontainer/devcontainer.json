@@ -21,7 +21,8 @@
                 "mcu-debug.memory-view",
                 "mcu-debug.debug-tracker-vscode",
                 "mcu-debug.rtos-views",
-                "mcu-debug.peripheral-viewer"
+                "mcu-debug.peripheral-viewer",
+                "ms-vscode.makefile-tools"
             ]
         }
     },
