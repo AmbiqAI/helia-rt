@@ -122,7 +122,7 @@ arm_quantize_f32_s8(
   for (int i = 0; i < size; i++) {
     float val = input[i];
     int32_t rounded = static_cast<int32_t>(std::round(val / scale)) + zero_point;
-    int32_t clamped = std::min(std::max(rounded, INT8_MIN), INT8_MAX);
+    int32_t clamped = CLAMP(rounded, INT8_MAX, INT8_MIN);
     output[i] = static_cast<int8_t>(clamped);
   }
 #endif
@@ -156,7 +156,7 @@ arm_quantize_f32_s16(
   for (int i = 0; i < size; i++) {
     float val = input[i];
     int32_t rounded = static_cast<int32_t>(std::round(val / scale)) + zero_point;
-    int32_t clamped = std::min(std::max(rounded, INT16_MIN), INT16_MAX);
+    int32_t clamped = CLAMP(rounded, INT16_MAX, INT16_MIN);
     output[i] = static_cast<int16_t>(clamped);
   }
 #endif
@@ -190,11 +190,11 @@ arm_requantize_s8_s8(
     output += 4;
   }
 #else
-  for (int i = 0; i < count; i++) {
+  for (int i = 0; i < size; i++) {
     int32_t val = input[i] - input_zeropoint;
     val = arm_nn_requantize(val, effective_scale_multiplier, effective_scale_shift);
     val += output_zeropoint;
-    output[i] = std::min(std::max(val, INT8_MIN), INT8_MAX);
+    output[i] = CLAMP(val, INT8_MAX, INT8_MIN);
   }
 #endif
 }
@@ -227,11 +227,11 @@ arm_requantize_s16_s16(
     output += 4;
   }
 #else
-  for (int i = 0; i < count; i++) {
+  for (int i = 0; i < size; i++) {
     int32_t val = input[i] - input_zeropoint;
     val = arm_nn_requantize(val, effective_scale_multiplier, effective_scale_shift);
     val += output_zeropoint;
-    output[i] = std::min(std::max(val, INT16_MIN), INT16_MAX);
+    output[i] = CLAMP(val, INT16_MAX, INT16_MIN);
   }
 #endif
 }
