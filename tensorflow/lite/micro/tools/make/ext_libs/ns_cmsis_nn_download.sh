@@ -45,7 +45,7 @@ else
 fi
 
 # Set GIT_COMMIT to NS_CMSIS_NN_COMMIT if set, otherwise use default
-GIT_COMMIT=${NS_CMSIS_NN_COMMIT:-2647e4fda1359aa7bc8afd354cd7ca5770db7e0f}
+GIT_COMMIT=${NS_CMSIS_NN_COMMIT:-18012e177e912e718a14d61f347257b02de067a7}
 
 should_download=$(check_should_download ${DOWNLOADS_DIR})
 
