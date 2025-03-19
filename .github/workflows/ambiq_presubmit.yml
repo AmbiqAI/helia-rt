@@ -14,7 +14,7 @@ jobs:
   ambiq_presubmit:
     runs-on: ubuntu-latest-md
 
-    name: ambiq_unit_tests
+    name: ambiq_build_only
     steps:
 
       - uses: actions/setup-python@v4
@@ -35,12 +35,44 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-third-party-downloads-
 
-      - name: Test
+      - name: Build M4 and M55
         uses: docker://ghcr.io/ambiqai/ns-tflm-ci:latest
         env:
           NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
         with:
-          args: /bin/sh -c tensorflow/lite/micro/tools/ci_build/test_ambiq_corstone_300.sh
+          args: |
+            /bin/sh -c "
+              set -e
+
+              # 1. Download dependencies (one-time).
+              make -f tensorflow/lite/micro/tools/make/Makefile \
+                CO_PROCESSOR= \
+                OPTIMIZED_KERNEL_DIR=ambiq \
+                TARGET=cortex_m_corstone_300 \
+                TARGET_ARCH=cortex-m55 \
+                TOOLCHAIN=gcc \
+                third_party_downloads
+
+              # 2. Clean, then build for Cortex-M4+fp
+              make -f tensorflow/lite/micro/tools/make/Makefile clean
+              make -j$(nproc) -f tensorflow/lite/micro/tools/make/Makefile \
+                CO_PROCESSOR= \
+                OPTIMIZED_KERNEL_DIR=ambiq \
+                TARGET=cortex_m_corstone_300 \
+                TARGET_ARCH=cortex-m4+fp \
+                TOOLCHAIN=gcc \
+                build
+
+              # 3. Clean, then build for Cortex-M55
+              make -f tensorflow/lite/micro/tools/make/Makefile clean
+              make -j$(nproc) -f tensorflow/lite/micro/tools/make/Makefile \
+                CO_PROCESSOR= \
+                OPTIMIZED_KERNEL_DIR=ambiq \
+                TARGET=cortex_m_corstone_300 \
+                TARGET_ARCH=cortex-m55 \
+                TOOLCHAIN=gcc \
+                build
+            "
 
       # Save cache
       - name: Save third-party downloads cache
