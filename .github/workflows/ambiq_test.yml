@@ -1,4 +1,4 @@
-name: Ambiq Postmerge
+name: Ambiq Unit Tests
 
 on:
   workflow_call:
@@ -11,7 +11,7 @@ on:
         required: true
 
 jobs:
-  ambiq_postmerge:
+  ambiq_test:
     runs-on: ubuntu-latest-md
 
     name: ambiq_unit_tests
