@@ -17,7 +17,6 @@ on:
 jobs:
 
   ambiq-test:
-    needs: [ambiq-build]
     uses: ./.github/workflows/ambiq_test.yml
     with:
       trigger-sha: ${{ github.event.pull_request.head.sha }}
