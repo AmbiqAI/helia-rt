@@ -14,7 +14,7 @@ jobs:
   ambiq_presubmit:
     runs-on: ubuntu-latest-md
 
-    name: ambiq_unit_tests
+    name: ambiq_build_only
     steps:
 
       - uses: actions/setup-python@v4
@@ -35,12 +35,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-third-party-downloads-
 
-      - name: Test
+      - name: Build M4 and M55
         uses: docker://ghcr.io/ambiqai/ns-tflm-ci:latest
         env:
           NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
         with:
-          args: /bin/sh -c tensorflow/lite/micro/tools/ci_build/test_ambiq_corstone_300.sh
+          args: |
+            /bin/sh -c tensorflow/lite/micro/tools/ci_build/build_ambiq_cm4_cm55.sh
 
       # Save cache
       - name: Save third-party downloads cache
