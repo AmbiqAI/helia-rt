@@ -1,16 +1,7 @@
 # tests_entry.yml
 # Entry point to the test suites
 #
-# - If neither ci:run, ci:run_full or ci:ready_to_merge labels are on PR, fail and exit.
-# - If ci:run or ci:run_full label is on PR, remove label and run the test scripts.
-# - If ci:ready_to_merge is on the PR and the pull_request_target type is synchronize not triggered
-#   by the mergify[bot] user, remove label and fail job.
-# - If ci:ready_to_merge label is on PR and pull_request_target type is labeled, run the test scripts.
-#
-# The end result is labeling ci:run or ci:ready_to_merge will run the test scripts,
-# If Mergify merges to the PR, the test scripts will run. If anyone else tries to add
-# a commit to the PR or merge , the script will fail and ci:ready_to_merge will be
-# removed.
+# - If ci:run_full label is on PR, run the ci workflow as well.
 #
 # This script runs the test scripts directly. Scheduled or manual runs use
 # run_<scriptname>.yml as the entry point.
@@ -19,62 +10,29 @@ name: Tests Entry Point
 on:
   pull_request_target:
     types:
+      - opened
       - synchronize
       - labeled
 
 jobs:
-  no-labels:
-    runs-on: ubuntu-latest-md
-    steps:
-      - name: fail-without-labels
-        if: >
-          github.event.action == 'labeled' &&
-          !(github.event.label.name == 'ci:run' ||
-            github.event.label.name == 'ci:ready_to_merge')
-        run: exit 1
 
-  ci-ready-to-merge:
-    runs-on: ubuntu-latest-md
-    needs: no-labels
-    steps:
-      - name: remove-ready-to-merge
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'ci:ready_to_merge') &&
-            github.event.action == 'synchronize' }}
-        uses: actions/github-script@v5
-        with:
-          github-token: ${{ secrets.TFLM_BOT_REPO_TOKEN }}
-          script: |
-            github.rest.issues.removeLabel({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              name: 'ci:ready_to_merge'
-            })
-      - name: fail-on-bad-synch
-        if: ${{ (github.event.action == 'synchronize') }}
-        run: exit 1
-
-  ambiq-presubmit:
-    if: github.event.action == 'synchronize'
-    uses: ./.github/workflows/ambiq_presubmit.yml
+  ambiq-build:
+    uses: ./.github/workflows/ambiq_build.yml
     with:
       trigger-sha: ${{ github.sha }}
     secrets:
       NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
 
-
-  ambiq-postmerge:
-    needs: [ci-ready-to-merge]
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'ci:ready_to_merge') }}
-    uses: ./.github/workflows/ambiq_postmerge.yml
+  ambiq-test:
+    needs: [ambiq-build]
+    uses: ./.github/workflows/ambiq_test.yml
     with:
       trigger-sha: ${{ github.event.pull_request.head.sha }}
     secrets:
       NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
 
   ci-run:
-    needs: [ci-ready-to-merge]
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'ci:ready_to_merge') }}
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'ci:run_full') }}
     uses: ./.github/workflows/ci.yml
     with:
       trigger-sha: ${{ github.event.pull_request.head.sha }}
