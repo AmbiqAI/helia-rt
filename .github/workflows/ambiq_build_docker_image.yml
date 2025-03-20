@@ -1,9 +1,7 @@
 name: Build and Push Docker Image
 
 on:
-  push:
-    branches:
-      - main  # Trigger on pushes to main branch
+  workflow_call:
 
 jobs:
   build-and-push:

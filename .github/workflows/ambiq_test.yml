@@ -1,4 +1,4 @@
-name: Ambiq Postmerge
+name: Ambiq Unit Tests
 
 on:
   workflow_call:
@@ -11,7 +11,7 @@ on:
         required: true
 
 jobs:
-  ambiq_postmerge:
+  ambiq_test:
     runs-on: ubuntu-latest-md
 
     name: ambiq_unit_tests
@@ -40,14 +40,14 @@ jobs:
         env:
           NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
         with:
-          args: /bin/sh -c tensorflow/lite/micro/tools/ci_build/test_ambiq_cm4_cm55.sh cortex-m55 gcc
+          args: /bin/sh -c "tensorflow/lite/micro/tools/ci_build/test_ambiq_cm4_cm55.sh cortex-m55 gcc"
 
       - name: Run Cortex-M4 tests
         uses: docker://ghcr.io/ambiqai/ns-tflm-ci:latest
         env:
           NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
         with:
-          args: /bin/sh -c tensorflow/lite/micro/tools/ci_build/test_ambiq_cm4_cm55.sh cortex-m4+fp gcc
+          args: /bin/sh -c "tensorflow/lite/micro/tools/ci_build/test_ambiq_cm4_cm55.sh cortex-m4+fp gcc"
 
       # Save cache
       - name: Save third-party downloads cache
