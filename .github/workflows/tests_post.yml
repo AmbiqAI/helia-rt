@@ -10,23 +10,6 @@ on:
       - closed
 
 jobs:
-  ci_run_full:
-    runs-on: ubuntu-latest
-    steps:
-      - name: remove-cirun-full
-        if: github.event.action == 'labeled' &&
-            github.event.label.name == 'ci:run_full'
-        uses: actions/github-script@v5
-        with:
-          github-token: ${{ secrets.TFLM_BOT_REPO_TOKEN }}
-          script: |
-            github.rest.issues.removeLabel({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              name: 'ci:run_full'
-            })
-        continue-on-error: true
 
   build_docker_image:
     runs-on: ubuntu-latest
@@ -35,7 +18,6 @@ jobs:
         uses: ./.github/workflows/run_ambiq.yml
 
   ambiq_test:
-    needs: [ci_run_full]
     if: always() && github.event.pull_request.merged == true ||
         (github.event.action == 'labeled' &&
          github.event.label.name == 'ci:run_full')
@@ -43,15 +25,14 @@ jobs:
     with:
       trigger-sha: ${{ github.event.pull_request.head.sha }}
     secrets:
-      tflm-bot-token: ${{ secrets.TFLM_BOT_PACKAGE_READ_TOKEN }}
+      NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
 
   cortex_m_ci_full:
-    needs: [ci_run_full]
     uses: ./.github/workflows/cortex_m.yml
     with:
       trigger-sha: ${{ github.event.pull_request.head.sha }}
     secrets:
-      tflm-bot-token: ${{ secrets.TFLM_BOT_PACKAGE_READ_TOKEN }}
+      token: ${{ secrets.GITHUB_TOKEN }}
 
   issue_on_error:
     needs: [ambiq_test, cortex_m_ci_full]

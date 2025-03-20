@@ -58,4 +58,3 @@ jobs:
           PR_LINK: ${{ inputs.pr_link }}
         run: |
           python3 ci/issue_on_error.py
-
