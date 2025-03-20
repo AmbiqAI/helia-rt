@@ -16,13 +16,6 @@ on:
 
 jobs:
 
-  ambiq-build:
-    uses: ./.github/workflows/ambiq_build.yml
-    with:
-      trigger-sha: ${{ github.sha }}
-    secrets:
-      NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
-
   ambiq-test:
     needs: [ambiq-build]
     uses: ./.github/workflows/ambiq_test.yml
