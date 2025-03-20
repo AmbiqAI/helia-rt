@@ -41,38 +41,7 @@ jobs:
           NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
         with:
           args: |
-            /bin/sh -c "
-              set -e
-
-              # 1. Download dependencies (one-time).
-              make -f tensorflow/lite/micro/tools/make/Makefile \
-                CO_PROCESSOR= \
-                OPTIMIZED_KERNEL_DIR=ambiq \
-                TARGET=cortex_m_corstone_300 \
-                TARGET_ARCH=cortex-m55 \
-                TOOLCHAIN=gcc \
-                third_party_downloads
-
-              # 2. Clean, then build for Cortex-M4+fp
-              make -f tensorflow/lite/micro/tools/make/Makefile clean
-              make -j$(nproc) -f tensorflow/lite/micro/tools/make/Makefile \
-                CO_PROCESSOR= \
-                OPTIMIZED_KERNEL_DIR=ambiq \
-                TARGET=cortex_m_corstone_300 \
-                TARGET_ARCH=cortex-m4+fp \
-                TOOLCHAIN=gcc \
-                build
-
-              # 3. Clean, then build for Cortex-M55
-              make -f tensorflow/lite/micro/tools/make/Makefile clean
-              make -j$(nproc) -f tensorflow/lite/micro/tools/make/Makefile \
-                CO_PROCESSOR= \
-                OPTIMIZED_KERNEL_DIR=ambiq \
-                TARGET=cortex_m_corstone_300 \
-                TARGET_ARCH=cortex-m55 \
-                TOOLCHAIN=gcc \
-                build
-            "
+            /bin/sh -c tensorflow/lite/micro/tools/ci_build/build_ambiq_cm4_cm55.sh
 
       # Save cache
       - name: Save third-party downloads cache
