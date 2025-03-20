@@ -72,9 +72,9 @@ jobs:
     secrets:
       NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
 
-  # ci-run:
-  #   needs: [ci-ready-to-merge]
-  #   if: ${{ contains(github.event.pull_request.labels.*.name, 'ci:ready_to_merge') }}
-  #   uses: ./.github/workflows/ci.yml
-  #   with:
-  #     trigger-sha: ${{ github.event.pull_request.head.sha }}
+  ci-run:
+    needs: [ci-ready-to-merge]
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'ci:ready_to_merge') }}
+    uses: ./.github/workflows/ci.yml
+    with:
+      trigger-sha: ${{ github.event.pull_request.head.sha }}
