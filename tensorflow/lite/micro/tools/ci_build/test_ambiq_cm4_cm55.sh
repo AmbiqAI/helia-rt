@@ -35,54 +35,77 @@ OPTIMIZED_KERNEL_DIR=ambiq
 
 
 # TODO(b/143715361): downloading first to allow for parallel builds.
+# --------------------------------------------------------------------
+# One-time downloads (don’t redo inside the loop)
 readable_run make -f tensorflow/lite/micro/tools/make/Makefile \
+  CO_PROCESSOR=${CO_PROCESSOR} \
+  OPTIMIZED_KERNEL_DIR=${OPTIMIZED_KERNEL_DIR} \
+  TARGET=${TARGET} \
+  TARGET_ARCH=${TARGET_ARCH} \
+  TOOLCHAIN=${TOOLCHAIN} \
+  third_party_downloads
+# --------------------------------------------------------------------
+
+# Build + test for both size and speed variants
+for OPTIMIZE_KERNELS_FOR in SPEED SIZE; do
+  echo "=== Building with ${OPTIMIZE_KERNELS_FOR} ==="
+
+  readable_run make -f tensorflow/lite/micro/tools/make/Makefile clean
+
+  # Build
+  readable_run make -j"$(nproc)" -f tensorflow/lite/micro/tools/make/Makefile \
     CO_PROCESSOR=${CO_PROCESSOR} \
     OPTIMIZED_KERNEL_DIR=${OPTIMIZED_KERNEL_DIR} \
     TARGET=${TARGET} \
     TARGET_ARCH=${TARGET_ARCH} \
     TOOLCHAIN=${TOOLCHAIN} \
-    third_party_downloads
-
-# Avoid running tests in parallel.
-readable_run make -f tensorflow/lite/micro/tools/make/Makefile \
-    clean
-
-readable_run make -j$(nproc) -f tensorflow/lite/micro/tools/make/Makefile \
-    CO_PROCESSOR=${CO_PROCESSOR} \
-    OPTIMIZED_KERNEL_DIR=${OPTIMIZED_KERNEL_DIR} \
-    TARGET=${TARGET} \
-    TARGET_ARCH=${TARGET_ARCH} \
-    TOOLCHAIN=${TOOLCHAIN} \
+    GLOBAL_KERNEL_OPTIMIZE=${OPTIMIZE_KERNELS_FOR} \
     build
 
-readable_run make  -j$(nproc) -f tensorflow/lite/micro/tools/make/Makefile \
+  # Individual tests (unrolled)
+  readable_run make -j"$(nproc)" -f tensorflow/lite/micro/tools/make/Makefile \
     CO_PROCESSOR=${CO_PROCESSOR} \
     OPTIMIZED_KERNEL_DIR=${OPTIMIZED_KERNEL_DIR} \
     TARGET=${TARGET} \
     TARGET_ARCH=${TARGET_ARCH} \
     TOOLCHAIN=${TOOLCHAIN} \
+    GLOBAL_KERNEL_OPTIMIZE=${OPTIMIZE_KERNELS_FOR} \
     test_integration_tests_nnaed_conv_test
 
-readable_run make  -j$(nproc) -f tensorflow/lite/micro/tools/make/Makefile \
+  readable_run make -j"$(nproc)" -f tensorflow/lite/micro/tools/make/Makefile \
     CO_PROCESSOR=${CO_PROCESSOR} \
     OPTIMIZED_KERNEL_DIR=${OPTIMIZED_KERNEL_DIR} \
     TARGET=${TARGET} \
     TARGET_ARCH=${TARGET_ARCH} \
     TOOLCHAIN=${TOOLCHAIN} \
+    GLOBAL_KERNEL_OPTIMIZE=${OPTIMIZE_KERNELS_FOR} \
     test_integration_tests_nnaed_pad_test
 
-readable_run make  -j$(nproc) -f tensorflow/lite/micro/tools/make/Makefile \
+  readable_run make -j"$(nproc)" -f tensorflow/lite/micro/tools/make/Makefile \
     CO_PROCESSOR=${CO_PROCESSOR} \
     OPTIMIZED_KERNEL_DIR=${OPTIMIZED_KERNEL_DIR} \
     TARGET=${TARGET} \
     TARGET_ARCH=${TARGET_ARCH} \
     TOOLCHAIN=${TOOLCHAIN} \
+    GLOBAL_KERNEL_OPTIMIZE=${OPTIMIZE_KERNELS_FOR} \
     test_integration_tests_nnaed_leaky_relu_test
 
-readable_run make -f tensorflow/lite/micro/tools/make/Makefile \
+  readable_run make -j"$(nproc)" -f tensorflow/lite/micro/tools/make/Makefile \
     CO_PROCESSOR=${CO_PROCESSOR} \
     OPTIMIZED_KERNEL_DIR=${OPTIMIZED_KERNEL_DIR} \
     TARGET=${TARGET} \
     TARGET_ARCH=${TARGET_ARCH} \
     TOOLCHAIN=${TOOLCHAIN} \
+    GLOBAL_KERNEL_OPTIMIZE=${OPTIMIZE_KERNELS_FOR} \
+    test_integration_tests_nnaed_fully_connected_test
+
+  # Full test suite
+  readable_run make -f tensorflow/lite/micro/tools/make/Makefile \
+    CO_PROCESSOR=${CO_PROCESSOR} \
+    OPTIMIZED_KERNEL_DIR=${OPTIMIZED_KERNEL_DIR} \
+    TARGET=${TARGET} \
+    TARGET_ARCH=${TARGET_ARCH} \
+    TOOLCHAIN=${TOOLCHAIN} \
+    GLOBAL_KERNEL_OPTIMIZE=${OPTIMIZE_KERNELS_FOR} \
     test
+done
