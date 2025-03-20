@@ -35,12 +35,19 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-third-party-downloads-
 
-      - name: Run Cortex-M55 and Cortex-M4 tests
+      - name: Run Cortex-M55 tests
         uses: docker://ghcr.io/ambiqai/ns-tflm-ci:latest
         env:
           NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
         with:
-          args: /bin/sh -c tensorflow/lite/micro/tools/ci_build/test_ambiq_cortex_m55.sh
+          args: /bin/sh -c tensorflow/lite/micro/tools/ci_build/test_ambiq_cm4_cm55.sh cortex-m55 gcc
+
+      - name: Run Cortex-M4 tests
+        uses: docker://ghcr.io/ambiqai/ns-tflm-ci:latest
+        env:
+          NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
+        with:
+          args: /bin/sh -c tensorflow/lite/micro/tools/ci_build/test_ambiq_cm4_cm55.sh cortex-m4+fp gcc
 
       # Save cache
       - name: Save third-party downloads cache
