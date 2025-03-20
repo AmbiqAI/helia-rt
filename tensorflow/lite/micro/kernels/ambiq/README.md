@@ -4,6 +4,8 @@ This directory contains custom kernel operations for TFLM optimized for Ambiq So
 
 ## Target SoCs
 
+* Apollo3
+* Apollo4
 * Apollo4 Plus w/ Cortex-M4
 * Apollo510 w/ Cortex-M55
 
@@ -66,7 +68,7 @@ This directory contains custom kernel operations for TFLM optimized for Ambiq So
 
 ## Notes
 
-### Testing full tflite models.
+### Testing full tflite models
 
 We can test full tflite models in 1 of 2 ways:
 
