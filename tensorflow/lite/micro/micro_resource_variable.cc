@@ -23,6 +23,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 
+#if defined(AMBIQ)
+#include "Include/arm_nnsupportfunctions.h"
+#endif
+
 namespace tflite {
 
 namespace {}  // namespace
@@ -76,7 +80,11 @@ TfLiteStatus MicroResourceVariables::Read(int id,
   MicroResourceVariable variable = resource_variables_[id];
   TFLITE_DCHECK(EvalTensorBytes(tensor) == variable.bytes);
   TFLITE_DCHECK(variable.resource_buffer != nullptr);
+#if defined(AMBIQ)
+  arm_memcpy_s8((int8_t*)tensor->data.raw, (int8_t*)variable.resource_buffer, variable.bytes);
+#else
   memcpy(tensor->data.raw, variable.resource_buffer, variable.bytes);
+#endif
   return kTfLiteOk;
 }
 
@@ -106,8 +114,12 @@ TfLiteStatus MicroResourceVariables::Allocate(int id, TfLiteContext* context,
       int8_t zero_point = quantization_data->zero_point[0].data[0];
       variable.default_value = zero_point;
     }
+#if defined(AMBIQ)
+    arm_memset_s8((int8_t *)variable.resource_buffer, variable.default_value, variable.bytes);
+#else
     // TODO(b/269669735): Explains why casting zero_point to int8 and memset.
     memset(variable.resource_buffer, variable.default_value, variable.bytes);
+#endif
   }
 
   return kTfLiteOk;
@@ -129,15 +141,23 @@ TfLiteStatus MicroResourceVariables::Assign(int id,
     return kTfLiteError;
   }
   TFLITE_DCHECK(EvalTensorBytes(tensor) == variable.bytes);
+#if defined(AMBIQ)
+  arm_memcpy_s8((int8_t *)variable.resource_buffer, (int8_t *)tensor->data.raw, variable.bytes);
+#else
   memcpy(variable.resource_buffer, tensor->data.raw, variable.bytes);
+#endif
   return kTfLiteOk;
 }
 
 TfLiteStatus MicroResourceVariables::ResetAll() {
   for (int i = 0; i < num_resource_variables_; i++) {
     MicroResourceVariable variable = resource_variables_[i];
+  #if defined(AMBIQ)
+    arm_memset_s8((int8_t *)variable.resource_buffer, variable.default_value, variable.bytes);
+  #else
     // TODO(b/269669735): Explains why casting zero_point to int8 and memset.
     memset(variable.resource_buffer, variable.default_value, variable.bytes);
+  #endif
   }
   return kTfLiteOk;
 }
