@@ -2,7 +2,6 @@ name: Post Tests
 # This is for tests that run on a PR post merge. This to optimize CI test suite time
 # for exceptionally long running test processes. Errors will still generate an
 # issue against the PR/commit so will be caught.
-# These tests also run on the ci:run_full label.
 
 on:
   pull_request_target:
