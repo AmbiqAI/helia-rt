@@ -35,6 +35,7 @@ struct OpData {
 
   // Index to buffer for optimizations if applicable.
   int buffer_idx;
+  cmsis_nn_context weight_sum_ctx;
 };
 
 void* Init(TfLiteContext* context, const char* buffer, size_t length) {
@@ -151,19 +152,38 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     conv_params.activation.min = data->reference_op_data.output_activation_min;
     conv_params.activation.max = data->reference_op_data.output_activation_max;
 
+    bool is_1x1_image_8bit = ((output_dims.h == 1) && (output_dims.w == 1) && 
+             ((conv_params.stride.w * input_dims.c) % 4 == 0) && (input_dims.c == filter_dims.c)) && (input->type == kTfLiteInt8);
+    //create the weight sum context and allocate for it
+    //
+    if (is_1x1_image_8bit) {
+      int32_t weights_sum_buf_size = arm_convolve_s8_get_weights_sum_size(&output_dims);
+      data->weight_sum_ctx.buf = static_cast<void*>(
+            context->AllocatePersistentBuffer(context, weights_sum_buf_size));
+      data->weight_sum_ctx.size = weights_sum_buf_size;
+
+      const int8_t* filter_data = GetTensorData<const int8_t>(filter);
+      const int32_t* bias_data = GetTensorData<const int32_t>(bias);
+      int32_t lhs_offset = conv_params.input_offset;
+      arm_convolve_weight_sum((int32_t*)data->weight_sum_ctx.buf, filter_data,&filter_dims, &output_dims, lhs_offset,  bias_data);
+    }
+
     if (input->type == kTfLiteInt8) {
       buf_size = arm_convolve_wrapper_s8_get_buffer_size(
-          &conv_params, &input_dims, &filter_dims, &output_dims);
+          &conv_params, &input_dims, &filter_dims, &output_dims); 
     } else if (input->type == kTfLiteInt16) {
       TF_LITE_ENSURE_EQ(context, input->params.zero_point, 0);
       TF_LITE_ENSURE_EQ(context, output->params.zero_point, 0);
       buf_size = arm_convolve_wrapper_s16_get_buffer_size(
           &conv_params, &input_dims, &filter_dims, &output_dims);
     }
-
     if (buf_size > 0) {
+      //check if we're 1x1 image 
+
       TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
           context, buf_size, &data->buffer_idx));
+
+
     } else {
       data->buffer_idx = -1;
     }
@@ -298,9 +318,12 @@ TfLiteStatus EvalQuantizedPerChannel(TfLiteContext* context, TfLiteNode* node,
 
   // Initialize cmsis_nn context
   cmsis_nn_context ctx;
+
+  bool is_1x1_image_8bit = ((output_dims.h == 1) && (output_dims.w == 1) && 
+           ((conv_params.stride.w * input_dims.c) % 4 == 0) && (input_dims.c == filter_dims.c)) && (input->type == kTfLiteInt8);
+
   ctx.buf = nullptr;
   ctx.size = 0;
-
   if (data.buffer_idx > -1) {
     ctx.buf = context->GetScratchBuffer(context, data.buffer_idx);
     // Note: ctx.size is currently not used in cmsis_nn.
@@ -308,8 +331,22 @@ TfLiteStatus EvalQuantizedPerChannel(TfLiteContext* context, TfLiteNode* node,
     // the corresponding arm_convolve_wrapper_[type]_get_buffer_size
   }
 
+  if(is_1x1_image_8bit) {
+  // 1x1 image is skipped for now from the wrapper to use the weight sum context
+  // don't have to templatize these params for now because only handling this case
+  TFLITE_DCHECK_EQ(
+      arm_convolve_1_x_1_out_s8(
+          &ctx, &data.weight_sum_ctx, &conv_params, &quant_params, &input_dims,
+          tflite::micro::GetTensorData<int8_t>(input), &filter_dims,
+          tflite::micro::GetTensorData<int8_t>(filter), &bias_dims,
+          tflite::micro::GetOptionalTensorData<int32_t>(bias),NULL, &output_dims,
+          tflite::micro::GetTensorData<int8_t>(output)),
+      ARM_CMSIS_NN_SUCCESS);
+  } else {
+
   // arm_convolve_wrapper_[type] dispatches the optimized kernel accordingly
   // with the parameters passed
+  //
   TFLITE_DCHECK_EQ(
       convolve_wrapper(
           &ctx, &conv_params, &quant_params, &input_dims,
@@ -318,6 +355,7 @@ TfLiteStatus EvalQuantizedPerChannel(TfLiteContext* context, TfLiteNode* node,
           tflite::micro::GetOptionalTensorData<BiasType>(bias), &output_dims,
           tflite::micro::GetTensorData<ActType>(output), type),
       ARM_CMSIS_NN_SUCCESS);
+  }
 
   return kTfLiteOk;
 }
