@@ -14,7 +14,7 @@
 #
 # This script runs the test scripts directly. Scheduled or manual runs use
 # run_<scriptname>.yml as the entry point.
-# quick test
+# test ambiq presubmit
 name: Tests Entry Point
 on:
   pull_request_target:
