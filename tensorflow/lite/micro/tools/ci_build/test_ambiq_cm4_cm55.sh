@@ -25,17 +25,14 @@ cd "${ROOT_DIR}"
 
 source tensorflow/lite/micro/tools/ci_build/helper_functions.sh
 
-if [[ $1 = "armclang" ]]; then
-    TOOLCHAIN=armclang
-else
-    TOOLCHAIN=gcc
-fi
+# Read arguments
+TARGET_ARCH="${1:-cortex-m55}"  # default to cortex-m55 if not provided
+TOOLCHAIN="${2:-gcc}"           # default to gcc if not provided
 
 TARGET=cortex_m_corstone_300
-TARGET_ARCH=cortex-m55
 CO_PROCESSOR=
 OPTIMIZED_KERNEL_DIR=ambiq
-TOOLCHAINS=(gcc armclang)
+
 
 # TODO(b/143715361): downloading first to allow for parallel builds.
 readable_run make -f tensorflow/lite/micro/tools/make/Makefile \
