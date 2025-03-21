@@ -4,6 +4,8 @@ This directory contains custom kernel operations for TFLM optimized for Ambiq So
 
 ## Target SoCs
 
+* Apollo3
+* Apollo4
 * Apollo4 Plus w/ Cortex-M4
 * Apollo510 w/ Cortex-M55
 
@@ -18,22 +20,22 @@ This directory contains custom kernel operations for TFLM optimized for Ambiq So
 | comparisons       | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | concatenation     | Yes         | Yes        | No         | Yes         | Yes          | No           | Yes         | Yes          | No           |
 | conv              | Yes         | Yes        | Yes        | Yes         | Yes          | Yes          | Yes         | Yes          | Yes          |
-| cumsum            | Yes         | No         | No         | No          | No           | No           | No          | No           | No           |
+| cumsum            | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | depth_to_space    | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | depthwise_conv    | Yes         | Yes        | Yes        | Yes         | Yes          | Yes          | Yes         | Yes          | Yes          |
 | dequantize        | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | elementwise       | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | elu               | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| embedding_lookup  | Yes         | No         | No         | No          | No           | No           | No          | No           | No           |
+| embedding_lookup  | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | expand_dims       | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | fill              | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | fully_connected   | Yes         | Yes        | Yes        | Yes         | Yes          | Yes          | Yes         | Yes          | Yes          |
 | gather_nd         | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | gather            | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| hard_swish        | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| hard_swish        | Yes         | No         | No         | No          | No           | No           | No          | No           | No           |
 | l2norm            | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | leaky_relu        | Yes         | Yes        | No         | Yes         | No           | No           | Yes         | Yes          | No           |
-| log_softmax       | Yes         | No         | No         | No          | No           | No           | No          | No           | No           |
+| log_softmax       | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | logistic          | Yes         | Yes        | No         | Yes         | No           | No           | Yes         | Yes          | No           |
 | lstm              | Yes         | Yes        | No         | Yes         | Yes          | No           | Yes         | Yes          | No           |
 | minimum           | Yes         | Yes        | N/A        | No          | No           | N/A          | Yes         | Yes          | N/A          |
@@ -66,7 +68,7 @@ This directory contains custom kernel operations for TFLM optimized for Ambiq So
 
 ## Notes
 
-### Testing full tflite models.
+### Testing full tflite models
 
 We can test full tflite models in 1 of 2 ways:
 

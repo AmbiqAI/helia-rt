@@ -21,8 +21,8 @@ on:
         required: true
         type: string
     secrets:
-      tflm-bot-token:
-        required: true
+      token:
+        required: false
 
 jobs:
   cortex_m_generic:
@@ -120,4 +120,4 @@ jobs:
       run_number: ${{ github.run_number }}
       flag_label: ci:bot_issue
     secrets:
-      token: ${{ secrets.GITHUB_TOKEN }}
+      token: ${{ inputs.token || secrets.GITHUB_TOKEN }}

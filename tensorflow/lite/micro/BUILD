@@ -135,6 +135,7 @@ tflm_cc_library(
         ":memory_helpers",
         ":micro_allocator",
         ":micro_common",
+        ":micro_context",
         ":micro_graph",
         ":micro_log",
         ":micro_profiler",

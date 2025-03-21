@@ -2,7 +2,6 @@ name: Post Tests
 # This is for tests that run on a PR post merge. This to optimize CI test suite time
 # for exceptionally long running test processes. Errors will still generate an
 # issue against the PR/commit so will be caught.
-# These tests also run on the ci:run_full label.
 
 on:
   pull_request_target:
@@ -11,34 +10,31 @@ on:
 
 jobs:
 
-  build-docker-image:
-    needs: ci_run_full
-    runs-on: ubuntu-latest-md
+  build_docker_image:
+    runs-on: ubuntu-latest
     steps:
       - name: call-ambiq-build-docker-image
         uses: ./.github/workflows/run_ambiq.yml
 
-  ambiq_postmerge:
-    needs: [ci_run_full]
+  ambiq_test:
     if: always() && github.event.pull_request.merged == true ||
         (github.event.action == 'labeled' &&
          github.event.label.name == 'ci:run_full')
-    uses: ./.github/workflows/ambiq_postmerge.yml
+    uses: ./.github/workflows/ambiq_test.yml
     with:
       trigger-sha: ${{ github.event.pull_request.head.sha }}
     secrets:
-      tflm-bot-token: ${{ secrets.TFLM_BOT_PACKAGE_READ_TOKEN }}
+      NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
 
   cortex_m_ci_full:
-    needs: [ci_run_full]
     uses: ./.github/workflows/cortex_m.yml
     with:
       trigger-sha: ${{ github.event.pull_request.head.sha }}
     secrets:
-      tflm-bot-token: ${{ secrets.TFLM_BOT_PACKAGE_READ_TOKEN }}
+      token: ${{ secrets.GITHUB_TOKEN }}
 
   issue_on_error:
-    needs: [ambiq_postmerge, cortex_m_ci_full]
+    needs: [ambiq_test, cortex_m_ci_full]
     if: ${{ always() && contains(needs.*.result, 'failure') &&
             github.event.pull_request.merged == true }}
     uses: ./.github/workflows/issue_on_error.yml

@@ -12,16 +12,16 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  call-ambiq-presubmit:
-    uses: ./.github/workflows/ambiq_presubmit.yml
+  call-ambiq-build:
+    uses: ./.github/workflows/ambiq_build.yml
     if: github.repository == 'AmbiqAI/ns-tflm'
     with:
       trigger-sha: ${{ github.sha }}
     secrets:
       NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
 
-  call-ambiq-postmerge:
-    uses: ./.github/workflows/ambiq_postmerge.yml
+  call-ambiq-test:
+    uses: ./.github/workflows/ambiq_test.yml
     if: github.repository == 'AmbiqAI/ns-tflm'
     with:
       trigger-sha: ${{ github.sha }}
@@ -29,7 +29,7 @@ jobs:
       NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
 
   issue-on-error:
-    needs: [call-ambiq-presubmit,call-ambiq-postmerge]
+    needs: [call-ambiq-build,call-ambiq-test]
     if: ${{ always() && contains(needs.*.result, 'failure') }}
     uses: ./.github/workflows/issue_on_error.yml
     with:
