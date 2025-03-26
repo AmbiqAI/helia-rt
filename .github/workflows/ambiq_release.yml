@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest-md
     container:
       image: ghcr.io/ambiqai/ns-tflm-ci:latest
+      options: --user ambiqai
     env:
       tag: ${{ github.ref_name }}
 
@@ -27,6 +28,7 @@ jobs:
       - name: Create artifacts
         env:
           NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
+          ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
         run: |
           mkdir -p artifacts
           # Create neuralSPOT module
