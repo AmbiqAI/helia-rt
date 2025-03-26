@@ -879,6 +879,7 @@ $(BINDIR)%.test_target: $(BINDIR)%_test
 # of the linker into a binary image that can be loaded directly.
 ifeq ($(TOOLCHAIN), armclang)
   CXXFLAGS += -ffp-mode=full
+  CXXFLAGS += -Wno-error=nan-infinity-disabled
   FROMELF := ${TARGET_TOOLCHAIN_ROOT}$(TARGET_TOOLCHAIN_PREFIX)fromelf
   $(BINDIR)%.bin: $(BINDIR)%
 		@mkdir -p $(dir $@)

@@ -13,8 +13,10 @@ on:
 jobs:
   ambiq_test:
     runs-on: ubuntu-latest-md
-
     name: ambiq_unit_tests
+    container:
+      image: ghcr.io/ambiqai/ns-tflm-ci:latest
+
     steps:
 
       - uses: actions/setup-python@v4
@@ -25,7 +27,6 @@ jobs:
         with:
           ref: ${{ inputs.trigger-sha }}
 
-      # Restore cache
       - name: Cache third-party downloads
         uses: actions/cache@v3
         with:
@@ -36,20 +37,15 @@ jobs:
             ${{ runner.os }}-third-party-downloads-
 
       - name: Run Cortex-M55 tests
-        uses: docker://ghcr.io/ambiqai/ns-tflm-ci:latest
         env:
           NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
-        with:
-          args: /bin/sh -c "tensorflow/lite/micro/tools/ci_build/test_ambiq_cm4_cm55.sh cortex-m55 gcc"
+        run: /bin/sh -c "tensorflow/lite/micro/tools/ci_build/test_ambiq_cm4_cm55.sh cortex-m55 gcc"
 
       - name: Run Cortex-M4 tests
-        uses: docker://ghcr.io/ambiqai/ns-tflm-ci:latest
         env:
           NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
-        with:
-          args: /bin/sh -c "tensorflow/lite/micro/tools/ci_build/test_ambiq_cm4_cm55.sh cortex-m4+fp gcc"
+        run: /bin/sh -c "tensorflow/lite/micro/tools/ci_build/test_ambiq_cm4_cm55.sh cortex-m4+fp gcc"
 
-      # Save cache
       - name: Save third-party downloads cache
         uses: actions/cache@v3
         with:

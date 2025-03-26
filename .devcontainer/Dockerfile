@@ -75,6 +75,14 @@ WORKDIR /usr/local
 COPY --from=qemu_builder /tmp/qemu_install/. .
 
 WORKDIR /
+
 COPY ci/*.sh /install/
+
 RUN /install/install_bazelisk.sh
+
 RUN /install/install_buildifier.sh
+
+# Add a non-root user 'ambiqai' with passwordless sudo access
+RUN useradd -m -s /bin/bash -G sudo ambiqai && \
+    echo "ambiqai ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ambiqai && \
+    chmod 0440 /etc/sudoers.d/ambiqai

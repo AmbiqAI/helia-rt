@@ -121,12 +121,24 @@ ifneq ($(filter cortex-m55%,$(TARGET_ARCH)),)
   endif
 endif
 
-# Toolchain specfic flags
+# Detect if host is Windows (Git Bash, WSL, or native)
+ifeq ($(OS),Windows_NT)
+  EXE := .exe
+else
+  UNAME_S := $(shell uname -s)
+  ifeq ($(UNAME_S),Windows)
+    EXE := .exe
+  else
+    EXE :=
+  endif
+endif
+
+# Toolchain specific flags
 ifeq ($(TOOLCHAIN), armclang)
-  CXX_TOOL  := armclang.exe
-  CC_TOOL   := armclang.exe
-  AR_TOOL   := armar.exe
-  LD        := armlink.exe
+  CXX_TOOL := armclang$(EXE)
+  CC_TOOL  := armclang$(EXE)
+  AR_TOOL  := armar$(EXE)
+  LD       := armlink$(EXE)
 
   FLAGS_ARMC = \
     --target=arm-arm-none-eabi \
