@@ -19,10 +19,6 @@ jobs:
 
     steps:
 
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
       - uses: actions/checkout@v3
         with:
           ref: ${{ inputs.trigger-sha }}
