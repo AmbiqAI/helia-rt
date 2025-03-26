@@ -1,6 +1,7 @@
 name: Build TFLM CI Docker Image
 
 on:
+  workflow_dispatch:
   workflow_call:
 
 jobs:

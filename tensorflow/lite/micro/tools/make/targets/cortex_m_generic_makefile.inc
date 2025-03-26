@@ -123,10 +123,10 @@ endif
 
 # Toolchain specfic flags
 ifeq ($(TOOLCHAIN), armclang)
-  CXX_TOOL  := armclang.exe
-  CC_TOOL   := armclang.exe
-  AR_TOOL   := armar.exe
-  LD        := armlink.exe
+  CXX_TOOL  := armclang
+  CC_TOOL   := armclang
+  AR_TOOL   := armar
+  LD        := armlink
 
   FLAGS_ARMC = \
     --target=arm-arm-none-eabi \
