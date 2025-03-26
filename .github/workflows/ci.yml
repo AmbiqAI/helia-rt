@@ -22,33 +22,40 @@ on:
 jobs:
   bazel_tests:
     runs-on: ubuntu-latest-md
-    name: Bazel (presubmit)
-    container:
-      image: ghcr.io/ambiqai/ns-tflm-ci:latest
-    steps:
 
+    name: Bazel (presubmit)
+    steps:
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
       - uses: actions/checkout@v3
         with:
           ref: ${{ inputs.trigger-sha }}
       - name: Install dependencies
         run: |
           sudo ci/install_bazelisk.sh
+          pip3 install Pillow
+          pip3 install numpy
       - name: Test
         run: |
           tensorflow/lite/micro/tools/ci_build/test_bazel.sh
 
   bazel_msan:
     runs-on: ubuntu-latest-md
+
     name: Bazel msan (presubmit)
-    container:
-      image: ghcr.io/ambiqai/ns-tflm-ci:latest
     steps:
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
       - uses: actions/checkout@v3
         with:
           ref: ${{ inputs.trigger-sha }}
       - name: Install dependencies
         run: |
           sudo ci/install_bazelisk.sh
+          pip3 install Pillow
+          pip3 install numpy
       - name: Fix kernel mmap rnd bits
         # Asan in llvm 14 provided in ubuntu 22.04 is incompatible with
         # high-entropy ASLR in much newer kernels that GitHub runners are
@@ -60,16 +67,20 @@ jobs:
 
   bazel_asan:
     runs-on: ubuntu-latest-md
+
     name: Bazel asan (presubmit)
-    container:
-      image: ghcr.io/ambiqai/ns-tflm-ci:latest
     steps:
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
       - uses: actions/checkout@v3
         with:
           ref: ${{ inputs.trigger-sha }}
       - name: Install dependencies
         run: |
           sudo ci/install_bazelisk.sh
+          pip3 install Pillow
+          pip3 install numpy
       - name: Fix kernel mmap rnd bits
         # Asan in llvm 14 provided in ubuntu 22.04 is incompatible with
         # high-entropy ASLR in much newer kernels that GitHub runners are
@@ -154,7 +165,7 @@ jobs:
           ref: ${{ inputs.trigger-sha }}
       - name: Test
         run: |
-          /bin/sh -c "tensorflow/lite/micro/tools/ci_build/test_cortex_m_qemu.sh ns-tflm/"
+          /bin/sh -c tensorflow/lite/micro/tools/ci_build/test_cortex_m_qemu.sh
 
   # check_code_style:
   #   runs-on: ubuntu-latest-md
