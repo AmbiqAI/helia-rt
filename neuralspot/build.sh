@@ -29,45 +29,7 @@ readonly TARGET_ARCHS=("cortex-m4+fp" "cortex-m55")
 readonly BUILDS=("debug" "release" "release_with_logs")
 ARM_UBL_LICENSE_IDENTIFIER=${ARM_UBL_LICENSE_IDENTIFIER:-}
 
-
-# Always run GCC build
-TOOLCHAINS=("gcc")
-
-# If ARM UBL license is available, prepare to run armclang builds too
-if [ -n "$ARM_UBL_LICENSE_IDENTIFIER" ]; then
-  echo "ARM UBL License detected. Adding armclang builds." >&2
-
-  # if [ "$(whoami)" != "ambiqai" ]; then
-  #     echo "Error: This script must be run as the 'ambiqai' user when building for arm clang." >&2
-  #     exit 1
-  # fi
-
-  ARM_COMPILER_INSTALLER="$TFLM_MAKE_DIR/arm_clang_download.sh"
-  ARM_COMPILER_DIR="$DOWNLOADS_DIR/arm_compiler"
-  ARM_COMPILER_BIN="$ARM_COMPILER_DIR/bin/" # need trailing slash for makefile
-
-  # 1. Install ARM compiler (if not already installed)
-  if [ ! -d "$ARM_COMPILER_BIN" ]; then
-    echo "Installing ARM Compiler to $ARM_COMPILER_DIR" >&2
-    bash "$ARM_COMPILER_INSTALLER" "$DOWNLOADS_DIR" "$TFLM_SRC_DIR"
-  else
-    echo "ARM Compiler already installed at $ARM_COMPILER_DIR" >&2
-  fi
-
-  # 2. Activate UBL license if not set
-  echo "Activating UBL license..." >&2
-  "${ARM_COMPILER_BIN}armlm" activate --code "$ARM_UBL_LICENSE_IDENTIFIER"
-
-  # 3. Check armclang version reports success
-  "${ARM_COMPILER_BIN}armclang" --version
-  if [ $? -ne 0 ]; then
-    echo "Error: ARM Compiler activation failed. Please check the license identifier." >&2
-    exit 1
-  fi
-
-  # 4. Add armclang to toolchains to build
-  TOOLCHAINS+=("armclang")
-fi
+TOOLCHAINS=("gcc" "armclang")
 
 cd "$DIR"
 
@@ -82,19 +44,13 @@ for BUILD in "${BUILDS[@]}"; do
 
       cd "$TFLM_SRC_DIR"
 
-      if [ "$TOOLCHAIN" == "armclang" ]; then
-        TARGET_TOOLCHAIN_ROOT="$ARM_COMPILER_BIN"
-      else
-        TARGET_TOOLCHAIN_ROOT="${DOWNLOADS_DIR}/gcc_embedded/bin/"
-      fi
-
       make -f "$TFLM_SRC_DIR/tensorflow/lite/micro/tools/make/Makefile" \
         TARGET="$TARGET" \
         TARGET_ARCH="$TARGET_ARCH" \
         TOOLCHAIN="$TOOLCHAIN" \
         OPTIMIZED_KERNEL_DIR="$OPTIM_KERNEL" \
+        ARM_UBL_LICENSE_IDENTIFIER="$ARM_UBL_LICENSE_IDENTIFIER" \
         BUILD_TYPE="$BUILD" \
-        TARGET_TOOLCHAIN_ROOT="$TARGET_TOOLCHAIN_ROOT" \
         microlite -j8
 
       LIB_PATH="$TFLM_SRC_DIR/gen/${TARGET}_${TARGET_ARCH}_${BUILD}_${OPTIM_KERNEL}_${TOOLCHAIN}/lib/libtensorflow-microlite.a"
