@@ -6,7 +6,7 @@ includes_api += $(subdirectory)/third_party/gemmlowp
 
 # Preprocessor defines
 DEFINES += NS_TFSTRUCTURE_RECENT
-DEFINES+= NS_TFLM_NEW_MICRO_PROFILER
+DEFINES += NS_TFLM_NEW_MICRO_PROFILER
 
 # Determine short architecture tag
 TFP := $(if $(filter apollo5,$(ARCH)),cm55,cm4)

@@ -34,7 +34,6 @@ jobs:
           bash ./neuralspot/build.sh
           cd ${GITHUB_WORKSPACE}/build
           zip -r ../artifacts/ns-tflm-$tag.zip *
-          tar -czf ../artifacts/ns-tflm-$tag.tar.gz *
           # Create a snapshot of the repository
           cd ${GITHUB_WORKSPACE}
           git archive --format zip    --output artifacts/repo-snapshot-$tag.zip HEAD
@@ -67,7 +66,6 @@ jobs:
           cd artifacts
           gh release create "$tag" \
             ns-tflm-$tag.zip \
-            ns-tflm-$tag.tar.gz \
             repo-snapshot-$tag.zip \
             repo-snapshot-$tag.tar.gz \
             -R "$GITHUB_REPOSITORY" \
