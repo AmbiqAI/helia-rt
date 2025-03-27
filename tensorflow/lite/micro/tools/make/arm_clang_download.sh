@@ -33,7 +33,7 @@ if [ -z "${TENSORFLOW_ROOT}" ]; then
   TENSORFLOW_ROOT="./"
 fi
 
-source "${TENSORFLOW_ROOT}tensorflow/lite/micro/tools/make/bash_helpers.sh"
+source "${TENSORFLOW_ROOT}/tensorflow/lite/micro/tools/make/bash_helpers.sh"
 
 DOWNLOADS_DIR=${1}
 if [ ! -d "${DOWNLOADS_DIR}" ]; then
