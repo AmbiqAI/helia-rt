@@ -13,8 +13,9 @@ echo "Starting to build TFLM"
 
 # Get the directory of this script
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-TFLM_SRC_DIR="$DIR/../"
-DOWNLOADS_DIR="$TFLM_SRC_DIR/tensorflow/lite/micro/tools/make/downloads"
+TFLM_SRC_DIR="$DIR/.."
+TFLM_MAKE_DIR="$TFLM_SRC_DIR/tensorflow/lite/micro/tools/make"
+DOWNLOADS_DIR="$TFLM_MAKE_DIR/downloads"
 
 BUILD_DIR="$TFLM_SRC_DIR/build"
 BUILD_LIB_DIR="$BUILD_DIR/lib"
@@ -41,7 +42,7 @@ if [ -n "$ARM_UBL_LICENSE_IDENTIFIER" ]; then
   #     exit 1
   # fi
 
-  ARM_COMPILER_INSTALLER="$DOWNLOADS_DIR/arm_compiler_download.sh"
+  ARM_COMPILER_INSTALLER="$TFLM_MAKE_DIR/arm_clang_download.sh"
   ARM_COMPILER_DIR="$DOWNLOADS_DIR/arm_compiler"
   ARM_COMPILER_BIN="$ARM_COMPILER_DIR/bin/" # need trailing slash for makefile
 
