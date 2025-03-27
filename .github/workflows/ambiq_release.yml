@@ -14,7 +14,6 @@ jobs:
     runs-on: ubuntu-latest-md
     container:
       image: ghcr.io/ambiqai/ns-tflm-ci:latest
-      options: --user ambiqai
     env:
       tag: ${{ github.ref_name }}
 
@@ -24,6 +23,9 @@ jobs:
 
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
+
+      - name: Set permissions for working directory __w
+        run: chmod 777 -R /__w
 
       - name: Create artifacts
         env:

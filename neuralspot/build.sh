@@ -2,12 +2,12 @@
 
 set -e
 
-# CURRENT_USER=$(whoami)
-# if [ "$CURRENT_USER" != "ambiqai" ]; then
-#   echo "Current user is '$CURRENT_USER'. Attempting to switch to 'ambiqai' using sudo..." >&2
-#   SCRIPT_PATH="$(readlink -f "$0")"
-#   exec sudo -u ambiqai env ARM_UBL_LICENSE_IDENTIFIER="$ARM_UBL_LICENSE_IDENTIFIER" "$SCRIPT_PATH" "$@"
-# fi
+CURRENT_USER=$(whoami)
+if [ "$CURRENT_USER" != "ambiqai" ]; then
+  echo "Current user is '$CURRENT_USER'. Attempting to switch to 'ambiqai' using sudo..." >&2
+  SCRIPT_PATH="$(readlink -f "$0")"
+  exec sudo -u ambiqai env ARM_UBL_LICENSE_IDENTIFIER="$ARM_UBL_LICENSE_IDENTIFIER" "$SCRIPT_PATH" "$@"
+fi
 
 echo "Starting to build TFLM"
 
@@ -36,10 +36,10 @@ TOOLCHAINS=("gcc")
 if [ -n "$ARM_UBL_LICENSE_IDENTIFIER" ]; then
   echo "ARM UBL License detected. Adding armclang builds." >&2
 
-  if [ "$(whoami)" != "ambiqai" ]; then
-      echo "Error: This script must be run as the 'ambiqai' user when building for arm clang." >&2
-      exit 1
-  fi
+  # if [ "$(whoami)" != "ambiqai" ]; then
+  #     echo "Error: This script must be run as the 'ambiqai' user when building for arm clang." >&2
+  #     exit 1
+  # fi
 
   ARM_COMPILER_INSTALLER="$DOWNLOADS_DIR/arm_compiler_download.sh"
   ARM_COMPILER_DIR="$DOWNLOADS_DIR/arm_compiler"
