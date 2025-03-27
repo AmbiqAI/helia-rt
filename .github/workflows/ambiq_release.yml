@@ -24,9 +24,6 @@ jobs:
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
 
-      - name: Set permissions for working directory __w
-        run: chmod 777 -R /__w
-
       - name: Create artifacts
         env:
           NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}

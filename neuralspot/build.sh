@@ -2,12 +2,12 @@
 
 set -e
 
-CURRENT_USER=$(whoami)
-if [ "$CURRENT_USER" != "ambiqai" ]; then
-  echo "Current user is '$CURRENT_USER'. Attempting to switch to 'ambiqai' using sudo..." >&2
-  SCRIPT_PATH="$(readlink -f "$0")"
-  exec sudo -u ambiqai env ARM_UBL_LICENSE_IDENTIFIER="$ARM_UBL_LICENSE_IDENTIFIER" "$SCRIPT_PATH" "$@"
-fi
+# CURRENT_USER=$(whoami)
+# if [ "$CURRENT_USER" != "ambiqai" ]; then
+#   echo "Current user is '$CURRENT_USER'. Attempting to switch to 'ambiqai' using sudo..." >&2
+#   SCRIPT_PATH="$(readlink -f "$0")"
+#   exec sudo -u ambiqai env ARM_UBL_LICENSE_IDENTIFIER="$ARM_UBL_LICENSE_IDENTIFIER" "$SCRIPT_PATH" "$@"
+# fi
 
 echo "Starting to build TFLM"
 
