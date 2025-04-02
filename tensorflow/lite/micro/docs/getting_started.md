@@ -5,41 +5,57 @@ Welcome to the NS-TFLM Getting Started guide. NS-TFLM, a derivative of TensorFlo
 
 ## Latest Release w/ neuralSPOT
 
-The latest release of NS-TFLM is packaged as a neuralSPOT static module in neuralSPOT. Refer to the following three options to use NS-TFLM in neuralSPOT:
+The latest release of NS-TFLM is now available as a static module within the neuralSPOT framework. Explore the following options to effectively utilize NS-TFLM with neuralSPOT:
 
-**Option 1. [Run a TFLite model via autodeploy](https://ambiqai.github.io/neuralSPOT/tools/index.html)**: ns_autodeploy is a python command line tool that automatically compiles, flashes, and profiles a supplied TFLite model. The autodeploy tool produces csv and excel files with the profiling results and also detects for known sub-optimal network architectures.
+### Option 1: Run a TFLite Model via Autodeploy
+
+The `ns_autodeploy` tool is a Python command-line utility designed to streamline the process of compiling, flashing, and profiling TensorFlow Lite models. This tool also generates CSV and Excel files containing detailed profiling results and identifies any known sub-optimal network architectures.
 
 ```bash
 ns_autodeploy --tflite-filename=mymodel.tflite --model-name mymodel
 ```
+Learn more and access the tool [here](https://ambiqai.github.io/neuralSPOT/tools/index.html).
 
-**Option 2. [Run an example in neuralSPOT](https://ambiqai.github.io/neuralSPOT/examples/basic_tf_stub/index.html)**: neuralSPOT comes included with several AI examples that can run across Ambiq's Apollo platforms. Each example includes a README.md file that describes how to run the example. The examples are located in the `examples` directory of the neuralSPOT repository.
+### Option 2: Run an Example in neuralSPOT
 
-**Option 3. [Create a nest application in neuralSPOT](https://ambiqai.github.io/neuralSPOT/docs/makefile-details.html)**: The neuralSPOT makefile system allows you to create a custom application that can run on Ambiq's Apollo platforms. A `nest` application is a self-contained application that can be built and flashed to the target device. The `nest` application can include any number of static modules, including NS-TFLM. The `nest` application can be created using the `make nest` command line tool.
+neuralSPOT includes a variety of AI examples tailored for Ambiq's Apollo platforms. Each example comes with its own README.md, providing detailed instructions on setup and execution. These examples can be found in the `examples` directory of the neuralSPOT repository.
+Access the examples [here](https://ambiqai.github.io/neuralSPOT/examples/).
+
+### Option 3: Create a Nest Application in neuralSPOT
+
+Utilize the neuralSPOT makefile system to create custom applications, known as `nest` applications, which can operate on Ambiq's Apollo platforms. These self-contained applications are customizable and can include any number of static modules, such as NS-TFLM.
+
+```bash
+make nest
+```
+
+For detailed makefile instructions, visit [this page](https://ambiqai.github.io/neuralSPOT/docs/makefile-details.html).
 
 
 ## Bleeding Edge w/ neuralSPOT
 
-The bleeding edge version of NS-TFLM can be built and packaged as a neuralSPOT static module. The following steps will guide you through creating the static module and adding it into neuralSPOT. Once configured, the above three options can be used to run a TFLite model.
+The bleeding edge version of NS-TFLM is available as a neuralSPOT static module and can be integrated into your projects to utilize the latest features and optimizations. Follow these steps to build and configure the module:
 
-1. **Clone the NS-TFLM repository and checkout the latest commit.**
+### 1. Clone the NS-TFLM Repository
+
+Start by cloning the NS-TFLM repository and checking out the latest commit:
 
 ```bash
 git clone https://github.com/AmbiqAI/ns-tflm
 ```
 
-2. **Build the static neuralSPOT module.**
+### 2. Build the NeuralSPOT Module
 
-The included neuralspot build script will generate both gcc and armclang toolchain versions. These toolchains are automatically downloaded and configured. To use a local toolchain, you can specify `$TARGET_TOOLCHAIN_ROOT`. If only one toolchain is required, you can modify the `build.sh` scripts `$TOOLCHAIN` variable to the desired toolchain (e.g `TOOLCHAINS=("gcc" "armclang")`)
+Navigate to the cloned directory and execute the build script. This script prepares both GCC and Arm Clang toolchain versions, which are automatically downloaded and configured. Specify a local toolchain by setting `$TARGET_TOOLCHAIN_ROOT` or adjust the toolchain used with the `build.sh` script's `$TOOLCHAIN` variable.
 
 ```bash
 cd ns-tflm
 ./neuralspot/build.sh
 ```
 
-This will generate a static module in the `build` directory with the following structure:
+This process generates a static module in the `build` directory structured as follows:
 
-```bash
+```plaintext
 build/
 ├── LICENSE
 ├── lib
@@ -69,22 +85,38 @@ build/
     ├── kissfft
     ├── ns_cmsis_nn
     └── ruy
-
 ```
 
-The `lib` directory contains the static libraries for different configurations. The `module.mk` is a neuralSPOT module makefile that describes the module and its dependencies. The signal, tensorflow, and third_party directories contain the source code for the module for intellisense and debugging.
+The `lib` directory contains static libraries for various configurations, and `module.mk` describes the module and its dependencies within neuralSPOT.
 
-3. **Add the static module to your neuralSPOT project.**
+### 3. Integrate the Module into Your NeuralSPOT Project
 
-Copy the `build` directory to your neuralSPOT project directory. Assuming neuralSPOT is installed alongside the ns-tflm repository, the following command will copy the build directory to your neuralSPOT project directory.
+To integrate the built module with your project, copy the `build` directory to the neuralSPOT project directory:
 
 ```bash
 cp -r ns-tflm/build neuralspot/extern/ns_tflm_bleeding_edge
 ```
 
-4. **Configure neuralSPOT to use the static module.**
+### 4. Configure NeuralSPOT to Use the Bleeding Edge Module
 
-You can define `$TF_VERSION := ns_tflm_bleeding_edge` in `make/local_overrides.mk` or as makefile argument. For autodeploy, you can pass the commandline argument `--tensorflow-version=ns_tflm_bleeding_edge` to the `ns_autodeploy` command.
+Define the module version in your project's makefile settings to use the bleeding edge version:
+
+```bash
+$TF_VERSION := ns_tflm_bleeding_edge
+```
+
+Alternatively, specify this version directly when using the `ns_autodeploy` tool:
+
+```bash
+ns_autodeploy --tensorflow-version=ns_tflm_bleeding_edge
+```
+
+These steps ensure that your project utilizes the latest NS-TFLM features, enhancing functionality and performance on supported Ambiq SoCs.
+
+
+## Zephyr Integration
+
+Coming soon...
 
 
 ## Building TFLM from Source
@@ -97,10 +129,15 @@ To integrate NS-TFLM into AmbiqSuite or a third-party project, you can build TFL
 git clone https://github.com/AmbiqAI/ns-tflm
 ```
 
-2. **(Optional) Open the repository as a VSCode devcontainer. This will install all the required dependencies and set up the environment for building TFLM.**
+2. **(Optional) Open the repository as a VSCode devcontainer.**
+
+This will install all the required dependencies and set up the environment for building TFLM.
 
 
-3. **Configure the build environment**
+3. **Configure the build environment.**
+
+Be sure to configure the variables below to match your target architecture and toolchain.
+
 
 ```bash
 
@@ -122,7 +159,6 @@ OPTIMIZED_KERNEL=ambiq
 ```bash
 
 readable_run make -f tensorflow/lite/micro/tools/make/Makefile \
-    CO_PROCESSOR=${CO_PROCESSOR} \
     OPTIMIZED_KERNEL_DIR=${OPTIMIZED_KERNEL} \
     TARGET=${TARGET} \
     TARGET_ARCH=${TARGET_ARCH} \
@@ -135,11 +171,11 @@ readable_run make -f tensorflow/lite/micro/tools/make/Makefile \
 
 ```bash
 readable_run make -f tensorflow/lite/micro/tools/make/Makefile \
-    TARGET="$TARGET" \
-    TARGET_ARCH="$TARGET_ARCH" \
-    TOOLCHAIN="$TOOLCHAIN" \
-    OPTIMIZED_KERNEL_DIR="$OPTIMIZED_KERNEL" \
-    BUILD_TYPE="$BUILD" \
+    TARGET=${TARGET} \
+    TARGET_ARCH="${TARGET_ARCH} \
+    TOOLCHAIN=${TOOLCHAIN} \
+    OPTIMIZED_KERNEL_DIR=${OPTIMIZED_KERNEL} \
+    BUILD_TYPE=${BUILD} \
     microlite -j8
 ```
 

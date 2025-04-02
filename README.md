@@ -25,22 +25,27 @@ Jumpstart your development with [neuralSPOT](https://github.com/AmbiqAI/neuralSP
 
 ## Supported SoCs
 
-NS-TFLM is optimized for the following Ambiq SoCs:
+NS-TFLM is specifically optimized to leverage the advanced features of Ambiq's ultra-low-power SoCs. Below is the list of SoCs that are fully supported:
 
-* Apollo3
-* Apollo4
-* Apollo4 Plus w/ Cortex-M4
-* Apollo510 w/ Cortex-M55
+- **Apollo3**: Ideal for battery-operated mobile devices with its highly efficient power management capabilities.
+- **Apollo4**: Enhances performance with higher processing capabilities and improved memory architecture.
+- **Apollo4 Plus**: Features a Cortex-M4 core, offering a balance of power and performance for complex processing tasks.
+- **Apollo510**: Equipped with a Cortex-M55 core and MVE Helium capabilities, designed for next-level computation needs and edge AI applications.
 
-## Official Builds
+These optimizations ensure that NS-TFLM can provide excellent performance and energy efficiency on Ambiq's cutting-edge hardware platforms.
 
-The following table summarizes the build status of the official builds for NS-TFLM. The builds are run on a variety of platforms and configurations to ensure compatibility and performance.
 
-| Build Type       |    Status     |
-| -----------      | --------------|
-| CI (Linux)       | [![CI](https://github.com/AmbiqAI/ns-tflm/actions/workflows/run_ci.yml/badge.svg)](https://github.com/AmbiqAI/ns-tflm/actions/workflows/run_ci.yml) |
-| Apollo3/4 (CM4)    | [![Apollo4 Tests](https://github.com/AmbiqAI/ns-tflm/actions/workflows/run_ambiq.yml/badge.svg)](https://github.com/AmbiqAI/ns-tflm/actions/workflows/run_ambiq.yml) |
-| Apollo510 (CM55)    | [![Apollo510 Tests](https://github.com/AmbiqAI/ns-tflm/actions/workflows/run_ambiq.yml/badge.svg)](https://github.com/AmbiqAI/ns-tflm/actions/workflows/run_ambiq.yml) |
+## Official Build Status
+
+This table provides a summary of the build status for NS-TFLM across various platforms and configurations, ensuring both compatibility and optimal performance.
+
+| Build Type         | Status |
+| ------------------ | ------ |
+| **CI on Linux**    | [![CI Status](https://github.com/AmbiqAI/ns-tflm/actions/workflows/run_ci.yml/badge.svg)](https://github.com/AmbiqAI/ns-tflm/actions/workflows/run_ci.yml) |
+| **Apollo3/4 (CM4)** | [![Apollo4 Tests](https://github.com/AmbiqAI/ns-tflm/actions/workflows/run_ambiq.yml/badge.svg)](https://github.com/AmbiqAI/ns-tflm/actions/workflows/run_ambiq.yml) |
+| **Apollo510 (CM55)** | [![Apollo510 Tests](https://github.com/AmbiqAI/ns-tflm/actions/workflows/run_ambiq.yml/badge.svg)](https://github.com/AmbiqAI/ns-tflm/actions/workflows/run_ambiq.yml) |
+
+Each badge links directly to the detailed results of the respective builds, allowing for quick access to the latest test outcomes and build logs.
 
 
 ## Getting Help
