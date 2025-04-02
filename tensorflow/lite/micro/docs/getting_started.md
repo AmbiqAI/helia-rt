@@ -119,7 +119,7 @@ These steps ensure that your project utilizes the latest NS-TFLM features, enhan
 Coming soon...
 
 
-## Building TFLM from Source
+## Building NS-TFLM from Source
 
 To integrate NS-TFLM into AmbiqSuite or a third-party project, you can build TFLM from source. The following steps will guide you through the high-level process of building TFLM from source into a static library.
 
@@ -150,7 +150,7 @@ TOOLCHAIN=gcc  # one of gcc, armclang
 BUILD_TYPE=release # one of debug, release, release-with-logs
 
 TARGET=cortex_m_generic
-OPTIMIZED_KERNEL=ambiq
+OPTIMIZED_KERNEL=ambiq # <- use ambiq optimized kernels
 
 ```
 
