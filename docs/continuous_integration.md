@@ -12,6 +12,7 @@ The continuous integration system is controlled by applying labels to PRs. There
   The `ci:run` label runs the [main testing suite](../.github/workflows/ci.yml) against the PR. For details of the tests involved, examine the linked file. The `ci:run` tag is self-removing.
   ## `ci:ready_to_merge`
   After all tests from `ci:run` have passed, the Google CLA has been agreed to, and a reviewer has approved the PR, applying the `ci:ready_to_merge` label will enter the PR into the merge queue. Unless there is a conflict with other PR's in the queue, this should be a fire and forget operation. In the case of a conflict due to code that is merged before a given PR, you will need to troubleshoot your code manually.
+
 # Manually Running Tests
 Tests can also be run manually on the command line within a docker container, which can be built with:
    ```
