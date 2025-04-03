@@ -318,4 +318,23 @@ TF_LITE_MICRO_TEST(PackQuantized16MultilDimensions) {
       output_shape, golden, output_data);
 }
 
+TF_LITE_MICRO_TEST(PackQuantized16NegativeAxis) {
+  int input_shape[] = {1, 2};
+  int output_shape[] = {3, 1, 2, 2}; 
+  
+  const int16_t input1_values[] = {1, 4};
+  const int16_t input2_values[] = {2, 5};
+
+  const int16_t golden[] = {1, 2, 4, 5};
+
+  const int axis = -1;
+  constexpr int output_dims_count = 4; 
+  int16_t output_data[output_dims_count];
+
+  tflite::testing::TestPackTwoInputsQuantized16(input_shape, input1_values,
+                                                 input_shape, input2_values,
+                                                 axis, output_shape, golden,
+                                                 output_data);
+}
+
 TF_LITE_MICRO_TESTS_END
