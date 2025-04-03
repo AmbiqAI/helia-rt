@@ -121,12 +121,41 @@ ifneq ($(filter cortex-m55%,$(TARGET_ARCH)),)
   endif
 endif
 
-# Toolchain specfic flags
+# Detect if host is Windows (Git Bash, WSL, or native)
+ifeq ($(OS),Windows_NT)
+  EXE := .exe
+else
+  UNAME_S := $(shell uname -s)
+  ifeq ($(UNAME_S),Windows)
+    EXE := .exe
+  else
+    EXE :=
+  endif
+endif
+
+# Toolchain specific flags
 ifeq ($(TOOLCHAIN), armclang)
-  CXX_TOOL  := armclang.exe
-  CC_TOOL   := armclang.exe
-  AR_TOOL   := armar.exe
-  LD        := armlink.exe
+
+  TARGET_DEFAULT_TOOLCHAIN_ROOT := $(DOWNLOADS_DIR)/arm_compiler/bin/
+  TARGET_TOOLCHAIN_ROOT := $(TARGET_DEFAULT_TOOLCHAIN_ROOT)
+  ifeq ($(TARGET_TOOLCHAIN_ROOT), $(TARGET_DEFAULT_TOOLCHAIN_ROOT))
+    DOWNLOAD_RESULT := $(shell $(MAKEFILE_DIR)/arm_clang_download.sh ${DOWNLOADS_DIR} ${TENSORFLOW_ROOT})
+    ifneq ($(DOWNLOAD_RESULT), SUCCESS)
+      $(error Something went wrong with the arm clang download: $(DOWNLOAD_RESULT))
+    endif
+
+    # If ARM_UBL_LICENSE_IDENTIFIER is set, activate the license.
+    ifneq ($(ARM_UBL_LICENSE_IDENTIFIER),)
+      # print the license identifier
+      $(info "Activating the license with the identifier: $(ARM_UBL_LICENSE_IDENTIFIER)")
+      ACTIVATE_LICENSE := $(shell $(TARGET_TOOLCHAIN_ROOT)armlm activate --code $(ARM_UBL_LICENSE_IDENTIFIER))
+    endif
+  endif
+
+  CXX_TOOL := armclang$(EXE)
+  CC_TOOL  := armclang$(EXE)
+  AR_TOOL  := armar$(EXE)
+  LD       := armlink$(EXE)
 
   FLAGS_ARMC = \
     --target=arm-arm-none-eabi \
