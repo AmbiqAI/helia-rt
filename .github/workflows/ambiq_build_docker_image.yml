@@ -3,6 +3,10 @@ name: Build TFLM CI Docker Image
 on:
   workflow_dispatch:
   workflow_call:
+    inputs:
+      trigger-sha:
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -15,6 +19,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.trigger-sha }}
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
