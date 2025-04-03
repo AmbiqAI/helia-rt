@@ -538,4 +538,68 @@ TF_LITE_MICRO_TEST(GatherOp_BatchDimsEqualIndexDims) {
       output_data, golden_dims, golden_data, axis, batch_dims);
 }
 
+
+TF_LITE_MICRO_TEST(GatherOp_NegativeAxis_Int16) {
+  const int axis = -1;
+  const int batch_dims = 0;
+
+
+  int input_dims[] = {3, 2, 2, 3};
+  const int16_t input_data[] = {
+      10, 11, 12,
+      13, 14, 15,
+      20, 21, 22,
+      23, 24, 25};
+
+  int positions_dims[] = {1, 2};
+  const int32_t positions_data[] = {2, 0};
+  const int golden_dims[] = {2, 2, 2};
+
+  const int16_t golden_data[] = {
+      12, 10, 15, 13,
+      22, 20, 25, 23
+  };
+
+  int16_t output_data[8];
+  int output_dims[] = {4, 0, 0, 0, 0};
+  tflite::testing::TestGather<int16_t, int32_t>(
+      input_dims, input_data,
+      positions_dims, positions_data,
+      output_dims, output_data,
+      golden_dims, golden_data,
+      axis, batch_dims);
+}
+
+TF_LITE_MICRO_TEST(GatherOp_OutOfOrderRepeatedCoords_Int16) {
+  const int axis = 1;
+  const int batch_dims = 0;
+
+  int input_dims[] = {2, 2, 3};
+  const int16_t input_data[] = {
+    10, 11, 12,
+    20, 21, 22
+  };
+
+  int positions_dims[] = {1, 3};
+  const int32_t positions_data[] = {1, 1, 0};
+
+  const int golden_dims[] = {2, 3};
+
+  const int16_t golden_data[] = {
+    11, 11, 10,
+    21, 21, 20
+  };
+
+  int16_t output_data[6];
+  int output_dims[] = {3, 0, 0, 0};
+
+  tflite::testing::TestGather<int16_t, int32_t>(
+      input_dims, input_data,
+      positions_dims, positions_data,
+      output_dims, output_data,
+      golden_dims, golden_data,
+      axis, batch_dims);
+}
+
+
 TF_LITE_MICRO_TESTS_END

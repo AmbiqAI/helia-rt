@@ -945,6 +945,140 @@ TF_LITE_MICRO_TEST(LessEqualQuantizedInt16) {
       expected_data, expected_dim, output_data);
 }
 
+TF_LITE_MICRO_TEST(LessEqualQuantizedInt16WithBroadcast) {
+  const int num_shapes = 4;
+  const int max_shape_size = 5;
+  int test_shapes[num_shapes][max_shape_size] = {
+      {1, 6}, {2, 2, 3}, {3, 2, 1, 3}, {4, 1, 3, 1, 2}};
 
+  for (int i = 0; i < num_shapes; ++i) {
+    int* input1_dim = test_shapes[i];
+    int input2_dim[] = {1, 1};
+
+    float input1_data[] = {8, 0, 7, 8, 12, -2};
+    float input2_data[] = {8};
+
+    bool expected_data[] = {true, true, true, true, false, true};
+
+    const float input1_scale = 0.25f;
+    const int input1_zero_point = -9;
+    int16_t input1_quantized[6];
+    int16_t input2_quantized[1];
+
+    bool output_data[6];
+
+    tflite::testing::TestComparisonQuantizedInt16(
+        tflite::Register_LESS_EQUAL(),
+        input1_dim, input1_data, input1_quantized,
+        input1_scale, input1_zero_point,
+        input2_dim, input2_data, input2_quantized,
+        input1_scale, input1_zero_point,
+        expected_data,
+        input1_dim,
+        output_data);
+  }
+}
+
+
+TF_LITE_MICRO_TEST(LessQuantizedInt16WithBroadcast) {
+  const int num_shapes = 4;
+  const int max_shape_size = 5;
+  int test_shapes[num_shapes][max_shape_size] = {
+      {1, 6}, {2, 2, 3}, {3, 2, 1, 3}, {4, 1, 3, 1, 2}};
+
+  for (int i = 0; i < num_shapes; ++i) {
+    int* input1_dim = test_shapes[i];
+    int input2_dim[] = {1, 1};
+
+    float input1_data[] = {10, 0, 1, 8, 10, -2};
+    float input2_data[] = {8};
+
+    bool expected_data[] = {false, true, true, false, false, true};
+
+    const float input1_scale = 0.25f;
+    const int input1_zero_point = 5; 
+    int16_t input1_quantized[6];
+    int16_t input2_quantized[1];
+
+    bool output_data[6];
+
+    tflite::testing::TestComparisonQuantizedInt16(
+        tflite::Register_LESS(),
+        input1_dim, input1_data, input1_quantized,
+        input1_scale, input1_zero_point,
+        input2_dim, input2_data, input2_quantized,
+        input1_scale, input1_zero_point,
+        expected_data,
+        input1_dim,
+        output_data);
+  }
+}
+
+TF_LITE_MICRO_TEST(GreaterEqualQuantizedInt16WithBroadcast) {
+  const int num_shapes = 4;
+  const int max_shape_size = 5;
+  int test_shapes[num_shapes][max_shape_size] = {
+      {1, 6}, {2, 2, 3}, {3, 2, 1, 3}, {4, 1, 3, 1, 2}};
+
+  for (int i = 0; i < num_shapes; ++i) {
+    int* input1_dim = test_shapes[i];
+    int input2_dim[] = {1, 1};
+
+    float input1_data[] = {8, 7, 10, 0, -1, 8};
+    float input2_data[] = {8};
+
+    bool expected_data[] = {true, false, true, false, false, true};
+
+    const float input1_scale = 0.25f;
+    const int input1_zero_point = -10;
+    int16_t input1_quantized[6];
+    int16_t input2_quantized[1];
+
+    bool output_data[6];
+
+    tflite::testing::TestComparisonQuantizedInt16(
+        tflite::Register_GREATER_EQUAL(),
+        input1_dim, input1_data, input1_quantized,
+        input1_scale, input1_zero_point,
+        input2_dim, input2_data, input2_quantized,
+        input1_scale, input1_zero_point,
+        expected_data,
+        input1_dim,
+        output_data);
+  }
+}
+
+TF_LITE_MICRO_TEST(NotEqualQuantizedInt16WithBroadcast) {
+  const int num_shapes = 4;
+  const int max_shape_size = 5;
+  int test_shapes[num_shapes][max_shape_size] = {
+      {1, 6}, {2, 2, 3}, {3, 2, 1, 3}, {4, 1, 3, 1, 2}};
+
+  for (int i = 0; i < num_shapes; ++i) {
+    int* input1_dim = test_shapes[i];
+    int input2_dim[] = {1, 1};
+
+    float input1_data[] = {0, 10, -5, 10, 0, 5};
+    float input2_data[] = {10};
+    bool expected_data[] = {true, false, true, false, true, true};
+
+    const float input1_scale = 0.25f;
+    const int input1_zero_point = 0;
+    int16_t input1_quantized[6];
+    int16_t input2_quantized[1];
+
+    bool output_data[6];
+
+    tflite::testing::TestComparisonQuantizedInt16(
+        tflite::Register_NOT_EQUAL(),
+        input1_dim, input1_data, input1_quantized,
+        input1_scale, input1_zero_point,
+        input2_dim, input2_data, input2_quantized,
+        input1_scale, input1_zero_point,
+        expected_data,
+        input1_dim,
+        output_data);
+  }
+}
 
 TF_LITE_MICRO_TESTS_END

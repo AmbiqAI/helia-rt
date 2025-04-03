@@ -396,4 +396,61 @@ TF_LITE_MICRO_TEST(DepthToSpaceOpModelInt16_1111_1) {
       output_data);
 }
 
+
+TF_LITE_MICRO_TEST(DepthToSpaceOpModelInt16_1119_3) {
+  int kInputDims[] = {4, 1, 1, 1, 9};
+  constexpr float kInput[] = {
+      1, 2, 3, 4, 5, 6, 7, 8, 9
+  };
+  int kExpectDims[] = {4, 1, 3, 3, 1};
+  constexpr float kExpect[] = {
+      1, 2, 3,
+      4, 5, 6,
+      7, 8, 9
+  };
+  constexpr int kOutputCount = 9;
+  float output_data[kOutputCount];
+
+  tflite::testing::DepthToSpaceTestParams params;
+  params.block_size = 3;
+
+  tflite::testing::TestQuantParams<int16_t, kOutputCount> quant_params = {};
+  quant_params.data_min = 0.0f;
+  quant_params.data_max = 10.0f;
+
+  tflite::testing::TestDepthToSpaceQuantized<int16_t, kOutputCount>(
+      params, &quant_params,
+      kInputDims, kInput,
+      kExpectDims, kExpect,
+      output_data);
+}
+
+TF_LITE_MICRO_TEST(DepthToSpaceOpModelInt16_Batch2_Block2) {
+  int kInputDims[] = {4, 2, 1, 1, 4};
+  constexpr float kInput[] = {
+    1, 2, 3, 4,
+    5, 6, 7, 8
+  };
+
+  int kExpectDims[] = {4, 2, 2, 2, 1};
+  constexpr float kExpect[] = {
+      1, 2, 3, 4,
+      5, 6, 7, 8
+  };
+  constexpr int kOutputCount = 8;
+  float output_data[kOutputCount];
+
+  tflite::testing::DepthToSpaceTestParams params;
+  params.block_size = 2;
+  tflite::testing::TestQuantParams<int16_t, kOutputCount> quant_params = {};
+  quant_params.data_min = 0.0f;
+  quant_params.data_max = 9.0f;
+
+  tflite::testing::TestDepthToSpaceQuantized<int16_t, kOutputCount>(
+      params, &quant_params,
+      kInputDims, kInput,
+      kExpectDims, kExpect,
+      output_data);
+}
+
 TF_LITE_MICRO_TESTS_END
