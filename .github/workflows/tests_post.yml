@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: call-ambiq-build-docker-image
-        uses: ./.github/workflows/run_ambiq.yml
+        uses: ./.github/workflows/ambiq_build_docker_image.yml
 
   ambiq_test:
     if: always() && github.event.pull_request.merged == true ||

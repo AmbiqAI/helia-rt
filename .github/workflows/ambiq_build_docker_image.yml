@@ -1,11 +1,16 @@
 name: Build TFLM CI Docker Image
 
 on:
+  workflow_dispatch:
   workflow_call:
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-md
 
     steps:
       - name: Checkout Repository
