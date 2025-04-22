@@ -250,4 +250,63 @@ TF_LITE_MICRO_TEST(SpaceToDepth_Int16_1441) {
   TestSpaceToDepth(test);
 }
 
+TF_LITE_MICRO_TEST(SpaceToDepth_Int16_1331_3) {
+  using value_type = int16_t;
+  SpaceToDepthTest<value_type> test;
+
+  int input_dims[] = {4, 1, 3, 3, 1};
+  test.input_dims = input_dims;
+  constexpr value_type kInputData[] = {
+      1, 2, 3,
+      4, 5, 6,
+      7, 8, 9
+  };
+  test.input_data = kInputData;
+  test.block_size = 3;
+
+  int expect_dims[] = {4, 1, 1, 1, 9};
+  test.expect_dims = expect_dims;
+
+  constexpr value_type kExpectData[] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+  test.expect_data = kExpectData;
+
+  constexpr int kExpectElements = ArrayLength(kInputData);
+  value_type output_data[kExpectElements];
+  test.output_data = output_data;
+
+  TestSpaceToDepth(test);
+}
+
+
+TF_LITE_MICRO_TEST(SpaceToDepth_Int16_Batch2) {
+  using value_type = int16_t;
+  SpaceToDepthTest<value_type> test;
+
+  int input_dims[] = {4, 2, 2, 2, 1};
+  test.input_dims = input_dims;
+
+  constexpr value_type kInputData[] = {
+    1, 2, 3, 4,
+    5, 6, 7, 8
+  };
+  test.input_data = kInputData;
+
+  test.block_size = 2;
+
+  int expect_dims[] = {4, 2, 1, 1, 4};
+  test.expect_dims = expect_dims;
+
+  constexpr value_type kExpectData[] = {
+    1, 2, 3, 4,
+    5, 6, 7, 8
+  };
+  test.expect_data = kExpectData;
+
+  constexpr int kExpectElements = ArrayLength(kInputData);
+  value_type output_data[kExpectElements];
+  test.output_data = output_data;
+
+  TestSpaceToDepth(test);
+}
+
 TF_LITE_MICRO_TESTS_END

@@ -27,13 +27,13 @@ jobs:
       - name: Create artifacts
         env:
           NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
+          ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
         run: |
           mkdir -p artifacts
           # Create neuralSPOT module
           bash ./neuralspot/build.sh
           cd ${GITHUB_WORKSPACE}/build
           zip -r ../artifacts/ns-tflm-$tag.zip *
-          tar -czf ../artifacts/ns-tflm-$tag.tar.gz *
           # Create a snapshot of the repository
           cd ${GITHUB_WORKSPACE}
           git archive --format zip    --output artifacts/repo-snapshot-$tag.zip HEAD
@@ -66,7 +66,6 @@ jobs:
           cd artifacts
           gh release create "$tag" \
             ns-tflm-$tag.zip \
-            ns-tflm-$tag.tar.gz \
             repo-snapshot-$tag.zip \
             repo-snapshot-$tag.tar.gz \
             -R "$GITHUB_REPOSITORY" \

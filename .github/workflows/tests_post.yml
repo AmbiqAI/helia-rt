@@ -11,10 +11,9 @@ on:
 jobs:
 
   build_docker_image:
-    runs-on: ubuntu-latest
-    steps:
-      - name: call-ambiq-build-docker-image
-        uses: ./.github/workflows/run_ambiq.yml
+    uses: ./.github/workflows/ambiq_build_docker_image.yml
+    with:
+      trigger-sha: ${{ github.event.pull_request.head.sha }}
 
   ambiq_test:
     if: always() && github.event.pull_request.merged == true ||

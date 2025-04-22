@@ -372,4 +372,63 @@ TF_LITE_MICRO_TEST(GatherNd_ReadOOBNegativeInt16) {
       nullptr, kTfLiteError);
 }
 
+TF_LITE_MICRO_TEST(GatherNd_SlicePartialIndices_Int16) {
+
+  int input_dims[] = {3, 2, 2, 3};
+
+  int index_dims[] = {2, 2, 2};  
+  const int32_t index_data[] = {1, 1, 
+                                0, 1};
+  const int16_t input_data[] = {
+      10, 11, 12,
+      13, 14, 15,
+      20, 21, 22,
+      23, 24, 25,
+  };
+
+  int output_dims[] = {2, 0, 0};
+
+  const int16_t golden_data[] = {
+      23, 24, 25,
+      13, 14, 15
+  };
+
+  int16_t output_data[6];
+
+  tflite::testing::TestGatherNd<int16_t, int32_t>(
+      input_dims, input_data,
+      index_dims, index_data,
+      output_dims, output_data,
+      golden_data);
+}
+
+TF_LITE_MICRO_TEST(GatherNd_RepeatedElementIndices_Int16) {
+  int input_dims[] = {2, 2, 2};
+
+  int index_dims[] = {2, 3, 2};
+  const int32_t index_data[] = {
+      1, 1,
+      1, 1,
+      0, 0
+  };
+
+  const int16_t input_data[] = {
+      10, 11,
+      20, 21
+  };
+
+  int output_dims[] = {1, 0};
+  const int16_t golden_data[] = {
+      21, 21, 10
+  };
+
+  int16_t output_data[3];
+
+  tflite::testing::TestGatherNd<int16_t, int32_t>(
+      input_dims, input_data,
+      index_dims, index_data,
+      output_dims, output_data,
+      golden_data);
+}
+
 TF_LITE_MICRO_TESTS_END
