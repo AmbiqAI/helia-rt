@@ -46,6 +46,7 @@ struct OpData {
   int32_t batches;
   int32_t accum_depth;
   int32_t output_depth;
+  cmsis_nn_context weight_sum_ctx;
 };
 
 
@@ -147,12 +148,28 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
             context, total_per_channel_quantization_size,
             &data->buffer_conv_1x1_idx));
       }
+      cmsis_nn_dims output_dims; 
+      output_dims.n = data->batches;
+      output_dims.h = 1;
+      output_dims.w = 1;
+      output_dims.c = output_shape.Dims(output_dim_count - 1);
 
+      int32_t weights_sum_buf_size = arm_convolve_s8_get_weights_sum_size(&output_dims);
+      data->weight_sum_ctx.buf = static_cast<void*>(
+            context->AllocatePersistentBuffer(context, weights_sum_buf_size));
+      data->weight_sum_ctx.size = weights_sum_buf_size;
+
+      const int8_t* filter_data = GetTensorData<const int8_t>(filter);
+      const int32_t* bias_data = GetTensorData<const int32_t>(bias);
+      int32_t lhs_offset = -data->reference_op_data.input_zero_point;
       cmsis_nn_dims input_dims;
       input_dims.n = data->batches;
       input_dims.h = 1;
       input_dims.w = 1;
       input_dims.c = data->accum_depth;
+
+
+      arm_convolve_weight_sum((int32_t*)data->weight_sum_ctx.buf, filter_data,&input_dims, &filter_dims, &output_dims, lhs_offset,  bias_data);
       buf_size = arm_convolve_1x1_s8_fast_get_buffer_size(&input_dims);
     } else if (input->type == kTfLiteInt8) {
       buf_size = arm_fully_connected_s8_get_buffer_size(&filter_dims);
@@ -330,7 +347,7 @@ TfLiteStatus EvalQuantizedInt8(TfLiteContext* context, TfLiteNode* node,
     TF_LITE_ENSURE_EQ(
         context,
         arm_convolve_1x1_s8_fast(
-            &ctx, &conv_params, &per_channel_quant_params, &input_dims,
+            &ctx, &data.weight_sum_ctx, &conv_params, &per_channel_quant_params, &input_dims,
             tflite::micro::GetTensorData<int8_t>(input), &filter_dims,
             tflite::micro::GetTensorData<int8_t>(filter), &bias_dims, bias_data,
             &output_dims, tflite::micro::GetTensorData<int8_t>(output)),

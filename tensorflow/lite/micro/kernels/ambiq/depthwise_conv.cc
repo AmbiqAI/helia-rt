@@ -37,6 +37,7 @@ struct OpData {
 
   // Index to buffer for optimizations if applicable.
   int buffer_idx;
+  cmsis_nn_context weight_sum_ctx;
 };
 
 // Always inline for optimal code size.
@@ -70,6 +71,8 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE(context, input != nullptr);
   TfLiteTensor* filter =
       micro_context->AllocateTempInputTensor(node, kDepthwiseConvWeightsTensor);
+  TfLiteTensor* bias =
+      micro_context->AllocateTempOutputTensor(node, kDepthwiseConvBiasTensor);
   TF_LITE_ENSURE(context, filter != nullptr);
   TfLiteTensor* output =
       micro_context->AllocateTempOutputTensor(node, kDepthwiseConvOutputTensor);
@@ -174,6 +177,16 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     dw_conv_params.dilation.w = params.dilation_width_factor;
 
     int32_t buf_size = 0;
+    int32_t weights_sum_buf_size = arm_convolve_s8_get_weights_sum_size(&output_dims);
+    data->weight_sum_ctx.buf = static_cast<void*>(
+          context->AllocatePersistentBuffer(context, weights_sum_buf_size));
+    data->weight_sum_ctx.size = weights_sum_buf_size;
+
+    const int8_t* filter_data = GetTensorData<const int8_t>(filter);
+    const int32_t* bias_data = GetTensorData<const int32_t>(bias);
+    int32_t lhs_offset = dw_conv_params.input_offset;
+    arm_convolve_weight_sum((int32_t*)data->weight_sum_ctx.buf, filter_data,&input_dims, &filter_dims, &output_dims, lhs_offset,  bias_data);
+
     if (filter->type == kTfLiteInt8) {
       buf_size = arm_depthwise_conv_wrapper_s8_get_buffer_size(
           &dw_conv_params, &input_dims, &filter_dims, &output_dims);
@@ -292,7 +305,7 @@ void EvalQuantizedPerChannel(TfLiteContext* context, TfLiteNode* node,
 
   TFLITE_DCHECK_EQ(
       arm_depthwise_conv_wrapper_s8(
-          &ctx, &dw_conv_params, &quant_params, &input_dims,
+          &ctx, &data.weight_sum_ctx, &dw_conv_params, &quant_params, &input_dims,
           tflite::micro::GetTensorData<int8_t>(input), &filter_dims,
           tflite::micro::GetTensorData<int8_t>(filter), &bias_dims,
           tflite::micro::GetOptionalTensorData<int32_t>(bias), &output_dims,
