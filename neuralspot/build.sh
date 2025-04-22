@@ -17,9 +17,9 @@ mkdir -p $BUILD_LIB_DIR
 TARGET=cortex_m_generic
 TOOLCHAIN=gcc
 OPTIM_KERNEL=ambiq
-#TARGET_ARCHS=("cortex-m4+fp" "cortex-m55")
+TARGET_ARCHS=("cortex-m4+fp" "cortex-m55")
 #TARGET_ARCHS=("cortex-m4+fp" )
-TARGET_ARCHS=("cortex-m55")
+#TARGET_ARCHS=("cortex-m55")
 TARGET_TOOLCHAIN_ROOT="" # TODO: Override the default which is currently 13.2.Rel1
 # Build TFLM with release, release_with_logs, and debug
 BUILDS=("debug" "release" "release_with_logs")

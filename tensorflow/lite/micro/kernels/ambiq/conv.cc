@@ -34,8 +34,10 @@ struct OpData {
   OpDataConv reference_op_data;
 
   // Index to buffer for optimizations if applicable.
-  int buffer_idx;
-  cmsis_nn_context weight_sum_ctx;
+  int activation_buffer_idx;
+  int weight_buffer_idx;
+  int32_t* weight_sum_buf;
+  int32_t weight_sum_length;
 };
 
 void* Init(TfLiteContext* context, const char* buffer, size_t length) {
@@ -47,7 +49,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
   TFLITE_DCHECK(node->builtin_data != nullptr);
 
-  int32_t buf_size = 0;
+  int32_t arena_buf_size = 0;
   const auto& params =
       *(static_cast<const TfLiteConvParams*>(node->builtin_data));
   OpData* data = static_cast<OpData*>(node->user_data);
@@ -101,6 +103,9 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     TFLITE_DCHECK_EQ(bias_size, output->dims->data[3]);
   }
 
+  //reset weight buffer idx
+  data->weight_buffer_idx = -1;
+
   // Initialize cmsis_nn dimensions
   cmsis_nn_dims input_dims;
   input_dims.n = input->dims->data[0];
@@ -152,40 +157,43 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     conv_params.activation.min = data->reference_op_data.output_activation_min;
     conv_params.activation.max = data->reference_op_data.output_activation_max;
 
-    bool is_1x1_image_8bit = ((output_dims.h == 1) && (output_dims.w == 1) && 
-             ((conv_params.stride.w * input_dims.c) % 4 == 0) && (input_dims.c == filter_dims.c)) && (input->type == kTfLiteInt8);
-    //create the weight sum context and allocate for it
-    //
-    if (is_1x1_image_8bit) {
-      int32_t weights_sum_buf_size = arm_convolve_s8_get_weights_sum_size(&output_dims);
-      data->weight_sum_ctx.buf = static_cast<void*>(
-            context->AllocatePersistentBuffer(context, weights_sum_buf_size));
-      data->weight_sum_ctx.size = weights_sum_buf_size;
-
-      const int8_t* filter_data = GetTensorData<const int8_t>(filter);
-      const int32_t* bias_data = GetTensorData<const int32_t>(bias);
-      int32_t lhs_offset = conv_params.input_offset;
-      arm_convolve_weight_sum((int32_t*)data->weight_sum_ctx.buf, filter_data,&filter_dims, &output_dims, lhs_offset,  bias_data);
-    }
-
     if (input->type == kTfLiteInt8) {
-      buf_size = arm_convolve_wrapper_s8_get_buffer_size(
+    data->weight_sum_length = arm_convolve_s8_get_weights_sum_size(&output_dims);
+
+#if defined(KERNELS_OPTIMIZED_FOR_SPEED)
+    //allocating buffer for weight sum context if optimized for speed
+    //otherwise we use a temp buffer
+    data->weight_sum_buf = static_cast<int32_t*>(
+          context->AllocatePersistentBuffer(context, data->weight_sum_length));
+
+    const int8_t* filter_data = GetTensorData<const int8_t>(filter);
+    const int32_t* bias_data = GetTensorData<const int32_t>(bias);
+    int32_t lhs_offset = conv_params.input_offset;
+    arm_convolve_weight_sum((int32_t*)data->weight_sum_buf, filter_data,&input_dims, &filter_dims, &output_dims, lhs_offset,  bias_data);
+
+#else
+      TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
+          context, data->weight_sum_length, &data->weight_buffer_idx));
+
+#endif
+
+      arena_buf_size = arm_convolve_wrapper_s8_get_buffer_size(
           &conv_params, &input_dims, &filter_dims, &output_dims); 
+
     } else if (input->type == kTfLiteInt16) {
       TF_LITE_ENSURE_EQ(context, input->params.zero_point, 0);
       TF_LITE_ENSURE_EQ(context, output->params.zero_point, 0);
-      buf_size = arm_convolve_wrapper_s16_get_buffer_size(
+      arena_buf_size = arm_convolve_wrapper_s16_get_buffer_size(
           &conv_params, &input_dims, &filter_dims, &output_dims);
+
+
+
     }
-    if (buf_size > 0) {
-      //check if we're 1x1 image 
-
+    if (arena_buf_size > 0) {
       TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
-          context, buf_size, &data->buffer_idx));
-
-
+          context, arena_buf_size, &data->activation_buffer_idx));
     } else {
-      data->buffer_idx = -1;
+      data->activation_buffer_idx = -1;
     }
   }
 
@@ -219,9 +227,7 @@ arm_cmsis_nn_status convolve_wrapper(
     const cmsis_nn_dims* bias_dims, const int32_t* bias,
     const cmsis_nn_dims* output_dims, int8_t* output, TfLiteType weightsT) {
   if (weightsT == kTfLiteInt8) {
-    return arm_convolve_wrapper_s8(ctx, conv_params, quant_params, input_dims,
-                                   input, filter_dims, filter, bias_dims, bias,
-                                   output_dims, output);
+    return ARM_CMSIS_NN_ARG_ERROR;
   } else if (weightsT == kTfLiteInt4) {
     return arm_convolve_wrapper_s4(ctx, conv_params, quant_params, input_dims,
                                    input, filter_dims, filter, bias_dims, bias,
@@ -318,35 +324,52 @@ TfLiteStatus EvalQuantizedPerChannel(TfLiteContext* context, TfLiteNode* node,
 
   // Initialize cmsis_nn context
   cmsis_nn_context ctx;
-
-  bool is_1x1_image_8bit = ((output_dims.h == 1) && (output_dims.w == 1) && 
-           ((conv_params.stride.w * input_dims.c) % 4 == 0) && (input_dims.c == filter_dims.c)) && (input->type == kTfLiteInt8);
-
   ctx.buf = nullptr;
   ctx.size = 0;
-  if (data.buffer_idx > -1) {
-    ctx.buf = context->GetScratchBuffer(context, data.buffer_idx);
+
+  if (data.activation_buffer_idx > -1) {
+    ctx.buf = context->GetScratchBuffer(context, data.activation_buffer_idx);
     // Note: ctx.size is currently not used in cmsis_nn.
     // The buffer should be allocated in the prepare function through
     // the corresponding arm_convolve_wrapper_[type]_get_buffer_size
   }
 
-  if(is_1x1_image_8bit) {
-  // 1x1 image is skipped for now from the wrapper to use the weight sum context
-  // don't have to templatize these params for now because only handling this case
-  TFLITE_DCHECK_EQ(
-      arm_convolve_1_x_1_out_s8(
-          &ctx, &data.weight_sum_ctx, &conv_params, &quant_params, &input_dims,
-          tflite::micro::GetTensorData<int8_t>(input), &filter_dims,
-          tflite::micro::GetTensorData<int8_t>(filter), &bias_dims,
-          tflite::micro::GetOptionalTensorData<int32_t>(bias),NULL, &output_dims,
-          tflite::micro::GetTensorData<int8_t>(output)),
-      ARM_CMSIS_NN_SUCCESS);
-  } else {
 
   // arm_convolve_wrapper_[type] dispatches the optimized kernel accordingly
   // with the parameters passed
+  // breaking away from usage due to 8 bit interface change 
   //
+  if (type == kTfLiteInt8) {
+      cmsis_nn_context weight_sum_ctx;
+      weight_sum_ctx.buf = nullptr;
+      weight_sum_ctx.size = data.weight_sum_length;
+      if (data.weight_sum_buf != nullptr) {
+        weight_sum_ctx.buf = data.weight_sum_buf;
+      } else {
+        if (data.weight_buffer_idx > -1) {
+          weight_sum_ctx.buf = context->GetScratchBuffer(context, data.weight_buffer_idx);
+        //now need to redo the weight sum because we didn't precompute
+        arm_convolve_weight_sum((int32_t*)weight_sum_ctx.buf, 
+                                tflite::micro::GetTensorData<const int8_t>(filter),
+                                &input_dims, &filter_dims,
+                                &output_dims, conv_params.input_offset, 
+                                tflite::micro::GetOptionalTensorData<const int32_t>(bias));
+        } else {
+          return kTfLiteError;
+        }
+        //I think we are error case here
+      }
+
+  TFLITE_DCHECK_EQ(
+      arm_convolve_wrapper_s8( &weight_sum_ctx,
+                &ctx, &conv_params, &quant_params, &input_dims,
+                tflite::micro::GetTensorData<int8_t>(input), &filter_dims,
+                tflite::micro::GetTensorData<const int8_t>(filter), &bias_dims,
+                tflite::micro::GetOptionalTensorData<const int32_t>(bias), &output_dims,
+                tflite::micro::GetTensorData<int8_t>(output)),
+      ARM_CMSIS_NN_SUCCESS);
+  }
+  else {
   TFLITE_DCHECK_EQ(
       convolve_wrapper(
           &ctx, &conv_params, &quant_params, &input_dims,
