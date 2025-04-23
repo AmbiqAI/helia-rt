@@ -74,7 +74,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TfLiteTensor* filter =
       micro_context->AllocateTempInputTensor(node, kDepthwiseConvWeightsTensor);
   TfLiteTensor* bias =
-      micro_context->AllocateTempOutputTensor(node, kDepthwiseConvBiasTensor);
+      micro_context->AllocateTempInputTensor(node, kDepthwiseConvBiasTensor);
   TF_LITE_ENSURE(context, filter != nullptr);
   TfLiteTensor* output =
       micro_context->AllocateTempOutputTensor(node, kDepthwiseConvOutputTensor);
