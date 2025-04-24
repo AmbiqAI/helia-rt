@@ -145,6 +145,9 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   //reset weight buffer idx
   data->weight_buffer_idx = -1;
   data->activation_buffer_idx = -1;
+  data->weight_sum_buf = nullptr;
+  data->weight_sum_length = 0;
+
   if (input->type == kTfLiteInt8) {
     RuntimeShape input_shape = GetTensorShape(input);
     RuntimeShape output_shape = GetTensorShape(output);
@@ -191,7 +194,6 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
 
     if (filter->type == kTfLiteInt8) {
       data->weight_sum_length = arm_convolve_s8_get_weights_sum_size(&output_dims);
-
 #if defined(KERNELS_OPTIMIZED_FOR_SPEED)
       data->weight_sum_buf = static_cast<int32_t*>(
             context->AllocatePersistentBuffer(context, data->weight_sum_length));
@@ -201,11 +203,12 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
       int32_t lhs_offset = dw_conv_params.input_offset;
       arm_convolve_weight_sum((int32_t*)data->weight_sum_buf, filter_data,&input_dims, &filter_dims, &output_dims, lhs_offset,  bias_data);
 #else
+      if (data->weight_sum_length > 0) {
         TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
             context, data->weight_sum_length, &data->weight_buffer_idx));
+      }
 
 #endif
-
       buf_size = arm_depthwise_conv_wrapper_s8_get_buffer_size(
           &dw_conv_params, &input_dims, &filter_dims, &output_dims);
     } else if (filter->type == kTfLiteInt4) {
@@ -242,6 +245,7 @@ inline void PopulateDwConvParams(
     const TfLiteDepthwiseConvParams& params, const OpData& data,
     const TfLiteEvalTensor* input, const TfLiteEvalTensor* filter,
     const TfLiteEvalTensor* bias, TfLiteEvalTensor* output) {
+
   dw_conv_params->dilation.h = params.dilation_height_factor;
   dw_conv_params->dilation.w = params.dilation_width_factor;
 
