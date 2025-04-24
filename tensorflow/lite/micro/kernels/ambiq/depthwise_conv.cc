@@ -194,21 +194,6 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
 
     if (filter->type == kTfLiteInt8) {
       data->weight_sum_length = arm_convolve_s8_get_weights_sum_size(&output_dims);
-#if defined(KERNELS_OPTIMIZED_FOR_SPEED)
-      data->weight_sum_buf = static_cast<int32_t*>(
-            context->AllocatePersistentBuffer(context, data->weight_sum_length));
-
-      const int8_t* filter_data = GetTensorData<const int8_t>(filter);
-      const int32_t* bias_data = GetTensorData<const int32_t>(bias);
-      int32_t lhs_offset = dw_conv_params.input_offset;
-      arm_convolve_weight_sum((int32_t*)data->weight_sum_buf, filter_data,&input_dims, &filter_dims, &output_dims, lhs_offset,  bias_data);
-#else
-      if (data->weight_sum_length > 0) {
-        TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
-            context, data->weight_sum_length, &data->weight_buffer_idx));
-      }
-
-#endif
       buf_size = arm_depthwise_conv_wrapper_s8_get_buffer_size(
           &dw_conv_params, &input_dims, &filter_dims, &output_dims);
     } else if (filter->type == kTfLiteInt4) {
@@ -226,6 +211,32 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     } else {
       data->activation_buffer_idx = -1;
     }
+
+    if (filter->type == kTfLiteInt8) {
+#if defined(KERNELS_OPTIMIZED_FOR_SPEED)
+      data->weight_sum_buf = static_cast<int32_t*>(
+            context->AllocatePersistentBuffer(context, data->weight_sum_length));
+
+      const int8_t* filter_data = GetTensorData<const int8_t>(filter);
+      const int32_t* bias_data = GetTensorData<const int32_t>(bias);
+      int32_t lhs_offset = dw_conv_params.input_offset;
+      int8_t* scratch_buffer = nullptr;
+      if (buf_size > 0) {
+        scratch_buffer = (int8_t*) micro_context->AllocateTempBuffer(buf_size, 16);
+      }
+      arm_depthwise_convolve_weight_sum((int32_t*)data->weight_sum_buf, scratch_buffer, filter_data,&dw_conv_params,&input_dims, &filter_dims, &output_dims, lhs_offset,  bias_data);
+      if (scratch_buffer != nullptr) {
+        micro_context->DeallocateTempBuffer((uint8_t*)scratch_buffer);
+      }
+    }
+#else
+      if (data->weight_sum_length > 0) {
+        TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
+            context, data->weight_sum_length, &data->weight_buffer_idx));
+      }
+
+#endif
+
   }
 
   micro_context->DeallocateTempTfLiteTensor(output);
@@ -342,7 +353,6 @@ void EvalQuantizedPerChannel(TfLiteContext* context, TfLiteNode* node,
                               tflite::micro::GetOptionalTensorData<const int32_t>(bias));
     }
   }
-
   TFLITE_DCHECK_EQ(
       arm_depthwise_conv_wrapper_s8(
           &ctx, &weight_sum_ctx, &dw_conv_params, &quant_params, &input_dims,
@@ -351,7 +361,6 @@ void EvalQuantizedPerChannel(TfLiteContext* context, TfLiteNode* node,
           tflite::micro::GetOptionalTensorData<int32_t>(bias), &output_dims,
           tflite::micro::GetTensorData<int8_t>(output)),
       ARM_CMSIS_NN_SUCCESS);
-
 }
 
 void EvalQuantizedPerChannelInt4(TfLiteContext* context, TfLiteNode* node,
