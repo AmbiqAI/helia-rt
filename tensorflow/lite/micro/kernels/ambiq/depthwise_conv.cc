@@ -346,9 +346,9 @@ void EvalQuantizedPerChannel(TfLiteContext* context, TfLiteNode* node,
     if (data.weight_buffer_idx > -1) {
       weight_sum_ctx.buf = context->GetScratchBuffer(context, data.weight_buffer_idx);
       //now need to redo the weight sum because we didn't precompute
-      arm_convolve_weight_sum((int32_t*)weight_sum_ctx.buf, 
+      arm_depthwise_convolve_weight_sum((int32_t*)weight_sum_ctx.buf, (int8_t*) ctx.buf, 
                               tflite::micro::GetTensorData<const int8_t>(filter),
-                              &input_dims, &filter_dims,
+                              &dw_conv_params, &input_dims, &filter_dims,
                               &output_dims, dw_conv_params.input_offset, 
                               tflite::micro::GetOptionalTensorData<const int32_t>(bias));
     }
