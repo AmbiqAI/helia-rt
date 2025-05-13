@@ -16,7 +16,7 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/reference/leaky_relu.h"
 
 #include "Include/arm_nnsupportfunctions.h"
-#include "Include/arm_nnactivations.h"
+#include "Include/arm_nnfunctions.h"
 
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/kernels/internal/quantization_util.h"
