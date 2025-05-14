@@ -31,7 +31,7 @@
 #   - Any other informational prints should be on stderr.
 
 set -e
-
+git config --global --add safe.directory /__w/ns-tflm/ns-tflm
 TENSORFLOW_ROOT=${2}
 source ${TENSORFLOW_ROOT}tensorflow/lite/micro/tools/make/bash_helpers.sh
 
