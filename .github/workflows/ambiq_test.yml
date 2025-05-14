@@ -50,4 +50,7 @@ jobs:
         with:
           path: |
             tensorflow/lite/micro/tools/make/downloads
-          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile') }}
+          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles(
+            'tensorflow/lite/micro/tools/make/Makefile', 
+            'tensorflow/lite/micro/tools/make/third_party_downloads.inc'
+            ) }}
