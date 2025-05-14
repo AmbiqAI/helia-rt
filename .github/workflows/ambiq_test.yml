@@ -24,7 +24,7 @@ jobs:
           ref: ${{ inputs.trigger-sha }}
 
       - name: Mark workspace as safe for Git
-        run: git config --global --add safe.directory "${{ github.workspace }}"
+        run: git config --global --add safe.directory "*"
 
       - name: Cache third-party downloads
         uses: actions/cache@v3
