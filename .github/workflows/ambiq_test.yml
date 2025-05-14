@@ -9,12 +9,7 @@ on:
     secrets:
       NS_CMSIS_NN_SSH_KEY:
         required: true
-  workflow_dispatch:                # ← manual trigger for testing
-    inputs:
-      trigger-sha:
-        description: 'Commit SHA to test'
-        required: true
-        type: string
+
 jobs:
   ambiq_test:
     runs-on: ubuntu-latest-md
