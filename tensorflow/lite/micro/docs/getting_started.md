@@ -1,11 +1,11 @@
-# Getting Started with NS-TFLM
+# Getting Started with HeliosRT
 
-Welcome to the NS-TFLM Getting Started guide. NS-TFLM, a derivative of TensorFlow Lite for Microcontrollers (TFLM), is specially optimized for Ambiq's Apollo platforms using NS-CMSIS-NN, enhancing performance on these devices. This guide outlines similarities with TFLM and provides detailed instructions on leveraging NS-TFLM's capabilities through neuralSPOT. Read on to learn how to deploy TFLite models, run examples, and integrate NS-TFLM into your development projects with ease.
+Welcome to the HeliosRT Getting Started guide. HeliosRT, a derivative of TensorFlow Lite for Microcontrollers (TFLM), is specially optimized for Ambiq's Apollo platforms using NS-CMSIS-NN, enhancing performance on these devices. This guide outlines similarities with TFLM and provides detailed instructions on leveraging HeliosRT's capabilities through neuralSPOT. Read on to learn how to deploy TFLite models, run examples, and integrate HeliosRT into your development projects with ease.
 
 
 ## Latest Release w/ neuralSPOT
 
-The latest release of NS-TFLM is now available as a static module within the neuralSPOT framework. Explore the following options to effectively utilize NS-TFLM with neuralSPOT:
+The latest release of HeliosRT is now available as a static module within the neuralSPOT framework. Explore the following options to effectively utilize HeliosRT with neuralSPOT:
 
 ### Option 1: Run a TFLite Model via Autodeploy
 
@@ -23,7 +23,7 @@ Access the examples [here](https://ambiqai.github.io/neuralSPOT/examples/).
 
 ### Option 3: Create a Nest Application in neuralSPOT
 
-Utilize the neuralSPOT makefile system to create custom applications, known as `nest` applications, which can operate on Ambiq's Apollo platforms. These self-contained applications are customizable and can include any number of static modules, such as NS-TFLM.
+Utilize the neuralSPOT makefile system to create custom applications, known as `nest` applications, which can operate on Ambiq's Apollo platforms. These self-contained applications are customizable and can include any number of static modules, such as HeliosRT.
 
 ```bash
 make nest
@@ -34,14 +34,14 @@ For detailed makefile instructions, visit [this page](https://ambiqai.github.io/
 
 ## Bleeding Edge w/ neuralSPOT
 
-The bleeding edge version of NS-TFLM is available as a neuralSPOT static module and can be integrated into your projects to utilize the latest features and optimizations. Follow these steps to build and configure the module:
+The bleeding edge version of HeliosRT is available as a neuralSPOT static module and can be integrated into your projects to utilize the latest features and optimizations. Follow these steps to build and configure the module:
 
-### 1. Clone the NS-TFLM Repository
+### 1. Clone the HeliosRT Repository
 
-Start by cloning the NS-TFLM repository and checking out the latest commit:
+Start by cloning the HeliosRT repository and checking out the latest commit:
 
 ```bash
-git clone https://github.com/AmbiqAI/ns-tflm
+git clone https://github.com/AmbiqAI/helios-rt
 ```
 
 ### 2. Build the NeuralSPOT Module
@@ -49,7 +49,7 @@ git clone https://github.com/AmbiqAI/ns-tflm
 Navigate to the cloned directory and execute the build script. This script prepares both GCC and Arm Clang toolchain versions, which are automatically downloaded and configured. Specify a local toolchain by setting `$TARGET_TOOLCHAIN_ROOT` or adjust the toolchain used with the `build.sh` script's `$TOOLCHAIN` variable.
 
 ```bash
-cd ns-tflm
+cd helios-rt
 ./neuralspot/build.sh
 ```
 
@@ -94,7 +94,7 @@ The `lib` directory contains static libraries for various configurations, and `m
 To integrate the built module with your project, copy the `build` directory to the neuralSPOT project directory:
 
 ```bash
-cp -r ns-tflm/build neuralspot/extern/ns_tflm_bleeding_edge
+cp -r helios-rt/build neuralspot/extern/ns_tflm_bleeding_edge
 ```
 
 ### 4. Configure NeuralSPOT to Use the Bleeding Edge Module
@@ -111,7 +111,7 @@ Alternatively, specify this version directly when using the `ns_autodeploy` tool
 ns_autodeploy --tensorflow-version=ns_tflm_bleeding_edge
 ```
 
-These steps ensure that your project utilizes the latest NS-TFLM features, enhancing functionality and performance on supported Ambiq SoCs.
+These steps ensure that your project utilizes the latest HeliosRT features, enhancing functionality and performance on supported Ambiq SoCs.
 
 
 ## Zephyr Integration
@@ -119,14 +119,14 @@ These steps ensure that your project utilizes the latest NS-TFLM features, enhan
 Coming soon...
 
 
-## Building NS-TFLM from Source
+## Building HeliosRT from Source
 
-To integrate NS-TFLM into AmbiqSuite or a third-party project, you can build TFLM from source. The following steps will guide you through the high-level process of building TFLM from source into a static library.
+To integrate HeliosRT into AmbiqSuite or a third-party project, you can build TFLM from source. The following steps will guide you through the high-level process of building TFLM from source into a static library.
 
-1. **Clone the NS-TFLM repository and checkout the latest commit.**
+1. **Clone the HeliosRT repository and checkout the latest commit.**
 
 ```bash
-git clone https://github.com/AmbiqAI/ns-tflm
+git clone https://github.com/AmbiqAI/helios-rt
 ```
 
 2. **(Optional) Open the repository as a VSCode devcontainer.**
@@ -141,7 +141,7 @@ Be sure to configure the variables below to match your target architecture and t
 
 ```bash
 
-cd ns-tflm
+cd helios-rt
 
 source tensorflow/lite/micro/tools/ci_build/helper_functions.sh
 
@@ -181,7 +181,7 @@ readable_run make -f tensorflow/lite/micro/tools/make/Makefile \
 
 The static library will be generated to `gen/${TARGET}_${TARGET_ARCH}_${BUILD}_${OPTIM_KERNEL}_${TOOLCHAIN}/lib/libtensorflow-microlite.a`. The library can be linked into your project using the standard linker flags.
 
-6. **(Optional) Generate NS-TFLM tree for intellisense and debugging.**
+6. **(Optional) Generate HeliosRT tree for intellisense and debugging.**
 
 ```bash
 python3 /tensorflow/lite/micro/tools/project_generation/create_tflm_tree.py \
