@@ -13,10 +13,11 @@
 # limitations under the License.
 # ==============================================================================
 
+#commenting for hash logic
 ifneq (3.82,$(firstword $(sort $(MAKE_VERSION) 3.82)))
   $(error "Requires make version 3.82 or later (current is $(MAKE_VERSION))")
 endif
-
+   
 # root directory of tensorflow
 TENSORFLOW_ROOT :=
 RELATIVE_MAKEFILE_DIR := tensorflow/lite/micro/tools/make
@@ -67,9 +68,19 @@ OPTIMIZED_KERNEL_DIR :=
 # The example kernel would have a smaller scratch buffer usage when building for size.
 # Vice versa it would use more scratch buffer when building for speed and would be more performant.
 # Note that this is optional. If having one implementation, nothing needs to be done.
-# OPTIMIZE_KERNELS_FOR has only two valid values, KERNELS_OPTIMIZED_FOR_SIZE and KERNELS_OPTIMIZED_FOR_SPEED where the
+# GLOBAL_KERNEL_OPTIMIZE has only two valid values, SIZE and SPEED where the
 # former is default.
-OPTIMIZE_KERNELS_FOR := KERNELS_OPTIMIZED_FOR_SPEED
+#
+GLOBAL_KERNEL_OPTIMIZE ?= SPEED          # project‑wide default
+
+# Per‑kernel overrides (inherit when left blank)
+CONV_OPT ?= $(GLOBAL_KERNEL_OPTIMIZE)
+FC_OPT ?= $(GLOBAL_KERNEL_OPTIMIZE)
+
+
+OPTIMIZE_KERNELS_FOR := KERNELS_OPTIMIZED_FOR_${GLOBAL_KERNEL_OPTIMIZE}
+OPTIMIZE_CONV_FOR := CONV_KERNEL_OPTIMIZED_FOR_${CONV_OPT}
+OPTIMIZE_FC_FOR := FC_KERNEL_OPTIMIZED_FOR_${FC_OPT}
 
 # Override this variable from the command line in case the optimized kernels are
 # in a different directory.
@@ -127,6 +138,15 @@ endif
 ifneq ($(OPTIMIZE_KERNELS_FOR),)
   ADDITIONAL_DEFINES += -D$(shell echo $(OPTIMIZE_KERNELS_FOR) | tr [a-z] [A-Z])
 endif
+
+ifneq ($(OPTIMIZE_CONV_FOR),)
+  ADDITIONAL_DEFINES += -D$(shell echo $(OPTIMIZE_CONV_FOR) | tr [a-z] [A-Z])
+endif
+
+ifneq ($(OPTIMIZE_FC_FOR),)
+  ADDITIONAL_DEFINES += -D$(shell echo $(OPTIMIZE_FC_FOR) | tr [a-z] [A-Z])
+endif
+
 
 ifeq ($(TOOLCHAIN), armclang)
   CORE_OPTIMIZATION_LEVEL := -Ofast
@@ -648,10 +668,33 @@ ifeq ($(findstring $(TARGET),$(TARGETS_WITHOUT_MAKEFILES)),)
   include $(MAKEFILE_DIR)/targets/$(TARGET)_makefile.inc
 endif
 
-# Validate valid options.
+
+ifeq (,$(filter $(GLOBAL_KERNEL_OPTIMIZE),SPEED SIZE))
+    $(error Incorrect GLOBAL_KERNEL_OPTIMIZE: $(GLOBAL_KERNEL_OPTIMIZE))
+endif
+
+ifeq (,$(filter $(CONV_OPT),SPEED SIZE))
+    $(error Incorrect CONV_OPT: $(CONV_OPT))
+endif
+
+ifeq (,$(filter $(FC_OPT),SPEED SIZE))
+    $(error Incorrect FC_OPT: $(FC_OPT))
+endif
+
 ifeq (,$(filter $(OPTIMIZE_KERNELS_FOR),KERNELS_OPTIMIZED_FOR_SPEED KERNELS_OPTIMIZED_FOR_SIZE))
     $(error Incorrect OPTIMIZE_KERNELS_FOR: $(OPTIMIZE_KERNELS_FOR))
 endif
+
+ifeq (,$(filter $(OPTIMIZE_FC_FOR),FC_KERNEL_OPTIMIZED_FOR_SPEED FC_KERNEL_OPTIMIZED_FOR_SIZE))
+    $(error Incorrect OPTIMIZE_FC_FOR: $(OPTIMIZE_FC_FOR))
+endif
+
+
+ifeq (,$(filter $(OPTIMIZE_CONV_FOR),CONV_KERNEL_OPTIMIZED_FOR_SPEED CONV_KERNEL_OPTIMIZED_FOR_SIZE))
+    $(error Incorrect OPTIMIZE_CONV_FOR: $(OPTIMIZE_CONV_FOR))
+endif
+
+
 
 ifneq ($(OPTIMIZED_KERNEL_DIR),)
   PATH_TO_OPTIMIZED_KERNELS := $(OPTIMIZED_KERNEL_DIR_PREFIX)/$(OPTIMIZED_KERNEL_DIR)

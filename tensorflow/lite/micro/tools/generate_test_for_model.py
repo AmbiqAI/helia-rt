@@ -154,7 +154,8 @@ class TestDataGenerator:
                               schema_fb.BuiltinOperator.DEPTHWISE_CONV_2D,
                               schema_fb.BuiltinOperator.STRIDED_SLICE,
                               schema_fb.BuiltinOperator.PAD,
-                              schema_fb.BuiltinOperator.LEAKY_RELU):
+                              schema_fb.BuiltinOperator.LEAKY_RELU,
+                              schema_fb.BuiltinOperator.FULLY_CONNECTED,):
         generated_inputs = self._generate_inputs_single(
             interpreter,
             input_tensor().dtype)

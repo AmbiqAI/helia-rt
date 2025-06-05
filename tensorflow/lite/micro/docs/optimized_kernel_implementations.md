@@ -171,9 +171,9 @@ support:
         OPTIMIZED_KERNEL_DIR=<optimize_dir> microlite`
     *   Optionally build for size or speed. Translated to a valid make command it will be any of these two:
         `make -f tensorflow/lite/micro/tools/make/Makefile TARGET=<target>
-        OPTIMIZED_KERNEL_DIR=<optimize_dir> OPTIMIZE_KERNELS_FOR=KERNELS_OPTIMIZED_FOR_SIZE microlite`
+        OPTIMIZED_KERNEL_DIR=<optimize_dir> GLOBAL_KERNEL_OPTIMIZE=SIZE microlite`
         `make -f tensorflow/lite/micro/tools/make/Makefile TARGET=<target>
-        OPTIMIZED_KERNEL_DIR=<optimize_dir> OPTIMIZE_KERNELS_FOR=KERNELS_OPTIMIZED_FOR_SPEED microlite`
+        OPTIMIZED_KERNEL_DIR=<optimize_dir> GLOBAL_KERNEL_OPTIMIZE=SPEED microlite`
         Check relevant README for given optimization library if this is applicable.
     *   Use the static library and any TFLM headers as part of the overall
         application (with its own build system).
