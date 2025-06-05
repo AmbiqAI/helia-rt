@@ -12,7 +12,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-
 #include "tensorflow/lite/micro/kernels/transpose_conv.h"
 
 #include "Include/arm_nnfunctions.h"
@@ -58,6 +57,8 @@ struct OpData {
   // Multiplier and shift arrays are required for the int8 implementation.
   int32_t* per_channel_output_multiplier;
   int32_t* per_channel_output_shift;
+  int weight_buffer_idx;
+  int32_t* weight_sum_buf;
 };
 
 inline PaddingType RuntimePaddingType(TfLitePadding padding) {
@@ -173,6 +174,8 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TfLiteTensor* filter =
       micro_context->AllocateTempInputTensor(node, kFilterTensor);
   TF_LITE_ENSURE(context, filter != nullptr);
+  TfLiteTensor* bias =
+        micro_context->AllocateTempOutputTensor(node, kBiasTensor);
 
   TF_LITE_ENSURE_EQ(context, input->type, output->type);
   TF_LITE_ENSURE_MSG(context,
@@ -186,6 +189,10 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
           (input->type == kTfLiteInt16 && filter->type == kTfLiteInt8) ||
           (input->type == kTfLiteInt8 && filter->type == kTfLiteInt8),
       "Hybrid models are not supported on TFLite Micro.");
+
+  data->weight_buffer_idx = -1;
+  data->weight_sum_buf = nullptr;
+
 
   // Get height and width of the output.
   const int width = SizeOfDimension(output, 2);
@@ -202,6 +209,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
       static_cast<int32_t*>(context->AllocatePersistentBuffer(
           context, num_channels * sizeof(int32_t)));
 
+
   if (input->type == kTfLiteInt8) {
     TFLITE_DCHECK(context->RequestScratchBufferInArena != nullptr);
 
@@ -211,6 +219,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
 
     const int batch_size = MatchingDim(input_shape, 0, output_shape, 0);
     const int output_depth = MatchingDim(filter_shape, 0, output_shape, 3);
+    const int input_depth = MatchingDim(input_shape, 3, filter_shape, 3);
 
     cmsis_nn_dims output_dims;
     output_dims.n = batch_size;
@@ -221,8 +230,6 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     cmsis_nn_transpose_conv_params conv_params;
     conv_params.stride.w = params->stride_width;
     conv_params.stride.h = params->stride_height;
-
-    const int input_depth = MatchingDim(input_shape, 3, filter_shape, 3);
 
     cmsis_nn_dims input_dims;
     input_dims.n = batch_size;
@@ -235,6 +242,36 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     filter_dims.h = filter_shape.Dims(1);
     filter_dims.w = filter_shape.Dims(2);
     filter_dims.c = input_depth;
+
+
+    if (filter->type == kTfLiteInt8) {
+      int32_t weight_sum_length = arm_convolve_s8_get_weights_sum_size(&output_dims);
+#if defined(CONV_KERNEL_OPTIMIZED_FOR_SPEED)
+        //allocating buffer for weight sum context if optimized for speed
+        //otherwise we use a temp buffer
+        const int8_t* filter_data = GetTensorData<const int8_t>(filter);
+        if (weight_sum_length > 0 && filter_data != nullptr){ 
+          data->weight_sum_buf = static_cast<int32_t*>(
+                context->AllocatePersistentBuffer(context, weight_sum_length));
+
+          const int32_t* bias_data = GetTensorData<const int32_t>(bias);
+
+          int32_t lhs_offset = conv_params.input_offset;
+          arm_convolve_weight_sum((int32_t*)data->weight_sum_buf, filter_data,&input_dims, &filter_dims, &output_dims, lhs_offset,  bias_data);
+        }
+#else
+        (void)bias;
+        if (weight_sum_length > 0 ) {
+          TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
+              context, weight_sum_length, &data->weight_buffer_idx));
+        }
+
+#endif
+    }
+
+
+
+
 
     const size_t buf_size = arm_transpose_conv_s8_get_buffer_size(
         &conv_params, &input_dims, &filter_dims, &output_dims);
@@ -251,7 +288,6 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
                       context, reverse_buf_size,
                       &(data->scratch_buffer_output_index)) == kTfLiteOk);
   }
-
   // Quantized 16x8 kernels use an int64 scratch buffer.
   if (input->type == kTfLiteInt16) {
     TFLITE_DCHECK(context->RequestScratchBufferInArena != nullptr);
@@ -379,9 +415,29 @@ TfLiteStatus EvalQuantizedPerChannel(TfLiteContext* context, TfLiteNode* node,
   scratch_output_ctx.buf =
       context->GetScratchBuffer(context, data.scratch_buffer_output_index);
 
+
+  cmsis_nn_context weight_sum_ctx;
+  weight_sum_ctx.buf = nullptr;
+  weight_sum_ctx.size = arm_convolve_s8_get_weights_sum_size(&output_dims);
+  if (data.weight_sum_buf != nullptr) {
+
+    weight_sum_ctx.buf = data.weight_sum_buf;
+  } else {
+    if (data.weight_buffer_idx > -1) {
+      weight_sum_ctx.buf = context->GetScratchBuffer(context, data.weight_buffer_idx);
+      //now need to redo the weight sum because we didn't precompute
+      arm_convolve_weight_sum((int32_t*)weight_sum_ctx.buf, 
+                              tflite::micro::GetTensorData<const int8_t>(filter),
+                              &input_dims, &filter_dims,
+                              &output_dims, conv_params.input_offset, 
+                              tflite::micro::GetOptionalTensorData<const int32_t>(bias));
+    }
+  }
+
   TFLITE_DCHECK_EQ(
       arm_transpose_conv_wrapper_s8(
-          &ctx, &scratch_output_ctx, &conv_params, &quant_params, &input_dims,
+          &ctx, &weight_sum_ctx, &scratch_output_ctx, 
+          &conv_params, &quant_params, &input_dims,
           tflite::micro::GetTensorData<int8_t>(input), &filter_dims,
           tflite::micro::GetTensorData<int8_t>(filter), &bias_dims,
           tflite::micro::GetOptionalTensorData<int32_t>(bias), &output_dims,

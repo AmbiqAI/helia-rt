@@ -170,6 +170,7 @@ class PerLayerTestGenerator(generate_test_for_model.TestDataGenerator):
   def generate_build_file(self):
     # Collect all target names into a list
     targets = []
+
     for model_path in self.model_paths:
       target_name = model_path.split('/')[-1].split('.')[0]
       targets.append(target_name)
@@ -187,6 +188,7 @@ class PerLayerTestGenerator(generate_test_for_model.TestDataGenerator):
 
 
 def op_info_from_name(name):
+
   if 'transpose_conv' in name:
     return [[0, 2], schema_fb.BuiltinOperator.TRANSPOSE_CONV]
   elif 'depthwise_conv' in name:
@@ -203,6 +205,8 @@ def op_info_from_name(name):
     return [[0], schema_fb.BuiltinOperator.LEAKY_RELU]
   elif 'pad' in name:
     return [[0], schema_fb.BuiltinOperator.PAD]
+  elif 'fully_connected' in name:
+    return [[0], schema_fb.BuiltinOperator.FULLY_CONNECTED]
   else:
     raise RuntimeError(f'Unsupported op: {name}')
 
