@@ -1,0 +1,38 @@
+[project]
+name = "helios-rt"
+version = "0.2.2"
+description = "An ahead-of-time nn compiler for Ambiq SoCs."
+authors = [
+    {name = "Ambiq AI", email = "support.aitg@ambiq.com"},
+]
+readme = "README.md"
+
+requires-python = ">=3.11,<3.13"
+
+dependencies = [
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.5.28",
+    "mkdocstrings-python>=1.10.5",
+    "markdown-include>=0.8.1",
+    "mkdocs-exclude>=1.0.2",
+    "mkdocs-gen-files>=0.5.0",
+    "mkdocs-section-index>=0.3.9",
+    "mkdocs-literate-nav>=0.6.1",
+    "pymdown-extensions>=10.14.3",
+    "mkdocs-charts-plugin>=0.0.12",
+    "ruff>=0.7.2",
+]
+
+
+[dependency-groups]
+dev = [
+]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
