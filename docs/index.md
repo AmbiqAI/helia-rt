@@ -2,7 +2,7 @@
 
 [![](./assets/helios-rt-banner-light.png#only-light)](https://ambiqai.github.io/helios-rt/)
 [![](./assets/helios-rt-banner-dark.png#only-dark)](https://ambiqai.github.io/helios-rt/)
-in
+
 ## 📖 Overview
 
 Welcome to HeliosRT, a specialized fork of TensorFlow Lite for Microcontrollers (TFLM), tailored for Ambiq's Apollo family of ultra-low-power System-on-Chips (SoCs). This project enhances TFLM by optimizing it to leverage the advanced hardware intrinsics of the Apollo series, such as Matrix Vector Extensions (MVE) and Digital Signal Processing (DSP) instructions.
