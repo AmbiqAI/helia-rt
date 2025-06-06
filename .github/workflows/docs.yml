@@ -39,7 +39,7 @@ jobs:
           CI: ""
           PUBLIC_URL: "${{ steps.pages.outputs.base_url }}/"
         run: |
-          uv sync --only-group docs
+          uv sync
           uv run mkdocs build
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
