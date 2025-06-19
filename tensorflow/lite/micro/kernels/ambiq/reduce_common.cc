@@ -63,9 +63,10 @@ static void PopulateCmsisParams(const TfLiteEvalTensor* input_t,
                                 int32_t *output_shift,
                                 bool compute_sum) {
 
-  // --- Unpack input shape into NHWC (pad to 4 dims) ---
-  int64_t num_elements_in_axis = 1;
-  int32_t in_shape[kCmsisRank]  = {1, 1, 1, 1};
+  (void)output_t;  // Unused in this function, but may be used later.
+
+  // --- 1) Pad input shape at end ---
+  int32_t in_shape[kCmsisRank] = {1, 1, 1, 1};
   int in_rank = input_t->dims->size;
   for (int i = 0; i < in_rank && i < kCmsisRank; ++i) {
     in_shape[i] = input_t->dims->data[i];
@@ -75,12 +76,11 @@ static void PopulateCmsisParams(const TfLiteEvalTensor* input_t,
   in_dims->w = in_shape[2];
   in_dims->c = in_shape[3];
 
-  // --- Build axis mask (0/1 per dimension) ---
-  // Initialize to no‐reduce
+  // --- 2) Build axis mask & count elements ---
+  int64_t num_elements_in_axis = 1;
   axis_dims->n = axis_dims->h = axis_dims->w = axis_dims->c = 0;
   for (int i = 0; i < axis_count; ++i) {
     int a = axis_data[i];
-    // handle negative axis
     if (a < 0) a += in_rank;
     switch (a) {
       case 0:
@@ -107,28 +107,25 @@ static void PopulateCmsisParams(const TfLiteEvalTensor* input_t,
           num_elements_in_axis *= in_shape[3];
         }
         break;
-      default: /* ignore out-of-range */; break;
+      default:
+        break;  // out of range gets ignored
     }
   }
 
-  // --- Unpack output shape into NHWC (pad to kCmsisRank dims) ---
-  int32_t out_shape[kCmsisRank] = {1, 1, 1, 1};
-  int out_rank = output_t->dims->size;
-  for (int i = 0; i < out_rank && i < kCmsisRank; ++i) {
-    out_shape[i] = output_t->dims->data[i];
-  }
-  out_dims->n = out_shape[0];
-  out_dims->h = out_shape[1];
-  out_dims->w = out_shape[2];
-  out_dims->c = out_shape[3];
+  // --- 3) Pad output shape at end ---
+  // NOTE: We do not rely on provided output tensor shape because it could be flattened or a
+  // different view (e.g. [1, 2] instead of [2, 1]). This is atypical but unit tests do this...
+  out_dims->n = axis_dims->n ? 1 : in_dims->n;
+  out_dims->h = axis_dims->h ? 1 : in_dims->h;
+  out_dims->w = axis_dims->w ? 1 : in_dims->w;
+  out_dims->c = axis_dims->c ? 1 : in_dims->c;
 
-
-  // Fold 1/count into output multiplier and shift.
+  // Fold 1/count into output multiplier & shift (only for MEAN)
   if (!compute_sum) {
     TFLITE_DCHECK_GE(num_elements_in_axis, 0);
     int shift = 63 - CountLeadingZeros(static_cast<uint64_t>(num_elements_in_axis));
     shift = std::min(shift, 32);
-    shift = std::min(shift, 31 + (int)(*output_shift));
+    shift = std::min(shift, 31 + static_cast<int>(*output_shift));
     *output_mult = static_cast<int32_t>(
         (static_cast<int64_t>(*output_mult) << shift) /
         num_elements_in_axis);

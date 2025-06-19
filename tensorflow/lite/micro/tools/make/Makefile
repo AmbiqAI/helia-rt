@@ -17,7 +17,7 @@
 ifneq (3.82,$(firstword $(sort $(MAKE_VERSION) 3.82)))
   $(error "Requires make version 3.82 or later (current is $(MAKE_VERSION))")
 endif
-   
+
 # root directory of tensorflow
 TENSORFLOW_ROOT :=
 RELATIVE_MAKEFILE_DIR := tensorflow/lite/micro/tools/make
@@ -57,6 +57,9 @@ AR_TOOL := ar
 ifneq ($(TAGS),)
   $(error The TAGS command line option is no longer supported in the TFLM Makefile.)
 endif
+
+# Use thumb-2 optimized instructions for ARM targets when set
+CMSIS_NN_USE_REQUANTIZE_INLINE_ASSEMBLY :=
 
 # Specify which specialized kernel implementation should be pulled in.
 OPTIMIZED_KERNEL_DIR :=
@@ -147,6 +150,9 @@ ifneq ($(OPTIMIZE_FC_FOR),)
   ADDITIONAL_DEFINES += -D$(shell echo $(OPTIMIZE_FC_FOR) | tr [a-z] [A-Z])
 endif
 
+ifneq ($(CMSIS_NN_USE_REQUANTIZE_INLINE_ASSEMBLY),)
+  ADDITIONAL_DEFINES += -DCMSIS_NN_USE_REQUANTIZE_INLINE_ASSEMBLY=$(CMSIS_NN_USE_REQUANTIZE_INLINE_ASSEMBLY)
+endif
 
 ifeq ($(TOOLCHAIN), armclang)
   CORE_OPTIMIZATION_LEVEL := -Ofast
