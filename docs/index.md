@@ -1,86 +1,36 @@
-# HeliosRT
+#
+
+[![](./assets/helios-rt-banner-light.png#only-light)](https://ambiqai.github.io/helios-rt/)
+[![](./assets/helios-rt-banner-dark.png#only-dark)](https://ambiqai.github.io/helios-rt/)
+
+## 📖 Overview
 
 Welcome to HeliosRT, a specialized fork of TensorFlow Lite for Microcontrollers (TFLM), tailored for Ambiq's Apollo family of ultra-low-power System-on-Chips (SoCs). This project enhances TFLM by optimizing it to leverage the advanced hardware intrinsics of the Apollo series, such as Matrix Vector Extensions (MVE) and Digital Signal Processing (DSP) instructions.
-
-[![CI](https://github.com/AmbiqAI/helios-rt/actions/workflows/run_ci.yml/badge.svg)](https://github.com/AmbiqAI/helios-rt/actions/workflows/run_ci.yml)
-[![Unit Tests](https://github.com/AmbiqAI/helios-rt/actions/workflows/run_ambiq.yml/badge.svg)](https://github.com/AmbiqAI/helios-rt/actions/workflows/run_ambiq.yml)
-
 
 ## Why HeliosRT?
 
 HeliosRT addresses the unique demands of ultra-low-power devices, offering developers the tools to build AI applications that require minimal energy consumption without sacrificing performance. By harnessing the specific capabilities of Ambiq's SoCs, HeliosRT enables more efficient neural network inference on devices like smart watches, fitness trackers, and other smart IoT devices.
 
-## Key Features
+## 🚀  Key Features
 
 - **Optimized Performance**: Utilizes MVE and DSP hardware capabilities to enhance computational efficiency and speed.
 - **Energy Efficiency**: Designed to minimize power usage, extending the battery life of edge devices.
 - **Broad Compatibility**: Supports a wide range of Ambiq's Apollo SoCs, ensuring versatile applications across different hardware.
 
-Explore our [Getting Started guide](tensorflow/lite/micro/docs/getting_started.md) to dive into the development with HeliosRT, or check out the [Benchmarks section](tensorflow/lite/micro/benchmarks/README.md) to see how HeliosRT performs under various conditions. Whether you are developing for wearable technology or other smart devices, HeliosRT provides a robust framework for embedding AI into your projects.
+Explore our [Getting Started guide](usage/index.md) to dive into the development with HeliosRT, or check out the [Benchmarks section](benchmarks/index.md) to see how HeliosRT performs under various conditions. Whether you are developing for wearable technology or other smart devices, HeliosRT provides a robust framework for embedding AI into your projects.
+
+## 📚 Quick Links
+
+- **Install HeliosRT** and getting up and running in minutes. &nbsp; [:material-clock-fast: Install HeliosRT](usage/index.md){ .md-button }
+
+- **Usage Examples** showcasing real-world applications and best practices. &nbsp; [:material-book-open-page-variant: Usage Examples](examples/index.md){ .md-button }
+
+- **Performance Benchmarks** comparing HeliosRT to other frameworks. &nbsp; [:material-chart-bar: Performance Benchmarks](benchmarks/index.md){ .md-button }
+
 
 ## Getting Started
 
-Jumpstart your development with [neuralSPOT](https://github.com/AmbiqAI/neuralSPOT), a robust AI SDK optimized for Ambiq's ultra-low-power Apollo SoCs. This toolkit provides comprehensive resources, including the latest stable releases of HeliosRT, fully configured for both GCC and Arm Clang across debug and release builds. For a detailed step-by-step guide, refer to our [Getting Started documentation](tensorflow/lite/micro/docs/getting_started.md).
-
-
-## Supported SoCs
-
-HeliosRT is specifically optimized to leverage the advanced features of Ambiq's ultra-low-power SoCs. Below is the list of SoCs that are fully supported:
-
-- **Apollo3**: Ideal for battery-operated mobile devices with its highly efficient power management capabilities.
-- **Apollo4**: Enhances performance with higher processing capabilities and improved memory architecture.
-- **Apollo4 Plus**: Features a Cortex-M4 core, offering a balance of power and performance for complex processing tasks.
-- **Apollo510**: Equipped with a Cortex-M55 core and MVE Helium capabilities, designed for next-level computation needs and edge AI applications.
-
-These optimizations ensure that HeliosRT can provide excellent performance and energy efficiency on Ambiq's cutting-edge hardware platforms.
-
-
-## Official Build Status
-
-This table provides a summary of the build status for HeliosRT across various platforms and configurations, ensuring both compatibility and optimal performance.
-
-| Build Type         | Status |
-| ------------------ | ------ |
-| **CI on Linux**    | [![CI Status](https://github.com/AmbiqAI/helios-rt/actions/workflows/run_ci.yml/badge.svg)](https://github.com/AmbiqAI/helios-rt/actions/workflows/run_ci.yml) |
-| **Apollo3/4 (CM4)** | [![Apollo4 Tests](https://github.com/AmbiqAI/helios-rt/actions/workflows/run_ambiq.yml/badge.svg)](https://github.com/AmbiqAI/helios-rt/actions/workflows/run_ambiq.yml) |
-| **Apollo510 (CM55)** | [![Apollo510 Tests](https://github.com/AmbiqAI/helios-rt/actions/workflows/run_ambiq.yml/badge.svg)](https://github.com/AmbiqAI/helios-rt/actions/workflows/run_ambiq.yml) |
-
-Each badge links directly to the detailed results of the respective builds, allowing for quick access to the latest test outcomes and build logs.
-
-
-## Getting Help
-
-If you encounter issues or need assistance, the following resources are available:
-
-- **Primary Support**: [Submit a GitHub Issue](https://github.com/AmbiqAI/helios-rt/issues/new/choose) for direct support on HeliosRT related queries.
-- **Community and Discussions**:
-  - Contact Ambiq AITG [email group](mailto:support.aitg@ambiq.com)
-- **TensorFlow Community**:
-  - Pose general questions on the [TensorFlow Discourse forum](https://discuss.tensorflow.org).
-  - Engage with the broader TensorFlow community via the [TensorFlow Lite mailing list](https://groups.google.com/a/tensorflow.org/g/tflite).
-  - Report broader TensorFlow issues on the [official TensorFlow GitHub page](https://github.com/tensorflow/tensorflow/issues/new/choose).
-  - Discuss optimization techniques on the [Model Optimization Toolkit GitHub page](https://github.com/tensorflow/model-optimization).
-
-## Documentation
-
-Explore our comprehensive documentation to get the most out of HeliosRT:
-
-- [Getting Started](tensorflow/lite/micro/docs/getting_started.md): Step-by-step guide to begin with HeliosRT.
-- [Continuous Integration](docs/continuous_integration.md): Details on our CI processes and infrastructure.
-- [Benchmarks](tensorflow/lite/micro/benchmarks/README.md): Benchmarking results and methodologies for performance evaluation.
-- [Profiling](tensorflow/lite/micro/docs/profiling.md): Techniques to profile and optimize your TFLM applications.
-- [Memory Management](tensorflow/lite/micro/docs/memory_management.md): Strategies for effective memory use in constrained environments.
-- [Logging](tensorflow/lite/micro/docs/logging.md): How to implement and utilize logging within HeliosRT projects.
-- [Porting Reference Kernels from TfLite to TFLM](tensorflow/lite/micro/docs/porting_reference_ops.md): Guide on adapting TensorFlow Lite kernels for microcontrollers.
-- [Optimized Kernel Implementations](tensorflow/lite/micro/docs/optimized_kernel_implementations.md): Discusses the optimized kernels specific to various architectures.
-- [New Platform Support](tensorflow/lite/micro/docs/new_platform_support.md): Instructions for adding HeliosRT support to new hardware platforms.
-- Platform/IP Support:
-  - [Arm IP Support](tensorflow/lite/micro/docs/arm.md): Specifics of HeliosRT support for ARM architecture.
-- [Software Emulation with Renode](tensorflow/lite/micro/docs/renode.md): How to use Renode for simulating HeliosRT applications.
-- [Software Emulation with QEMU](tensorflow/lite/micro/docs/qemu.md): Utilizing QEMU for development and testing.
-- [HeliosRT Python Development Guide](docs/python.md): Insights into using Python for HeliosRT development.
-- [Automatically Generated Files](docs/automatically_generated_files.md): Information about the files generated during the build process.
-- [Python Interpreter Guide](python/tflite_micro/README.md): Detailed guide for using the Python interpreter with TFLM.
+Jumpstart your development with [neuralSPOT](https://github.com/AmbiqAI/neuralSPOT), a robust AI SDK optimized for Ambiq's ultra-low-power Apollo SoCs. This toolkit provides comprehensive resources, including the latest stable releases of HeliosRT, fully configured for both GCC and Arm Clang across debug and release builds. For a detailed step-by-step guide, refer to our [Getting Started documentation](usage/index.md).
 
 
 ## Operator Support Matrix
@@ -145,3 +95,11 @@ The implementations are categorized under three main technologies:
 | tranpose          | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | unpack            | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | zeros_like        | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+
+
+---
+
+> **Ready to dive in?**
+> Head over to the [Getting Started](./usage/index.md) guide and generate your first module in minutes.
+
+## 📜 License

@@ -21,7 +21,7 @@ jobs:
 
     if: |
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'schedule' && github.repository == 'AmbiqAI/ns-tflm')
+      (github.event_name == 'schedule' && github.repository == 'AmbiqAI/helios-rt')
 
     steps:
       - uses: actions/setup-python@v4

@@ -1,4 +1,4 @@
-# Getting Started with HeliosRT
+# :material-rocket-launch: Getting Started
 
 Welcome to the HeliosRT Getting Started guide. HeliosRT, a derivative of TensorFlow Lite for Microcontrollers (TFLM), is specially optimized for Ambiq's Apollo platforms using NS-CMSIS-NN, enhancing performance on these devices. This guide outlines similarities with TFLM and provides detailed instructions on leveraging HeliosRT's capabilities through neuralSPOT. Read on to learn how to deploy TFLite models, run examples, and integrate HeliosRT into your development projects with ease.
 

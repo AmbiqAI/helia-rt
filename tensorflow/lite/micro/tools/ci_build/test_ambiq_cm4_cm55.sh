@@ -60,6 +60,7 @@ for OPTIMIZE_KERNELS_FOR in SPEED SIZE; do
     TARGET_ARCH=${TARGET_ARCH} \
     TOOLCHAIN=${TOOLCHAIN} \
     GLOBAL_KERNEL_OPTIMIZE=${OPTIMIZE_KERNELS_FOR} \
+    CMSIS_NN_USE_REQUANTIZE_INLINE_ASSEMBLY=1 \
     build
 
   # Individual tests (unrolled)
@@ -70,6 +71,7 @@ for OPTIMIZE_KERNELS_FOR in SPEED SIZE; do
     TARGET_ARCH=${TARGET_ARCH} \
     TOOLCHAIN=${TOOLCHAIN} \
     GLOBAL_KERNEL_OPTIMIZE=${OPTIMIZE_KERNELS_FOR} \
+    CMSIS_NN_USE_REQUANTIZE_INLINE_ASSEMBLY=1 \
     test_integration_tests_nnaed_conv_test
 
   readable_run make -j"$(nproc)" -f tensorflow/lite/micro/tools/make/Makefile \
@@ -79,6 +81,7 @@ for OPTIMIZE_KERNELS_FOR in SPEED SIZE; do
     TARGET_ARCH=${TARGET_ARCH} \
     TOOLCHAIN=${TOOLCHAIN} \
     GLOBAL_KERNEL_OPTIMIZE=${OPTIMIZE_KERNELS_FOR} \
+    CMSIS_NN_USE_REQUANTIZE_INLINE_ASSEMBLY=1 \
     test_integration_tests_nnaed_pad_test
 
   readable_run make -j"$(nproc)" -f tensorflow/lite/micro/tools/make/Makefile \
@@ -88,6 +91,7 @@ for OPTIMIZE_KERNELS_FOR in SPEED SIZE; do
     TARGET_ARCH=${TARGET_ARCH} \
     TOOLCHAIN=${TOOLCHAIN} \
     GLOBAL_KERNEL_OPTIMIZE=${OPTIMIZE_KERNELS_FOR} \
+    CMSIS_NN_USE_REQUANTIZE_INLINE_ASSEMBLY=1 \
     test_integration_tests_nnaed_leaky_relu_test
 
   readable_run make -j"$(nproc)" -f tensorflow/lite/micro/tools/make/Makefile \
@@ -97,6 +101,7 @@ for OPTIMIZE_KERNELS_FOR in SPEED SIZE; do
     TARGET_ARCH=${TARGET_ARCH} \
     TOOLCHAIN=${TOOLCHAIN} \
     GLOBAL_KERNEL_OPTIMIZE=${OPTIMIZE_KERNELS_FOR} \
+    CMSIS_NN_USE_REQUANTIZE_INLINE_ASSEMBLY=1 \
     test_integration_tests_nnaed_fully_connected_test
 
   # Full test suite
@@ -106,6 +111,7 @@ for OPTIMIZE_KERNELS_FOR in SPEED SIZE; do
     TARGET=${TARGET} \
     TARGET_ARCH=${TARGET_ARCH} \
     TOOLCHAIN=${TOOLCHAIN} \
+    CMSIS_NN_USE_REQUANTIZE_INLINE_ASSEMBLY=1 \
     GLOBAL_KERNEL_OPTIMIZE=${OPTIMIZE_KERNELS_FOR} \
     test
 done

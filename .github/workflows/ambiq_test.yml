@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest-md
     name: ambiq_unit_tests
     container:
-      image: ghcr.io/ambiqai/ns-tflm-ci:latest
+      image: ghcr.io/ambiqai/helios-rt-ci:latest
 
     steps:
 
@@ -32,7 +32,7 @@ jobs:
           path: |
             tensorflow/lite/micro/tools/make/downloads
           key: ${{ runner.os }}-third-party-downloads-${{ hashFiles(
-            'tensorflow/lite/micro/tools/make/Makefile', 
+            'tensorflow/lite/micro/tools/make/Makefile',
             'tensorflow/lite/micro/tools/make/third_party_downloads.inc'
             ) }}
           restore-keys: |
@@ -54,6 +54,6 @@ jobs:
           path: |
             tensorflow/lite/micro/tools/make/downloads
           key: ${{ runner.os }}-third-party-downloads-${{ hashFiles(
-            'tensorflow/lite/micro/tools/make/Makefile', 
+            'tensorflow/lite/micro/tools/make/Makefile',
             'tensorflow/lite/micro/tools/make/third_party_downloads.inc'
             ) }}

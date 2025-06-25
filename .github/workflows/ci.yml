@@ -95,7 +95,7 @@ jobs:
   #   runs-on: ubuntu-latest-md
   #   name: Bazel ubsan (presubmit)
   #   container:
-  #     image: ghcr.io/ambiqai/ns-tflm-ci:latest
+  #     image: ghcr.io/ambiqai/helios-rt-ci:latest
   #   steps:
   #     - uses: actions/checkout@v3
   #       with:
@@ -116,7 +116,7 @@ jobs:
     runs-on: ubuntu-latest-md
     name: Cortex-M Bluepill Release (presubmit)
     container:
-      image: ghcr.io/ambiqai/ns-tflm-ci:latest
+      image: ghcr.io/ambiqai/helios-rt-ci:latest
     steps:
       - uses: actions/checkout@v3
         with:
@@ -124,13 +124,13 @@ jobs:
       - name: Test
         run: |
           cd ../
-          ns-tflm/tensorflow/lite/micro/tools/ci_build/test_bluepill_release.sh ns-tflm/
+          helios-rt/tensorflow/lite/micro/tools/ci_build/test_bluepill_release.sh helios-rt/
 
   cortex_m_bluepill_no_release:
     runs-on: ubuntu-latest-md
     name: Cortex-M Bluepill No Release (presubmit)
     container:
-      image: ghcr.io/ambiqai/ns-tflm-ci:latest
+      image: ghcr.io/ambiqai/helios-rt-ci:latest
     steps:
       - uses: actions/checkout@v3
         with:
@@ -138,13 +138,13 @@ jobs:
       - name: Test
         run: |
           cd ../
-          ns-tflm/tensorflow/lite/micro/tools/ci_build/test_bluepill_no_release.sh ns-tflm/
+          helios-rt/tensorflow/lite/micro/tools/ci_build/test_bluepill_no_release.sh helios-rt/
 
   cortex_m_bluepill_renode:
     runs-on: ubuntu-latest-md
     name: Cortex-M Bluepill Renode (presubmit)
     container:
-      image: ghcr.io/ambiqai/ns-tflm-ci:latest
+      image: ghcr.io/ambiqai/helios-rt-ci:latest
     steps:
       - uses: actions/checkout@v3
         with:
@@ -152,13 +152,13 @@ jobs:
       - name: Test
         run: |
           cd ../
-          ns-tflm/tensorflow/lite/micro/tools/ci_build/test_bluepill_renode.sh ns-tflm/
+          helios-rt/tensorflow/lite/micro/tools/ci_build/test_bluepill_renode.sh helios-rt/
 
   cortex_m_qemu:
     runs-on: ubuntu-latest-md
     name: Cortex-M QEMU Unit Tests (presubmit)
     container:
-      image: ghcr.io/ambiqai/ns-tflm-ci:latest
+      image: ghcr.io/ambiqai/helios-rt-ci:latest
     steps:
       - uses: actions/checkout@v3
         with:
@@ -171,7 +171,7 @@ jobs:
   #   runs-on: ubuntu-latest-md
   #   name: Code Style (presubmit)
   #   container:
-  #     image: ghcr.io/ambiqai/ns-tflm-ci:latest
+  #     image: ghcr.io/ambiqai/helios-rt-ci:latest
   #   steps:
   #     - uses: actions/checkout@v3
   #       with:
@@ -184,7 +184,7 @@ jobs:
     runs-on: ubuntu-latest-md
     name: Project Generation (presubmit)
     container:
-      image: ghcr.io/ambiqai/ns-tflm-ci:latest
+      image: ghcr.io/ambiqai/helios-rt-ci:latest
     steps:
       - uses: actions/checkout@v3
         with:
@@ -192,13 +192,13 @@ jobs:
       - name: Test
         run: |
           cd ../
-          ns-tflm/tensorflow/lite/micro/tools/ci_build/test_project_generation.sh ns-tflm/
+          helios-rt/tensorflow/lite/micro/tools/ci_build/test_project_generation.sh helios-rt/
 
   x86_release:
     runs-on: ubuntu-latest-md
     name: Makefile x86 Release (presubmit)
     container:
-      image: ghcr.io/ambiqai/ns-tflm-ci:latest
+      image: ghcr.io/ambiqai/helios-rt-ci:latest
     steps:
       - uses: actions/checkout@v3
         with:
@@ -207,13 +207,13 @@ jobs:
         run: |
           tensorflow/lite/micro/tools/ci_build/test_makefile.sh
           cd ../
-          ns-tflm/tensorflow/lite/micro/tools/ci_build/test_x86_release.sh ns-tflm/
+          helios-rt/tensorflow/lite/micro/tools/ci_build/test_x86_release.sh helios-rt/
 
   x86_default:
     runs-on: ubuntu-latest-md
     name: Makefile x86 Default (presubmit)
     container:
-      image: ghcr.io/ambiqai/ns-tflm-ci:latest
+      image: ghcr.io/ambiqai/helios-rt-ci:latest
     steps:
       - uses: actions/checkout@v3
         with:
@@ -222,13 +222,13 @@ jobs:
         run: |
           tensorflow/lite/micro/tools/ci_build/test_makefile.sh
           cd ../
-          ns-tflm/tensorflow/lite/micro/tools/ci_build/test_x86_default.sh ns-tflm/
+          helios-rt/tensorflow/lite/micro/tools/ci_build/test_x86_default.sh helios-rt/
 
   x86_out_of_tree:
     runs-on: ubuntu-latest-md
     name: Makefile x86 Out Of Tree (presubmit)
     container:
-      image: ghcr.io/ambiqai/ns-tflm-ci:latest
+      image: ghcr.io/ambiqai/helios-rt-ci:latest
     steps:
       - uses: actions/checkout@v3
         with:
@@ -237,13 +237,13 @@ jobs:
         run: |
           tensorflow/lite/micro/tools/ci_build/test_makefile.sh
           cd ../
-          ns-tflm/tensorflow/lite/micro/tools/ci_build/test_x86_out_of_tree.sh ns-tflm/
+          helios-rt/tensorflow/lite/micro/tools/ci_build/test_x86_out_of_tree.sh helios-rt/
 
   x86_no_tflite_static_memory:
     runs-on: ubuntu-latest-md
     name: Makefile x86 No TFLite Static Memory (presubmit)
     container:
-      image: ghcr.io/ambiqai/ns-tflm-ci:latest
+      image: ghcr.io/ambiqai/helios-rt-ci:latest
     steps:
       - uses: actions/checkout@v3
         with:
@@ -252,4 +252,4 @@ jobs:
         run: |
           tensorflow/lite/micro/tools/ci_build/test_makefile.sh
           cd ../
-          ns-tflm/tensorflow/lite/micro/tools/ci_build/test_x86_no_tflite_static_memory.sh ns-tflm/
+          helios-rt/tensorflow/lite/micro/tools/ci_build/test_x86_no_tflite_static_memory.sh helios-rt/

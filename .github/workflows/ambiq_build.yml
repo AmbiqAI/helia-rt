@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest-md
     name: ambiq_build
     container:
-      image: ghcr.io/ambiqai/ns-tflm-ci:latest
+      image: ghcr.io/ambiqai/helios-rt-ci:latest
     steps:
 
       - uses: actions/checkout@v3
@@ -24,14 +24,14 @@ jobs:
 
       - name: Mark workspace as safe for Git
         run: git config --global --add safe.directory "*"
-        
+
       - name: Cache third-party downloads
         uses: actions/cache@v3
         with:
           path: |
             tensorflow/lite/micro/tools/make/downloads
           key: ${{ runner.os }}-third-party-downloads-${{ hashFiles(
-            'tensorflow/lite/micro/tools/make/Makefile', 
+            'tensorflow/lite/micro/tools/make/Makefile',
             'tensorflow/lite/micro/tools/make/third_party_downloads.inc'
             ) }}
           restore-keys: |
@@ -48,6 +48,6 @@ jobs:
           path: |
             tensorflow/lite/micro/tools/make/downloads
           key: ${{ runner.os }}-third-party-downloads-${{ hashFiles(
-            'tensorflow/lite/micro/tools/make/Makefile', 
+            'tensorflow/lite/micro/tools/make/Makefile',
             'tensorflow/lite/micro/tools/make/third_party_downloads.inc'
             ) }}
