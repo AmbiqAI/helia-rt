@@ -530,6 +530,56 @@ TF_LITE_MICRO_TEST(Int8MaxOpTestWithoutKeepDims) {
       tflite::Register_REDUCE_MAX(), &params);
 }
 
+TF_LITE_MICRO_TEST(Int16MaxOpTestKeepDims) {
+  int input_shape[] = {3, 1, 3, 2};
+  const float input_data[] = {0.4, 0.2, 0.3, 0.4, 0.5, 0.6};
+  int axis_shape[] = {1, 1};
+  const int32_t axis_data[] = {1, 1};
+  int output_shape[] = {1, 2};
+  const float expected_output_data[] = {0.5, 0.6};
+
+  float input_scale = 2 / 255.0;
+  int input_zp = 0;
+
+  TfLiteReducerParams params = {true};
+
+  int16_t input_data_quant[6];
+  int16_t output_data_quant[2];
+  int16_t expected_output_data_quant[2];
+
+  tflite::testing::TestReduceOpQuantized<int16_t>(
+      input_shape, input_data, input_data_quant, input_scale, input_zp,
+      axis_shape, axis_data, output_shape, expected_output_data,
+      output_data_quant, expected_output_data_quant, input_scale, input_zp,
+      tflite::Register_REDUCE_MAX(), &params);
+}
+
+TF_LITE_MICRO_TEST(Int16MaxOpTestWithoutKeepDims) {
+  int input_shape[] = {3, 1, 3, 2};
+  const float input_data[] = {0.4, 0.2, 0.3, 0.4, 0.5, 0.6};
+  int axis_shape[] = {1, 1};
+  const int32_t axis_data[] = {1, 1};
+  int output_shape[] = {1, 2};
+  const float expected_output_data[] = {0.5, 0.6};
+
+  float input_scale = 2 / 255.0;
+  int input_zp = 0;
+  float output_scale = 2 / 255.0;
+  int output_zp = 0;
+
+  TfLiteReducerParams params = {false};
+
+  int16_t input_data_quant[6];
+  int16_t output_data_quant[2];
+  int16_t expected_output_data_quant[2];
+
+  tflite::testing::TestReduceOpQuantized<int16_t>(
+      input_shape, input_data, input_data_quant, input_scale, input_zp,
+      axis_shape, axis_data, output_shape, expected_output_data,
+      output_data_quant, expected_output_data_quant, output_scale, output_zp,
+      tflite::Register_REDUCE_MAX(), &params);
+}
+
 TF_LITE_MICRO_TEST(MeanInt84DWithoutKeepDimsWithPrecision) {
   int kInputShape4D[] = {4, 2, 2, 3, 1};
   const float kInputData4D[] = {1.0,  24.0, 13.0, 3.0,  9.0,  17.0,

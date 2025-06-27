@@ -283,8 +283,25 @@ TfLiteStatus EvalMaxHelper(TfLiteContext* context, TfLiteNode* node,
                 return (in > current) ? in : current;
               }));
       break;
+    case kTfLiteInt16:
+      TF_LITE_ENSURE_EQ(context, static_cast<double>(op_data->input_scale),
+                        static_cast<double>(op_data->output_scale));
+      TF_LITE_ENSURE_EQ(context, op_data->input_zp, op_data->output_zp);
+      TF_LITE_ENSURE(
+          context,
+          reference_ops::ReduceGeneric<int16_t>(
+              tflite::micro::GetTensorData<int16_t>(input), input->dims->data,
+              input->dims->size, tflite::micro::GetTensorData<int16_t>(output),
+              output->dims->data, output->dims->size,
+              tflite::micro::GetTensorData<int>(axis), num_axis,
+              params->keep_dims, temp_buffer, resolved_axis,
+              std::numeric_limits<int16_t>::lowest(),
+              [](const int16_t current, const int16_t in) -> int16_t {
+                return (in > current) ? in : current;
+              }));
+      break;
     default:
-      MicroPrintf("Only float32 and int8 types are supported.");
+      MicroPrintf("Only float32, int8, and int16 types are supported.");
       return kTfLiteError;
   }
   return kTfLiteOk;
