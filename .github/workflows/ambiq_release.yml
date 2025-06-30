@@ -70,7 +70,7 @@ jobs:
             repo-snapshot-$tag.tar.gz \
             -R "$GITHUB_REPOSITORY" \
             -t "Release $tag" \
-            --notes "Automated release for tag $tag"
+            --generate-notes
           if [[ "$tag" == *"-rc"* ]]; then
             gh release edit "$tag" --prerelease
           fi
