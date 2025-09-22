@@ -424,10 +424,35 @@ TfLiteStatus EvalMaxHelper(TfLiteContext* context, TfLiteNode* node,
                 return (in > current) ? in : current;
               }));
       break;
-    case kTfLiteInt8:
+    case kTfLiteInt8: {
       TF_LITE_ENSURE_EQ(context, static_cast<double>(op_data->input_scale),
                         static_cast<double>(op_data->output_scale));
       TF_LITE_ENSURE_EQ(context, op_data->input_zp, op_data->output_zp);
+
+      if (input->dims->size <= kCmsisRank) {
+        cmsis_nn_dims in_d, ax_d, out_d;
+        int32_t output_mult = op_data->multiplier; // Not used
+        int32_t output_shift = op_data->shift; // Not used
+
+        PopulateCmsisParams(
+          input, output,
+          tflite::micro::GetTensorData<int32_t>(axis),
+          num_axis,
+          &in_d, &ax_d, &out_d,
+          &output_mult, &output_shift,
+          /*compute_sum=*/true
+        );
+
+        arm_cmsis_nn_status rst = arm_reduce_max_s8(
+          tflite::micro::GetTensorData<int8_t>(input),
+          &in_d,
+          &ax_d,
+          tflite::micro::GetTensorData<int8_t>(output),
+          &out_d
+        );
+        return rst == ARM_CMSIS_NN_SUCCESS ? kTfLiteOk : kTfLiteError;
+      }
+
       TF_LITE_ENSURE(
           context,
           reference_ops::ReduceGeneric<int8_t>(
@@ -440,9 +465,53 @@ TfLiteStatus EvalMaxHelper(TfLiteContext* context, TfLiteNode* node,
               [](const int8_t current, const int8_t in) -> int8_t {
                 return (in > current) ? in : current;
               }));
-      break;
+      } break;
+
+    case kTfLiteInt16: {
+      TF_LITE_ENSURE_EQ(context, static_cast<double>(op_data->input_scale),
+                        static_cast<double>(op_data->output_scale));
+      TF_LITE_ENSURE_EQ(context, op_data->input_zp, op_data->output_zp);
+
+      if (input->dims->size <= kCmsisRank) {
+        cmsis_nn_dims in_d, ax_d, out_d;
+        int32_t output_mult = op_data->multiplier; // Not used
+        int32_t output_shift = op_data->shift; // Not used
+
+        PopulateCmsisParams(
+          input, output,
+          tflite::micro::GetTensorData<int32_t>(axis),
+          num_axis,
+          &in_d, &ax_d, &out_d,
+          &output_mult, &output_shift,
+          /*compute_sum=*/true
+        );
+
+        arm_cmsis_nn_status rst = arm_reduce_max_s16(
+          tflite::micro::GetTensorData<int16_t>(input),
+          &in_d,
+          &ax_d,
+          tflite::micro::GetTensorData<int16_t>(output),
+          &out_d
+        );
+        return rst == ARM_CMSIS_NN_SUCCESS ? kTfLiteOk : kTfLiteError;
+      }
+
+      TF_LITE_ENSURE(
+          context,
+          reference_ops::ReduceGeneric<int16_t>(
+              tflite::micro::GetTensorData<int16_t>(input), input->dims->data,
+              input->dims->size, tflite::micro::GetTensorData<int16_t>(output),
+              output->dims->data, output->dims->size,
+              tflite::micro::GetTensorData<int>(axis), num_axis,
+              params->keep_dims, temp_buffer, resolved_axis,
+              std::numeric_limits<int16_t>::lowest(),
+              [](const int16_t current, const int16_t in) -> int16_t {
+                return (in > current) ? in : current;
+              }));
+      } break;
+
     default:
-      MicroPrintf("Only float32 and int8 types are supported.");
+      MicroPrintf("Only float32, int8, and int16 types are supported.");
       return kTfLiteError;
   }
   return kTfLiteOk;
