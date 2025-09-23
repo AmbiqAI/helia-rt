@@ -13,7 +13,7 @@ jobs:
   build:
     runs-on: ubuntu-latest-md
     container:
-      image: ghcr.io/ambiqai/helios-rt-ci:latest
+      image: ghcr.io/ambiqai/helia-rt-ci:latest
     env:
       tag: ${{ github.ref_name }}
 
@@ -33,7 +33,7 @@ jobs:
           # Create neuralSPOT module
           bash ./neuralspot/build.sh
           cd ${GITHUB_WORKSPACE}/build
-          zip -r ../artifacts/helios-rt-$tag.zip *
+          zip -r ../artifacts/helia-rt-$tag.zip *
           # Create a snapshot of the repository
           cd ${GITHUB_WORKSPACE}
           git archive --format zip    --output artifacts/repo-snapshot-$tag.zip HEAD
@@ -65,7 +65,7 @@ jobs:
           ls -R artifacts
           cd artifacts
           gh release create "$tag" \
-            helios-rt-$tag.zip \
+            helia-rt-$tag.zip \
             repo-snapshot-$tag.zip \
             repo-snapshot-$tag.tar.gz \
             -R "$GITHUB_REPOSITORY" \

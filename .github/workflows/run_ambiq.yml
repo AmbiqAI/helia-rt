@@ -14,7 +14,7 @@ on:
 jobs:
   call-ambiq-build:
     uses: ./.github/workflows/ambiq_build.yml
-    if: github.repository == 'AmbiqAI/helios-rt'
+    if: github.repository == 'AmbiqAI/helia-rt'
     with:
       trigger-sha: ${{ github.sha }}
     secrets:
@@ -22,7 +22,7 @@ jobs:
 
   call-ambiq-test:
     uses: ./.github/workflows/ambiq_test.yml
-    if: github.repository == 'AmbiqAI/helios-rt'
+    if: github.repository == 'AmbiqAI/helia-rt'
     with:
       trigger-sha: ${{ github.sha }}
     secrets:

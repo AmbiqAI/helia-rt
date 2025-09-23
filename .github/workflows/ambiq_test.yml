@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest-md
     name: ambiq_unit_tests
     container:
-      image: ghcr.io/ambiqai/helios-rt-ci:latest
+      image: ghcr.io/ambiqai/helia-rt-ci:latest
 
     steps:
 

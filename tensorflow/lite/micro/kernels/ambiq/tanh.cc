@@ -15,6 +15,9 @@ limitations under the License.
 
 #include "tensorflow/lite/kernels/internal/reference/integer_ops/tanh.h"
 
+#include "Include/arm_nnsupportfunctions.h"
+#include "Include/arm_nnfunctions.h"
+
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/kernels/internal/common.h"
@@ -41,6 +44,7 @@ struct OpData {
   int input_left_shift;
   int8_t table[256];
 };
+
 
 void* TanhInit(TfLiteContext* context, const char* buffer, size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
@@ -216,21 +220,16 @@ TfLiteStatus TanhEval(TfLiteContext* context, TfLiteNode* node) {
       return kTfLiteOk;
     } break;
     case kTfLiteInt16: {
-      reference_integer_ops::Tanh(
-          data.input_multiplier, data.input_left_shift,
-          tflite::micro::GetTensorShape(input),
+      arm_tanh_s16(
           tflite::micro::GetTensorData<int16_t>(input),
-          tflite::micro::GetTensorShape(output),
-          tflite::micro::GetTensorData<int16_t>(output));
+          tflite::micro::GetTensorData<int16_t>(output),
+          tflite::micro::GetTensorShape(input).FlatSize(),
+          data.input_multiplier,
+          data.input_left_shift
+      );
       return kTfLiteOk;
     } break;
     case kTfLiteInt8: {
-      //reference_integer_ops::Tanh(
-      //    data.input_zero_point, data.input_range_radius, data.input_multiplier,
-      //    data.input_left_shift, tflite::micro::GetTensorShape(input),
-      //    tflite::micro::GetTensorData<int8_t>(input),
-      //    tflite::micro::GetTensorShape(output),
-      //    tflite::micro::GetTensorData<int8_t>(output));
       EvalUsingLookupTable(&data, input, output);
       return kTfLiteOk;
     } break;

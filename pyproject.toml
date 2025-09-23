@@ -1,5 +1,5 @@
 [project]
-name = "helios-rt"
+name = "helia-rt"
 version = "0.2.2"
 description = "An ahead-of-time nn compiler for Ambiq SoCs."
 authors = [
