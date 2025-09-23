@@ -144,4 +144,4 @@ The implementations are categorized under three main technologies:
 | transpose_conv    | Yes         | No         | No         | Yes         | No           | No           | Yes         | No           | No           |
 | tranpose          | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | unpack            | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| zeros_like        | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| zeros_like        | Yes         | Yes        | No         | Yes         | Yes          | No           | Yes         | Yes          | No           |
