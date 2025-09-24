@@ -113,7 +113,7 @@ wheels = [
 ]
 
 [[package]]
-name = "helios-rt"
+name = "helia-rt"
 version = "0.2.2"
 source = { virtual = "." }
 dependencies = [

@@ -30,7 +30,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Docker Image
-        run: docker build -t ghcr.io/ambiqai/helios-rt-ci:latest -f .devcontainer/Dockerfile .
+        run: docker build -t ghcr.io/ambiqai/helia-rt-ci:latest -f .devcontainer/Dockerfile .
 
       - name: Push Docker Image
-        run: docker push ghcr.io/ambiqai/helios-rt-ci:latest
+        run: docker push ghcr.io/ambiqai/helia-rt-ci:latest

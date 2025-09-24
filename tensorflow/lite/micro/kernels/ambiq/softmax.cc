@@ -37,8 +37,7 @@ struct CMSISNNSoftmaxParams {
 
 void* Init(TfLiteContext* context, const char* buffer, size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
-  return context->AllocatePersistentBuffer(context,
-                                           sizeof(CMSISNNSoftmaxParams));
+  return context->AllocatePersistentBuffer(context, sizeof(CMSISNNSoftmaxParams));
 }
 
 TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
@@ -105,19 +104,23 @@ TfLiteStatus SoftmaxEval(TfLiteContext* context, TfLiteNode* node) {
     }
     case kTfLiteInt8: {
       if (output->type == kTfLiteInt8) {
-        arm_softmax_s8(tflite::micro::GetTensorData<int8_t>(input),
-                       op_data.num_rows, op_data.row_size,
-                       op_data.softmax_params.input_multiplier,
-                       op_data.softmax_params.input_left_shift,
-                       op_data.softmax_params.diff_min,
-                       tflite::micro::GetTensorData<int8_t>(output));
+        arm_softmax_s8(
+          tflite::micro::GetTensorData<int8_t>(input),
+          op_data.num_rows, op_data.row_size,
+          op_data.softmax_params.input_multiplier,
+          op_data.softmax_params.input_left_shift,
+          op_data.softmax_params.diff_min,
+          tflite::micro::GetTensorData<int8_t>(output)
+        );
       } else {
-        arm_softmax_s8_s16(tflite::micro::GetTensorData<int8_t>(input),
-                           op_data.num_rows, op_data.row_size,
-                           op_data.softmax_params.input_multiplier,
-                           op_data.softmax_params.input_left_shift,
-                           op_data.softmax_params.diff_min,
-                           tflite::micro::GetTensorData<int16_t>(output));
+        arm_softmax_s8_s16(
+          tflite::micro::GetTensorData<int8_t>(input),
+          op_data.num_rows, op_data.row_size,
+          op_data.softmax_params.input_multiplier,
+          op_data.softmax_params.input_left_shift,
+          op_data.softmax_params.diff_min,
+          tflite::micro::GetTensorData<int16_t>(output)
+        );
       }
       return kTfLiteOk;
     }

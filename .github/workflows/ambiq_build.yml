@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest-md
     name: ambiq_build
     container:
-      image: ghcr.io/ambiqai/helios-rt-ci:latest
+      image: ghcr.io/ambiqai/helia-rt-ci:latest
     steps:
 
       - uses: actions/checkout@v3

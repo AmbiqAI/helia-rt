@@ -268,11 +268,11 @@ TF_LITE_MICRO_TEST(SimpleReluTestInt8) {
 TF_LITE_MICRO_TEST(SimpleRelu6TestInt8) {
   const int elements_count = 10;
 
-  int input_shape[] = {2, 1, 5};
-  const float input_data[] = {4, 5, 6, 7, 8, -1, -2, -3, -4, -5};
+  int input_shape[] = {2, 1, 8};
+  const float input_data[] = {4, 5, 6, 7, 8, -1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11};
   int8_t input_quantized[elements_count];
   int output_shape[] = {2, 1, 5};
-  const float golden[] = {4, 5, 6, 6, 6, 0, 0, 0, 0, 0};
+  const float golden[] = {4, 5, 6, 6, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   int8_t golden_quantized[elements_count];
   int8_t output_data[elements_count];
 

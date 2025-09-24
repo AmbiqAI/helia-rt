@@ -28,7 +28,7 @@ jobs:
       contents: read
     if: |
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'schedule' && github.repository == 'AmbiqAI/helios-rt')
+      (github.event_name == 'schedule' && github.repository == 'AmbiqAI/helia-rt')
     name: Cortex-M Generic
     steps:
       - uses: actions/checkout@v2
@@ -56,7 +56,7 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'schedule' && github.repository == 'AmbiqAI/helios-rt')
+      (github.event_name == 'schedule' && github.repository == 'AmbiqAI/helia-rt')
     name: Cortex-M Corstone 300 (FVP)
     steps:
       - uses: actions/checkout@v2

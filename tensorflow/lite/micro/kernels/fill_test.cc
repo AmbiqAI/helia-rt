@@ -176,6 +176,48 @@ TF_LITE_MICRO_TEST(FillInt8NoInputDimsData) {
            output_data);
 }
 
+// Fill a 2x2x2 tensor with a int16 scalar value. The dimension of the tensor is
+// of int32 type.
+TF_LITE_MICRO_TEST(FillInt16Int32Dims) {
+  constexpr int kDim1 = 2;
+  constexpr int kDim2 = 2;
+  constexpr int kDim3 = 2;
+
+  int dims_shape[] = {1, 3};
+  int32_t dims_data[] = {kDim1, kDim2, kDim3};
+
+  int value_shape[] = {0};
+  int16_t value_data[] = {4};
+
+  int output_shape[] = {3, kDim1, kDim2, kDim3};
+  int16_t output_data[kDim1 * kDim2 * kDim3];
+
+  TestFill(dims_shape, dims_data, value_shape, value_data, output_shape,
+           output_data);
+}
+
+// Verify the FILL still works when the input dims tensor is an activation
+// tensor (i.e. has not prepopulated value). Fill a 2x2x2 tensor with a int16
+// scalar value.
+TF_LITE_MICRO_TEST(FillInt16NoInputDimsData) {
+  constexpr int kDim1 = 2;
+  constexpr int kDim2 = 2;
+  constexpr int kDim3 = 2;
+
+  // The dims tensor with unknown data. Note that shape is always known.
+  int dims_shape[] = {1, 3};
+  int32_t* dims_data = nullptr;
+
+  int value_shape[] = {0};
+  int16_t value_data[] = {4};
+
+  int output_shape[] = {3, kDim1, kDim2, kDim3};
+  int16_t output_data[kDim1 * kDim2 * kDim3];
+
+  TestFill(dims_shape, dims_data, value_shape, value_data, output_shape,
+           output_data);
+}
+
 TF_LITE_MICRO_TEST(FillFloatInt32Dims) {
   constexpr int kDim1 = 2;
   constexpr int kDim2 = 2;

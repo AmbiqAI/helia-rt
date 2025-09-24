@@ -1,15 +1,15 @@
 #
 
-[![](./assets/helios-rt-banner-light.png#only-light)](https://ambiqai.github.io/helios-rt/)
-[![](./assets/helios-rt-banner-dark.png#only-dark)](https://ambiqai.github.io/helios-rt/)
+[![](./assets/helia-rt-banner-light.png#only-light)](https://ambiqai.github.io/helia-rt/)
+[![](./assets/helia-rt-banner-dark.png#only-dark)](https://ambiqai.github.io/helia-rt/)
 
 ## 📖 Overview
 
-Welcome to HeliosRT, a specialized fork of TensorFlow Lite for Microcontrollers (TFLM), tailored for Ambiq's Apollo family of ultra-low-power System-on-Chips (SoCs). This project enhances TFLM by optimizing it to leverage the advanced hardware intrinsics of the Apollo series, such as Matrix Vector Extensions (MVE) and Digital Signal Processing (DSP) instructions.
+Welcome to HeliaRT, a specialized fork of TensorFlow Lite for Microcontrollers (TFLM), tailored for Ambiq's Apollo family of ultra-low-power System-on-Chips (SoCs). This project enhances TFLM by optimizing it to leverage the advanced hardware intrinsics of the Apollo series, such as Matrix Vector Extensions (MVE) and Digital Signal Processing (DSP) instructions.
 
-## Why HeliosRT?
+## Why HeliaRT?
 
-HeliosRT addresses the unique demands of ultra-low-power devices, offering developers the tools to build AI applications that require minimal energy consumption without sacrificing performance. By harnessing the specific capabilities of Ambiq's SoCs, HeliosRT enables more efficient neural network inference on devices like smart watches, fitness trackers, and other smart IoT devices.
+HeliaRT addresses the unique demands of ultra-low-power devices, offering developers the tools to build AI applications that require minimal energy consumption without sacrificing performance. By harnessing the specific capabilities of Ambiq's SoCs, HeliaRT enables more efficient neural network inference on devices like smart watches, fitness trackers, and other smart IoT devices.
 
 ## 🚀  Key Features
 
@@ -17,25 +17,25 @@ HeliosRT addresses the unique demands of ultra-low-power devices, offering devel
 - **Energy Efficiency**: Designed to minimize power usage, extending the battery life of edge devices.
 - **Broad Compatibility**: Supports a wide range of Ambiq's Apollo SoCs, ensuring versatile applications across different hardware.
 
-Explore our [Getting Started guide](usage/index.md) to dive into the development with HeliosRT, or check out the [Benchmarks section](benchmarks/index.md) to see how HeliosRT performs under various conditions. Whether you are developing for wearable technology or other smart devices, HeliosRT provides a robust framework for embedding AI into your projects.
+Explore our [Getting Started guide](usage/index.md) to dive into the development with HeliaRT, or check out the [Benchmarks section](benchmarks/index.md) to see how HeliaRT performs under various conditions. Whether you are developing for wearable technology or other smart devices, HeliaRT provides a robust framework for embedding AI into your projects.
 
 ## 📚 Quick Links
 
-- **Install HeliosRT** and getting up and running in minutes. &nbsp; [:material-clock-fast: Install HeliosRT](usage/index.md){ .md-button }
+- **Install HeliaRT** and getting up and running in minutes. &nbsp; [:material-clock-fast: Install HeliaRT](usage/index.md){ .md-button }
 
 - **Usage Examples** showcasing real-world applications and best practices. &nbsp; [:material-book-open-page-variant: Usage Examples](examples/index.md){ .md-button }
 
-- **Performance Benchmarks** comparing HeliosRT to other frameworks. &nbsp; [:material-chart-bar: Performance Benchmarks](benchmarks/index.md){ .md-button }
+- **Performance Benchmarks** comparing HeliaRT to other frameworks. &nbsp; [:material-chart-bar: Performance Benchmarks](benchmarks/index.md){ .md-button }
 
 
 ## Getting Started
 
-Jumpstart your development with [neuralSPOT](https://github.com/AmbiqAI/neuralSPOT), a robust AI SDK optimized for Ambiq's ultra-low-power Apollo SoCs. This toolkit provides comprehensive resources, including the latest stable releases of HeliosRT, fully configured for both GCC and Arm Clang across debug and release builds. For a detailed step-by-step guide, refer to our [Getting Started documentation](usage/index.md).
+Jumpstart your development with [neuralSPOT](https://github.com/AmbiqAI/neuralSPOT), a robust AI SDK optimized for Ambiq's ultra-low-power Apollo SoCs. This toolkit provides comprehensive resources, including the latest stable releases of HeliaRT, fully configured for both GCC and Arm Clang across debug and release builds. For a detailed step-by-step guide, refer to our [Getting Started documentation](usage/index.md).
 
 
 ## Operator Support Matrix
 
-Below is a detailed matrix that outlines the support for various operators across different backends and data types within HeliosRT. Each entry indicates whether an operator is supported (`Yes`), not supported (`No`), or not applicable (`N/A`) for the specified data type and backend. "N/A" is used where the operation does not logically apply to the data type, whereas "No" indicates that the operation could be supported but currently isn't.
+Below is a detailed matrix that outlines the support for various operators across different backends and data types within HeliaRT. Each entry indicates whether an operator is supported (`Yes`), not supported (`No`), or not applicable (`N/A`) for the specified data type and backend. "N/A" is used where the operation does not logically apply to the data type, whereas "No" indicates that the operation could be supported but currently isn't.
 
 The implementations are categorized under three main technologies:
 - **C**: Standard C implementation.
@@ -54,8 +54,8 @@ The implementations are categorized under three main technologies:
 | cumsum            | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | depth_to_space    | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | depthwise_conv    | Yes         | Yes        | Yes        | Yes         | Yes          | Yes          | Yes         | Yes          | Yes          |
-| dequantize        | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| elementwise       | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
+| dequantize        | Yes         | Yes        | No         | No          | No           | No           | Yes         | Yes          | No           |
+| elementwise       | Yes         | Yes        | No         | No          | No           | No           | Yes         | Yes          | No           |
 | elu               | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | embedding_lookup  | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | expand_dims       | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
@@ -90,7 +90,7 @@ The implementations are categorized under three main technologies:
 | strided_slice     | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | sub               | Yes         | Yes        | No         | Yes         | No           | N/A          | No          | No           | No           |
 | svdf              | Yes         | Yes        | No         | Yes         | Yes          | No           | Yes         | Yes          | No           |
-| tanh              | Yes         | Yes        | No         | Yes         | No           | No           | Yes         | No           | No           |
+| tanh              | Yes         | Yes        | No         | Yes         | No           | No           | Yes         | Yes          | No           |
 | transpose_conv    | Yes         | No         | No         | Yes         | No           | No           | Yes         | No           | No           |
 | tranpose          | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
 | unpack            | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
