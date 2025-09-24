@@ -87,21 +87,27 @@ void ArmPopulateCommonParams(const tflite::StridedSliceParams& op_params,
 
 
 int32_t
-ArmStridedSliceS8(const tflite::StridedSliceParams& op_params,
-                  const RuntimeShape& unextended_input_shape,
-                  const int8_t* input_data,
-                  const RuntimeShape& unextended_output_shape,
-                  int8_t* output_data)
-{
-
+ArmStridedSliceS8(
+  const tflite::StridedSliceParams& op_params,
+  const RuntimeShape& unextended_input_shape,
+  const int8_t* input_data,
+  const RuntimeShape& unextended_output_shape,
+  int8_t* output_data
+) {
   cmsis_nn_dims input_dims;
   cmsis_nn_dims output_dims;
   cmsis_nn_dims begin_dims;
   cmsis_nn_dims stride_dims;
 
-  ArmPopulateCommonParams(op_params, unextended_input_shape,
-                          unextended_output_shape, &input_dims, &output_dims,
-                          &begin_dims, &stride_dims);
+  ArmPopulateCommonParams(
+    op_params,
+    unextended_input_shape,
+    unextended_output_shape,
+    &input_dims,
+    &output_dims,
+    &begin_dims,
+    &stride_dims
+  );
 
   return arm_strided_slice_s8(
     input_data,
@@ -114,21 +120,29 @@ ArmStridedSliceS8(const tflite::StridedSliceParams& op_params,
 }
 
 int32_t
-ArmStridedSliceS16(const tflite::StridedSliceParams& op_params,
-                   const RuntimeShape& unextended_input_shape,
-                   const int16_t* input_data,
-                   const RuntimeShape& unextended_output_shape,
-                   int16_t* output_data)
-{
+ArmStridedSliceS16(
+  const tflite::StridedSliceParams& op_params,
+  const RuntimeShape& unextended_input_shape,
+  const int16_t* input_data,
+  const RuntimeShape& unextended_output_shape,
+  int16_t* output_data
+) {
 
   cmsis_nn_dims input_dims;
   cmsis_nn_dims output_dims;
   cmsis_nn_dims begin_dims;
   cmsis_nn_dims stride_dims;
 
-  ArmPopulateCommonParams(op_params, unextended_input_shape,
-                          unextended_output_shape, &input_dims, &output_dims,
-                          &begin_dims, &stride_dims);
+  ArmPopulateCommonParams(
+    op_params,
+    unextended_input_shape,
+    unextended_output_shape,
+    &input_dims,
+    &output_dims,
+    &begin_dims,
+    &stride_dims
+  );
+
   return arm_strided_slice_s16(
     input_data,
     output_data,
@@ -154,57 +168,71 @@ TfLiteStatus StridedSliceEval(TfLiteContext* context, TfLiteNode* node) {
 
   switch (output->type) {
     case kTfLiteFloat32:
-      reference_ops::StridedSlice(op_params,
-                                  tflite::micro::GetTensorShape(input),
-                                  tflite::micro::GetTensorData<float>(input),
-                                  tflite::micro::GetTensorShape(output),
-                                  tflite::micro::GetTensorData<float>(output));
+      reference_ops::StridedSlice(
+        op_params,
+        tflite::micro::GetTensorShape(input),
+        tflite::micro::GetTensorData<float>(input),
+        tflite::micro::GetTensorShape(output),
+        tflite::micro::GetTensorData<float>(output)
+      );
       break;
     case kTfLiteInt8:
       if (input_dims_count <= 4) {
-        ArmStridedSliceS8(op_params,
-                          tflite::micro::GetTensorShape(input),
-                          tflite::micro::GetTensorData<int8_t>(input),
-                          tflite::micro::GetTensorShape(output),
-                          tflite::micro::GetTensorData<int8_t>(output));
-      }
-      else {
-        reference_ops::StridedSlice(op_params,
-                                    tflite::micro::GetTensorShape(input),
-                                    tflite::micro::GetTensorData<int8_t>(input),
-                                    tflite::micro::GetTensorShape(output),
-                                    tflite::micro::GetTensorData<int8_t>(output));
-        }
-      break;
-    case kTfLiteInt16:
-      if (input_dims_count <= 4) {
-        ArmStridedSliceS16(op_params,
-                           tflite::micro::GetTensorShape(input),
-                           tflite::micro::GetTensorData<int16_t>(input),
-                           tflite::micro::GetTensorShape(output),
-                           tflite::micro::GetTensorData<int16_t>(output));
+        ArmStridedSliceS8(
+          op_params,
+          tflite::micro::GetTensorShape(input),
+          tflite::micro::GetTensorData<int8_t>(input),
+          tflite::micro::GetTensorShape(output),
+          tflite::micro::GetTensorData<int8_t>(output)
+        );
       }
       else {
         reference_ops::StridedSlice(
-            op_params, tflite::micro::GetTensorShape(input),
-            tflite::micro::GetTensorData<int16_t>(input),
-            tflite::micro::GetTensorShape(output),
-            tflite::micro::GetTensorData<int16_t>(output));
+          op_params,
+          tflite::micro::GetTensorShape(input),
+          tflite::micro::GetTensorData<int8_t>(input),
+          tflite::micro::GetTensorShape(output),
+          tflite::micro::GetTensorData<int8_t>(output)
+        );
+      }
+      break;
+    case kTfLiteInt16:
+      if (input_dims_count <= 4) {
+        ArmStridedSliceS16(
+          op_params,
+          tflite::micro::GetTensorShape(input),
+          tflite::micro::GetTensorData<int16_t>(input),
+          tflite::micro::GetTensorShape(output),
+          tflite::micro::GetTensorData<int16_t>(output)
+        );
+      }
+      else {
+        reference_ops::StridedSlice(
+          op_params,
+          tflite::micro::GetTensorShape(input),
+          tflite::micro::GetTensorData<int16_t>(input),
+          tflite::micro::GetTensorShape(output),
+          tflite::micro::GetTensorData<int16_t>(output)
+        );
       }
       break;
     case kTfLiteInt32:
       reference_ops::StridedSlice(
-          op_params, tflite::micro::GetTensorShape(input),
-          tflite::micro::GetTensorData<int32_t>(input),
-          tflite::micro::GetTensorShape(output),
-          tflite::micro::GetTensorData<int32_t>(output));
+        op_params,
+        tflite::micro::GetTensorShape(input),
+        tflite::micro::GetTensorData<int32_t>(input),
+        tflite::micro::GetTensorShape(output),
+        tflite::micro::GetTensorData<int32_t>(output)
+      );
       break;
     case kTfLiteBool:
-      reference_ops::StridedSlice(op_params,
-                                  tflite::micro::GetTensorShape(input),
-                                  tflite::micro::GetTensorData<bool>(input),
-                                  tflite::micro::GetTensorShape(output),
-                                  tflite::micro::GetTensorData<bool>(output));
+      reference_ops::StridedSlice(
+        op_params,
+        tflite::micro::GetTensorShape(input),
+        tflite::micro::GetTensorData<bool>(input),
+        tflite::micro::GetTensorShape(output),
+        tflite::micro::GetTensorData<bool>(output)
+      );
       break;
     default:
       MicroPrintf("Type %s (%d) not supported.", TfLiteTypeGetName(input->type),
@@ -217,8 +245,7 @@ TfLiteStatus StridedSliceEval(TfLiteContext* context, TfLiteNode* node) {
 }  // namespace
 
 TFLMRegistration Register_STRIDED_SLICE() {
-  return tflite::micro::RegisterOp(StridedSliceInit, StridedSlicePrepare,
-                                   StridedSliceEval);
+  return tflite::micro::RegisterOp(StridedSliceInit, StridedSlicePrepare, StridedSliceEval);
 }
 
 }  // namespace tflite
