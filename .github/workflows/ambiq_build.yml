@@ -43,12 +43,8 @@ jobs:
         uses: actions/cache@v3
         with:
           path: tensorflow/lite/micro/tools/make/downloads
-          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles(
-            'tensorflow/lite/micro/tools/make/Makefile',
-            'tensorflow/lite/micro/tools/make/third_party_downloads.inc'
-          ) }}
-          restore-keys: |
-            ${{ runner.os }}-third-party-downloads-
+          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc') }}
+          restore-keys: ${{ runner.os }}-third-party-downloads-
 
       - name: Building (${{ matrix.arch }} / ${{ matrix.toolchain }})
         run: |
