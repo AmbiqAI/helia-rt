@@ -23,6 +23,9 @@ jobs:
     runs-on: ubuntu-latest-md
     container:
       image: ghcr.io/ambiqai/helia-rt-ci:latest
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       max-parallel: 6
@@ -135,8 +138,8 @@ jobs:
           echo "== Selecting one tflm tree into ${BUNDLE}/tflm =="
           CAND=""
           for p in \
-            "out/cortex-m55/gcc/release/tflm" \
-            "out/cortex-m4+fp/gcc/release/tflm"
+            "artifacts/out/cortex-m55/gcc/release/tflm" \
+            "artifacts/out/cortex-m4+fp/gcc/release/tflm"
           do
             [[ -d "$p" ]] && CAND="$p" && break
           done
