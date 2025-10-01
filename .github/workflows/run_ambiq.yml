@@ -1,14 +1,10 @@
 name: Run-Ambiq
 
-# This is the entry point for ambiq.yml for scheduled and workflow_dispatch events.
-
-
 on:
   # schedule:
   #   # 10am UTC is 3am or 4am PT depending on daylight savings.
   #   - cron: '0 10 * * *'
 
-  # Allow manually triggering of the workflow.
   workflow_dispatch: {}
 
 jobs:
@@ -19,6 +15,7 @@ jobs:
       trigger-sha: ${{ github.sha }}
     secrets:
       NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
+      ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
 
   call-ambiq-test:
     uses: ./.github/workflows/ambiq_test.yml
@@ -27,6 +24,7 @@ jobs:
       trigger-sha: ${{ github.sha }}
     secrets:
       NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
+      ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
 
   issue-on-error:
     needs: [call-ambiq-build,call-ambiq-test]
