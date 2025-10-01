@@ -41,7 +41,7 @@ RUN ./llvm.sh 16
 RUN ln -s /usr/bin/clang-16 /usr/bin/clang
 RUN ln -s /usr/bin/clang++-16 /usr/bin/clang++
 
-RUN apt-get install clang-format-16
+RUN apt-get install -y clang-format-16
 RUN ln -s /usr/bin/clang-format-16 /usr/bin/clang-format
 
 # Needed when using the Dockerfile locally.
