@@ -1,6 +1,7 @@
 name: HeliaRT Unit Tests
 
 on:
+
   workflow_call:
     inputs:
       trigger-sha:
@@ -11,6 +12,13 @@ on:
         required: true
       ARM_UBL_LICENSE_IDENTIFIER:
         required: false
+
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to build (branch, tag, or SHA). Leave empty to use the current commit."
+        required: false
+        default: ""
 
 jobs:
   ambiq_test:
