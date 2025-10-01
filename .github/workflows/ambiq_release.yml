@@ -20,7 +20,7 @@ concurrency:
 jobs:
   neuralspot-build:
     name: Build neuralSPOT module (${{ matrix.arch }} • ${{ matrix.toolchain }} • ${{ matrix.build }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-md
     container:
       image: ghcr.io/ambiqai/helia-rt-ci:latest
     strategy:

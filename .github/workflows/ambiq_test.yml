@@ -1,4 +1,4 @@
-name: HeliaRT Tests
+name: HeliaRT Unit Tests
 
 on:
   workflow_call:
@@ -14,7 +14,7 @@ on:
 
 jobs:
   ambiq_test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-md
     container:
       image: ghcr.io/ambiqai/helia-rt-ci:latest
 
@@ -22,7 +22,7 @@ jobs:
       fail-fast: false
       max-parallel: 4
       matrix:
-        arch: [ "cortex-m55", "cortex-m4+fp", "cortex-m0" ]
+        arch: [ "cortex-m55", "cortex-m4+fp", "cortex-m3" ]
         toolchain: [ "gcc" ]
 
     env:
