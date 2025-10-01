@@ -2,7 +2,7 @@
   "bootstrap-sha": "645d1c2164a63368a5c60ec41fe7fbba320951a0",
   "packages": {
     ".": {
-      "component": "tflm-ambiq",
+      "component": "HeliaRT",
       "release-type": "simple",
       "include-component-in-tag": true,
       "include-v-in-tag": true,
@@ -12,9 +12,8 @@
 
       "extra-files": [
         {
-          "type": "simple",
-          "path": "tensorflow/lite/micro/ambiq_version.h",
-          "pattern": "#define TFLM_AMBIQ_VERSION \"${version}\""
+          "type": "generic",
+          "path": "tensorflow/lite/micro/heliart_version.h"
         }
       ],
 
