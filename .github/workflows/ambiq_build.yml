@@ -1,6 +1,7 @@
 name: HeliaRT Build
 
 on:
+  # Reusable workflow
   workflow_call:
     inputs:
       trigger-sha:
@@ -12,8 +13,20 @@ on:
       ARM_UBL_LICENSE_IDENTIFIER:
         required: false
 
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to build (branch, tag, or SHA). Leave empty to use the current commit."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
 jobs:
   ambiq_build:
+    name: build-${{ matrix.arch }}-${{ matrix.toolchain }}
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/ambiqai/helia-rt-ci:latest
@@ -29,12 +42,23 @@ jobs:
       NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
 
-    name: build-${{ matrix.arch }}-${{ matrix.toolchain }}
-
     steps:
+      - name: Select ref
+        id: sel
+        shell: bash
+        run: |
+          if [[ -n "${{ inputs.trigger-sha }}" ]]; then
+            echo "ref=${{ inputs.trigger-sha }}" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${{ inputs.ref }}" ]]; then
+            echo "ref=${{ inputs.ref }}" >> "$GITHUB_OUTPUT"
+          else
+            # default to the current commit of this workflow run
+            echo "ref=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.trigger-sha }}
+          ref: ${{ steps.sel.outputs.ref }}
 
       - name: Mark workspace as safe for Git
         run: git config --global --add safe.directory "*"
@@ -50,7 +74,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-third-party-downloads-
 
-      - name: Building (${{ matrix.arch }} / ${{ matrix.toolchain }})
+      - name: Build (${{ matrix.arch }} / ${{ matrix.toolchain }})
         run: |
           chmod +x tensorflow/lite/micro/tools/ci_build/test_ambiq.sh
           tensorflow/lite/micro/tools/ci_build/test_ambiq.sh \
