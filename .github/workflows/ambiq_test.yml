@@ -42,14 +42,9 @@ jobs:
       - name: Cache third-party downloads
         uses: actions/cache@v3
         with:
-          path: |
-            tensorflow/lite/micro/tools/make/downloads
-          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles(
-            'tensorflow/lite/micro/tools/make/Makefile',
-            'tensorflow/lite/micro/tools/make/third_party_downloads.inc'
-            ) }}
-          restore-keys: |
-            ${{ runner.os }}-third-party-downloads-
+          path: tensorflow/lite/micro/tools/make/downloads
+          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc') }}
+          restore-keys: ${{ runner.os }}-third-party-downloads-
 
       - name: Testing (${{ matrix.arch }} / ${{ matrix.toolchain }})
         run: |
