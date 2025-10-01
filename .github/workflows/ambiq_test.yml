@@ -1,4 +1,4 @@
-name: HeliaRT Tests
+name: HeliaRT Unit Tests
 
 on:
   workflow_call:
