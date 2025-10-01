@@ -1,7 +1,7 @@
 name: HeliaRT Build
 
 on:
-  # Reusable workflow
+
   workflow_call:
     inputs:
       trigger-sha:
@@ -13,7 +13,6 @@ on:
       ARM_UBL_LICENSE_IDENTIFIER:
         required: false
 
-  # Manual trigger
   workflow_dispatch:
     inputs:
       ref:
@@ -27,7 +26,7 @@ permissions:
 jobs:
   ambiq_build:
     name: build-${{ matrix.arch }}-${{ matrix.toolchain }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-md
     container:
       image: ghcr.io/ambiqai/helia-rt-ci:latest
 
