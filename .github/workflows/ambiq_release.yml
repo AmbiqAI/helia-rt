@@ -100,6 +100,9 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/ambiqai/helia-rt-ci:latest
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Determine tag/ref
         id: info
