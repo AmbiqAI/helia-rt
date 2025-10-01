@@ -28,7 +28,7 @@ jobs:
         shell: bash
     strategy:
       fail-fast: false
-      max-parallel: 6
+      max-parallel: 12
       matrix:
         arch: [ "cortex-m4+fp", "cortex-m55" ]
         build: [ "debug", "release", "release_with_logs" ]
@@ -136,17 +136,10 @@ jobs:
           mkdir -p "${BUNDLE}/lib" "${BUNDLE}/tflm"
 
           echo "== Collecting libraries into ${BUNDLE}/lib =="
-          find artifacts/out -type f -path "*/lib/*.a" -print -exec cp -v {} "${BUNDLE}/lib/" \;
+          find artifacts -type f -path "*/lib/*.a" -print -exec cp -v {} "${BUNDLE}/lib/" \;
 
           echo "== Selecting one tflm tree into ${BUNDLE}/tflm =="
-          CAND=""
-          for p in \
-            "artifacts/out/cortex-m55/gcc/release/tflm" \
-            "artifacts/out/cortex-m4+fp/gcc/release/tflm"
-          do
-            [[ -d "$p" ]] && CAND="$p" && break
-          done
-          [[ -z "$CAND" ]] && CAND="$(find artifacts/out -type d -path '*/tflm' | head -n1 || true)"
+          CAND="$(find artifacts -type d -path '*/tflm' | sort | head -n1 || true)"
           [[ -z "$CAND" ]] && { echo "::error ::No tflm tree found in artifacts"; exit 1; }
           cp -a "${CAND}/." "${BUNDLE}/"
 
