@@ -15,7 +15,11 @@ if(CONFIG_HELIA_RT)
   # Select optimized vs reference kernels
   if(CONFIG_NS_CMSIS_NN)
     set(OPTIMIZED_KERNEL_DIR ambiq)
+    # Fixes imports to start w/ Include/
+    set(tflm_cmsis_nn_glue_path ${ZEPHYR_NS_CMSIS_NN_MODULE_DIR})
+    zephyr_library_include_directories(${tflm_cmsis_nn_glue_path})
     zephyr_library_compile_definitions(NS_CMSIS_NN)
+    zephyr_library_compile_definitions(AMBIQ)
   else()
     set(OPTIMIZED_KERNEL_DIR "")
   endif()
