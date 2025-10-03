@@ -255,6 +255,7 @@ tflm_kernel_cc_library(
         "neg.cc",
         "pack.cc",
         "pad.cc",
+        "pad_common.cc",
         "pooling.cc",
         "pooling_common.cc",
         "prelu.cc",

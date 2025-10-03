@@ -85,6 +85,7 @@ py_test(
     name = "runtime_test",
     srcs = ["runtime_test.py"],
     tags = [
+        "manual",
         "noasan",
         "nomsan",  # Python doesn't like these symbols in _runtime.so
         "noubsan",

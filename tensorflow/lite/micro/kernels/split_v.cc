@@ -80,7 +80,7 @@ TfLiteStatus SplitVPrepare(TfLiteContext* context, TfLiteNode* node) {
   // constant axis tensor for now.
   TfLiteTensor* axis = micro_context->AllocateTempInputTensor(node, 2);
   TF_LITE_ENSURE_MSG(context, IsConstantTensor(axis),
-                     "Non constant axis tensor not supported");
+                     "Non-constant >axis< tensor is not supported");
   micro_context->DeallocateTempTfLiteTensor(axis);
   return kTfLiteOk;
 }

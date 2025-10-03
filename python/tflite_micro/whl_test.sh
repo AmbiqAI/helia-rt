@@ -1,4 +1,4 @@
-#!/usr/bin/sh
+#!/usr/bin/env sh
 
 # Copyright 2023 The TensorFlow Authors. All Rights Reserved.
 #

@@ -17,7 +17,6 @@ limitations under the License.
 
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
-#include "tensorflow/lite/kernels/internal/common.h"
 #include "tensorflow/lite/kernels/internal/quantization_util.h"
 #include "tensorflow/lite/kernels/internal/reference/integer_ops/mean.h"
 #include "tensorflow/lite/kernels/internal/reference/reduce.h"
@@ -134,6 +133,9 @@ static void PopulateCmsisParams(const TfLiteEvalTensor* input_t,
 
 }
 
+
+namespace {
+
 TfLiteStatus PrepareSimple(TfLiteContext* context, TfLiteNode* node,
                            int32_t* multiplier, int* shift) {
   MicroContext* micro_context = GetMicroContext(context);
@@ -167,8 +169,227 @@ TfLiteStatus PrepareSimple(TfLiteContext* context, TfLiteNode* node,
   return kTfLiteOk;
 }
 
-TfLiteStatus PrepareMaxHelper(TfLiteContext* context, TfLiteNode* node,
-                              OpDataReduce* op_data) {
+void ResolveAxis(const int* axis_data, int axis_count,
+                 tflite::MeanParams* op_params) {
+  int i = 0;
+  for (; i < axis_count; ++i) {
+    op_params->axis[i] = static_cast<int16_t>(axis_data[i]);
+  }
+  for (; i < 4; ++i) {
+    op_params->axis[i] = 1;
+  }
+  op_params->axis_count = axis_count;
+}
+
+template <typename T>
+TfLiteStatus QuantizedMeanOrSum(TfLiteContext* context, TfLiteNode* node,
+                                int* temp_index, int* resolved_axis,
+                                int32_t* temp_sum, OpDataReduce* op_data,
+                                bool compute_sum) {
+  const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
+  const TfLiteEvalTensor* axis = tflite::micro::GetEvalInput(context, node, 1);
+  TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
+  TfLiteReducerParams* params =
+      static_cast<TfLiteReducerParams*>(node->builtin_data);
+
+  bool result = reference_ops::QuantizedMeanOrSumExtraArgs<T, int32_t>(
+      tflite::micro::GetTensorData<T>(input), op_data->input_zp,
+      op_data->input_scale, &input->dims->data[0], input->dims->size,
+      tflite::micro::GetTensorData<T>(output), op_data->output_scale,
+      op_data->multiplier, op_data->shift, op_data->output_zp,
+      &output->dims->data[0], output->dims->size,
+      tflite::micro::GetTensorData<int>(axis), op_data->num_axis,
+      params->keep_dims, temp_index, resolved_axis, temp_sum, compute_sum);
+  TF_LITE_ENSURE(context, result);
+
+  return kTfLiteOk;
+}
+
+template <typename integer_type>
+TfLiteStatus EvalIntegerMean(TfLiteContext* context, TfLiteNode* node,
+                             int num_axis, OpDataReduce* op_data,
+                             int* temp_index, int* resolved_axis) {
+  int32_t* temp_sum = static_cast<int32_t*>(
+      context->GetScratchBuffer(context, op_data->temp_buffer_idx));
+
+  QuantizedMeanOrSum<integer_type>(context, node, temp_index, resolved_axis,
+                                   temp_sum, op_data, /*compute_sum=*/false);
+
+  return kTfLiteOk;
+}
+
+enum MinMaxEvalType { kEvalMin, kEvalMax };
+
+template <typename T>
+struct MinMaxReducerCompare {
+  MinMaxReducerCompare() = delete;
+  MinMaxReducerCompare(MinMaxEvalType evalType) : type_(evalType){};
+
+  constexpr T initialValue() const {
+    return (type_ == kEvalMin) ? std::numeric_limits<T>::max()
+                               : std::numeric_limits<T>::lowest();
+  }
+
+  // should be able to use "auto" keyword here, but GCC and Clang blow a fuse
+  T (*compare())(const T, const T) {
+    if (type_ == kEvalMin) {
+      return [](const T current, const T in) -> T {
+        return (in < current) ? in : current;
+      };
+    } else {
+      return [](const T current, const T in) -> T {
+        return (in > current) ? in : current;
+      };
+    }
+  }
+
+ private:
+  MinMaxEvalType type_;
+};
+
+TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
+                              OpDataReduce* op_data, MinMaxEvalType evalType) {
+  const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
+  const TfLiteEvalTensor* axis = tflite::micro::GetEvalInput(context, node, 1);
+  TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
+  TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
+  TfLiteReducerParams* params =
+      static_cast<TfLiteReducerParams*>(node->builtin_data);
+
+  // Interpret an axis tensor with null dimensions as a scalar
+  int num_axis = static_cast<int>(ElementCount(*axis->dims));
+  int* temp_buffer = static_cast<int*>(
+      context->GetScratchBuffer(context, op_data->temp_buffer_idx));
+  int* resolved_axis = static_cast<int*>(
+      context->GetScratchBuffer(context, op_data->resolved_axis_idx));
+  switch (input->type) {
+    case kTfLiteFloat32: {
+      MinMaxReducerCompare<float> reducer(evalType);
+      TF_LITE_ENSURE(
+          context,
+          reference_ops::ReduceGeneric<float>(
+              tflite::micro::GetTensorData<float>(input), input->dims->data,
+              input->dims->size, tflite::micro::GetTensorData<float>(output),
+              output->dims->data, output->dims->size,
+              tflite::micro::GetTensorData<int>(axis), num_axis,
+              params->keep_dims, temp_buffer, resolved_axis,
+              reducer.initialValue(), reducer.compare()));
+    } break;
+    case kTfLiteInt8: {
+
+      if (input->dims->size <= kCmsisRank) {
+        arm_cmsis_nn_status rst;
+        cmsis_nn_dims in_d, ax_d, out_d;
+        int32_t output_mult = op_data->multiplier; // Not used
+        int32_t output_shift = op_data->shift; // Not used
+
+        PopulateCmsisParams(
+          input, output,
+          tflite::micro::GetTensorData<int32_t>(axis),
+          num_axis,
+          &in_d, &ax_d, &out_d,
+          &output_mult, &output_shift,
+          /*compute_sum=*/true
+        );
+
+        if (evalType == kEvalMax) {
+          rst = arm_reduce_max_s8(
+            tflite::micro::GetTensorData<int8_t>(input),
+            &in_d,
+            &ax_d,
+            tflite::micro::GetTensorData<int8_t>(output),
+            &out_d
+          );
+        } else {
+          rst = arm_reduce_min_s8(
+            tflite::micro::GetTensorData<int8_t>(input),
+            &in_d,
+            &ax_d,
+            tflite::micro::GetTensorData<int8_t>(output),
+            &out_d
+          );
+        }
+        return rst == ARM_CMSIS_NN_SUCCESS ? kTfLiteOk : kTfLiteError;
+      }
+
+      MinMaxReducerCompare<int8_t> reducer(evalType);
+      TF_LITE_ENSURE_EQ(context, static_cast<double>(op_data->input_scale),
+                        static_cast<double>(op_data->output_scale));
+      TF_LITE_ENSURE_EQ(context, op_data->input_zp, op_data->output_zp);
+      TF_LITE_ENSURE(
+          context,
+          reference_ops::ReduceGeneric<int8_t>(
+              tflite::micro::GetTensorData<int8_t>(input), input->dims->data,
+              input->dims->size, tflite::micro::GetTensorData<int8_t>(output),
+              output->dims->data, output->dims->size,
+              tflite::micro::GetTensorData<int>(axis), num_axis,
+              params->keep_dims, temp_buffer, resolved_axis,
+              reducer.initialValue(), reducer.compare()));
+    } break;
+
+    case kTfLiteInt16: {
+
+      if (input->dims->size <= kCmsisRank) {
+        arm_cmsis_nn_status rst;
+        cmsis_nn_dims in_d, ax_d, out_d;
+        int32_t output_mult = op_data->multiplier; // Not used
+        int32_t output_shift = op_data->shift; // Not used
+
+        PopulateCmsisParams(
+          input, output,
+          tflite::micro::GetTensorData<int32_t>(axis),
+          num_axis,
+          &in_d, &ax_d, &out_d,
+          &output_mult, &output_shift,
+          /*compute_sum=*/true
+        );
+
+        if (evalType == kEvalMax) {
+          rst = arm_reduce_max_s16(
+            tflite::micro::GetTensorData<int16_t>(input),
+            &in_d,
+            &ax_d,
+            tflite::micro::GetTensorData<int16_t>(output),
+            &out_d
+          );
+        } else {
+          rst = arm_reduce_min_s16(
+            tflite::micro::GetTensorData<int16_t>(input),
+            &in_d,
+            &ax_d,
+            tflite::micro::GetTensorData<int16_t>(output),
+            &out_d
+          );
+        }
+        return rst == ARM_CMSIS_NN_SUCCESS ? kTfLiteOk : kTfLiteError;
+      }
+
+      MinMaxReducerCompare<int16_t> reducer(evalType);
+      TF_LITE_ENSURE_EQ(context, static_cast<double>(op_data->input_scale),
+                        static_cast<double>(op_data->output_scale));
+      TF_LITE_ENSURE_EQ(context, op_data->input_zp, op_data->output_zp);
+      TF_LITE_ENSURE(
+          context,
+          reference_ops::ReduceGeneric<int16_t>(
+              tflite::micro::GetTensorData<int16_t>(input), input->dims->data,
+              input->dims->size, tflite::micro::GetTensorData<int16_t>(output),
+              output->dims->data, output->dims->size,
+              tflite::micro::GetTensorData<int>(axis), num_axis,
+              params->keep_dims, temp_buffer, resolved_axis,
+              reducer.initialValue(), reducer.compare()));
+    } break;
+
+    default:
+      MicroPrintf("Only float32, int8, and int16 types are supported.");
+      return kTfLiteError;
+  }
+  return kTfLiteOk;
+}
+
+}  // namespace
+
+TfLiteStatus PrepareMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
+                                 OpDataReduce* op_data) {
   TF_LITE_ENSURE_OK(context, PrepareSimple(context, node, &op_data->multiplier,
                                            &op_data->shift));
 
@@ -229,55 +450,6 @@ TfLiteStatus PrepareMeanOrSumHelper(TfLiteContext* context, TfLiteNode* node,
   return kTfLiteOk;
 }
 
-void ResolveAxis(const int* axis_data, int axis_count,
-                 tflite::MeanParams* op_params) {
-  int i = 0;
-  for (; i < axis_count; ++i) {
-    op_params->axis[i] = static_cast<int16_t>(axis_data[i]);
-  }
-  for (; i < 4; ++i) {
-    op_params->axis[i] = 1;
-  }
-  op_params->axis_count = axis_count;
-}
-
-template <typename T>
-TfLiteStatus QuantizedMeanOrSum(TfLiteContext* context, TfLiteNode* node,
-                                int* temp_index, int* resolved_axis,
-                                int32_t* temp_sum, OpDataReduce* op_data,
-                                bool compute_sum) {
-  const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
-  const TfLiteEvalTensor* axis = tflite::micro::GetEvalInput(context, node, 1);
-  TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
-  TfLiteReducerParams* params =
-      static_cast<TfLiteReducerParams*>(node->builtin_data);
-
-  bool result = reference_ops::QuantizedMeanOrSumExtraArgs<T, int32_t>(
-      tflite::micro::GetTensorData<T>(input), op_data->input_zp,
-      op_data->input_scale, &input->dims->data[0], input->dims->size,
-      tflite::micro::GetTensorData<T>(output), op_data->output_scale,
-      op_data->multiplier, op_data->shift, op_data->output_zp,
-      &output->dims->data[0], output->dims->size,
-      tflite::micro::GetTensorData<int>(axis), op_data->num_axis,
-      params->keep_dims, temp_index, resolved_axis, temp_sum, compute_sum);
-  TF_LITE_ENSURE(context, result);
-
-  return kTfLiteOk;
-}
-
-template <typename integer_type>
-TfLiteStatus EvalIntegerMean(TfLiteContext* context, TfLiteNode* node,
-                             int num_axis, OpDataReduce* op_data,
-                             int* temp_index, int* resolved_axis) {
-  int32_t* temp_sum = static_cast<int32_t*>(
-      context->GetScratchBuffer(context, op_data->temp_buffer_idx));
-
-  QuantizedMeanOrSum<integer_type>(context, node, temp_index, resolved_axis,
-                                   temp_sum, op_data, /*compute_sum=*/false);
-
-  return kTfLiteOk;
-}
-
 TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
                             OpDataReduce* op_data) {
   const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
@@ -296,7 +468,8 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
       ResolveAxis(tflite::micro::GetTensorData<int>(axis), num_axis,
                   &op_params);
 
-      // Special case mean implementation exists for 4D mean across axes 1 and 2.
+      // Special case mean implementation exists for 4D mean across axes 1
+      // and 2.
       bool special_case_4d_axes_1_and_2 =
           input->dims->size == 4 && op_params.axis_count == 2 &&
           ((op_params.axis[0] == 1 && op_params.axis[1] == 2) ||
@@ -348,7 +521,6 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
         );
         return rst == ARM_CMSIS_NN_SUCCESS ? kTfLiteOk : kTfLiteError;
       }
-
       TF_LITE_ENSURE_OK(
           context, EvalIntegerMean<int8_t>(context, node, num_axis, op_data,
                                            temp_index, resolved_axis));
@@ -381,7 +553,6 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
         );
         return rst == ARM_CMSIS_NN_SUCCESS ? kTfLiteOk : kTfLiteError;
       }
-
       TF_LITE_ENSURE_OK(
           context, EvalIntegerMean<int16_t>(context, node, num_axis, op_data,
                                             temp_index, resolved_axis));
@@ -396,125 +567,12 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
 
 TfLiteStatus EvalMaxHelper(TfLiteContext* context, TfLiteNode* node,
                            OpDataReduce* op_data) {
-  const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
-  const TfLiteEvalTensor* axis = tflite::micro::GetEvalInput(context, node, 1);
-  TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
-  TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
-  TfLiteReducerParams* params =
-      static_cast<TfLiteReducerParams*>(node->builtin_data);
+  return EvalMinMaxHelper(context, node, op_data, kEvalMax);
+}
 
-  // Interpret an axis tensor with null dimensions as a scalar
-  int num_axis = static_cast<int>(ElementCount(*axis->dims));
-  int* temp_buffer = static_cast<int*>(
-      context->GetScratchBuffer(context, op_data->temp_buffer_idx));
-  int* resolved_axis = static_cast<int*>(
-      context->GetScratchBuffer(context, op_data->resolved_axis_idx));
-  switch (input->type) {
-    case kTfLiteFloat32:
-      TF_LITE_ENSURE(
-          context,
-          reference_ops::ReduceGeneric<float>(
-              tflite::micro::GetTensorData<float>(input), input->dims->data,
-              input->dims->size, tflite::micro::GetTensorData<float>(output),
-              output->dims->data, output->dims->size,
-              tflite::micro::GetTensorData<int>(axis), num_axis,
-              params->keep_dims, temp_buffer, resolved_axis,
-              std::numeric_limits<float>::lowest(),
-              [](const float current, const float in) -> float {
-                return (in > current) ? in : current;
-              }));
-      break;
-    case kTfLiteInt8: {
-      TF_LITE_ENSURE_EQ(context, static_cast<double>(op_data->input_scale),
-                        static_cast<double>(op_data->output_scale));
-      TF_LITE_ENSURE_EQ(context, op_data->input_zp, op_data->output_zp);
-
-      if (input->dims->size <= kCmsisRank) {
-        cmsis_nn_dims in_d, ax_d, out_d;
-        int32_t output_mult = op_data->multiplier; // Not used
-        int32_t output_shift = op_data->shift; // Not used
-
-        PopulateCmsisParams(
-          input, output,
-          tflite::micro::GetTensorData<int32_t>(axis),
-          num_axis,
-          &in_d, &ax_d, &out_d,
-          &output_mult, &output_shift,
-          /*compute_sum=*/true
-        );
-
-        arm_cmsis_nn_status rst = arm_reduce_max_s8(
-          tflite::micro::GetTensorData<int8_t>(input),
-          &in_d,
-          &ax_d,
-          tflite::micro::GetTensorData<int8_t>(output),
-          &out_d
-        );
-        return rst == ARM_CMSIS_NN_SUCCESS ? kTfLiteOk : kTfLiteError;
-      }
-
-      TF_LITE_ENSURE(
-          context,
-          reference_ops::ReduceGeneric<int8_t>(
-              tflite::micro::GetTensorData<int8_t>(input), input->dims->data,
-              input->dims->size, tflite::micro::GetTensorData<int8_t>(output),
-              output->dims->data, output->dims->size,
-              tflite::micro::GetTensorData<int>(axis), num_axis,
-              params->keep_dims, temp_buffer, resolved_axis,
-              std::numeric_limits<int8_t>::lowest(),
-              [](const int8_t current, const int8_t in) -> int8_t {
-                return (in > current) ? in : current;
-              }));
-      } break;
-
-    case kTfLiteInt16: {
-      TF_LITE_ENSURE_EQ(context, static_cast<double>(op_data->input_scale),
-                        static_cast<double>(op_data->output_scale));
-      TF_LITE_ENSURE_EQ(context, op_data->input_zp, op_data->output_zp);
-
-      if (input->dims->size <= kCmsisRank) {
-        cmsis_nn_dims in_d, ax_d, out_d;
-        int32_t output_mult = op_data->multiplier; // Not used
-        int32_t output_shift = op_data->shift; // Not used
-
-        PopulateCmsisParams(
-          input, output,
-          tflite::micro::GetTensorData<int32_t>(axis),
-          num_axis,
-          &in_d, &ax_d, &out_d,
-          &output_mult, &output_shift,
-          /*compute_sum=*/true
-        );
-
-        arm_cmsis_nn_status rst = arm_reduce_max_s16(
-          tflite::micro::GetTensorData<int16_t>(input),
-          &in_d,
-          &ax_d,
-          tflite::micro::GetTensorData<int16_t>(output),
-          &out_d
-        );
-        return rst == ARM_CMSIS_NN_SUCCESS ? kTfLiteOk : kTfLiteError;
-      }
-
-      TF_LITE_ENSURE(
-          context,
-          reference_ops::ReduceGeneric<int16_t>(
-              tflite::micro::GetTensorData<int16_t>(input), input->dims->data,
-              input->dims->size, tflite::micro::GetTensorData<int16_t>(output),
-              output->dims->data, output->dims->size,
-              tflite::micro::GetTensorData<int>(axis), num_axis,
-              params->keep_dims, temp_buffer, resolved_axis,
-              std::numeric_limits<int16_t>::lowest(),
-              [](const int16_t current, const int16_t in) -> int16_t {
-                return (in > current) ? in : current;
-              }));
-      } break;
-
-    default:
-      MicroPrintf("Only float32, int8, and int16 types are supported.");
-      return kTfLiteError;
-  }
-  return kTfLiteOk;
+TfLiteStatus EvalMinHelper(TfLiteContext* context, TfLiteNode* node,
+                           OpDataReduce* op_data) {
+  return EvalMinMaxHelper(context, node, op_data, kEvalMin);
 }
 
 TfLiteStatus EvalSumHelper(TfLiteContext* context, TfLiteNode* node,
@@ -581,6 +639,7 @@ TfLiteStatus EvalSumHelper(TfLiteContext* context, TfLiteNode* node,
                                  temp_sum, op_data, /*compute_sum=*/true);
     } break;
     case kTfLiteInt16: {
+
       if (input->dims->size <= kCmsisRank) {
         cmsis_nn_dims in_d, ax_d, out_d;
         int32_t output_mult = op_data->multiplier;
@@ -608,6 +667,7 @@ TfLiteStatus EvalSumHelper(TfLiteContext* context, TfLiteNode* node,
         );
         return rst == ARM_CMSIS_NN_SUCCESS ? kTfLiteOk : kTfLiteError;
       }
+
       int32_t* temp_sum = static_cast<int32_t*>(
           context->GetScratchBuffer(context, op_data->temp_buffer_idx));
       QuantizedMeanOrSum<int16_t>(context, node, temp_index, resolved_axis,
