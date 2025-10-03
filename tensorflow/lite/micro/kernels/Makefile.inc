@@ -1,4 +1,4 @@
-# Copyright 2023 The TensorFlow Authors. All Rights Reserved.
+# Copyright 2025 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -80,7 +80,7 @@ $(eval $(call microlite_test,kernel_signal_filter_bank_log_test,\
   $(TENSORFLOW_ROOT)signal/micro/kernels/filter_bank_log_flexbuffers_generated_data.h))
 
 $(eval $(call microlite_test,kernel_signal_filter_bank_square_root_test,\
-  $(TENSORFLOW_ROOT)signal/micro/kernels/filter_bank_square_root_test.cc))  
+  $(TENSORFLOW_ROOT)signal/micro/kernels/filter_bank_square_root_test.cc))
 
 $(eval $(call microlite_test,kernel_signal_filter_bank_spectral_subtraction_test,\
   $(TENSORFLOW_ROOT)signal/micro/kernels/filter_bank_spectral_subtraction_test.cc \
@@ -160,6 +160,7 @@ $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/reduce_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/reshape_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/resize_bilinear_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/resize_nearest_neighbor_test.cc \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/reverse_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/round_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/select_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/shape_test.cc \

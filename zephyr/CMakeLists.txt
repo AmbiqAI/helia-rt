@@ -105,7 +105,7 @@ if(CONFIG_HELIA_RT)
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/comparisons.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/concatenation.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/conv.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/conv_common.cc
+    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/conv_common.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/cumsum.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/depth_to_space.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/depthwise_conv.cc
@@ -152,6 +152,7 @@ if(CONFIG_HELIA_RT)
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/neg.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/pack.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/pad.cc
+    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/pad_common.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/pooling.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/pooling_common.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/prelu.cc
@@ -165,6 +166,7 @@ if(CONFIG_HELIA_RT)
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/reshape_common.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/resize_bilinear.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/resize_nearest_neighbor.cc
+    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/reverse.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/round.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/select.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/shape.cc
@@ -185,6 +187,7 @@ if(CONFIG_HELIA_RT)
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/svdf_common.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/tanh.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/transpose.cc
+    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/transpose_common.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/transpose_conv.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/unidirectional_sequence_lstm.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/unpack.cc
