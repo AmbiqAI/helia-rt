@@ -134,7 +134,7 @@ for OPTIMIZE_KERNELS_FOR in "${variants[@]}"; do
 
     # Full suite
     mapfile -t ARGS2 < <(build_args_with_opts "${OPTIMIZE_KERNELS_FOR}")
-    readable_run make -j"${JOBS}" "${ARGS2[@]}" test
+    readable_run make "${ARGS2[@]}" test
   else
     echo ">>> Skipping tests for ${OPTIMIZE_KERNELS_FOR} (build-only mode)."
   fi
