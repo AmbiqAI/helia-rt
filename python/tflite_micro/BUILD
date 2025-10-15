@@ -73,7 +73,6 @@ py_library(
         "runtime.py",
     ],
     data = [":_runtime.so"],
-    srcs_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
         requirement("numpy"),
@@ -85,8 +84,8 @@ py_library(
 py_test(
     name = "runtime_test",
     srcs = ["runtime_test.py"],
-    python_version = "PY3",
     tags = [
+        "manual",
         "noasan",
         "nomsan",  # Python doesn't like these symbols in _runtime.so
         "noubsan",

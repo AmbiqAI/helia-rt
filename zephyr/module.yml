@@ -1,4 +1,4 @@
-name: tflite-micro
+name: helia_rt
 build:
-  cmake-ext: True
-  kconfig-ext: True
+  cmake: zephyr
+  kconfig: zephyr/Kconfig

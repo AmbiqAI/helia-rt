@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2024 The TensorFlow Authors. All Rights Reserved.
+# Copyright 2025 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,9 +38,9 @@ source ${TENSORFLOW_ROOT}tensorflow/lite/micro/tools/make/bash_helpers.sh
 DOWNLOADS_DIR=${1}
 DOWNLOADED_CMSIS_NN_PATH=${DOWNLOADS_DIR}/cmsis_nn
 
-ZIP_PREFIX_NN="b9041706bc38dd51c2ca0bb0e06b3f0b42bc4f5f"
+ZIP_PREFIX_NN="e096196a0c49f065abc03d943c583cd50de424ba"
 CMSIS_NN_URL="http://github.com/ARM-software/CMSIS-NN/archive/${ZIP_PREFIX_NN}.zip"
-CMSIS_NN_MD5="128a9dd4473c26b7d3288ba7b934cbd0"
+CMSIS_NN_MD5="d2a6bc4330fed5653c74fc5dae31fd3a"
 
 should_download=$(check_should_download ${DOWNLOADS_DIR})
 

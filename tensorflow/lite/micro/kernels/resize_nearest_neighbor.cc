@@ -54,10 +54,9 @@ TfLiteStatus ResizeNearestNeighborPrepare(TfLiteContext* context,
 
   output->type = input->type;
 
-  if (!IsConstantTensor(size)) {
-    MicroPrintf("Dynamic tensors are unsupported in tfmicro.");
-    return kTfLiteError;
-  }
+
+  TF_LITE_ENSURE_MSG(context, IsConstantTensor(size),
+                     "Non-constant >size< tensor is not supported");
 
   micro_context->DeallocateTempTfLiteTensor(input);
   micro_context->DeallocateTempTfLiteTensor(size);

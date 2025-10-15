@@ -1,4 +1,4 @@
-/* Copyright 2023 The TensorFlow Authors. All Rights Reserved.
+/* Copyright 2025 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,6 +12,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
+#include "tensorflow/lite/micro/kernels/strided_slice.h"
+
 #include <cstdint>
 
 #include "tensorflow/lite/c/builtin_op_data.h"
@@ -83,6 +85,13 @@ void TestStridedSliceFloat(int* input_shape, int* begin_shape, int* end_shape,
       CreateTensor(output_data, output_dims),
   };
 
+  // begin must be a const tensor
+  tensors[kStridedSliceBeginTensor].allocation_type = kTfLiteMmapRo;
+  // end must be a const tensor
+  tensors[kStridedSliceEndTensor].allocation_type = kTfLiteMmapRo;
+  // strides must be a const tensor
+  tensors[kStridedSliceStridesTensor].allocation_type = kTfLiteMmapRo;
+
   ValidateStridedSliceGoldens(tensors, tensors_size, expected_output,
                               output_data, ElementCount(*output_dims),
                               builtin_data, expect_prepare_err, num_invoke, 1.0,
@@ -116,6 +125,13 @@ void TestStridedSliceQuantized(int* input_shape, int* begin_shape,
       CreateTensor(strides_data, strides_dims),
       CreateQuantizedTensor(output_data, output_dims, 1.0, zero_point),
   };
+
+  // begin must be a const tensor
+  tensors[kStridedSliceBeginTensor].allocation_type = kTfLiteMmapRo;
+  // end must be a const tensor
+  tensors[kStridedSliceEndTensor].allocation_type = kTfLiteMmapRo;
+  // strides must be a const tensor
+  tensors[kStridedSliceStridesTensor].allocation_type = kTfLiteMmapRo;
 
   ValidateStridedSliceGoldens(tensors, tensors_size, expected_output,
                               output_data, ElementCount(*output_dims),
