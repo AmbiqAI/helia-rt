@@ -9,10 +9,7 @@ on:
         description: "Git ref to build (defaults to release tag or current ref)"
         required: false
         default: ""
-      release_tag:
-        description: "Existing release tag to upload bundle to (optional)"
-        required: false
-        default: ""
+
 
 permissions:
   contents: write
@@ -119,25 +116,6 @@ jobs:
           fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
-      - name: Determine release upload tag
-        id: rel
-        shell: bash
-        run: |
-          # Decide which tag (if any) we will attempt to upload assets to.
-          # Priority order:
-          # 1. release event tag (for published release trigger)
-          # 2. manually provided workflow_dispatch input release_tag
-          # 3. (none) -> skip upload
-          if [[ "${{ github.event_name }}" == "release" ]]; then
-            echo "upload_tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
-          else
-            if [[ -n "${{ inputs.release_tag }}" ]]; then
-              echo "upload_tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
-            else
-              echo "upload_tag=" >> "$GITHUB_OUTPUT"
-            fi
-          fi
-
       - name: Check out code (to fetch neuralspot/module.mk)
         uses: actions/checkout@v4
         with:
@@ -198,13 +176,13 @@ jobs:
           path: upload/*.zip
 
       - name: Upload bundle to release (gh)
-        if: ${{ steps.rel.outputs.upload_tag != '' }}
+        if: ${{ github.event_name == 'release' || github.event_name == 'workflow_dispatch' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
-          TAG='${{ steps.rel.outputs.upload_tag }}'
+          TAG='${{ steps.info.outputs.tag }}'
           ZIP="upload/neuralspot-helios-rt-${TAG}.zip"
           if [[ ! -f "$ZIP" ]]; then
             echo "::error ::Zip artifact $ZIP not found"; exit 1
@@ -214,5 +192,9 @@ jobs:
             echo "Uploading $ZIP to release $TAG"
             gh release upload "$TAG" "$ZIP" --repo "$GITHUB_REPOSITORY" --clobber
           else
-            echo "::warning ::Release tag $TAG not found. Skipping upload. Create the release first to attach assets."
+            if [[ "${{ github.event_name }}" == "release" ]]; then
+              echo "::error ::Release tag $TAG not found during release event (unexpected)."; exit 1
+            else
+              echo "::warning ::No release for tag $TAG. Create it to attach assets (manual run)."
+            fi
           fi
