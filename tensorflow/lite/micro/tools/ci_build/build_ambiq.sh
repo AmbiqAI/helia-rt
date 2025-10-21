@@ -159,10 +159,10 @@ fi
 cp "${LIB_PATH}" "${OUTDIR}/lib/libtensorflow-microlite-${TARGET_SHORT}-${TOOLCHAIN}-${BUILD_NAME}.a"
 echo "Copied lib -> ${OUTDIR}/lib/libtensorflow-microlite-${TARGET_SHORT}-${TOOLCHAIN}-${BUILD_NAME}.a"
 
-# ---- Create reduced TFLM tree into OUTDIR/tflm ----
+# ---- Create reduced TFLM tree into OUTDIR/tensorflow ----
 python3 "${TFLM_SRC_DIR}/tensorflow/lite/micro/tools/project_generation/create_tflm_tree.py" \
   --makefile_options "TARGET=${TARGET} TARGET_ARCH=${ARCH} OPTIMIZED_KERNEL_DIR=${OPTIMIZED_KERNEL}" \
-  "${OUTDIR}/tflm"
+  "${OUTDIR}/tensorflow"
 
 # ---- Summary ----
 echo "== Build complete =="
