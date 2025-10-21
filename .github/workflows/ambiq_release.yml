@@ -131,14 +131,14 @@ jobs:
           TAG='${{ steps.info.outputs.tag }}'
           SHA='${{ steps.info.outputs.sha }}'
           BUNDLE="neuralspot-helios-rt-${TAG}"
-          mkdir -p "${BUNDLE}/lib" "${BUNDLE}/tensorflow"
+          mkdir -p "${BUNDLE}/lib"
 
           echo "== Collecting libraries into ${BUNDLE}/lib =="
           find artifacts -type f -path "*/lib/*.a" -print -exec cp -v {} "${BUNDLE}/lib/" \;
 
-          echo "== Selecting one tensorflow tree into ${BUNDLE}/tensorflow =="
-          CAND="$(find artifacts -type d -path '*/tensorflow' | sort | head -n1 || true)"
-          [[ -z "$CAND" ]] && { echo "::error ::No tensorflow tree found in artifacts"; exit 1; }
+          echo "== Selecting one tflm tree into ${BUNDLE}/ =="
+          CAND="$(find artifacts -type d -path '*/tflm' | sort | head -n1 || true)"
+          [[ -z "$CAND" ]] && { echo "::error ::No tflm tree found in artifacts"; exit 1; }
           cp -a "${CAND}/." "${BUNDLE}/"
 
           echo "== Copy neuralSPOT module.mk to bundle root =="
