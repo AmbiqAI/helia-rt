@@ -9,10 +9,7 @@ on:
         description: "Git ref to build (defaults to release tag or current ref)"
         required: false
         default: ""
-      release_tag:
-        description: "Existing release tag to upload bundle to (optional)"
-        required: false
-        default: ""
+
 
 permissions:
   contents: write
