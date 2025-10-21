@@ -187,14 +187,9 @@ jobs:
           if [[ ! -f "$ZIP" ]]; then
             echo "::error ::Zip artifact $ZIP not found"; exit 1
           fi
-          echo "Checking if release $TAG exists..."
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Uploading $ZIP to release $TAG"
-            gh release upload "$TAG" "$ZIP" --repo "$GITHUB_REPOSITORY" --clobber
+          echo "Attempting upload of $ZIP to release $TAG (no pre-check)";
+          if gh release upload "$TAG" "$ZIP" --repo "$GITHUB_REPOSITORY" --clobber; then
+            echo "Upload succeeded.";
           else
-            if [[ "${{ github.event_name }}" == "release" ]]; then
-              echo "::error ::Release tag $TAG not found during release event (unexpected)."; exit 1
-            else
-              echo "::warning ::No release for tag $TAG. Create it to attach assets (manual run)."
-            fi
+            echo "::warning ::Upload failed (release may not exist). Create the release tag $TAG then re-run or trigger a release event.";
           fi
