@@ -1,21 +1,41 @@
-name: HeliaRT Release
+name: NeuralSPOT Release
 
 on:
-  release:
-    types: [published]
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref (branch, commit, or tag) to build"
+        required: true
+        type: string
+      tag:
+        description: "Release tag name"
+        required: false
+        type: string
+      upload_to_release:
+        description: "Upload the generated bundle to the GitHub release"
+        required: false
+        type: boolean
+        default: true
   workflow_dispatch:
     inputs:
       ref:
-        description: "Git ref to build (defaults to release tag or current ref)"
+        description: "Git ref (branch, commit, or tag) to build"
+        required: true
+        default: main
+      tag:
+        description: "Release tag name (defaults to ref)"
         required: false
         default: ""
-
+      upload_to_release:
+        description: "Upload the generated bundle to the GitHub release"
+        required: false
+        default: "false"
 
 permissions:
   contents: write
 
 concurrency:
-  group: neuralspot-assets-${{ github.event_name }}-${{ github.event.release.tag_name || inputs.ref || github.sha }}
+  group: neuralspot-assets-${{ inputs.tag || inputs.ref || github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -40,24 +60,31 @@ jobs:
       NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
 
     steps:
-      - name: Select ref
-        id: sel
+      - name: Resolve ref and tag
+        id: meta
         shell: bash
         run: |
-          if [[ "${{ github.event_name }}" == "release" ]]; then
-            echo "ref=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
-            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
-          else
-            ref_in="${{ inputs.ref }}"
-            if [[ -z "$ref_in" ]]; then ref_in="${GITHUB_REF_NAME}"; fi
-            echo "ref=${ref_in}" >> "$GITHUB_OUTPUT"
-            echo "tag=${ref_in}" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          ref_in='${{ inputs.ref }}'
+          tag_in='${{ inputs.tag }}'
+          upload_in='${{ inputs.upload_to_release }}'
+          if [[ -z "${ref_in}" ]]; then
+            echo "::error ::Input ref is required."; exit 1;
           fi
+          if [[ -z "${tag_in}" ]]; then
+            tag_in="${ref_in}"
+          fi
+          if [[ -z "${upload_in}" ]]; then
+            upload_in="false"
+          fi
+          echo "ref=${ref_in}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag_in}" >> "$GITHUB_OUTPUT"
+          echo "upload=${upload_in}" >> "$GITHUB_OUTPUT"
 
       - name: Check out code
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.sel.outputs.ref }}
+          ref: ${{ steps.meta.outputs.ref }}
 
       - name: Mark workspace safe
         run: git config --global --add safe.directory '*'
@@ -107,10 +134,14 @@ jobs:
         id: info
         shell: bash
         run: |
-          if [[ "${{ github.event_name }}" == "release" ]]; then
-            TAG="${{ github.event.release.tag_name }}"
-          else
-            TAG="${{ inputs.ref || github.ref_name }}"
+          set -euo pipefail
+          REF="${{ inputs.ref }}"
+          TAG="${{ inputs.tag }}"
+          if [[ -z "${REF}" ]]; then
+            echo "::error ::Input ref is required."; exit 1;
+          fi
+          if [[ -z "${TAG}" ]]; then
+            TAG="${REF}"
           fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
@@ -174,7 +205,7 @@ jobs:
           path: upload/*.zip
 
       - name: Upload bundle to release (gh)
-        if: ${{ github.event_name == 'release' || github.event_name == 'workflow_dispatch' }}
+        if: ${{ inputs.upload_to_release == true || inputs.upload_to_release == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
