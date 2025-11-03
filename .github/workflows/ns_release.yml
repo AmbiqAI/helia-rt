@@ -1,0 +1,224 @@
+name: NeuralSPOT Release
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref (branch, commit, or tag) to build"
+        required: true
+        type: string
+      tag:
+        description: "Release tag name"
+        required: false
+        type: string
+      upload_to_release:
+        description: "Upload the generated bundle to the GitHub release"
+        required: false
+        type: boolean
+        default: true
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref (branch, commit, or tag) to build"
+        required: true
+        default: main
+      tag:
+        description: "Release tag name (defaults to ref)"
+        required: false
+        default: ""
+      upload_to_release:
+        description: "Upload the generated bundle to the GitHub release"
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: neuralspot-assets-${{ inputs.tag || inputs.ref || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  neuralspot-build:
+    name: Build neuralSPOT module (${{ matrix.arch }} • ${{ matrix.toolchain }} • ${{ matrix.build }})
+    runs-on: ubuntu-latest-md
+    container:
+      image: ghcr.io/ambiqai/helia-rt-ci:latest
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        arch: [ "cortex-m4+fp", "cortex-m55" ]
+        build: [ "debug", "release", "release_with_logs" ]
+        toolchain: [ "gcc", "armclang" ]
+
+    env:
+      ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
+      NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
+
+    steps:
+      - name: Resolve ref and tag
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          ref_in='${{ inputs.ref }}'
+          tag_in='${{ inputs.tag }}'
+          upload_in='${{ inputs.upload_to_release }}'
+          if [[ -z "${ref_in}" ]]; then
+            echo "::error ::Input ref is required."; exit 1;
+          fi
+          if [[ -z "${tag_in}" ]]; then
+            tag_in="${ref_in}"
+          fi
+          if [[ -z "${upload_in}" ]]; then
+            upload_in="false"
+          fi
+          echo "ref=${ref_in}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag_in}" >> "$GITHUB_OUTPUT"
+          echo "upload=${upload_in}" >> "$GITHUB_OUTPUT"
+
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.meta.outputs.ref }}
+
+      - name: Mark workspace safe
+        run: git config --global --add safe.directory '*'
+
+      - name: Cache third-party downloads
+        uses: actions/cache@v3
+        with:
+          path: tensorflow/lite/micro/tools/make/downloads
+          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc') }}
+          restore-keys: ${{ runner.os }}-third-party-downloads-
+
+      - name: Validate armclang license
+        if: ${{ matrix.toolchain == 'armclang' }}
+        run: |
+          if [[ -z "${ARM_UBL_LICENSE_IDENTIFIER}" ]]; then
+            echo "::error ::ARM_UBL_LICENSE_IDENTIFIER is required for armclang builds."
+            exit 1
+          fi
+
+      - name: Build neuralSPOT static libs
+        run: |
+          set -euo pipefail
+          OUTDIR="${GITHUB_WORKSPACE}/out/${{ matrix.arch }}/${{ matrix.toolchain }}/${{ matrix.build }}"
+          tensorflow/lite/micro/tools/ci_build/build_ambiq.sh \
+            -a "${{ matrix.arch }}" \
+            -b "${{ matrix.build }}" \
+            -t "${{ matrix.toolchain }}" \
+            -o "${OUTDIR}"
+          echo "Produced files:"
+          find "${OUTDIR}" -maxdepth 3 -type f -print
+
+      - name: Upload neuralSPOT combo (raw dir)
+        uses: actions/upload-artifact@v4
+        with:
+          name: neuralSPOT-combo-${{ matrix.arch }}-${{ matrix.toolchain }}-${{ matrix.build }}
+          path: out/${{ matrix.arch }}/${{ matrix.toolchain }}/${{ matrix.build }}/**
+
+  neuralspot-package:
+    name: Package neuralSPOT bundle
+    needs: neuralspot-build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Determine tag/ref
+        id: info
+        shell: bash
+        run: |
+          set -euo pipefail
+          REF="${{ inputs.ref }}"
+          TAG="${{ inputs.tag }}"
+          if [[ -z "${REF}" ]]; then
+            echo "::error ::Input ref is required."; exit 1;
+          fi
+          if [[ -z "${TAG}" ]]; then
+            TAG="${REF}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+      - name: Check out code (to fetch neuralspot/module.mk)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.info.outputs.tag }}
+
+      - name: Download all neuralSPOT combos
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Assemble neuralSPOT bundle (lib + tflm + module.mk)
+        run: |
+          set -euo pipefail
+          TAG='${{ steps.info.outputs.tag }}'
+          SHA='${{ steps.info.outputs.sha }}'
+          BUNDLE="neuralspot-helios-rt-${TAG}"
+          mkdir -p "${BUNDLE}/lib"
+
+          echo "== Collecting libraries into ${BUNDLE}/lib =="
+          find artifacts -type f -path "*/lib/*.a" -print -exec cp -v {} "${BUNDLE}/lib/" \;
+
+          echo "== Selecting one tflm tree into ${BUNDLE}/ =="
+          CAND="$(find artifacts -type d -path '*/tflm' | sort | head -n1 || true)"
+          [[ -z "$CAND" ]] && { echo "::error ::No tflm tree found in artifacts"; exit 1; }
+          cp -a "${CAND}/." "${BUNDLE}/"
+
+          echo "== Copy neuralSPOT module.mk to bundle root =="
+          if [[ -f "neuralspot/module.mk" ]]; then
+            cp neuralspot/module.mk "${BUNDLE}/module.mk"
+          else
+            echo "::error ::neuralspot/module.mk not found"; exit 1
+          fi
+
+          echo "== Write MANIFEST =="
+          {
+            echo "neuralspot-helios-rt ${TAG}"
+            echo "Commit: ${SHA}"
+            echo
+            echo "Libraries:"
+            ls -1 "${BUNDLE}/lib"
+          } > "${BUNDLE}/MANIFEST.txt"
+
+          echo "== Final bundle structure =="
+          find "${BUNDLE}" -maxdepth 2 -type f -print
+
+      - name: Zip neuralSPOT bundle
+        run: |
+          TAG='${{ steps.info.outputs.tag }}'
+          ZIP="neuralspot-helios-rt-${TAG}.zip"
+          zip -r "${ZIP}" "neuralspot-helios-rt-${TAG}"
+          mkdir -p upload && mv "${ZIP}" upload/
+
+      - name: Upload neuralSPOT bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: neuralSPOT-bundle-${{ steps.info.outputs.tag }}
+          path: upload/*.zip
+
+      - name: Upload bundle to release (gh)
+        if: ${{ inputs.upload_to_release == true || inputs.upload_to_release == 'true' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG='${{ steps.info.outputs.tag }}'
+          ZIP="upload/neuralspot-helios-rt-${TAG}.zip"
+          if [[ ! -f "$ZIP" ]]; then
+            echo "::error ::Zip artifact $ZIP not found"; exit 1
+          fi
+          echo "Attempting upload of $ZIP to release $TAG (no pre-check)";
+          if gh release upload "$TAG" "$ZIP" --repo "$GITHUB_REPOSITORY" --clobber; then
+            echo "Upload succeeded.";
+          else
+            echo "::warning ::Upload failed (release may not exist). Create the release tag $TAG then re-run or trigger a release event.";
+          fi

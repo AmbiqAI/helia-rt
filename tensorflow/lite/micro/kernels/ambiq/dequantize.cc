@@ -14,6 +14,7 @@ limitations under the License.
 ==============================================================================*/
 
 #include "Include/arm_nnsupportfunctions.h"
+#include "Include/arm_nnfunctions.h"
 
 #include "tensorflow/lite/kernels/internal/reference/dequantize.h"
 
@@ -31,87 +32,6 @@ limitations under the License.
 
 namespace tflite {
 
-void
-arm_dequantize_s8_f32(
-  const int8_t *input,
-  float *output,
-  int32_t size,
-  float scale,
-  int32_t zero_point
-){
-#if defined(ARM_MATH_MVEI)
-
-  __ASM volatile(
-    " .p2align 2                                 \n"
-    "   wlstp.32         lr, %[size], 1f         \n"
-    "   vdup.32           q4, %[zero_point]      \n"
-    "   vdup.32           q5, %[scale]           \n"
-    "2:                                          \n"
-    "   vldrb.s32       q0, [%[input]], #4       \n"
-    "   vsub.s32        q0, q0, q4               \n"
-    "   vcvt.f32.s32    q1, q0                   \n"
-    "   vmul.f32        q1, q1, q5               \n"
-    "   vstrw.32        q1, [%[output]], #16     \n"
-    "   letp             lr, 2b                  \n"
-    "1:                                          \n"
-  :
-    [input] "+r" (input),
-    [output] "+r" (output),
-    [size] "+r" (size)
-  :
-    [scale] "r" (scale),
-    [zero_point] "r" (zero_point)
-  :
-    "q0", "q1", "q4", "q5", "memory", "r14"
-  );
-
-#else
-  for (int i = 0; i < size; i++) {
-    output[i] = (input[i] - zero_point) * scale;
-  }
-#endif
-}
-
-void
-arm_dequantize_s16_f32(
-  const int16_t *input,
-  float *output,
-  int32_t size,
-  float scale,
-  int32_t zero_point
-){
-#if defined(ARM_MATH_MVEI)
-
-  __ASM volatile(
-    " .p2align 2                                 \n"
-    "   wlstp.32         lr, %[size], 1f         \n"
-    "   vdup.32           q4, %[zero_point]      \n"
-    "   vdup.32           q5, %[scale]           \n"
-    "2:                                          \n"
-    "   vldrh.s32       q0, [%[input]], #8       \n"
-    "   vsub.s32        q0, q0, q4               \n"
-    "   vcvt.f32.s32    q1, q0                   \n"
-    "   vmul.f32        q1, q1, q5               \n"
-    "   vstrw.32        q1, [%[output]], #16     \n"
-    "   letp             lr, 2b                  \n"
-    "1:                                          \n"
-  :
-    [input] "+r" (input),
-    [output] "+r" (output),
-    [size] "+r" (size)
-  :
-    [scale] "r" (scale),
-    [zero_point] "r" (zero_point)
-  :
-    "q0", "q1", "q4", "q5", "memory", "r14"
-  );
-
-#else
-  for (int i = 0; i < size; i++) {
-    output[i] = (input[i] - zero_point) * scale;
-  }
-#endif
-}
 
 void* DequantizeInit(TfLiteContext* context, const char* buffer,
                      size_t length) {
@@ -135,28 +55,18 @@ TfLiteStatus DequantizeEval(TfLiteContext* context, TfLiteNode* node) {
         tflite::micro::GetTensorData<int8_t>(input),
         tflite::micro::GetTensorData<float>(output),
         ElementCount(*input->dims),
-        data->quantization_params.scale,
-        data->quantization_params.zero_point
+        data->quantization_params.zero_point,
+        data->quantization_params.scale
       );
-      // reference_ops::Dequantize(data->quantization_params,
-      //                           tflite::micro::GetTensorShape(input),
-      //                           tflite::micro::GetTensorData<int8_t>(input),
-      //                           tflite::micro::GetTensorShape(output),
-      //                           tflite::micro::GetTensorData<float>(output));
       break;
     case kTfLiteInt16:
       arm_dequantize_s16_f32(
         tflite::micro::GetTensorData<int16_t>(input),
         tflite::micro::GetTensorData<float>(output),
         ElementCount(*input->dims),
-        data->quantization_params.scale,
-        data->quantization_params.zero_point
+        data->quantization_params.zero_point,
+        data->quantization_params.scale
       );
-      // reference_ops::Dequantize(data->quantization_params,
-      //                           tflite::micro::GetTensorShape(input),
-      //                           tflite::micro::GetTensorData<int16_t>(input),
-      //                           tflite::micro::GetTensorShape(output),
-      //                           tflite::micro::GetTensorData<float>(output));
       break;
     case kTfLiteUInt8:
       reference_ops::Dequantize(data->quantization_params,

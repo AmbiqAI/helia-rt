@@ -15,7 +15,7 @@ jobs:
     uses: ./.github/workflows/ci.yml
     if: |
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'schedule' && github.repository == 'AmbiqAI/helios-rt')
+      (github.event_name == 'schedule' && github.repository == 'AmbiqAI/helia-rt')
     with:
       trigger-sha: ${{ github.sha }}
 

@@ -62,17 +62,39 @@ void TestHardSwishQuantized(int size, const T* output_data,
                             float* float_ref_output_values) {
   int input_dims_data[] = {2, 1, size};
   int output_dims_data[] = {2, 1, size};
-  const float input_scale = ScaleFromMinMax<T>(input_min, input_max);
-  const int input_zero_point = ZeroPointFromMinMax<T>(input_min, input_max);
-  const float output_scale = ScaleFromMinMax<T>(output_min, output_max);
-  const int output_zero_point = ZeroPointFromMinMax<T>(output_min, output_max);
+  float input_scale;
+  int input_zero_point;
+  float output_scale;
+  int output_zero_point;
+  float kTolerance;
+  float exp_clip_min;
+  float exp_clip_max;
 
-  // The numerical error for any 8bit quantized function is at least one half
-  // times the quantization step: 0.5 * (kOutMax - kOutMin) / 256.
-  // To that we add again the quantization step (kOutMax - kOutMin) / 256
-  // to allow for an off-by-one rounding error.
-  const float kTolerance =
-      std::max(input_max - input_min, output_max - output_min) * (1.5f / 256.f);
+  if (std::is_same<T, int8_t>::value) {
+    input_scale = ScaleFromMinMax<T>(input_min, input_max);
+    input_zero_point = ZeroPointFromMinMax<T>(input_min, input_max);
+    output_scale = ScaleFromMinMax<T>(output_min, output_max);
+    output_zero_point = ZeroPointFromMinMax<T>(output_min, output_max);
+    // The numerical error for any 8bit quantized function is at least one half
+    // times the quantization step: 0.5 * (kOutMax - kOutMin) / 256.
+    // To that we add again the quantization step (kOutMax - kOutMin) / 256
+    // to allow for an off-by-one rounding error.
+    kTolerance = std::max(input_max - input_min, output_max - output_min) * (1.5f / 256.f);
+    exp_clip_min = output_min;
+    exp_clip_max = output_max;
+
+  } else if (std::is_same<T, int16_t>::value) {
+    input_scale = SymmetricScaleFromMinMax<T>(input_min, input_max);
+    input_zero_point = 0;
+    output_scale = SymmetricScaleFromMinMax<T>(output_min, output_max);
+    output_zero_point = 0;
+    kTolerance = std::max(input_max - input_min, output_max - output_min) * (4.0f / 32767.f);
+    exp_clip_min = (std::numeric_limits<int16_t>::min() - output_zero_point) * output_scale;
+    exp_clip_max = (std::numeric_limits<int16_t>::max() - output_zero_point) * output_scale;
+  } else {
+    // Unsupported type
+    TF_LITE_MICRO_EXPECT_TRUE(false);
+  }
 
   TfLiteIntArray* input_dims = IntArrayFromInts(input_dims_data);
   TfLiteIntArray* output_dims = IntArrayFromInts(output_dims_data);
@@ -85,8 +107,7 @@ void TestHardSwishQuantized(int size, const T* output_data,
   EvalTestReferenceHardSwish(size, float_input_values, float_ref_output_values);
   for (int i = 0; i < size; i++) {
     float val = float_ref_output_values[i];
-    float_ref_output_values[i] =
-        std::min(output_max, std::max(output_min, val));
+    float_ref_output_values[i] = std::min(exp_clip_max, std::max(exp_clip_min, val));
   }
 
   constexpr int inputs_size = 1;
@@ -290,31 +311,35 @@ TF_LITE_MICRO_TEST(SimpleHardSwishTestInt8) {
   }
 }
 
-// TF_LITE_MICRO_TEST(SimpleHardSwishTestInt16) {
-//   std::minstd_rand random_engine;
-//   constexpr int pairs = 4, one_pair = 2;
-//   constexpr int size = 101;
-//   constexpr float minmax_pairs[pairs][one_pair] = {
-//       {0.f, 1.f}, {-2.f, 1.f}, {-5.f, 10.f}, {-40.f, 60.f}};
-//   int16_t output_data[size] = {0};
-//   int16_t input_data_quantized[size] = {0};
-//   float dequantized_output[size] = {0.f};
-//   float input_values[size] = {0.f};
-//   float output_values[size] = {0.f};
+#if defined(AMBIQ)
 
-//   for (int x = 0; x < pairs; x++) {
-//     for (int y = 0; y < pairs; y++) {
-//       float input_min = minmax_pairs[x][0];
-//       float input_max = minmax_pairs[x][1];
-//       float output_min = minmax_pairs[y][0];
-//       float output_max = minmax_pairs[y][1];
+TF_LITE_MICRO_TEST(SimpleHardSwishTestInt16) {
+  std::minstd_rand random_engine;
+  constexpr int pairs = 4, one_pair = 2;
+  constexpr int size = 101;
+  constexpr float minmax_pairs[pairs][one_pair] = {
+      {0.f, 1.f}, {-2.f, 1.f}, {-5.f, 10.f}, {-40.f, 60.f}};
+  int16_t output_data[size] = {0};
+  int16_t input_data_quantized[size] = {0};
+  float dequantized_output[size] = {0.f};
+  float input_values[size] = {0.f};
+  float output_values[size] = {0.f};
 
-//       tflite::testing::TestHardSwishQuantized<int16_t>(
-//           size, output_data, input_data_quantized, dequantized_output,
-//           input_min, input_max, output_min, output_max, &random_engine,
-//           input_values, output_values);
-//     }
-//   }
-// }
+  for (int x = 0; x < pairs; x++) {
+    for (int y = 0; y < pairs; y++) {
+      float input_min = minmax_pairs[x][0];
+      float input_max = minmax_pairs[x][1];
+      float output_min = minmax_pairs[y][0];
+      float output_max = minmax_pairs[y][1];
+
+      tflite::testing::TestHardSwishQuantized<int16_t>(
+          size, output_data, input_data_quantized, dequantized_output,
+          input_min, input_max, output_min, output_max, &random_engine,
+          input_values, output_values);
+    }
+  }
+}
+
+#endif
 
 TF_LITE_MICRO_TESTS_END

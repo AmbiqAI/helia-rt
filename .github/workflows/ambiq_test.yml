@@ -1,6 +1,7 @@
-name: Ambiq Unit Tests
+name: HeliaRT Unit Tests
 
 on:
+
   workflow_call:
     inputs:
       trigger-sha:
@@ -9,17 +10,37 @@ on:
     secrets:
       NS_CMSIS_NN_SSH_KEY:
         required: true
+      ARM_UBL_LICENSE_IDENTIFIER:
+        required: false
+
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to build (branch, tag, or SHA). Leave empty to use the current commit."
+        required: false
+        default: ""
 
 jobs:
   ambiq_test:
     runs-on: ubuntu-latest-md
-    name: ambiq_unit_tests
     container:
-      image: ghcr.io/ambiqai/helios-rt-ci:latest
+      image: ghcr.io/ambiqai/helia-rt-ci:latest
+
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        arch: [ "cortex-m55", "cortex-m4+fp", "cortex-m3" ]
+        toolchain: [ "gcc" ]
+
+    env:
+      NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
+      ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
+
+    name: test-${{ matrix.arch }}-${{ matrix.toolchain }}
 
     steps:
-
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.trigger-sha }}
 
@@ -29,31 +50,11 @@ jobs:
       - name: Cache third-party downloads
         uses: actions/cache@v3
         with:
-          path: |
-            tensorflow/lite/micro/tools/make/downloads
-          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles(
-            'tensorflow/lite/micro/tools/make/Makefile',
-            'tensorflow/lite/micro/tools/make/third_party_downloads.inc'
-            ) }}
-          restore-keys: |
-            ${{ runner.os }}-third-party-downloads-
+          path: tensorflow/lite/micro/tools/make/downloads
+          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc') }}
+          restore-keys: ${{ runner.os }}-third-party-downloads-
 
-      - name: Run Cortex-M55 tests
-        env:
-          NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
-        run: /bin/sh -c "tensorflow/lite/micro/tools/ci_build/test_ambiq_cm4_cm55.sh cortex-m55 gcc"
-
-      - name: Run Cortex-M4 tests
-        env:
-          NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
-        run: /bin/sh -c "tensorflow/lite/micro/tools/ci_build/test_ambiq_cm4_cm55.sh cortex-m4+fp gcc"
-
-      - name: Save third-party downloads cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            tensorflow/lite/micro/tools/make/downloads
-          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles(
-            'tensorflow/lite/micro/tools/make/Makefile',
-            'tensorflow/lite/micro/tools/make/third_party_downloads.inc'
-            ) }}
+      - name: Testing (${{ matrix.arch }} / ${{ matrix.toolchain }})
+        run: |
+          /bin/sh -c "tensorflow/lite/micro/tools/ci_build/test_ambiq.sh \
+          -a ${{ matrix.arch }} -t ${{ matrix.toolchain }}"

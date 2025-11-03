@@ -1,0 +1,31 @@
+{
+  "bootstrap-sha": "645d1c2164a63368a5c60ec41fe7fbba320951a0",
+  "packages": {
+    ".": {
+      "component": "HeliaRT",
+      "release-type": "simple",
+      "include-component-in-tag": true,
+      "include-v-in-tag": true,
+
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true,
+
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "tensorflow/lite/micro/heliart_version.h"
+        }
+      ],
+
+      "changelog-sections": [
+        { "type": "feat",       "section": "Features" },
+        { "type": "fix",        "section": "Bug Fixes" },
+        { "type": "perf",       "section": "Performance" },
+        { "type": "refactor",   "section": "Refactoring" },
+        { "type": "docs",       "section": "Docs",          "hidden": true },
+        { "type": "test",       "section": "Tests",         "hidden": true },
+        { "type": "chore",      "section": "Chores",        "hidden": true }
+      ]
+    }
+  }
+}

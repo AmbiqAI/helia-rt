@@ -414,7 +414,7 @@ tflm_cc_library(
         "hexdump.h",
     ],
     deps = [
-        ":debug_log",
+        ":micro_log",
         ":span",
         ":static_vector",
     ],

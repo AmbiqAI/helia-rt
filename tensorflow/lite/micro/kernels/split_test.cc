@@ -209,6 +209,64 @@ void TestSplitTwoOutputsQuantized(int* input_dims_data,
   }
 }
 
+void TestSplitTwoOutputsQuantized16(int* input_dims_data,
+                                  const int16_t* input_data, int* axis_dims_data,
+                                  const int32_t* axis_data,
+                                  int* output1_dims_data,
+                                  const int16_t* expected_output1_data,
+                                  int* output2_dims_data,
+                                  const int16_t* expected_output2_data,
+                                  int16_t* output1_data, int16_t* output2_data) {
+  TfLiteIntArray* input_dims = IntArrayFromInts(input_dims_data);
+  TfLiteIntArray* axis_dims = IntArrayFromInts(axis_dims_data);
+  TfLiteIntArray* output1_dims = IntArrayFromInts(output1_dims_data);
+  TfLiteIntArray* output2_dims = IntArrayFromInts(output2_dims_data);
+  const int output1_dims_count = ElementCount(*output1_dims);
+  const int output2_dims_count = ElementCount(*output2_dims);
+
+  constexpr int input_size = 1;
+  constexpr int output_size = 2;
+  constexpr int axis_size = 1;
+  constexpr int tensors_size = input_size + output_size + axis_size;
+  TfLiteTensor tensors[tensors_size] = {
+      CreateTensor(axis_data, axis_dims),
+      CreateQuantizedTensor(input_data, input_dims, 0, 10),
+      CreateQuantizedTensor(output1_data, output1_dims, 0, 10),
+      CreateQuantizedTensor(output2_data, output2_dims, 0, 10)};
+
+  // Currently only support constant axis tensor.
+  tensors[0].allocation_type = kTfLiteMmapRo;
+
+  // Place a unique value in the uninitialized output buffer.
+  for (int i = 0; i < output1_dims_count; ++i) {
+    output1_data[i] = 23;
+  }
+
+  for (int i = 0; i < output2_dims_count; ++i) {
+    output2_data[i] = 23;
+  }
+
+  int inputs_array_data[] = {2, 0, 1};
+  TfLiteIntArray* inputs_array = IntArrayFromInts(inputs_array_data);
+  int outputs_array_data[] = {2, 2, 3};
+  TfLiteIntArray* outputs_array = IntArrayFromInts(outputs_array_data);
+
+  const TFLMRegistration registration = tflite::Register_SPLIT();
+  micro::KernelRunner runner(registration, tensors, tensors_size, inputs_array,
+                             outputs_array, nullptr);
+
+  TF_LITE_MICRO_EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  TF_LITE_MICRO_EXPECT_EQ(kTfLiteOk, runner.Invoke());
+
+  for (int i = 0; i < output1_dims_count; ++i) {
+    TF_LITE_MICRO_EXPECT_EQ(expected_output1_data[i], output1_data[i]);
+  }
+
+  for (int i = 0; i < output2_dims_count; ++i) {
+    TF_LITE_MICRO_EXPECT_EQ(expected_output2_data[i], output2_data[i]);
+  }
+}
+
 void TestSplitTwoOutputsQuantized32(
     int* input_dims_data, const int32_t* input_data, int* axis_dims_data,
     const int32_t* axis_data, int* output1_dims_data,
@@ -432,6 +490,26 @@ TF_LITE_MICRO_TEST(TwoSplitFourDimensionalQuantized) {
   int8_t output1_data[output1_dims_count];
   int8_t output2_data[output2_dims_count];
   tflite::testing::TestSplitTwoOutputsQuantized(
+      input_shape, input_data, axis_shape, axis_data, output1_shape, golden1,
+      output2_shape, golden2, output1_data, output2_data);
+}
+
+TF_LITE_MICRO_TEST(TwoSplitFourDimensionalQuantized16) {
+  int input_shape[] = {4, 2, 2, 2, 2};
+  const int16_t input_data[] = {1, 2,  3,  4,  5,  6,  7,  8,
+                               9, 10, 11, 12, 13, 14, 15, 16};
+  int axis_shape[] = {1, 1};
+  const int32_t axis_data[] = {1};
+  int output1_shape[] = {4, 2, 1, 2, 2};
+  const int16_t golden1[] = {1, 2, 3, 4, 9, 10, 11, 12};
+  int output2_shape[] = {4, 2, 1, 2, 2};
+  const int16_t golden2[] = {5, 6, 7, 8, 13, 14, 15, 16};
+
+  constexpr int output1_dims_count = 8;
+  constexpr int output2_dims_count = 8;
+  int16_t output1_data[output1_dims_count];
+  int16_t output2_data[output2_dims_count];
+  tflite::testing::TestSplitTwoOutputsQuantized16(
       input_shape, input_data, axis_shape, axis_data, output1_shape, golden1,
       output2_shape, golden2, output1_data, output2_data);
 }

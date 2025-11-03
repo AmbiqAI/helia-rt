@@ -1,6 +1,7 @@
-name: Ambiq Build
+name: HeliaRT Build
 
 on:
+
   workflow_call:
     inputs:
       trigger-sha:
@@ -9,18 +10,54 @@ on:
     secrets:
       NS_CMSIS_NN_SSH_KEY:
         required: true
+      ARM_UBL_LICENSE_IDENTIFIER:
+        required: false
+
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to build (branch, tag, or SHA). Leave empty to use the current commit."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
 
 jobs:
   ambiq_build:
+    name: build-${{ matrix.arch }}-${{ matrix.toolchain }}
     runs-on: ubuntu-latest-md
-    name: ambiq_build
     container:
-      image: ghcr.io/ambiqai/helios-rt-ci:latest
-    steps:
+      image: ghcr.io/ambiqai/helia-rt-ci:latest
 
-      - uses: actions/checkout@v3
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        arch: [ "cortex-m55", "cortex-m4+fp", "cortex-m0" ]
+        toolchain: [ "gcc" ]
+
+    env:
+      NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
+      ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
+
+    steps:
+      - name: Select ref
+        id: sel
+        shell: bash
+        run: |
+          if [[ -n "${{ inputs.trigger-sha }}" ]]; then
+            echo "ref=${{ inputs.trigger-sha }}" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${{ inputs.ref }}" ]]; then
+            echo "ref=${{ inputs.ref }}" >> "$GITHUB_OUTPUT"
+          else
+            # default to the current commit of this workflow run
+            echo "ref=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.trigger-sha }}
+          ref: ${{ steps.sel.outputs.ref }}
 
       - name: Mark workspace as safe for Git
         run: git config --global --add safe.directory "*"
@@ -28,26 +65,14 @@ jobs:
       - name: Cache third-party downloads
         uses: actions/cache@v3
         with:
-          path: |
-            tensorflow/lite/micro/tools/make/downloads
-          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles(
-            'tensorflow/lite/micro/tools/make/Makefile',
-            'tensorflow/lite/micro/tools/make/third_party_downloads.inc'
-            ) }}
-          restore-keys: |
-            ${{ runner.os }}-third-party-downloads-
+          path: tensorflow/lite/micro/tools/make/downloads
+          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc') }}
+          restore-keys: ${{ runner.os }}-third-party-downloads-
 
-      - name: Build M4 and M55
-        env:
-          NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
-        run: /bin/sh -c tensorflow/lite/micro/tools/ci_build/build_ambiq_cm4_cm55.sh
-
-      - name: Save third-party downloads cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            tensorflow/lite/micro/tools/make/downloads
-          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles(
-            'tensorflow/lite/micro/tools/make/Makefile',
-            'tensorflow/lite/micro/tools/make/third_party_downloads.inc'
-            ) }}
+      - name: Build (${{ matrix.arch }} / ${{ matrix.toolchain }})
+        run: |
+          chmod +x tensorflow/lite/micro/tools/ci_build/test_ambiq.sh
+          tensorflow/lite/micro/tools/ci_build/test_ambiq.sh \
+            -a "${{ matrix.arch }}" \
+            -t "${{ matrix.toolchain }}" \
+            --no-tests

@@ -1,0 +1,31 @@
+config ZEPHYR_HELIA_RT_MODULE
+	bool
+
+menuconfig HELIA_RT
+	bool "Helia RT (Ambiq optimized TFLM)"
+	select REQUIRES_FULL_LIBCPP
+	help
+		This option enables HeliaRT (TFLM fork).
+
+if HELIA_RT
+
+choice HELIA_RT_KERNEL_BACKEND
+	prompt "Helia RT kernel backend"
+	default HELIA_RT_BACKEND_REFERENCE
+	help
+		Reference works on any arch. ns-cmsis-nn is ARM Cortex-M only.
+
+config HELIA_RT_BACKEND_REFERENCE
+	bool "Reference (generic TFLM kernels)"
+
+config HELIA_RT_BACKEND_NS_CMSIS_NN
+	bool "ns-cmsis-nn (Ambiq optimized kernels)"
+	depends on CPU_CORTEX_M
+	imply NS_CMSIS_NN
+	imply NS_CMSIS_NN_ALL
+	help
+		Uses Ambiq's ns-cmsis-nn module (ARM-specific).
+
+endchoice
+
+endif # HELIA_RT

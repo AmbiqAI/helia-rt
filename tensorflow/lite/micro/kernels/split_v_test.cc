@@ -96,6 +96,86 @@ void TestSplitVFloat(int* input_dims_data, const float* input_data,
   }
 }
 
+template <typename T, int N>
+struct OutputTensorsT {
+  T* data[N];
+  int* dims[N];
+  const T* expected_output_data[N];
+};
+
+template <typename T, int N>
+void TestSplitV(int* input_dims_data, const T* input_data,
+                int* axis_dims_data, const int32_t* axis_data,
+                int* split_dims_data, const int32_t* split_data,
+                const OutputTensorsT<T, N>& output_tensors) {
+  TfLiteIntArray* input_dims = IntArrayFromInts(input_dims_data);
+  TfLiteIntArray* axis_dims = IntArrayFromInts(axis_dims_data);
+  TfLiteIntArray* split_dims = IntArrayFromInts(split_dims_data);
+  TfLiteIntArray* output_dims[N];
+  for (int i = 0; i < N; i++) {
+    output_dims[i] = IntArrayFromInts(output_tensors.dims[i]);
+  }
+
+  // Fill outputs with a sentinel value
+  for (int i = 0; i < N; i++) {
+    int dim_count = ElementCount(*output_dims[i]);
+    if (output_tensors.data[i] != nullptr) {
+      for (int j = 0; j < dim_count; j++) {
+        (output_tensors.data[i])[j] = static_cast<T>(23);
+      }
+    }
+  }
+
+  constexpr int input_size = 1;
+  constexpr int axis_size = 1;
+  constexpr int split_size = 1;
+  constexpr int output_size = N;
+  constexpr int tensors_size = input_size + output_size + axis_size + split_size;
+
+  TfLiteTensor tensors[tensors_size];
+  tensors[0] = CreateTensor(input_data, input_dims);
+  tensors[1] = CreateTensor(split_data, split_dims);  // size_splits
+  tensors[2] = CreateTensor(axis_data, axis_dims);    // axis
+
+  for (int i = 0; i < N; i++) {
+    tensors[3 + i] = CreateTensor(output_tensors.data[i], output_dims[i]);
+  }
+
+  // Mark const inputs (matches float tests)
+  tensors[1].allocation_type = kTfLiteMmapRo; // size_splits
+  tensors[2].allocation_type = kTfLiteMmapRo; // axis
+
+  int inputs_array_data[] = {3, 0, 1, 2}; // input, size_splits, axis
+  TfLiteIntArray* inputs_array = IntArrayFromInts(inputs_array_data);
+
+  int outputs_array_data[N + 1];
+  outputs_array_data[0] = N;
+  for (int i = 0; i < N; i++) outputs_array_data[i + 1] = i + 3;
+  TfLiteIntArray* outputs_array = IntArrayFromInts(outputs_array_data);
+
+  const TFLMRegistration registration = Register_SPLIT_V();
+  micro::KernelRunner runner(registration, tensors, tensors_size,
+                             inputs_array, outputs_array, /*builtin_data=*/nullptr);
+
+  TF_LITE_MICRO_EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  TF_LITE_MICRO_EXPECT_EQ(kTfLiteOk, runner.Invoke());
+
+  // Exact equality for integers
+  for (int i = 0; i < N; i++) {
+    const int dim_count = ElementCount(*output_dims[i]);
+    if (dim_count == 0) {
+      // Zero-sized output: allow nullptr data
+      TF_LITE_MICRO_EXPECT(output_tensors.data[i] == nullptr ||
+                           output_tensors.data[i] == tensors[3 + i].data.data);
+      continue;
+    }
+    for (int j = 0; j < dim_count; j++) {
+      TF_LITE_MICRO_EXPECT_EQ((output_tensors.expected_output_data[i])[j],
+                              (output_tensors.data[i])[j]);
+    }
+  }
+}
+
 }  // namespace testing
 }  // namespace tflite
 
@@ -461,6 +541,168 @@ TF_LITE_MICRO_TEST(SPLIT_V_OneDimensionalFloatTest2) {
   tflite::testing::TestSplitVFloat(input_shape, input_values, axis_shape,
                                    axis_value, split_size_shape, split,
                                    output_tensors);
+}
+
+TF_LITE_MICRO_TEST(SPLIT_V_ThreeOutputs_Int8) {
+  constexpr int output1_dims_count = 3;
+  constexpr int output2_dims_count = 3;
+  constexpr int output3_dims_count = 6;
+  int8_t output1_data[output1_dims_count];
+  int8_t output2_data[output2_dims_count];
+  int8_t output3_data[output3_dims_count];
+
+  int input_shape[] = {2, 4, 3};
+  int8_t input_values[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+  int axis_shape[] = {1, 1};
+  int32_t axis_values[] = {0};
+  int split_shape[] = {1, 3};
+  int32_t split_values[] = {1, 1, 2};
+  int output1_shape[] = {2, 1, 3};
+  int8_t output1_values[] = {1, 2, 3};
+  int output2_shape[] = {2, 1, 3};
+  int8_t output2_values[] = {4, 5, 6};
+  int output3_shape[] = {2, 2, 3};
+  int8_t output3_values[] = {7, 8, 9, 10, 11, 12};
+
+  tflite::testing::OutputTensorsT<int8_t, 3> outs;
+  outs.data[0] = output1_data; outs.dims[0] = output1_shape; outs.expected_output_data[0] = output1_values;
+  outs.data[1] = output2_data; outs.dims[1] = output2_shape; outs.expected_output_data[1] = output2_values;
+  outs.data[2] = output3_data; outs.dims[2] = output3_shape; outs.expected_output_data[2] = output3_values;
+
+  tflite::testing::TestSplitV<int8_t, 3>(input_shape, input_values,
+                                         axis_shape, axis_values,
+                                         split_shape, split_values, outs);
+}
+
+TF_LITE_MICRO_TEST(SPLIT_V_OneDimensional_Int8_WithMinusOne) {
+  // Mirrors SPLIT_V_OneDimensionalFloatTest2
+  constexpr int output1_dims_count = 1;
+  constexpr int output2_dims_count = 1;
+  constexpr int output3_dims_count = 1;
+  constexpr int output4_dims_count = 1;
+  constexpr int output5_dims_count = 1;
+  constexpr int output6_dims_count = 1;
+  constexpr int output7_dims_count = 2;
+
+  int8_t output1_data[output1_dims_count];
+  int8_t output2_data[output2_dims_count];
+  int8_t output3_data[output3_dims_count];
+  int8_t output4_data[output4_dims_count];
+  int8_t output5_data[output5_dims_count];
+  int8_t output6_data[output6_dims_count];
+  int8_t output7_data[output7_dims_count];
+
+  int input_shape[] = {1, 8};
+  int8_t input_values[] = {1,2,3,4,5,6,7,8};
+  int axis_shape[] = {1, 1};
+  int32_t axis_value[] = {0};
+  int split_size_shape[] = {1, 8};
+  int32_t split[] = {1,1,1,1,1,1,2,-1};
+  int output1_shape[] = {1, 1}; int8_t output1_values[] = {1};
+  int output2_shape[] = {1, 1}; int8_t output2_values[] = {2};
+  int output3_shape[] = {1, 1}; int8_t output3_values[] = {3};
+  int output4_shape[] = {1, 1}; int8_t output4_values[] = {4};
+  int output5_shape[] = {1, 1}; int8_t output5_values[] = {5};
+  int output6_shape[] = {1, 1}; int8_t output6_values[] = {6};
+  int output7_shape[] = {1, 2}; int8_t output7_values[] = {7, 8};
+  int output8_shape[] = {1, 0}; // zero-sized
+  // No storage needed for zero-sized; keep pointer null
+  int8_t* output8_data = nullptr;
+  static const int8_t output8_values[] = {}; // expected empty
+
+  tflite::testing::OutputTensorsT<int8_t, 8> outs;
+  outs.data[0]=output1_data; outs.dims[0]=output1_shape; outs.expected_output_data[0]=output1_values;
+  outs.data[1]=output2_data; outs.dims[1]=output2_shape; outs.expected_output_data[1]=output2_values;
+  outs.data[2]=output3_data; outs.dims[2]=output3_shape; outs.expected_output_data[2]=output3_values;
+  outs.data[3]=output4_data; outs.dims[3]=output4_shape; outs.expected_output_data[3]=output4_values;
+  outs.data[4]=output5_data; outs.dims[4]=output5_shape; outs.expected_output_data[4]=output5_values;
+  outs.data[5]=output6_data; outs.dims[5]=output6_shape; outs.expected_output_data[5]=output6_values;
+  outs.data[6]=output7_data; outs.dims[6]=output7_shape; outs.expected_output_data[6]=output7_values;
+  outs.data[7]=output8_data; outs.dims[7]=output8_shape; outs.expected_output_data[7]=output8_values;
+
+  tflite::testing::TestSplitV<int8_t, 8>(input_shape, input_values,
+                                         axis_shape, axis_value,
+                                         split_size_shape, split, outs);
+}
+
+TF_LITE_MICRO_TEST(SPLIT_V_ThreeOutputs_Int16) {
+  constexpr int output1_dims_count = 3;
+  constexpr int output2_dims_count = 3;
+  constexpr int output3_dims_count = 6;
+  int16_t output1_data[output1_dims_count];
+  int16_t output2_data[output2_dims_count];
+  int16_t output3_data[output3_dims_count];
+
+  int input_shape[] = {2, 4, 3};
+  int16_t input_values[] = {1,2,3,4,5,6,7,8,9,10,11,12};
+  int axis_shape[] = {1, 1};
+  int32_t axis_values[] = {0};
+  int split_shape[] = {1, 3};
+  int32_t split_values[] = {1, 1, 2};
+  int output1_shape[] = {2, 1, 3};
+  int16_t output1_values[] = {1,2,3};
+  int output2_shape[] = {2, 1, 3};
+  int16_t output2_values[] = {4,5,6};
+  int output3_shape[] = {2, 2, 3};
+  int16_t output3_values[] = {7,8,9,10,11,12};
+
+  tflite::testing::OutputTensorsT<int16_t, 3> outs;
+  outs.data[0]=output1_data; outs.dims[0]=output1_shape; outs.expected_output_data[0]=output1_values;
+  outs.data[1]=output2_data; outs.dims[1]=output2_shape; outs.expected_output_data[1]=output2_values;
+  outs.data[2]=output3_data; outs.dims[2]=output3_shape; outs.expected_output_data[2]=output3_values;
+
+  tflite::testing::TestSplitV<int16_t, 3>(input_shape, input_values,
+                                          axis_shape, axis_values,
+                                          split_shape, split_values, outs);
+}
+
+TF_LITE_MICRO_TEST(SPLIT_V_OneDimensional_Int16_WithMinusOne) {
+  constexpr int output1_dims_count = 1;
+  constexpr int output2_dims_count = 1;
+  constexpr int output3_dims_count = 1;
+  constexpr int output4_dims_count = 1;
+  constexpr int output5_dims_count = 1;
+  constexpr int output6_dims_count = 1;
+  constexpr int output7_dims_count = 2;
+
+  int16_t output1_data[output1_dims_count];
+  int16_t output2_data[output2_dims_count];
+  int16_t output3_data[output3_dims_count];
+  int16_t output4_data[output4_dims_count];
+  int16_t output5_data[output5_dims_count];
+  int16_t output6_data[output6_dims_count];
+  int16_t output7_data[output7_dims_count];
+
+  int input_shape[] = {1, 8};
+  int16_t input_values[] = {1,2,3,4,5,6,7,8};
+  int axis_shape[] = {1, 1};
+  int32_t axis_value[] = {0};
+  int split_size_shape[] = {1, 8};
+  int32_t split[] = {1,1,1,1,1,1,2,-1};
+  int output1_shape[] = {1, 1}; int16_t output1_values[] = {1};
+  int output2_shape[] = {1, 1}; int16_t output2_values[] = {2};
+  int output3_shape[] = {1, 1}; int16_t output3_values[] = {3};
+  int output4_shape[] = {1, 1}; int16_t output4_values[] = {4};
+  int output5_shape[] = {1, 1}; int16_t output5_values[] = {5};
+  int output6_shape[] = {1, 1}; int16_t output6_values[] = {6};
+  int output7_shape[] = {1, 2}; int16_t output7_values[] = {7, 8};
+  int output8_shape[] = {1, 0};
+  int16_t* output8_data = nullptr;
+  static const int16_t output8_values[] = {};
+
+  tflite::testing::OutputTensorsT<int16_t, 8> outs;
+  outs.data[0]=output1_data; outs.dims[0]=output1_shape; outs.expected_output_data[0]=output1_values;
+  outs.data[1]=output2_data; outs.dims[1]=output2_shape; outs.expected_output_data[1]=output2_values;
+  outs.data[2]=output3_data; outs.dims[2]=output3_shape; outs.expected_output_data[2]=output3_values;
+  outs.data[3]=output4_data; outs.dims[3]=output4_shape; outs.expected_output_data[3]=output4_values;
+  outs.data[4]=output5_data; outs.dims[4]=output5_shape; outs.expected_output_data[4]=output5_values;
+  outs.data[5]=output6_data; outs.dims[5]=output6_shape; outs.expected_output_data[5]=output6_values;
+  outs.data[6]=output7_data; outs.dims[6]=output7_shape; outs.expected_output_data[6]=output7_values;
+  outs.data[7]=output8_data; outs.dims[7]=output8_shape; outs.expected_output_data[7]=output8_values;
+
+  tflite::testing::TestSplitV<int16_t, 8>(input_shape, input_values,
+                                          axis_shape, axis_value,
+                                          split_size_shape, split, outs);
 }
 
 TF_LITE_MICRO_TESTS_END

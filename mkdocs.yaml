@@ -1,7 +1,7 @@
-site_name: HeliosRT
+site_name: HeliaRT
 site_dir: "site"
-site_url: "https://ambiqai.github.io/helios-rt"
-site_description: HeliosRT, optimized TFLM tailored for Ambiq SoCs
+site_url: "https://ambiqai.github.io/helia-rt"
+site_description: HeliaRT, optimized TFLM tailored for Ambiq SoCs
 repo_name: ""
 repo_url: ""
 edit_uri: ""
@@ -25,8 +25,8 @@ nav:
 
 theme:
   name: material
-  favicon: assets/helios-rt-icon.png
-  logo: assets/helios-rt-icon-white.png
+  favicon: assets/helia-rt-icon.png
+  logo: assets/helia-rt-icon-white.png
   icon:
       repo: fontawesome/brands/github-alt
   font:

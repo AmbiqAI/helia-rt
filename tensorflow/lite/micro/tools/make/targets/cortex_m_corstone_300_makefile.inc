@@ -37,6 +37,7 @@ endif
 # This target has dependencies to CMSIS-Device so just in case running without OPTIMIZED_KERNEL_DIR=cmsis_nn.
 CMSIS_DEFAULT_DOWNLOAD_PATH := $(DOWNLOADS_DIR)/cmsis
 CMSIS_PATH := $(CMSIS_DEFAULT_DOWNLOAD_PATH)
+CORTEX_DFP_PATH := $(CMSIS_PATH)/Cortex_DFP
 ifeq ($(CMSIS_PATH), $(CMSIS_DEFAULT_DOWNLOAD_PATH))
   DOWNLOAD_RESULT := $(shell $(MAKEFILE_DIR)/ext_libs/cmsis_download.sh $(DOWNLOADS_DIR) $(TENSORFLOW_ROOT))
   ifneq ($(DOWNLOAD_RESULT), SUCCESS)
@@ -93,6 +94,23 @@ ARM_CPU := $(subst cortex-m,ARMCM,$(MCPU_OPTION))
 ARM_CPU := $(subst +nofp,,$(ARM_CPU))
 
 ifeq ($(TOOLCHAIN), armclang)
+
+  TARGET_DEFAULT_TOOLCHAIN_ROOT := $(DOWNLOADS_DIR)/arm_compiler/bin/
+  TARGET_TOOLCHAIN_ROOT := $(TARGET_DEFAULT_TOOLCHAIN_ROOT)
+  ifeq ($(TARGET_TOOLCHAIN_ROOT), $(TARGET_DEFAULT_TOOLCHAIN_ROOT))
+    DOWNLOAD_RESULT := $(shell $(MAKEFILE_DIR)/arm_clang_download.sh ${DOWNLOADS_DIR} ${TENSORFLOW_ROOT})
+    ifneq ($(DOWNLOAD_RESULT), SUCCESS)
+      $(error Something went wrong with the arm clang download: $(DOWNLOAD_RESULT))
+    endif
+
+    # If ARM_UBL_LICENSE_IDENTIFIER is set, activate the license.
+    ifneq ($(ARM_UBL_LICENSE_IDENTIFIER),)
+      # print the license identifier
+      $(info "Activating the license with the identifier: $(ARM_UBL_LICENSE_IDENTIFIER)")
+      ACTIVATE_LICENSE := $(shell $(TARGET_TOOLCHAIN_ROOT)armlm activate --code $(ARM_UBL_LICENSE_IDENTIFIER))
+    endif
+  endif
+
   CXX_TOOL  := armclang
   CC_TOOL   := armclang
   AR_TOOL   := armar
@@ -194,13 +212,11 @@ ifeq ($(CO_PROCESSOR), ethos_u)
   ETHOSU_ARCH=u55
 endif
 
-CMSIS_DEFAULT_DOWNLOAD_PATH := $(DOWNLOADS_DIR)/cmsis
-CMSIS_PATH := $(CMSIS_DEFAULT_DOWNLOAD_PATH)
 THIRD_PARTY_CC_SRCS += \
-  $(CMSIS_PATH)/Cortex_DFP/Device/$(ARM_CPU)/Source/system_$(ARM_CPU).c \
-  $(CMSIS_PATH)/Cortex_DFP/Device/$(ARM_CPU)/Source/startup_$(ARM_CPU).c
+  $(CORTEX_DFP_PATH)/Device/$(ARM_CPU)/Source/system_$(ARM_CPU).c \
+  $(CORTEX_DFP_PATH)/Device/$(ARM_CPU)/Source/startup_$(ARM_CPU).c
 INCLUDES += \
-  -I$(CMSIS_PATH)/Cortex_DFP/Device/$(ARM_CPU)/Include \
+  -I$(CORTEX_DFP_PATH)/Device/$(ARM_CPU)/Include \
   -I$(CMSIS_PATH)/CMSIS/Core/Include
 
 # TODO(#274): Examine why some tests fail here.
