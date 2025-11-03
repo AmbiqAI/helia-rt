@@ -558,7 +558,7 @@ TF_LITE_MICRO_TEST(SimpleTestQuantizedInt16) {
       kTfLiteOk);
 }
 
-#if !defined(XTENSA) && !defined(CMSIS_NN) && !defined(AMBIQ)
+#if !defined(XTENSA) && !defined(CMSIS_NN)
 
 TF_LITE_MICRO_TEST(SimpleTestPerChannelQuantizedInt16) {
   const float input_scale = 128.0 / 65536;
@@ -590,7 +590,7 @@ TF_LITE_MICRO_TEST(SimpleTestPerChannelQuantizedInt16) {
       kTfLiteOk);
 }
 
-#endif  // !defined(XTENSA) && !defined(CMSIS_NN) && !defined(AMBIQ)
+#endif  // !defined(XTENSA) && !defined(CMSIS_NN)
 
 #endif  // #if !defined(HEXAGON)
 
