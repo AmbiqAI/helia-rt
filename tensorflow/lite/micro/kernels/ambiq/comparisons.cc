@@ -59,36 +59,26 @@ arm_cmsis_nn_status InvokeArmComparison(const cmsis_nn_context* ctx,
                                         bool* output_data,
                                         const cmsis_nn_dims* output_dims,
                                         const ComparisonParams& params,
-                                        arm_nn_compare_operation operation);
+                                        arm_nn_compare_operation operation) {
+  static_assert(std::is_same<T, int8_t>::value ||
+                    std::is_same<T, int16_t>::value,
+                "CMSIS comparison only supports int8 and int16 types.");
 
-template <>
-arm_cmsis_nn_status InvokeArmComparison<int8_t>(
-    const cmsis_nn_context* ctx, const int8_t* input1_data,
-    const cmsis_nn_dims* input1_dims, const int8_t* input2_data,
-    const cmsis_nn_dims* input2_dims, bool* output_data,
-    const cmsis_nn_dims* output_dims, const ComparisonParams& params,
-    arm_nn_compare_operation operation) {
-  return arm_comparison_s8(ctx, input1_data, input1_dims, input2_data,
-                           input2_dims, output_data, output_dims,
-                           params.input1_offset, params.input1_multiplier,
-                           params.input1_shift, params.input2_offset,
-                           params.input2_multiplier, params.input2_shift,
-                           params.left_shift, operation);
-}
-
-template <>
-arm_cmsis_nn_status InvokeArmComparison<int16_t>(
-    const cmsis_nn_context* ctx, const int16_t* input1_data,
-    const cmsis_nn_dims* input1_dims, const int16_t* input2_data,
-    const cmsis_nn_dims* input2_dims, bool* output_data,
-    const cmsis_nn_dims* output_dims, const ComparisonParams& params,
-    arm_nn_compare_operation operation) {
-  return arm_comparison_s16(ctx, input1_data, input1_dims, input2_data,
-                            input2_dims, output_data, output_dims,
-                            params.input1_offset, params.input1_multiplier,
-                            params.input1_shift, params.input2_offset,
-                            params.input2_multiplier, params.input2_shift,
-                            params.left_shift, operation);
+  if constexpr (std::is_same_v<T, int8_t>) {
+    return arm_comparison_s8(ctx, input1_data, input1_dims, input2_data,
+                             input2_dims, output_data, output_dims,
+                             params.input1_offset, params.input1_multiplier,
+                             params.input1_shift, params.input2_offset,
+                             params.input2_multiplier, params.input2_shift,
+                             params.left_shift, operation);
+  } else if constexpr (std::is_same_v<T, int16_t>) {
+    return arm_comparison_s16(ctx, input1_data, input1_dims, input2_data,
+                              input2_dims, output_data, output_dims,
+                              params.input1_offset, params.input1_multiplier,
+                              params.input1_shift, params.input2_offset,
+                              params.input2_multiplier, params.input2_shift,
+                              params.left_shift, operation);
+  }
 }
 
 template <typename T>
