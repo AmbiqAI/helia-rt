@@ -41,4 +41,4 @@ EMBARC_MLI_PRE_COMPILED_MD5 := "173990c2dde4efef6a2c95b92d1f0244"
 
 # Skip md5sum-check since ethos-u-core-driver download link is non-deterministic, see  https://github.com/google/gitiles/issues/84
 
-NS_CMSIS_NN_COMMIT ?= 92b957c167f91f9df5f8893406aee2fd0b073931
+NS_CMSIS_NN_COMMIT ?= ca1e137b7136b32eae9fef112b484ab93a2e3765
