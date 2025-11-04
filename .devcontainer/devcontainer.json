@@ -6,6 +6,7 @@
     "customizations": {
         "vscode": {
             "extensions": [
+                "openai.chatgpt",
                 "GitHub.copilot",
                 "GitHub.copilot-chat",
                 "tamasfe.even-better-toml",
