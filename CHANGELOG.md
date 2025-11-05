@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.7.0](https://github.com/AmbiqAI/helia-rt/compare/HeliaRT-v1.6.0...HeliaRT-v1.7.0) (2025-11-05)
+
+
+### Features
+
+* Add cmsis optimized comparison operators ([#78](https://github.com/AmbiqAI/helia-rt/issues/78)) ([45f65e8](https://github.com/AmbiqAI/helia-rt/commit/45f65e849823aef1a51822089e241ca57688a5ed))
+* Add optimized SUB operator for s8 and s16. ([#79](https://github.com/AmbiqAI/helia-rt/issues/79)) ([dffaa28](https://github.com/AmbiqAI/helia-rt/commit/dffaa285d3f8b5c7e59799a78a69c1ef3f5e0c13))
+* Use reusable workflow. ([#74](https://github.com/AmbiqAI/helia-rt/issues/74)) ([366421f](https://github.com/AmbiqAI/helia-rt/commit/366421f6d4d6c9377dceceef2239b72d706ebe71))
+
+
+### Bug Fixes
+
+* Use latest ns-cmsis-nn w/ corrected arm_fully_connected_per_channel_s16 ([#76](https://github.com/AmbiqAI/helia-rt/issues/76)) ([f9a5ded](https://github.com/AmbiqAI/helia-rt/commit/f9a5ded7851fe63504a75447e960a8a0fe20d902))
+
 ## [1.6.0](https://github.com/AmbiqAI/helia-rt/compare/HeliaRT-v1.5.0...HeliaRT-v1.6.0) (2025-10-22)
 
 
