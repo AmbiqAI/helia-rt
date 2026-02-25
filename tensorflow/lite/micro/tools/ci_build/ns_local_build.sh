@@ -127,8 +127,10 @@ if [[ " ${TOOLCHAINS[*]} " == *" armclang " ]] && [[ -z "${ARM_UBL_LICENSE_IDENT
 fi
 
 COMBO_ROOT="${OUTDIR}/combos"
-BUNDLE_DIR="${OUTDIR}/${BUNDLE_PREFIX}-${TAG}"
-ZIP_PATH="${OUTDIR}/${BUNDLE_PREFIX}-${TAG}.zip"
+BUNDLE_REL="${BUNDLE_PREFIX}-${TAG}"
+BUNDLE_DIR="${OUTDIR}/${BUNDLE_REL}"
+ZIP_REL="${BUNDLE_REL}.zip"
+ZIP_PATH="${OUTDIR}/${ZIP_REL}"
 
 mkdir -p "${COMBO_ROOT}" "${OUTDIR}"
 rm -rf "${BUNDLE_DIR}" "${ZIP_PATH}"
@@ -184,8 +186,9 @@ fi
 } > "${BUNDLE_DIR}/MANIFEST.txt"
 
 (
-  cd "${OUTDIR}"
-  zip -r "$(basename "${ZIP_PATH}")" "$(basename "${BUNDLE_DIR}")" >/dev/null
+  mkdir -p "$(dirname "${ZIP_PATH}")"
+  cd "${BUNDLE_DIR}"
+  zip -r "${ZIP_PATH}" . >/dev/null
 )
 
 echo "== Done =="
