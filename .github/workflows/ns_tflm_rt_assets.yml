@@ -53,8 +53,12 @@ jobs:
           if [[ -z "${tag_in}" ]]; then
             tag_in="${ref_in}"
           fi
+          safe_tag="${tag_in//\//-}"
+          if [[ -z "${safe_tag}" ]]; then
+            echo "::error ::Resolved tag is empty after sanitization."; exit 1;
+          fi
           echo "ref=${ref_in}" >> "$GITHUB_OUTPUT"
-          echo "tag=${tag_in}" >> "$GITHUB_OUTPUT"
+          echo "tag=${safe_tag}" >> "$GITHUB_OUTPUT"
 
       - name: Check out code
         uses: actions/checkout@v4
