@@ -53,8 +53,12 @@ jobs:
           if [[ -z "${tag_in}" ]]; then
             tag_in="${ref_in}"
           fi
+          safe_tag="${tag_in//\//-}"
+          if [[ -z "${safe_tag}" ]]; then
+            echo "::error ::Resolved tag is empty after sanitization."; exit 1;
+          fi
           echo "ref=${ref_in}" >> "$GITHUB_OUTPUT"
-          echo "tag=${tag_in}" >> "$GITHUB_OUTPUT"
+          echo "tag=${safe_tag}" >> "$GITHUB_OUTPUT"
 
       - name: Check out code
         uses: actions/checkout@v4
@@ -149,6 +153,18 @@ jobs:
           CAND="$(find artifacts -type d -path '*/tflm' | sort | head -n1 || true)"
           [[ -z "$CAND" ]] && { echo "::error ::No tflm tree found in artifacts"; exit 1; }
           cp -a "${CAND}/." "${BUNDLE}/"
+
+          echo "== Prune ns-cmsis-nn to headers only =="
+          NS_CMSIS_NN_DIR="${BUNDLE}/third_party/ns_cmsis_nn"
+          if [[ -d "${NS_CMSIS_NN_DIR}" ]]; then
+            find "${NS_CMSIS_NN_DIR}" -type f \
+              ! \( \
+                \( -path "${NS_CMSIS_NN_DIR}/Include/*" -a \( -name '*.h' -o -name '*.hpp' \) \) \
+                -o -name 'LICENSE' \
+              \) \
+              -delete
+            find "${NS_CMSIS_NN_DIR}" -depth -type d -empty -delete
+          fi
 
           echo "== Copy neuralSPOT module.mk to bundle root =="
           if [[ -f "neuralspot/module.mk" ]]; then

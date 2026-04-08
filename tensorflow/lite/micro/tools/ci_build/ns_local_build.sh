@@ -61,8 +61,18 @@ USAGE
 
 parse_csv_into_array() {
   local value="$1"
-  local -n out_ref="$2"
-  IFS=',' read -r -a out_ref <<< "${value}"
+  local out_var="$2"
+  local parsed=()
+  local item
+  local item_quoted
+
+  IFS=',' read -r -a parsed <<< "${value}"
+
+  eval "${out_var}=()"
+  for item in "${parsed[@]}"; do
+    printf -v item_quoted '%q' "${item}"
+    eval "${out_var}+=(${item_quoted})"
+  done
 }
 
 ARCHES=("${DEFAULT_ARCHES[@]}")
@@ -168,6 +178,17 @@ find "${COMBO_ROOT}" -type f -path "*/lib/*.a" -print -exec cp -v {} "${BUNDLE_D
 CAND="$(find "${COMBO_ROOT}" -type d -path '*/tflm' | sort | head -n1 || true)"
 [[ -z "${CAND}" ]] && { echo "ERROR: No tflm tree found in ${COMBO_ROOT}" >&2; exit 5; }
 cp -a "${CAND}/." "${BUNDLE_DIR}/"
+
+NS_CMSIS_NN_DIR="${BUNDLE_DIR}/third_party/ns_cmsis_nn"
+if [[ -d "${NS_CMSIS_NN_DIR}" ]]; then
+  find "${NS_CMSIS_NN_DIR}" -type f \
+    ! \( \
+      \( -path "${NS_CMSIS_NN_DIR}/Include/*" -a \( -name '*.h' -o -name '*.hpp' \) \) \
+      -o -name 'LICENSE' \
+    \) \
+    -delete
+  find "${NS_CMSIS_NN_DIR}" -depth -type d -empty -delete
+fi
 
 if [[ -f "${NEURALSPOT_MODULE_MK}" ]]; then
   cp "${NEURALSPOT_MODULE_MK}" "${BUNDLE_DIR}/module.mk"
