@@ -32,6 +32,7 @@
         "ghcr.io/devcontainers/features/github-cli:1": {
             "installDirectlyFromGitHubRelease": true,
             "version": "latest"
-        }
+        },
+        "ghcr.io/devcontainers-extra/features/uv:1": {}
     }
 }

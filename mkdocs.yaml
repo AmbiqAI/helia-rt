@@ -1,7 +1,7 @@
-site_name: HeliaRT
+site_name: heliaRT
 site_dir: "site"
 site_url: "https://ambiqai.github.io/helia-rt"
-site_description: HeliaRT, optimized TFLM tailored for Ambiq SoCs
+site_description: heliaRT, optimized TFLM tailored for Ambiq SoCs
 repo_name: ""
 repo_url: ""
 edit_uri: ""
@@ -34,21 +34,21 @@ theme:
     code: Roboto Mono
   palette:
     - media: "(prefers-color-scheme)"
-      primary: blue
-      accent: cyan
+      primary: cyan
+      accent: blue
       toggle:
         icon: material/brightness-auto
         name: Use system theme
     - media: "(prefers-color-scheme: light)"
-      primary: blue
-      accent: cyan
+      primary: cyan
+      accent: blue
       toggle:
         icon: material/brightness-7
         name: Switch to light theme
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: blue
-      accent: cyan
+      primary: cyan
+      accent: blue
       toggle:
         icon: material/brightness-4
         name: Switch to dark theme
