@@ -61,8 +61,18 @@ USAGE
 
 parse_csv_into_array() {
   local value="$1"
-  local -n out_ref="$2"
-  IFS=',' read -r -a out_ref <<< "${value}"
+  local out_var="$2"
+  local parsed=()
+  local item
+  local item_quoted
+
+  IFS=',' read -r -a parsed <<< "${value}"
+
+  eval "${out_var}=()"
+  for item in "${parsed[@]}"; do
+    printf -v item_quoted '%q' "${item}"
+    eval "${out_var}+=(${item_quoted})"
+  done
 }
 
 ARCHES=("${DEFAULT_ARCHES[@]}")
