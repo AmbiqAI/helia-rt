@@ -1,14 +1,14 @@
-# HeliaRT
+# heliaRT
 
-Welcome to HeliaRT, a specialized fork of TensorFlow Lite for Microcontrollers (TFLM), tailored for Ambiq's Apollo family of ultra-low-power System-on-Chips (SoCs). This project enhances TFLM by optimizing it to leverage the advanced hardware intrinsics of the Apollo series, such as Matrix Vector Extensions (MVE) and Digital Signal Processing (DSP) instructions.
+Welcome to heliaRT, a specialized fork of TensorFlow Lite for Microcontrollers (TFLM), tailored for Ambiq's Apollo family of ultra-low-power System-on-Chips (SoCs). This project enhances TFLM by optimizing it to leverage the advanced hardware intrinsics of the Apollo series, such as Matrix Vector Extensions (MVE) and Digital Signal Processing (DSP) instructions.
 
 [![CI](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ci.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ci.yml)
 [![Unit Tests](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ambiq.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ambiq.yml)
 
 
-## Why HeliaRT?
+## Why heliaRT?
 
-HeliaRT addresses the unique demands of ultra-low-power devices, offering developers the tools to build AI applications that require minimal energy consumption without sacrificing performance. By harnessing the specific capabilities of Ambiq's SoCs, HeliaRT enables more efficient neural network inference on devices like smart watches, fitness trackers, and other smart IoT devices.
+heliaRT addresses the unique demands of ultra-low-power devices, offering developers the tools to build AI applications that require minimal energy consumption without sacrificing performance. By harnessing the specific capabilities of Ambiq's SoCs, heliaRT enables more efficient neural network inference on devices like smart watches, fitness trackers, and other smart IoT devices.
 
 ## Key Features
 
@@ -16,28 +16,28 @@ HeliaRT addresses the unique demands of ultra-low-power devices, offering develo
 - **Energy Efficiency**: Designed to minimize power usage, extending the battery life of edge devices.
 - **Broad Compatibility**: Supports a wide range of Ambiq's Apollo SoCs, ensuring versatile applications across different hardware.
 
-Explore our [Getting Started guide](tensorflow/lite/micro/docs/getting_started.md) to dive into the development with HeliaRT, or check out the [Benchmarks section](tensorflow/lite/micro/benchmarks/README.md) to see how HeliaRT performs under various conditions. Whether you are developing for wearable technology or other smart devices, HeliaRT provides a robust framework for embedding AI into your projects.
+Explore our [Getting Started guide](tensorflow/lite/micro/docs/getting_started.md) to dive into the development with heliaRT, or check out the [Benchmarks section](tensorflow/lite/micro/benchmarks/README.md) to see how heliaRT performs under various conditions. Whether you are developing for wearable technology or other smart devices, heliaRT provides a robust framework for embedding AI into your projects.
 
 ## Getting Started
 
-Jumpstart your development with [neuralSPOT](https://github.com/AmbiqAI/neuralSPOT), a robust AI SDK optimized for Ambiq's ultra-low-power Apollo SoCs. This toolkit provides comprehensive resources, including the latest stable releases of HeliaRT, fully configured for both GCC and Arm Clang across debug and release builds. For a detailed step-by-step guide, refer to our [Getting Started documentation](tensorflow/lite/micro/docs/getting_started.md).
+Jumpstart your development with [neuralSPOT](https://github.com/AmbiqAI/neuralSPOT), a robust AI SDK optimized for Ambiq's ultra-low-power Apollo SoCs. This toolkit provides comprehensive resources, including the latest stable releases of heliaRT, fully configured for both GCC and Arm Clang across debug and release builds. For a detailed step-by-step guide, refer to our [Getting Started documentation](tensorflow/lite/micro/docs/getting_started.md).
 
 
 ## Supported SoCs
 
-HeliaRT is specifically optimized to leverage the advanced features of Ambiq's ultra-low-power SoCs. Below is the list of SoCs that are fully supported:
+heliaRT is specifically optimized to leverage the advanced features of Ambiq's ultra-low-power SoCs. Below is the list of SoCs that are fully supported:
 
 - **Apollo3**: Ideal for battery-operated mobile devices with its highly efficient power management capabilities.
 - **Apollo4**: Enhances performance with higher processing capabilities and improved memory architecture.
 - **Apollo4 Plus**: Features a Cortex-M4 core, offering a balance of power and performance for complex processing tasks.
 - **Apollo510**: Equipped with a Cortex-M55 core and MVE Helium capabilities, designed for next-level computation needs and edge AI applications.
 
-These optimizations ensure that HeliaRT can provide excellent performance and energy efficiency on Ambiq's cutting-edge hardware platforms.
+These optimizations ensure that heliaRT can provide excellent performance and energy efficiency on Ambiq's cutting-edge hardware platforms.
 
 
 ## Official Build Status
 
-This table provides a summary of the build status for HeliaRT across various platforms and configurations, ensuring both compatibility and optimal performance.
+This table provides a summary of the build status for heliaRT across various platforms and configurations, ensuring both compatibility and optimal performance.
 
 | Build Type         | Status |
 | ------------------ | ------ |
@@ -52,7 +52,7 @@ Each badge links directly to the detailed results of the respective builds, allo
 
 If you encounter issues or need assistance, the following resources are available:
 
-- **Primary Support**: [Submit a GitHub Issue](https://github.com/AmbiqAI/helia-rt/issues/new/choose) for direct support on HeliaRT related queries.
+- **Primary Support**: [Submit a GitHub Issue](https://github.com/AmbiqAI/helia-rt/issues/new/choose) for direct support on heliaRT related queries.
 - **Community and Discussions**:
   - Contact Ambiq AITG [email group](mailto:support.aitg@ambiq.com)
 - **TensorFlow Community**:
@@ -63,29 +63,29 @@ If you encounter issues or need assistance, the following resources are availabl
 
 ## Documentation
 
-Explore our comprehensive documentation to get the most out of HeliaRT:
+Explore our comprehensive documentation to get the most out of heliaRT:
 
-- [Getting Started](tensorflow/lite/micro/docs/getting_started.md): Step-by-step guide to begin with HeliaRT.
+- [Getting Started](tensorflow/lite/micro/docs/getting_started.md): Step-by-step guide to begin with heliaRT.
 - [Continuous Integration](docs/continuous_integration.md): Details on our CI processes and infrastructure.
 - [Benchmarks](tensorflow/lite/micro/benchmarks/README.md): Benchmarking results and methodologies for performance evaluation.
 - [Profiling](tensorflow/lite/micro/docs/profiling.md): Techniques to profile and optimize your TFLM applications.
 - [Memory Management](tensorflow/lite/micro/docs/memory_management.md): Strategies for effective memory use in constrained environments.
-- [Logging](tensorflow/lite/micro/docs/logging.md): How to implement and utilize logging within HeliaRT projects.
+- [Logging](tensorflow/lite/micro/docs/logging.md): How to implement and utilize logging within heliaRT projects.
 - [Porting Reference Kernels from TfLite to TFLM](tensorflow/lite/micro/docs/porting_reference_ops.md): Guide on adapting TensorFlow Lite kernels for microcontrollers.
 - [Optimized Kernel Implementations](tensorflow/lite/micro/docs/optimized_kernel_implementations.md): Discusses the optimized kernels specific to various architectures.
-- [New Platform Support](tensorflow/lite/micro/docs/new_platform_support.md): Instructions for adding HeliaRT support to new hardware platforms.
+- [New Platform Support](tensorflow/lite/micro/docs/new_platform_support.md): Instructions for adding heliaRT support to new hardware platforms.
 - Platform/IP Support:
-  - [Arm IP Support](tensorflow/lite/micro/docs/arm.md): Specifics of HeliaRT support for ARM architecture.
-- [Software Emulation with Renode](tensorflow/lite/micro/docs/renode.md): How to use Renode for simulating HeliaRT applications.
+  - [Arm IP Support](tensorflow/lite/micro/docs/arm.md): Specifics of heliaRT support for ARM architecture.
+- [Software Emulation with Renode](tensorflow/lite/micro/docs/renode.md): How to use Renode for simulating heliaRT applications.
 - [Software Emulation with QEMU](tensorflow/lite/micro/docs/qemu.md): Utilizing QEMU for development and testing.
-- [HeliaRT Python Development Guide](docs/python.md): Insights into using Python for HeliaRT development.
+- [heliaRT Python Development Guide](docs/python.md): Insights into using Python for heliaRT development.
 - [Automatically Generated Files](docs/automatically_generated_files.md): Information about the files generated during the build process.
 - [Python Interpreter Guide](python/tflite_micro/README.md): Detailed guide for using the Python interpreter with TFLM.
 
 
 ## Operator Support Matrix
 
-Below is a detailed matrix that outlines the support for various operators across different backends and data types within HeliaRT. Each entry indicates whether an operator is supported (`Yes`), not supported (`No`), or not applicable (`N/A`) for the specified data type and backend. "N/A" is used where the operation does not logically apply to the data type, whereas "No" indicates that the operation could be supported but currently isn't.
+Below is a detailed matrix that outlines the support for various operators across different backends and data types within heliaRT. Each entry indicates whether an operator is supported (`Yes`), not supported (`No`), or not applicable (`N/A`) for the specified data type and backend. "N/A" is used where the operation does not logically apply to the data type, whereas "No" indicates that the operation could be supported but currently isn't.
 
 The implementations are categorized under three main technologies:
 - **C**: Standard C implementation.

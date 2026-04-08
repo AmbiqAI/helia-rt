@@ -5,7 +5,7 @@ menuconfig HELIA_RT
 	bool "Helia RT (Ambiq optimized TFLM)"
 	select REQUIRES_FULL_LIBCPP
 	help
-		This option enables HeliaRT (TFLM fork).
+		This option enables heliaRT.
 
 if HELIA_RT
 

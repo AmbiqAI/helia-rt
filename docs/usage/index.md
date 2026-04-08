@@ -1,11 +1,11 @@
 # :material-rocket-launch: Getting Started
 
-Welcome to the HeliaRT Getting Started guide. HeliaRT, a derivative of TensorFlow Lite for Microcontrollers (TFLM), is specially optimized for Ambiq's Apollo platforms using NS-CMSIS-NN, enhancing performance on these devices. This guide outlines similarities with TFLM and provides detailed instructions on leveraging HeliaRT's capabilities through neuralSPOT. Read on to learn how to deploy TFLite models, run examples, and integrate HeliaRT into your development projects with ease.
+Welcome to the heliaRT Getting Started guide. heliaRT, a derivative of TensorFlow Lite for Microcontrollers (TFLM), is specially optimized for Ambiq's Apollo platforms using NS-CMSIS-NN, enhancing performance on these devices. This guide outlines similarities with TFLM and provides detailed instructions on leveraging heliaRT's capabilities through neuralSPOT. Read on to learn how to deploy TFLite models, run examples, and integrate heliaRT into your development projects with ease.
 
 
 ## Latest Release w/ neuralSPOT
 
-The latest release of HeliaRT is now available as a static module within the neuralSPOT framework. Explore the following options to effectively utilize HeliaRT with neuralSPOT:
+The latest release of heliaRT is now available as a static module within the neuralSPOT framework. Explore the following options to effectively utilize heliaRT with neuralSPOT:
 
 ### Option 1: Run a TFLite Model via Autodeploy
 
@@ -23,7 +23,7 @@ Access the examples [here](https://ambiqai.github.io/neuralSPOT/examples/).
 
 ### Option 3: Create a Nest Application in neuralSPOT
 
-Utilize the neuralSPOT makefile system to create custom applications, known as `nest` applications, which can operate on Ambiq's Apollo platforms. These self-contained applications are customizable and can include any number of static modules, such as HeliaRT.
+Utilize the neuralSPOT makefile system to create custom applications, known as `nest` applications, which can operate on Ambiq's Apollo platforms. These self-contained applications are customizable and can include any number of static modules, such as heliaRT.
 
 ```bash
 make nest
@@ -34,11 +34,11 @@ For detailed makefile instructions, visit [this page](https://ambiqai.github.io/
 
 ## Bleeding Edge w/ neuralSPOT
 
-The bleeding edge version of HeliaRT is available as a neuralSPOT static module and can be integrated into your projects to utilize the latest features and optimizations. Follow these steps to build and configure the module:
+The bleeding edge version of heliaRT is available as a neuralSPOT static module and can be integrated into your projects to utilize the latest features and optimizations. Follow these steps to build and configure the module:
 
-### 1. Clone the HeliaRT Repository
+### 1. Clone the heliaRT Repository
 
-Start by cloning the HeliaRT repository and checking out the latest commit:
+Start by cloning the heliaRT repository and checking out the latest commit:
 
 ```bash
 git clone https://github.com/AmbiqAI/helia-rt
@@ -111,7 +111,7 @@ Alternatively, specify this version directly when using the `ns_autodeploy` tool
 ns_autodeploy --tensorflow-version=ns_tflm_bleeding_edge
 ```
 
-These steps ensure that your project utilizes the latest HeliaRT features, enhancing functionality and performance on supported Ambiq SoCs.
+These steps ensure that your project utilizes the latest heliaRT features, enhancing functionality and performance on supported Ambiq SoCs.
 
 
 ## Zephyr Integration
@@ -119,11 +119,11 @@ These steps ensure that your project utilizes the latest HeliaRT features, enhan
 Coming soon...
 
 
-## Building HeliaRT from Source
+## Building heliaRT from Source
 
-To integrate HeliaRT into AmbiqSuite or a third-party project, you can build TFLM from source. The following steps will guide you through the high-level process of building TFLM from source into a static library.
+To integrate heliaRT into AmbiqSuite or a third-party project, you can build TFLM from source. The following steps will guide you through the high-level process of building TFLM from source into a static library.
 
-1. **Clone the HeliaRT repository and checkout the latest commit.**
+1. **Clone the heliaRT repository and checkout the latest commit.**
 
 ```bash
 git clone https://github.com/AmbiqAI/helia-rt
@@ -181,7 +181,7 @@ readable_run make -f tensorflow/lite/micro/tools/make/Makefile \
 
 The static library will be generated to `gen/${TARGET}_${TARGET_ARCH}_${BUILD}_${OPTIM_KERNEL}_${TOOLCHAIN}/lib/libtensorflow-microlite.a`. The library can be linked into your project using the standard linker flags.
 
-6. **(Optional) Generate HeliaRT tree for intellisense and debugging.**
+6. **(Optional) Generate heliaRT tree for intellisense and debugging.**
 
 ```bash
 python3 /tensorflow/lite/micro/tools/project_generation/create_tflm_tree.py \
