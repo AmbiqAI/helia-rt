@@ -15,7 +15,7 @@ This guide assumes a west workspace with:
 - `modules/` for external Zephyr modules
 - `app/` for your application
 
-Expected layout:
+Expected layout for the public source path:
 
 ```plaintext
 <ws>/
@@ -24,7 +24,7 @@ Expected layout:
 │   └── ...
 ├── modules/
 │   ├── helia-rt/
-│   └── ns-cmsis-nn/            # raw module path only
+│   └── cmsis-nn/               # raw module path when using open CMSIS-NN
 └── app/
     └── helia_rt_app/
         ├── CMakeLists.txt
@@ -62,6 +62,7 @@ Use the raw repository when you want:
 - source-based integration
 - the ability to debug or modify heliaRT internals
 - configurations outside the published prebuilt matrix
+- a public-safe path that does not require HELIA acceleration sources
 
 Clone the repository into `modules/`:
 
@@ -69,7 +70,15 @@ Clone the repository into `modules/`:
 git clone https://github.com/AmbiqAI/helia-rt <ws>/modules/helia-rt
 ```
 
-With the raw module, the Ambiq-optimized backend depends on the separate `ns-cmsis-nn` Zephyr module.
+The raw/source module supports three backend choices:
+
+- `Reference`: generic TFLM kernels
+- `CMSIS-NN`: open-source Arm CMSIS-NN backend
+- `HELIA`: Ambiq-optimized backend provided through a separate Ambiq-distributed module
+
+On Cortex-M builds with an enabled open CMSIS-NN module, `CMSIS-NN` is the default raw-module backend. Otherwise `Reference` is the default.
+
+Cloning `helia-rt` alone gives you a working source integration path, but it does not include HELIA acceleration. The public source path uses `Reference` or open `CMSIS-NN`. To use `HELIA`, you need access to Ambiq's private backend module, currently distributed as `ns-cmsis-nn`.
 
 ### Prebuilt Release Bundle
 
@@ -86,7 +95,7 @@ unzip zephyr-helia-rt-<tag>.zip -d <ws>/modules
 mv <ws>/modules/zephyr-helia-rt-<tag> <ws>/modules/helia-rt
 ```
 
-With the prebuilt bundle, `ns-cmsis-nn` is already embedded in the archive, so you do not add a separate `ns-cmsis-nn` module.
+With the prebuilt bundle, HELIA acceleration is already embedded in the archive, so you do not add a separate private backend module.
 
 Initial supported prebuilt matrix:
 
@@ -94,13 +103,73 @@ Initial supported prebuilt matrix:
 - `gcc` and `armclang`
 - `debug`, `release`, and `release_with_logs`
 
-## 4. Add `ns-cmsis-nn` for the Raw Module
+## 4. Choose a Raw-Module Backend
 
-If you are using the raw module with the Ambiq-optimized backend, add `ns-cmsis-nn` to the workspace.
+### `Reference`
 
-### West-Managed
+Use `Reference` when you want the simplest source path and do not need an optimized Cortex-M backend.
 
-Add `ns-cmsis-nn` to `zephyr/west.yml`:
+Example `prj.conf`:
+
+```conf
+CONFIG_HELIA_RT=y
+CONFIG_HELIA_RT_BACKEND_REFERENCE=y
+```
+
+### `CMSIS-NN`
+
+Use `CMSIS-NN` when you want the public source path with open-source Arm optimized kernels.
+
+For this backend, add an open CMSIS-NN Zephyr module to the workspace.
+
+Example `zephyr/west.yml` snippet:
+
+```yaml
+remotes:
+  - name: arm-software
+    url-base: https://github.com/ARM-software
+
+projects:
+  - name: cmsis-nn
+    remote: arm-software
+    repo-path: CMSIS-NN
+    path: modules/cmsis-nn
+    revision: main
+```
+
+Then run:
+
+```bash
+west update
+```
+
+Example app-local copy:
+
+```bash
+cp -r <path-to-cmsis-nn> <ws>/modules/cmsis-nn
+```
+
+Example `prj.conf`:
+
+```conf
+CONFIG_HELIA_RT=y
+CONFIG_HELIA_RT_BACKEND_CMSIS_NN=y
+```
+
+### `HELIA`
+
+Use `HELIA` when you want Ambiq's private accelerated backend from the raw/source path.
+
+HELIA acceleration is not included in the public `helia-rt` repository. To use it:
+
+1. Reach out to Ambiq to get access to the HELIA backend package.
+2. Obtain the package currently distributed as `ns-cmsis-nn`.
+3. Place that module in your Zephyr workspace.
+4. Toggle the HELIA backend in `prj.conf`.
+
+Assume the private module exposes the necessary Zephyr `module.yml` and CMake integration and is available at `<ws>/modules/ns-cmsis-nn`.
+
+Example `zephyr/west.yml` snippet:
 
 ```yaml
 remotes:
@@ -123,10 +192,17 @@ west update
 
 For reproducibility, pin `revision` to a tag or commit SHA instead of `main`.
 
-### Local Copy
+Example app-local copy:
 
 ```bash
 cp -r <path-to-ns-cmsis-nn> <ws>/modules/ns-cmsis-nn
+```
+
+Example `prj.conf`:
+
+```conf
+CONFIG_HELIA_RT=y
+CONFIG_HELIA_RT_BACKEND_HELIA=y
 ```
 
 ## 5. Choose Module Discovery
@@ -144,6 +220,7 @@ This is often the easiest path when:
 - you are iterating locally
 - you want app-local control over module paths
 - you are using a downloaded prebuilt bundle
+- you are switching between `Reference`, `CMSIS-NN`, and `HELIA` source backends
 
 ## 6. Create the Application
 
@@ -160,6 +237,39 @@ Application layout:
 ### `CMakeLists.txt`
 
 Raw module:
+
+```cmake
+cmake_minimum_required(VERSION 3.20.0)
+
+list(APPEND ZEPHYR_EXTRA_MODULES
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../modules/helia-rt
+)
+
+find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+project(helia_rt_app)
+
+target_sources(app PRIVATE src/main.cpp)
+```
+
+Raw module with open `CMSIS-NN`:
+
+```cmake
+cmake_minimum_required(VERSION 3.20.0)
+
+list(APPEND ZEPHYR_EXTRA_MODULES
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../modules/helia-rt
+)
+list(APPEND ZEPHYR_EXTRA_MODULES
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../modules/cmsis-nn
+)
+
+find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+project(helia_rt_app)
+
+target_sources(app PRIVATE src/main.cpp)
+```
+
+Raw module with `HELIA`:
 
 ```cmake
 cmake_minimum_required(VERSION 3.20.0)
@@ -203,9 +313,31 @@ CONFIG_CONSOLE=y
 CONFIG_UART_CONSOLE=y
 
 CONFIG_HELIA_RT=y
-CONFIG_HELIA_RT_BACKEND_NS_CMSIS_NN=y
-CONFIG_NS_CMSIS_NN=y
-CONFIG_NS_CMSIS_NN_ALL=y
+CONFIG_HELIA_RT_BACKEND_CMSIS_NN=y
+```
+
+Raw module with `Reference`:
+
+```conf
+CONFIG_FPU=y
+CONFIG_PRINTK=y
+CONFIG_CONSOLE=y
+CONFIG_UART_CONSOLE=y
+
+CONFIG_HELIA_RT=y
+CONFIG_HELIA_RT_BACKEND_REFERENCE=y
+```
+
+Raw module with `HELIA`:
+
+```conf
+CONFIG_FPU=y
+CONFIG_PRINTK=y
+CONFIG_CONSOLE=y
+CONFIG_UART_CONSOLE=y
+
+CONFIG_HELIA_RT=y
+CONFIG_HELIA_RT_BACKEND_HELIA=y
 ```
 
 Prebuilt bundle:
@@ -221,6 +353,12 @@ CONFIG_HELIA_RT_PREBUILT_BUILD_RELEASE=y
 ```
 
 Use `CONFIG_HELIA_RT_PREBUILT_BUILD_DEBUG=y` or `CONFIG_HELIA_RT_PREBUILT_BUILD_RELEASE_WITH_LOGS=y` when you need another published prebuilt flavor.
+
+For the raw/source module:
+
+- `Reference` works everywhere
+- `CMSIS-NN` is the recommended public Cortex-M backend when an open CMSIS-NN module is present
+- `HELIA` requires the Ambiq-provided private backend module
 
 ### `src/main.cpp`
 
@@ -261,7 +399,8 @@ To view logs, connect to the board console using your preferred serial terminal.
 ## 9. Integration Checks
 
 - confirm `<ws>/modules/helia-rt/zephyr/module.yml` exists
-- if using the raw module with the Ambiq backend, confirm `<ws>/modules/ns-cmsis-nn` exists
+- if using the raw module with `CMSIS-NN`, confirm `<ws>/modules/cmsis-nn` exists
+- if using the raw module with `HELIA`, confirm `<ws>/modules/ns-cmsis-nn` exists
 - verify `ZEPHYR_EXTRA_MODULES` paths if the module is not discovered
 - if using the prebuilt bundle, ensure the selected prebuilt flavor matches arch, toolchain, and build type
 
@@ -269,7 +408,7 @@ To view logs, connect to the board console using your preferred serial terminal.
 
 | Option | Advantages | Tradeoffs |
 | --- | --- | --- |
-| Raw module | source-visible, flexible, easier to debug | requires separate `ns-cmsis-nn` for the Ambiq backend |
-| Prebuilt bundle | fast setup, release-pinned, fewer module dependencies | limited to the published prebuilt matrix |
+| Raw module | source-visible, flexible, public-safe with `Reference` or open `CMSIS-NN` | HELIA acceleration requires a separate Ambiq-provided module |
+| Prebuilt bundle | fast setup, release-pinned, HELIA acceleration already embedded | limited to the published prebuilt matrix |
 
 For examples built around these flows, see [Zephyr examples](../examples/zephyr.md).

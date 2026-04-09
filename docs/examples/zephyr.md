@@ -60,7 +60,7 @@ Use the raw module when:
 
 - you need to inspect or modify the runtime
 - you are debugging kernel or integration issues
-- your configuration is outside the published prebuilt matrix
+- you want to stay on the public source path with `Reference` or open `CMSIS-NN`
 
 Use the prebuilt bundle when:
 
@@ -74,7 +74,8 @@ Before debugging model behavior, verify:
 
 - the correct module path is listed in `ZEPHYR_EXTRA_MODULES` or the west manifest
 - `CONFIG_HELIA_RT=y` is enabled
-- raw module users added `ns-cmsis-nn` when selecting the Ambiq backend
+- raw module users added the open CMSIS-NN module when selecting the `CMSIS-NN` backend
+- raw module users added the Ambiq-provided HELIA module when selecting the `HELIA` backend
 - the selected prebuilt flavor matches the target when using the prebuilt bundle
 - the board console is enabled so initialization and inference logs are visible
 

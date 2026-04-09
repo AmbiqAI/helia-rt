@@ -16,7 +16,8 @@ That means existing TFLM knowledge transfers directly to heliaRT, while Ambiq-sp
 
 ## What heliaRT Adds
 
-- Ambiq-optimized kernels built on top of `ns-cmsis-nn`
+- public source integration with `Reference` and open `CMSIS-NN` backends
+- optional HELIA acceleration through Ambiq's private backend module
 - build and packaging flows aligned with Ambiq silicon targets
 - prebuilt release bundles for faster bring-up
 - Zephyr module support alongside source-based integration

@@ -26,7 +26,7 @@ The main differences are in packaging, supported integration paths, and Ambiq-op
 
 | Path | Best for | Notes |
 | --- | --- | --- |
-| Zephyr raw module | Source-visible integration and custom builds | Separate `ns-cmsis-nn` module required for the Ambiq backend |
+| Zephyr raw module | Source-visible integration and custom builds | Public-safe source path uses `Reference` or open `CMSIS-NN`; `HELIA` requires a separate Ambiq-provided module |
 | Zephyr prebuilt bundle | Fast-start Zephyr integration | Ambiq-optimized kernels embedded in the archive |
 | neuralSPOT with `ns_autodeploy` | Quick profiling and deployment | Good first step when evaluating a model on hardware |
 | Source build | Custom build systems and low-level integration | Most flexible, but most manual |
