@@ -1,6 +1,6 @@
 # heliaRT
 
-Welcome to heliaRT, a specialized fork of TensorFlow Lite for Microcontrollers (TFLM), tailored for Ambiq's Apollo family of ultra-low-power System-on-Chips (SoCs). This project enhances TFLM by optimizing it to leverage the advanced hardware intrinsics of the Apollo series, such as Matrix Vector Extensions (MVE) and Digital Signal Processing (DSP) instructions.
+heliaRT is Ambiq's optimized TensorFlow Lite for Microcontrollers runtime for Apollo platforms. It is designed to help developers bring efficient inference to ultra-low-power Ambiq silicon, with tuned kernels that take advantage of Apollo CPU, DSP, and MVE capabilities where available.
 
 [![CI](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ci.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ci.yml)
 [![Unit Tests](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ambiq.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ambiq.yml)
@@ -8,19 +8,32 @@ Welcome to heliaRT, a specialized fork of TensorFlow Lite for Microcontrollers (
 
 ## Why heliaRT?
 
-heliaRT addresses the unique demands of ultra-low-power devices, offering developers the tools to build AI applications that require minimal energy consumption without sacrificing performance. By harnessing the specific capabilities of Ambiq's SoCs, heliaRT enables more efficient neural network inference on devices like smart watches, fitness trackers, and other smart IoT devices.
+heliaRT focuses on efficient inference for Ambiq edge devices. By aligning the runtime with Apollo hardware capabilities, heliaRT helps reduce integration friction while improving performance and energy efficiency on supported Ambiq targets.
 
 ## Key Features
 
 - **Optimized Performance**: Utilizes MVE and DSP hardware capabilities to enhance computational efficiency and speed.
 - **Energy Efficiency**: Designed to minimize power usage, extending the battery life of edge devices.
-- **Broad Compatibility**: Supports a wide range of Ambiq's Apollo SoCs, ensuring versatile applications across different hardware.
+- **Broad Ambiq Coverage**: Supports a range of Ambiq Apollo SoCs through source and prebuilt integration paths.
 
-Explore our [Getting Started guide](tensorflow/lite/micro/docs/getting_started.md) to dive into the development with heliaRT, or check out the [Benchmarks section](tensorflow/lite/micro/benchmarks/README.md) to see how heliaRT performs under various conditions. Whether you are developing for wearable technology or other smart devices, heliaRT provides a robust framework for embedding AI into your projects.
+Start with the [Getting Started guide](docs/usage/index.md) to choose a neuralSPOT, Zephyr, or source-build path for heliaRT on Ambiq hardware.
 
 ## Getting Started
 
-Jumpstart your development with [neuralSPOT](https://github.com/AmbiqAI/neuralSPOT), a robust AI SDK optimized for Ambiq's ultra-low-power Apollo SoCs. This toolkit provides comprehensive resources, including the latest stable releases of heliaRT, fully configured for both GCC and Arm Clang across debug and release builds. For a detailed step-by-step guide, refer to our [Getting Started documentation](tensorflow/lite/micro/docs/getting_started.md).
+The recommended getting-started paths are:
+
+- profile a model with `ns_autodeploy`
+- integrate heliaRT into a Zephyr application
+- build heliaRT from source for a custom integration
+
+See the full [Getting Started documentation](docs/usage/index.md) for step-by-step instructions.
+
+The main setup guides are:
+
+- [Zephyr setup](docs/usage/zephyr.md)
+- [neuralSPOT setup](docs/usage/neuralspot.md)
+- [Source builds](docs/usage/source.md)
+- [Features overview](docs/features/index.md)
 
 
 ## Supported SoCs
@@ -63,21 +76,17 @@ If you encounter issues or need assistance, the following resources are availabl
 
 ## Documentation
 
-Explore our comprehensive documentation to get the most out of heliaRT:
+Explore the main documentation entry points:
 
-- [Getting Started](tensorflow/lite/micro/docs/getting_started.md): Step-by-step guide to begin with heliaRT.
+- [Getting Started](docs/usage/index.md): Step-by-step guide to begin with heliaRT.
 - [Continuous Integration](docs/continuous_integration.md): Details on our CI processes and infrastructure.
-- [Benchmarks](tensorflow/lite/micro/benchmarks/README.md): Benchmarking results and methodologies for performance evaluation.
+- [Benchmarks](docs/benchmarks/index.md): Performance-focused documentation for supported Ambiq targets.
 - [Profiling](tensorflow/lite/micro/docs/profiling.md): Techniques to profile and optimize your TFLM applications.
 - [Memory Management](tensorflow/lite/micro/docs/memory_management.md): Strategies for effective memory use in constrained environments.
 - [Logging](tensorflow/lite/micro/docs/logging.md): How to implement and utilize logging within heliaRT projects.
 - [Porting Reference Kernels from TfLite to TFLM](tensorflow/lite/micro/docs/porting_reference_ops.md): Guide on adapting TensorFlow Lite kernels for microcontrollers.
 - [Optimized Kernel Implementations](tensorflow/lite/micro/docs/optimized_kernel_implementations.md): Discusses the optimized kernels specific to various architectures.
 - [New Platform Support](tensorflow/lite/micro/docs/new_platform_support.md): Instructions for adding heliaRT support to new hardware platforms.
-- Platform/IP Support:
-  - [Arm IP Support](tensorflow/lite/micro/docs/arm.md): Specifics of heliaRT support for ARM architecture.
-- [Software Emulation with Renode](tensorflow/lite/micro/docs/renode.md): How to use Renode for simulating heliaRT applications.
-- [Software Emulation with QEMU](tensorflow/lite/micro/docs/qemu.md): Utilizing QEMU for development and testing.
 - [heliaRT Python Development Guide](docs/python.md): Insights into using Python for heliaRT development.
 - [Automatically Generated Files](docs/automatically_generated_files.md): Information about the files generated during the build process.
 - [Python Interpreter Guide](python/tflite_micro/README.md): Detailed guide for using the Python interpreter with TFLM.

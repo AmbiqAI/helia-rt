@@ -8,20 +8,24 @@ edit_uri: ""
 copyright: Copyright &copy; 2025 Ambiq
 
 nav:
-  - Home:
-    - Home: index.md
-    - Getting Started: usage/index.md
-    - Examples: examples/index.md
-    - Benchmarks: benchmarks/index.md
-
-  - Getting Started:
-    - usage/index.md
-
+  - Home: index.md
+  - Overview:
+      - Getting Started: usage/index.md
+      - Features: features/index.md
+  - Setup:
+      - Zephyr: usage/zephyr.md
+      - neuralSPOT: usage/neuralspot.md
+      - Source Builds: usage/source.md
   - Examples:
-    - examples/index.md
-
-  - Benchmarks:
-    - benchmarks/index.md
+      - Overview: examples/index.md
+      - Zephyr: examples/zephyr.md
+      - neuralSPOT: examples/neuralspot.md
+      - Source Integration: examples/source.md
+  - Reference:
+      - Benchmarks: benchmarks/index.md
+      - Continuous Integration: continuous_integration.md
+      - Python Development: python.md
+      - Generated Files: automatically_generated_files.md
 
 theme:
   name: material

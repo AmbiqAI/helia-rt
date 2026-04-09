@@ -1,4 +1,4 @@
-name: NeuralSPOT heliaRT Assets
+name: Zephyr heliaRT Assets
 
 on:
   workflow_dispatch:
@@ -16,12 +16,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: neuralspot-helia-rt-assets-${{ inputs.tag || inputs.ref || github.sha }}
+  group: zephyr-helia-rt-assets-${{ inputs.tag || inputs.ref || github.sha }}
   cancel-in-progress: false
 
 jobs:
-  neuralspot-build:
-    name: Build neuralSPOT module (${{ matrix.arch }} • ${{ matrix.toolchain }} • ${{ matrix.build }})
+  zephyr-build:
+    name: Build Zephyr prebuilt module (${{ matrix.arch }} • ${{ matrix.toolchain }} • ${{ matrix.build }})
     runs-on: ubuntu-latest-md
     container:
       image: ghcr.io/ambiqai/helia-rt-ci:latest
@@ -38,6 +38,7 @@ jobs:
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
+      NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
 
     steps:
       - name: Check out code
@@ -63,34 +64,33 @@ jobs:
             exit 1
           fi
 
-      - name: Build neuralSPOT static libs (cmsis_nn)
+      - name: Build Zephyr prebuilt static libs
         run: |
           set -euo pipefail
-          OUTDIR="${GITHUB_WORKSPACE}/out/${{ matrix.arch }}/${{ matrix.toolchain }}/${{ matrix.build }}"
-          tensorflow/lite/micro/tools/ci_build/build_ambiq.sh \
+          OUTDIR="${GITHUB_WORKSPACE}/out/zephyr/${{ matrix.arch }}/${{ matrix.toolchain }}/${{ matrix.build }}"
+          tensorflow/lite/micro/tools/ci_build/build_zephyr_prebuilt.sh \
             -a "${{ matrix.arch }}" \
             -b "${{ matrix.build }}" \
             -t "${{ matrix.toolchain }}" \
-            -k "cmsis_nn" \
             -o "${OUTDIR}"
           echo "Produced files:"
           find "${OUTDIR}" -maxdepth 3 -type f -print
 
-      - name: Upload neuralSPOT combo (raw dir)
+      - name: Upload Zephyr combo (raw dir)
         uses: actions/upload-artifact@v4
         with:
-          name: neuralSPOT-combo-${{ matrix.arch }}-${{ matrix.toolchain }}-${{ matrix.build }}
-          path: out/${{ matrix.arch }}/${{ matrix.toolchain }}/${{ matrix.build }}/**
+          name: zephyr-combo-${{ matrix.arch }}-${{ matrix.toolchain }}-${{ matrix.build }}
+          path: out/zephyr/${{ matrix.arch }}/${{ matrix.toolchain }}/${{ matrix.build }}/**
 
-  neuralspot-package:
-    name: Package neuralSPOT heliaRT bundle
-    needs: neuralspot-build
+  zephyr-package:
+    name: Package Zephyr prebuilt bundle
+    needs: zephyr-build
     runs-on: ubuntu-latest
     defaults:
       run:
         shell: bash
     steps:
-      - name: Check out code (to fetch neuralspot/module.mk)
+      - name: Check out code
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
@@ -104,27 +104,26 @@ jobs:
             --sanitize-tag
           echo "sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
 
-      - name: Download all neuralSPOT combos
+      - name: Download all Zephyr combos
         uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
 
-      - name: Assemble neuralSPOT bundle (lib + sources + module.mk)
+      - name: Assemble Zephyr bundle
         run: |
-          tensorflow/lite/micro/tools/ci_build/package_neuralspot_bundle.sh \
+          tensorflow/lite/micro/tools/ci_build/package_zephyr_bundle.sh \
             --artifacts-dir artifacts \
             --checkout-dir "${GITHUB_WORKSPACE}" \
             --tag '${{ steps.info.outputs.tag }}' \
             --sha '${{ steps.info.outputs.sha }}' \
-            --bundle-prefix neuralspot-helia-rt \
             --upload-dir upload
 
-      - name: Zip neuralSPOT bundle
+      - name: List Zephyr bundle
         run: ls -1 upload/*.zip
 
-      - name: Upload neuralSPOT bundle artifact
+      - name: Upload Zephyr bundle artifact
         uses: actions/upload-artifact@v4
         with:
-          name: neuralSPOT-helia-rt-bundle-${{ steps.info.outputs.tag }}
+          name: zephyr-helia-rt-bundle-${{ steps.info.outputs.tag }}
           path: upload/*.zip

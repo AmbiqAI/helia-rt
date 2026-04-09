@@ -1,192 +1,46 @@
 # :material-rocket-launch: Getting Started
 
-Welcome to the heliaRT Getting Started guide. heliaRT, a derivative of TensorFlow Lite for Microcontrollers (TFLM), is specially optimized for Ambiq's Apollo platforms using NS-CMSIS-NN, enhancing performance on these devices. This guide outlines similarities with TFLM and provides detailed instructions on leveraging heliaRT's capabilities through neuralSPOT. Read on to learn how to deploy TFLite models, run examples, and integrate heliaRT into your development projects with ease.
+Welcome to the heliaRT getting-started guide. heliaRT keeps the familiar TensorFlow Lite for Microcontrollers programming model and adds Ambiq-focused runtime and kernel optimizations for Apollo platforms.
 
+## Start Here
 
-## Latest Release w/ neuralSPOT
+Choose the setup path that matches how you want to evaluate or integrate heliaRT:
 
-The latest release of heliaRT is now available as a static module within the neuralSPOT framework. Explore the following options to effectively utilize heliaRT with neuralSPOT:
+- [Zephyr setup](zephyr.md): integrate heliaRT into a Zephyr west workspace using either the raw module or the prebuilt release bundle.
+- [neuralSPOT setup](neuralspot.md): profile and deploy a `.tflite` model with `ns_autodeploy` using a fast Ambiq-oriented workflow.
+- [Source builds](source.md): build heliaRT directly when you need a custom environment or tighter control over the build.
 
-### Option 1: Run a TFLite Model via Autodeploy
+## Core Concepts
 
-The `ns_autodeploy` tool is a Python command-line utility designed to streamline the process of compiling, flashing, and profiling TensorFlow Lite models. This tool also generates CSV and Excel files containing detailed profiling results and identifies any known sub-optimal network architectures.
+If you have already used TFLM, the high-level model is the same:
 
-```bash
-ns_autodeploy --tflite-filename=mymodel.tflite --model-name mymodel
-```
-Learn more and access the tool [here](https://ambiqai.github.io/neuralSPOT/tools/index.html).
+- `.tflite` flatbuffer models
+- operator resolvers
+- tensor arenas
+- `MicroInterpreter`-based inference
+- embedded-friendly logging and profiling
 
-### Option 2: Run an Example in neuralSPOT
+The main differences are in packaging, supported integration paths, and Ambiq-optimized kernels.
 
-neuralSPOT includes a variety of AI examples tailored for Ambiq's Apollo platforms. Each example comes with its own README.md, providing detailed instructions on setup and execution. These examples can be found in the `examples` directory of the neuralSPOT repository.
-Access the examples [here](https://ambiqai.github.io/neuralSPOT/examples/).
+## Setup Paths at a Glance
 
-### Option 3: Create a Nest Application in neuralSPOT
+| Path | Best for | Notes |
+| --- | --- | --- |
+| Zephyr raw module | Source-visible integration and custom builds | Separate `ns-cmsis-nn` module required for the Ambiq backend |
+| Zephyr prebuilt bundle | Fast-start Zephyr integration | Ambiq-optimized kernels embedded in the archive |
+| neuralSPOT with `ns_autodeploy` | Quick profiling and deployment | Good first step when evaluating a model on hardware |
+| Source build | Custom build systems and low-level integration | Most flexible, but most manual |
 
-Utilize the neuralSPOT makefile system to create custom applications, known as `nest` applications, which can operate on Ambiq's Apollo platforms. These self-contained applications are customizable and can include any number of static modules, such as heliaRT.
+## Recommended Order
 
-```bash
-make nest
-```
+1. Start with [neuralSPOT setup](neuralspot.md) if your first goal is profiling and basic model validation.
+2. Move to [Zephyr setup](zephyr.md) when you are integrating heliaRT into a product or application workspace.
+3. Use [source builds](source.md) when you need direct control over toolchains, archives, or custom packaging.
 
-For detailed makefile instructions, visit [this page](https://ambiqai.github.io/neuralSPOT/docs/makefile-details.html).
+## Related Pages
 
-
-## Bleeding Edge w/ neuralSPOT
-
-The bleeding edge version of heliaRT is available as a neuralSPOT static module and can be integrated into your projects to utilize the latest features and optimizations. Follow these steps to build and configure the module:
-
-### 1. Clone the heliaRT Repository
-
-Start by cloning the heliaRT repository and checking out the latest commit:
-
-```bash
-git clone https://github.com/AmbiqAI/helia-rt
-```
-
-### 2. Build the NeuralSPOT Module
-
-Navigate to the cloned directory and execute the build script. This script prepares both GCC and Arm Clang toolchain versions, which are automatically downloaded and configured. Specify a local toolchain by setting `$TARGET_TOOLCHAIN_ROOT` or adjust the toolchain used with the `build.sh` script's `$TOOLCHAIN` variable.
-
-```bash
-cd helia-rt
-./neuralspot/build.sh
-```
-
-This process generates a static module in the `build` directory structured as follows:
-
-```plaintext
-build/
-├── LICENSE
-├── lib
-│   ├── libtensorflow-microlite-cm4-armclang-debug.a
-│   ├── libtensorflow-microlite-cm4-armclang-release-with-logs.a
-│   ├── libtensorflow-microlite-cm4-armclang-release.a
-│   ├── libtensorflow-microlite-cm4-gcc-debug.a
-│   ├── libtensorflow-microlite-cm4-gcc-release-with-logs.a
-│   ├── libtensorflow-microlite-cm4-gcc-release.a
-│   ├── libtensorflow-microlite-cm55-armclang-debug.a
-│   ├── libtensorflow-microlite-cm55-armclang-release-with-logs.a
-│   ├── libtensorflow-microlite-cm55-armclang-release.a
-│   ├── libtensorflow-microlite-cm55-gcc-debug.a
-│   ├── libtensorflow-microlite-cm55-gcc-release-with-logs.a
-│   └── libtensorflow-microlite-cm55-gcc-release.a
-├── module.mk
-├── signal
-│   ├── micro
-│   └── src
-├── tensorflow
-│   ├── compiler
-│   └── lite
-└── third_party
-    ├── cmsis
-    ├── flatbuffers
-    ├── gemmlowp
-    ├── kissfft
-    ├── ns_cmsis_nn
-    └── ruy
-```
-
-The `lib` directory contains static libraries for various configurations, and `module.mk` describes the module and its dependencies within neuralSPOT.
-
-### 3. Integrate the Module into Your NeuralSPOT Project
-
-To integrate the built module with your project, copy the `build` directory to the neuralSPOT project directory:
-
-```bash
-cp -r helia-rt/build neuralspot/extern/ns_tflm_bleeding_edge
-```
-
-### 4. Configure NeuralSPOT to Use the Bleeding Edge Module
-
-Define the module version in your project's makefile settings to use the bleeding edge version:
-
-```bash
-$TF_VERSION := ns_tflm_bleeding_edge
-```
-
-Alternatively, specify this version directly when using the `ns_autodeploy` tool:
-
-```bash
-ns_autodeploy --tensorflow-version=ns_tflm_bleeding_edge
-```
-
-These steps ensure that your project utilizes the latest heliaRT features, enhancing functionality and performance on supported Ambiq SoCs.
-
-
-## Zephyr Integration
-
-Coming soon...
-
-
-## Building heliaRT from Source
-
-To integrate heliaRT into AmbiqSuite or a third-party project, you can build TFLM from source. The following steps will guide you through the high-level process of building TFLM from source into a static library.
-
-1. **Clone the heliaRT repository and checkout the latest commit.**
-
-```bash
-git clone https://github.com/AmbiqAI/helia-rt
-```
-
-2. **(Optional) Open the repository as a VSCode devcontainer.**
-
-This will install all the required dependencies and set up the environment for building TFLM.
-
-
-3. **Configure the build environment.**
-
-Be sure to configure the variables below to match your target architecture and toolchain.
-
-
-```bash
-
-cd helia-rt
-
-source tensorflow/lite/micro/tools/ci_build/helper_functions.sh
-
-TARGET_ARCH=cortex-m55  # one of cortex-m4+fp, cortex-m55
-TOOLCHAIN=gcc  # one of gcc, armclang
-BUILD_TYPE=release # one of debug, release, release-with-logs
-
-TARGET=cortex_m_generic
-OPTIMIZED_KERNEL=ambiq # <- use ambiq optimized kernels
-
-```
-
-4. **Download the third-party dependencies.**
-
-```bash
-
-readable_run make -f tensorflow/lite/micro/tools/make/Makefile \
-    OPTIMIZED_KERNEL_DIR=${OPTIMIZED_KERNEL} \
-    TARGET=${TARGET} \
-    TARGET_ARCH=${TARGET_ARCH} \
-    TOOLCHAIN=${TOOLCHAIN} \
-    third_party_downloads
-
-```
-
-5. **Build the static library.**
-
-```bash
-readable_run make -f tensorflow/lite/micro/tools/make/Makefile \
-    TARGET=${TARGET} \
-    TARGET_ARCH="${TARGET_ARCH} \
-    TOOLCHAIN=${TOOLCHAIN} \
-    OPTIMIZED_KERNEL_DIR=${OPTIMIZED_KERNEL} \
-    BUILD_TYPE=${BUILD} \
-    microlite -j8
-```
-
-The static library will be generated to `gen/${TARGET}_${TARGET_ARCH}_${BUILD}_${OPTIM_KERNEL}_${TOOLCHAIN}/lib/libtensorflow-microlite.a`. The library can be linked into your project using the standard linker flags.
-
-6. **(Optional) Generate heliaRT tree for intellisense and debugging.**
-
-```bash
-python3 /tensorflow/lite/micro/tools/project_generation/create_tflm_tree.py \
-  --makefile_options "TARGET=$TARGET TARGET_ARCH=$TARGET_ARCH OPTIMIZED_KERNEL_DIR=$OPTIM_KERNEL" \
-  "gen/${TARGET}_${TARGET_ARCH}_${BUILD}_${OPTIM_KERNEL}_${TOOLCHAIN}"
-```
-
-This will generate `signal`, `tensorflow`, and `third_party` directories in the `gen/${TARGET}_${TARGET_ARCH}_${BUILD}_${OPTIM_KERNEL}_${TOOLCHAIN}` directory. These directories contain the source code for the module for intellisense and debugging.
+- [Features](../features/index.md)
+- [Zephyr setup](zephyr.md)
+- [neuralSPOT setup](neuralspot.md)
+- [Source builds](source.md)
+- [Examples](../examples/index.md)

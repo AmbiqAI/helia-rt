@@ -60,31 +60,10 @@ jobs:
       NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
 
     steps:
-      - name: Resolve ref and tag
-        id: meta
-        shell: bash
-        run: |
-          set -euo pipefail
-          ref_in='${{ inputs.ref }}'
-          tag_in='${{ inputs.tag }}'
-          upload_in='${{ inputs.upload_to_release }}'
-          if [[ -z "${ref_in}" ]]; then
-            echo "::error ::Input ref is required."; exit 1;
-          fi
-          if [[ -z "${tag_in}" ]]; then
-            tag_in="${ref_in}"
-          fi
-          if [[ -z "${upload_in}" ]]; then
-            upload_in="false"
-          fi
-          echo "ref=${ref_in}" >> "$GITHUB_OUTPUT"
-          echo "tag=${tag_in}" >> "$GITHUB_OUTPUT"
-          echo "upload=${upload_in}" >> "$GITHUB_OUTPUT"
-
       - name: Check out code
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.meta.outputs.ref }}
+          ref: ${{ inputs.ref }}
 
       - name: Mark workspace safe
         run: git config --global --add safe.directory '*'
@@ -130,25 +109,18 @@ jobs:
       run:
         shell: bash
     steps:
-      - name: Determine tag/ref
-        id: info
-        shell: bash
-        run: |
-          set -euo pipefail
-          REF="${{ inputs.ref }}"
-          TAG="${{ inputs.tag }}"
-          if [[ -z "${REF}" ]]; then
-            echo "::error ::Input ref is required."; exit 1;
-          fi
-          if [[ -z "${TAG}" ]]; then
-            TAG="${REF}"
-          fi
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
       - name: Check out code (to fetch neuralspot/module.mk)
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.info.outputs.tag }}
+          ref: ${{ inputs.ref }}
+
+      - name: Determine tag/ref
+        id: info
+        run: |
+          tensorflow/lite/micro/tools/ci_build/resolve_release_meta.sh \
+            --ref '${{ inputs.ref }}' \
+            --tag '${{ inputs.tag }}'
+          echo "sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
 
       - name: Download all neuralSPOT combos
         uses: actions/download-artifact@v4
@@ -158,57 +130,16 @@ jobs:
 
       - name: Assemble neuralSPOT bundle (lib + tflm + module.mk)
         run: |
-          set -euo pipefail
-          TAG='${{ steps.info.outputs.tag }}'
-          SHA='${{ steps.info.outputs.sha }}'
-          BUNDLE="neuralspot-helios-rt-${TAG}"
-          mkdir -p "${BUNDLE}/lib"
-
-          echo "== Collecting libraries into ${BUNDLE}/lib =="
-          find artifacts -type f -path "*/lib/*.a" -print -exec cp -v {} "${BUNDLE}/lib/" \;
-
-          echo "== Selecting one tflm tree into ${BUNDLE}/ =="
-          CAND="$(find artifacts -type d -path '*/tflm' | sort | head -n1 || true)"
-          [[ -z "$CAND" ]] && { echo "::error ::No tflm tree found in artifacts"; exit 1; }
-          cp -a "${CAND}/." "${BUNDLE}/"
-
-          echo "== Prune ns-cmsis-nn to headers only =="
-          NS_CMSIS_NN_DIR="${BUNDLE}/third_party/ns_cmsis_nn"
-          if [[ -d "${NS_CMSIS_NN_DIR}" ]]; then
-            find "${NS_CMSIS_NN_DIR}" -type f \
-              ! \( \
-                \( -path "${NS_CMSIS_NN_DIR}/Include/*" -a \( -name '*.h' -o -name '*.hpp' \) \) \
-                -o -name 'LICENSE' \
-              \) \
-              -delete
-            find "${NS_CMSIS_NN_DIR}" -depth -type d -empty -delete
-          fi
-
-          echo "== Copy neuralSPOT module.mk to bundle root =="
-          if [[ -f "neuralspot/module.mk" ]]; then
-            cp neuralspot/module.mk "${BUNDLE}/module.mk"
-          else
-            echo "::error ::neuralspot/module.mk not found"; exit 1
-          fi
-
-          echo "== Write MANIFEST =="
-          {
-            echo "neuralspot-helios-rt ${TAG}"
-            echo "Commit: ${SHA}"
-            echo
-            echo "Libraries:"
-            ls -1 "${BUNDLE}/lib"
-          } > "${BUNDLE}/MANIFEST.txt"
-
-          echo "== Final bundle structure =="
-          find "${BUNDLE}" -maxdepth 2 -type f -print
+          tensorflow/lite/micro/tools/ci_build/package_neuralspot_bundle.sh \
+            --artifacts-dir artifacts \
+            --checkout-dir "${GITHUB_WORKSPACE}" \
+            --tag '${{ steps.info.outputs.tag }}' \
+            --sha '${{ steps.info.outputs.sha }}' \
+            --bundle-prefix neuralspot-helios-rt \
+            --upload-dir upload
 
       - name: Zip neuralSPOT bundle
-        run: |
-          TAG='${{ steps.info.outputs.tag }}'
-          ZIP="neuralspot-helios-rt-${TAG}.zip"
-          zip -r "${ZIP}" "neuralspot-helios-rt-${TAG}"
-          mkdir -p upload && mv "${ZIP}" upload/
+        run: ls -1 upload/*.zip
 
       - name: Upload neuralSPOT bundle artifact
         uses: actions/upload-artifact@v4
@@ -220,17 +151,9 @@ jobs:
         if: ${{ inputs.upload_to_release == true || inputs.upload_to_release == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
         run: |
-          set -euo pipefail
-          TAG='${{ steps.info.outputs.tag }}'
-          ZIP="upload/neuralspot-helios-rt-${TAG}.zip"
-          if [[ ! -f "$ZIP" ]]; then
-            echo "::error ::Zip artifact $ZIP not found"; exit 1
-          fi
-          echo "Attempting upload of $ZIP to release $TAG (no pre-check)";
-          if gh release upload "$TAG" "$ZIP" --repo "$GITHUB_REPOSITORY" --clobber; then
-            echo "Upload succeeded.";
-          else
-            echo "::warning ::Upload failed (release may not exist). Create the release tag $TAG then re-run or trigger a release event.";
-          fi
+          source tensorflow/lite/micro/tools/ci_build/release_asset_helpers.sh
+          upload_bundle_to_release \
+            '${{ steps.info.outputs.tag }}' \
+            "upload/neuralspot-helios-rt-${{ steps.info.outputs.tag }}.zip" \
+            "${GITHUB_REPOSITORY}"
