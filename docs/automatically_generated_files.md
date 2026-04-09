@@ -25,10 +25,10 @@ to the `microlite_test` call in the example's Makefile and `generate_cc_arrays`
 should be used to create cc and header sources in the BUILD file.
 
 For reference, see the
-[Makefile](https://github.com/tensorflow/tflite-micro/blob/main/tensorflow/lite/micro/examples/hello_world/Makefile.inc)
-and [BUILD](https://github.com/tensorflow/tflite-micro/blob/main/tensorflow/lite/micro/examples/hello_world/BUILD)
+[Makefile](https://github.com/AmbiqAI/helia-rt/blob/main/tensorflow/lite/micro/examples/hello_world/Makefile.inc)
+and [BUILD](https://github.com/AmbiqAI/helia-rt/blob/main/tensorflow/lite/micro/examples/hello_world/BUILD)
 files in the [hello_world
-example](https://github.com/tensorflow/tflite-micro/tree/main/tensorflow/lite/micro/examples/hello_world).
+example](https://github.com/AmbiqAI/helia-rt/tree/main/tensorflow/lite/micro/examples/hello_world).
 
 The generated cc and header files can be found in
 `gen/<target>/genfiles/<path to example>`.

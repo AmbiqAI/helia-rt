@@ -24,7 +24,8 @@ Expected layout for the public source path:
 │   └── ...
 ├── modules/
 │   ├── helia-rt/
-│   └── cmsis-nn/               # raw module path when using open CMSIS-NN
+│   ├── cmsis-nn/               # raw module path when using open CMSIS-NN
+│   └── ns-cmsis-nn/            # raw module path when using HELIA (private, Ambiq-provided)
 └── app/
     └── helia_rt_app/
         ├── CMakeLists.txt
@@ -76,7 +77,7 @@ The raw/source module supports three backend choices:
 - `CMSIS-NN`: open-source Arm CMSIS-NN backend
 - `HELIA`: Ambiq-optimized backend provided through a separate Ambiq-distributed module
 
-On Cortex-M builds with an enabled open CMSIS-NN module, `CMSIS-NN` is the default raw-module backend. Otherwise `Reference` is the default.
+On Cortex-M builds where `CONFIG_CMSIS_NN=y` is set (provided by the open CMSIS-NN Zephyr module), the `CMSIS-NN` backend is the auto-selected default. Otherwise `Reference` is the default.
 
 Cloning `helia-rt` alone gives you a working source integration path, but it does not include HELIA acceleration. The public source path uses `Reference` or open `CMSIS-NN`. To use `HELIA`, you need access to Ambiq's private backend module, currently distributed as `ns-cmsis-nn`.
 
@@ -152,6 +153,7 @@ cp -r <path-to-cmsis-nn> <ws>/modules/cmsis-nn
 Example `prj.conf`:
 
 ```conf
+CONFIG_CMSIS_NN=y
 CONFIG_HELIA_RT=y
 CONFIG_HELIA_RT_BACKEND_CMSIS_NN=y
 ```
@@ -201,6 +203,7 @@ cp -r <path-to-ns-cmsis-nn> <ws>/modules/ns-cmsis-nn
 Example `prj.conf`:
 
 ```conf
+CONFIG_NS_CMSIS_NN=y
 CONFIG_HELIA_RT=y
 CONFIG_HELIA_RT_BACKEND_HELIA=y
 ```
@@ -236,7 +239,7 @@ Application layout:
 
 ### `CMakeLists.txt`
 
-Raw module:
+Raw module (Reference):
 
 ```cmake
 cmake_minimum_required(VERSION 3.20.0)
@@ -304,19 +307,7 @@ target_sources(app PRIVATE src/main.cpp)
 
 ### `prj.conf`
 
-Raw module:
-
-```conf
-CONFIG_FPU=y
-CONFIG_PRINTK=y
-CONFIG_CONSOLE=y
-CONFIG_UART_CONSOLE=y
-
-CONFIG_HELIA_RT=y
-CONFIG_HELIA_RT_BACKEND_CMSIS_NN=y
-```
-
-Raw module with `Reference`:
+Raw module (Reference):
 
 ```conf
 CONFIG_FPU=y
@@ -328,6 +319,19 @@ CONFIG_HELIA_RT=y
 CONFIG_HELIA_RT_BACKEND_REFERENCE=y
 ```
 
+Raw module with open `CMSIS-NN`:
+
+```conf
+CONFIG_FPU=y
+CONFIG_PRINTK=y
+CONFIG_CONSOLE=y
+CONFIG_UART_CONSOLE=y
+
+CONFIG_CMSIS_NN=y
+CONFIG_HELIA_RT=y
+CONFIG_HELIA_RT_BACKEND_CMSIS_NN=y
+```
+
 Raw module with `HELIA`:
 
 ```conf
@@ -336,6 +340,7 @@ CONFIG_PRINTK=y
 CONFIG_CONSOLE=y
 CONFIG_UART_CONSOLE=y
 
+CONFIG_NS_CMSIS_NN=y
 CONFIG_HELIA_RT=y
 CONFIG_HELIA_RT_BACKEND_HELIA=y
 ```
@@ -353,6 +358,8 @@ CONFIG_HELIA_RT_PREBUILT_BUILD_RELEASE=y
 ```
 
 Use `CONFIG_HELIA_RT_PREBUILT_BUILD_DEBUG=y` or `CONFIG_HELIA_RT_PREBUILT_BUILD_RELEASE_WITH_LOGS=y` when you need another published prebuilt flavor.
+
+> **Note:** The `HELIA_RT_PREBUILT_BUILD_*` symbols are defined in the prebuilt bundle's own Kconfig, not in the raw module Kconfig. They are only available when using the prebuilt bundle.
 
 For the raw/source module:
 

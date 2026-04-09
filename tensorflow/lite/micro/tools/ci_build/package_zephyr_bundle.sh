@@ -73,7 +73,7 @@ if [[ -f "${CHECKOUT_DIR}/LICENSE" ]]; then
   cp "${CHECKOUT_DIR}/LICENSE" "${BUNDLE_DIR}/LICENSE"
 fi
 
-MANIFEST_EXTRA=$'Backend: Ambiq optimized (embedded ns-cmsis-nn)\nSupported matrix: cortex-m4+fp, cortex-m55 x gcc, armclang x debug, release, release_with_logs'
+MANIFEST_EXTRA=$'Backend: HELIA (Ambiq optimized, embedded ns-cmsis-nn)\nSupported matrix: cortex-m4+fp, cortex-m55 x gcc, armclang x debug, release, release_with_logs'
 echo "== Writing MANIFEST =="
 write_manifest "${BUNDLE_PREFIX}" "${TAG}" "${SHA}" "${BUNDLE_DIR}/lib" "${BUNDLE_DIR}/MANIFEST.txt" "${MANIFEST_EXTRA}"
 

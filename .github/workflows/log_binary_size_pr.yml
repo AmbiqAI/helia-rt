@@ -38,7 +38,7 @@ jobs:
       (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci:test')) ||
       github.event_name == 'schedule'
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
         token: ${{ secrets.TFLM_BOT_REPO_TOKEN }}
@@ -56,8 +56,8 @@ jobs:
          token: ${{ secrets.TFLM_BOT_REPO_TOKEN }}
          title: Automated binary size log update
          commit-message: Automated binary size log update
-         committer: TFLM-bot <tflm-github-bot@google.com>
-         author: TFLM-bot <tflm-github-bot@google.com>
+         committer: heliaRT-bot <helia-rt-bot@ambiq.com>
+         author: heliaRT-bot <helia-rt-bot@ambiq.com>
          body: "BUG=automated binary size log update"
          labels: ci:run
-         reviewers: advaitjain
+         reviewers: apage224

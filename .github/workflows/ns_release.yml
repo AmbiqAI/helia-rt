@@ -138,7 +138,7 @@ jobs:
             --bundle-prefix neuralspot-helios-rt \
             --upload-dir upload
 
-      - name: Zip neuralSPOT bundle
+      - name: List neuralSPOT bundle
         run: ls -1 upload/*.zip
 
       - name: Upload neuralSPOT bundle artifact

@@ -10,7 +10,7 @@ if(CONFIG_HELIA_RT)
     ${HELIA_RT_DIR}/third_party/flatbuffers/include
     ${HELIA_RT_DIR}/third_party/ruy
     ${HELIA_RT_DIR}/third_party/kissfft
-    ${HELIA_RT_DIR}/third_party/cmsis_nn/Include
+    ${HELIA_RT_DIR}/third_party/ns_cmsis_nn/Include
   )
 
   zephyr_library_compile_definitions(NS_CMSIS_NN)

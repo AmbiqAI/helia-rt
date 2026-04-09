@@ -11,6 +11,7 @@ on:
 jobs:
 
   build_docker_image:
+    if: github.event.pull_request.merged == true
     uses: ./.github/workflows/ambiq_build_docker_image.yml
     with:
       trigger-sha: ${{ github.event.pull_request.head.sha }}

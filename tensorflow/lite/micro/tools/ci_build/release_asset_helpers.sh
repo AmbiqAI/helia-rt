@@ -41,19 +41,21 @@ emit_release_meta() {
 
 prune_cmsis_nn_to_headers() {
   local bundle_root="$1"
-  local cmsis_dir="${bundle_root}/third_party/cmsis_nn"
+  local dir
 
-  if [[ ! -d "${cmsis_dir}" ]]; then
-    return 0
-  fi
+  for dir in "${bundle_root}/third_party/cmsis_nn" "${bundle_root}/third_party/ns_cmsis_nn"; do
+    if [[ ! -d "${dir}" ]]; then
+      continue
+    fi
 
-  find "${cmsis_dir}" -type f \
-    ! \( \
-      \( -path "${cmsis_dir}/Include/*" -a \( -name '*.h' -o -name '*.hpp' \) \) \
-      -o -name 'LICENSE' \
-    \) \
-    -delete
-  find "${cmsis_dir}" -depth -type d -empty -delete
+    find "${dir}" -type f \
+      ! \( \
+        \( -path "${dir}/Include/*" -a \( -name '*.h' -o -name '*.hpp' \) \) \
+        -o -name 'LICENSE' \
+      \) \
+      -delete
+    find "${dir}" -depth -type d -empty -delete
+  done
 }
 
 copy_archives_from_artifacts() {

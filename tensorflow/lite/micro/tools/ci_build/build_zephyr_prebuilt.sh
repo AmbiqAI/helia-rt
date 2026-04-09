@@ -49,7 +49,7 @@ done
   --arch "${ARCH}" \
   --build "${BUILD}" \
   --toolchain "${TOOLCHAIN}" \
-  --optimized-kernel-dir cmsis_nn \
+  --optimized-kernel-dir ambiq \
   --outdir "${OUTDIR}"
 
 case "${ARCH}" in

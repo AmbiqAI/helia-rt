@@ -2,10 +2,10 @@ site_name: heliaRT
 site_dir: "site"
 site_url: "https://ambiqai.github.io/helia-rt"
 site_description: heliaRT, optimized TFLM tailored for Ambiq SoCs
-repo_name: ""
-repo_url: ""
+repo_name: "AmbiqAI/helia-rt"
+repo_url: "https://github.com/AmbiqAI/helia-rt"
 edit_uri: ""
-copyright: Copyright &copy; 2025 Ambiq
+copyright: Copyright &copy; 2025-2026 Ambiq
 
 nav:
   - Home: index.md
