@@ -146,7 +146,8 @@ make -f "${MAKE_DIR}/Makefile" \
 make -f "${MAKE_DIR}/Makefile" clean
 
 # ---------------------------- Build library -----------------------------------
-make -j"$(nproc)" -f "${MAKE_DIR}/Makefile" \
+JOBS="$(command -v nproc >/dev/null 2>&1 && nproc || echo 4)"
+make -j"${JOBS}" -f "${MAKE_DIR}/Makefile" \
   TARGET="${TARGET}" \
   TARGET_ARCH="${ARCH}" \
   TOOLCHAIN="${TOOLCHAIN}" \

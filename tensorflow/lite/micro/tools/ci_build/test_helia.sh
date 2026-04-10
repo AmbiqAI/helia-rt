@@ -30,7 +30,7 @@ TARGET=cortex_m_corstone_300
 # --------------------------- Arg parsing --------------------------------------
 usage() {
   cat <<'USAGE'
-Usage: helia_test.sh [options]
+Usage: test_helia.sh [options]
 
 Options:
   -a, --arch <cortex-m55|cortex-m4|cortex-m4+fp|...>   Target CPU arch (default: cortex-m55)
@@ -41,10 +41,10 @@ Options:
   -h, --help                                           Show this help
 
 Examples:
-  ./helia_test.sh
-  ./helia_test.sh -a cortex-m4 -t gcc
-  ./helia_test.sh --no-tests
-  ./helia_test.sh -O SPEED --build-only
+  ./test_helia.sh
+  ./test_helia.sh -a cortex-m4 -t gcc
+  ./test_helia.sh --no-tests
+  ./test_helia.sh -O SPEED --build-only
 USAGE
 }
 
