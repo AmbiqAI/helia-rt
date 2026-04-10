@@ -39,13 +39,13 @@ Please note that this setup is unsupported and will need users to debug various
 issues on their own. It is described here for illustrative purposes only.
 
 ```sh
-# The cloned tflite-micro folder needs to be renamed to tflite_micro
-mv tflite-micro tflite_micro
+# The cloned helia-rt folder needs to be renamed to helia_rt
+mv helia-rt helia_rt
 # To set up a specific Python version, make sure `python` is pointed to the
-# desired version. For example, call `python3.11 -m venv tflite_micro/venv`.
-python -m venv tflite_micro/venv
-echo "export PYTHONPATH=\${PYTHONPATH}:${PWD}" >> tflite_micro/venv/bin/activate
-cd tflite_micro
+# desired version. For example, call `python3.11 -m venv helia_rt/venv`.
+python -m venv helia_rt/venv
+echo "export PYTHONPATH=\${PYTHONPATH}:${PWD}" >> helia_rt/venv/bin/activate
+cd helia_rt
 source venv/bin/activate
 pip install --upgrade pip
 pip install -r third_party/python_requirements.txt
@@ -59,4 +59,3 @@ Run some tests and binaries:
 python tensorflow/lite/tools/flatbuffer_utils_test.py
 python tensorflow/lite/tools/visualize.py tensorflow/lite/micro/models/person_detect.tflite tensorflow/lite/micro/models/person_detect.tflite.html
 ```
-

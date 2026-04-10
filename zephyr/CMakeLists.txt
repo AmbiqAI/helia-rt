@@ -1,6 +1,7 @@
 if(CONFIG_HELIA_RT)
 
   set(HELIA_RT_DIR ${ZEPHYR_CURRENT_MODULE_DIR})
+  set(HELIA_RT_KERNEL_ROOT ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels)
 
   zephyr_library_named(helia_rt)
 
@@ -12,17 +13,98 @@ if(CONFIG_HELIA_RT)
     ${HELIA_RT_DIR}/third_party_static/kissfft
   )
 
-  # Select optimized vs reference kernels
-  if(CONFIG_NS_CMSIS_NN)
-    set(OPTIMIZED_KERNEL_DIR ambiq)
-    # Fixes imports to start w/ Include/
-    set(tflm_cmsis_nn_glue_path ${ZEPHYR_NS_CMSIS_NN_MODULE_DIR})
-    zephyr_library_include_directories(${tflm_cmsis_nn_glue_path})
+  # Select reference, open CMSIS-NN, or HELIA kernel sources.
+  set(HELIA_RT_OPTIMIZED_KERNEL_DIR "")
+  set(HELIA_RT_EXTERNAL_KERNEL_MODULE_DIR "")
+  set(HELIA_RT_BACKEND_EXTRA_SOURCES "")
+
+  if(CONFIG_HELIA_RT_BACKEND_CMSIS_NN)
+    if(DEFINED ZEPHYR_CMSIS_NN_MODULE_DIR AND EXISTS "${ZEPHYR_CMSIS_NN_MODULE_DIR}")
+      set(HELIA_RT_EXTERNAL_KERNEL_MODULE_DIR "${ZEPHYR_CMSIS_NN_MODULE_DIR}")
+    else()
+      message(FATAL_ERROR
+        "CONFIG_HELIA_RT_BACKEND_CMSIS_NN requires an open CMSIS-NN Zephyr module. "
+        "Add the CMSIS-NN module to your workspace or select the REFERENCE backend.")
+    endif()
+
+    set(HELIA_RT_OPTIMIZED_KERNEL_DIR cmsis_nn)
+    zephyr_library_compile_definitions(CMSIS_NN)
+  elseif(CONFIG_HELIA_RT_BACKEND_HELIA)
+    if(DEFINED ZEPHYR_NS_CMSIS_NN_MODULE_DIR AND EXISTS "${ZEPHYR_NS_CMSIS_NN_MODULE_DIR}")
+      set(HELIA_RT_EXTERNAL_KERNEL_MODULE_DIR "${ZEPHYR_NS_CMSIS_NN_MODULE_DIR}")
+    else()
+      message(FATAL_ERROR
+        "CONFIG_HELIA_RT_BACKEND_HELIA requires Ambiq's HELIA acceleration module, "
+        "currently distributed as ns-cmsis-nn. Add that module to your workspace "
+        "or select the REFERENCE or CMSIS-NN backend.")
+    endif()
+
+    set(HELIA_RT_OPTIMIZED_KERNEL_DIR ambiq)
+    list(APPEND HELIA_RT_BACKEND_EXTRA_SOURCES
+      ${HELIA_RT_KERNEL_ROOT}/ambiq/conv2d_common.cc
+    )
     zephyr_library_compile_definitions(NS_CMSIS_NN)
     zephyr_library_compile_definitions(AMBIQ)
-  else()
-    set(OPTIMIZED_KERNEL_DIR "")
   endif()
+
+  if(HELIA_RT_EXTERNAL_KERNEL_MODULE_DIR)
+    # Fixes imports that start with Include/ and pulls in CMSIS-Core headers.
+    zephyr_library_include_directories(${HELIA_RT_EXTERNAL_KERNEL_MODULE_DIR})
+    if(EXISTS "${HELIA_RT_EXTERNAL_KERNEL_MODULE_DIR}/Include")
+      zephyr_library_include_directories(${HELIA_RT_EXTERNAL_KERNEL_MODULE_DIR}/Include)
+    endif()
+    if(EXISTS "${HELIA_RT_EXTERNAL_KERNEL_MODULE_DIR}/CMSIS/Core/Include")
+      zephyr_library_include_directories(${HELIA_RT_EXTERNAL_KERNEL_MODULE_DIR}/CMSIS/Core/Include)
+    endif()
+  endif()
+
+  function(helia_rt_select_kernel_source out_var relative_path)
+    if(HELIA_RT_OPTIMIZED_KERNEL_DIR)
+      set(candidate "${HELIA_RT_KERNEL_ROOT}/${HELIA_RT_OPTIMIZED_KERNEL_DIR}/${relative_path}")
+      if(EXISTS "${candidate}")
+        set(${out_var} "${candidate}" PARENT_SCOPE)
+        return()
+      endif()
+    endif()
+
+    set(${out_var} "${HELIA_RT_KERNEL_ROOT}/${relative_path}" PARENT_SCOPE)
+  endfunction()
+
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_ACTIVATIONS activations.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_ADD add.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_BATCH_MATMUL batch_matmul.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_COMPARISONS comparisons.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_CONCATENATION concatenation.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_CONV conv.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_DEPTHWISE_CONV depthwise_conv.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_DEQUANTIZE dequantize.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_FILL fill.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_FULLY_CONNECTED fully_connected.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_HARD_SWISH hard_swish.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_LEAKY_RELU leaky_relu.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_LEAKY_RELU_COMMON leaky_relu_common.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_LOGISTIC logistic.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_MAXIMUM_MINIMUM maximum_minimum.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_MUL mul.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_PACK pack.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_PAD pad.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_POOLING pooling.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_QUANTIZE_COMMON quantize_common.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_REDUCE reduce.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_REDUCE_COMMON reduce_common.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_RESHAPE reshape.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_SOFTMAX softmax.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_SPLIT split.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_SPLIT_V split_v.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_SQUEEZE squeeze.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_STRIDED_SLICE strided_slice.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_SUB sub.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_SVDF svdf.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_TANH tanh.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_TRANSPOSE transpose.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_TRANSPOSE_CONV transpose_conv.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_UNIDIRECTIONAL_SEQUENCE_LSTM unidirectional_sequence_lstm.cc)
+  helia_rt_select_kernel_source(HELIA_RT_KERNEL_ZEROS_LIKE zeros_like.cc)
 
   if (CONFIG_ETHOS_U)
     set(ETHOSU_CO_PROCESSOR ethos_u)
@@ -85,14 +167,14 @@ if(CONFIG_HELIA_RT)
     ${HELIA_RT_DIR}/tensorflow/lite/kernels/kernel_util.cc
     ${HELIA_RT_DIR}/tensorflow/lite/core/api/flatbuffer_conversions.cc
     ${HELIA_RT_DIR}/tensorflow/lite/core/api/tensor_utils.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/activations.cc
+    ${HELIA_RT_KERNEL_ACTIVATIONS}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/activations_common.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/add.cc
+    ${HELIA_RT_KERNEL_ADD}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/add_common.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/add_n.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/arg_min_max.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/assign_variable.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/batch_matmul.cc
+    ${HELIA_RT_KERNEL_BATCH_MATMUL}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/batch_matmul_common.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/batch_to_space_nd.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/broadcast_args.cc
@@ -102,15 +184,15 @@ if(CONFIG_HELIA_RT)
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/ceil.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/circular_buffer.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/circular_buffer_common.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/comparisons.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/concatenation.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/conv.cc
+    ${HELIA_RT_KERNEL_COMPARISONS}
+    ${HELIA_RT_KERNEL_CONCATENATION}
+    ${HELIA_RT_KERNEL_CONV}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/conv_common.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/cumsum.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/depth_to_space.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/depthwise_conv.cc
+    ${HELIA_RT_KERNEL_DEPTHWISE_CONV}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/depthwise_conv_common.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/dequantize.cc
+    ${HELIA_RT_KERNEL_DEQUANTIZE}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/dequantize_common.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/detection_postprocess.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/div.cc
@@ -120,49 +202,49 @@ if(CONFIG_HELIA_RT)
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${ETHOSU_CO_PROCESSOR}/ethosu.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/exp.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/expand_dims.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/fill.cc
+    ${HELIA_RT_KERNEL_FILL}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/floor.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/floor_div.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/floor_mod.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/fully_connected.cc
+    ${HELIA_RT_KERNEL_FULLY_CONNECTED}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/fully_connected_common.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/gather.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/gather_nd.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/hard_swish.cc
+    ${HELIA_RT_KERNEL_HARD_SWISH}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/hard_swish_common.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/if.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/kernel_runner.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/kernel_util.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/l2_pool_2d.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/l2norm.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/leaky_relu.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/leaky_relu_common.cc
+    ${HELIA_RT_KERNEL_LEAKY_RELU}
+    ${HELIA_RT_KERNEL_LEAKY_RELU_COMMON}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/log_softmax.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/logical.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/logical_common.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/logistic.cc
+    ${HELIA_RT_KERNEL_LOGISTIC}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/logistic_common.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/lstm_eval.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/lstm_eval_common.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/maximum_minimum.cc
+    ${HELIA_RT_KERNEL_MAXIMUM_MINIMUM}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/micro_tensor_utils.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/mirror_pad.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/mul.cc
+    ${HELIA_RT_KERNEL_MUL}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/mul_common.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/neg.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/pack.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/pad.cc
+    ${HELIA_RT_KERNEL_PACK}
+    ${HELIA_RT_KERNEL_PAD}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/pad_common.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/pooling.cc
+    ${HELIA_RT_KERNEL_POOLING}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/pooling_common.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/prelu.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/prelu_common.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/quantize.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/quantize_common.cc
+    ${HELIA_RT_KERNEL_QUANTIZE_COMMON}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/read_variable.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/reduce.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/reduce_common.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/reshape.cc
+    ${HELIA_RT_KERNEL_REDUCE}
+    ${HELIA_RT_KERNEL_REDUCE_COMMON}
+    ${HELIA_RT_KERNEL_RESHAPE}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/reshape_common.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/resize_bilinear.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/resize_nearest_neighbor.cc
@@ -171,29 +253,30 @@ if(CONFIG_HELIA_RT)
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/select.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/shape.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/slice.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/softmax.cc
+    ${HELIA_RT_KERNEL_SOFTMAX}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/softmax_common.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/space_to_batch_nd.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/space_to_depth.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/split.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/split_v.cc
+    ${HELIA_RT_KERNEL_SPLIT}
+    ${HELIA_RT_KERNEL_SPLIT_V}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/squared_difference.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/squeeze.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/strided_slice.cc
+    ${HELIA_RT_KERNEL_SQUEEZE}
+    ${HELIA_RT_KERNEL_STRIDED_SLICE}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/strided_slice_common.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/sub.cc
+    ${HELIA_RT_KERNEL_SUB}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/sub_common.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/svdf.cc
+    ${HELIA_RT_KERNEL_SVDF}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/svdf_common.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/tanh.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/transpose.cc
+    ${HELIA_RT_KERNEL_TANH}
+    ${HELIA_RT_KERNEL_TRANSPOSE}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/transpose_common.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/transpose_conv.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/unidirectional_sequence_lstm.cc
+    ${HELIA_RT_KERNEL_TRANSPOSE_CONV}
+    ${HELIA_RT_KERNEL_UNIDIRECTIONAL_SEQUENCE_LSTM}
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/unpack.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/var_handle.cc
     ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/while.cc
-    ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/${OPTIMIZED_KERNEL_DIR}/zeros_like.cc
+    ${HELIA_RT_KERNEL_ZEROS_LIKE}
+    ${HELIA_RT_BACKEND_EXTRA_SOURCES}
   )
 
 endif()

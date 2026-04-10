@@ -3,103 +3,57 @@
 [![](./assets/helia-rt-banner-light.png#only-light)](https://ambiqai.github.io/helia-rt/)
 [![](./assets/helia-rt-banner-dark.png#only-dark)](https://ambiqai.github.io/helia-rt/)
 
-## 📖 Overview
+## Built for Ambiq Edge AI
 
-Welcome to heliaRT, a specialized fork of TensorFlow Lite for Microcontrollers (TFLM), tailored for Ambiq's Apollo family of ultra-low-power System-on-Chips (SoCs). This project enhances TFLM by optimizing it to leverage the advanced hardware intrinsics of the Apollo series, such as Matrix Vector Extensions (MVE) and Digital Signal Processing (DSP) instructions.
+heliaRT is Ambiq's optimized TensorFlow Lite for Microcontrollers runtime for Apollo platforms. It is designed to help developers bring efficient inference to ultra-low-power Ambiq silicon, with tuned kernels that take advantage of Apollo CPU, DSP, and MVE capabilities where available.
 
-## Why heliaRT?
+## Start Here
 
-heliaRT addresses the unique demands of ultra-low-power devices, offering developers the tools to build AI applications that require minimal energy consumption without sacrificing performance. By harnessing the specific capabilities of Ambiq's SoCs, heliaRT enables more efficient neural network inference on devices like smart watches, fitness trackers, and other smart IoT devices.
+- [Getting Started](usage/index.md): choose a setup path for Zephyr, neuralSPOT, or source builds
+- [Features](features/index.md): understand how heliaRT maps onto familiar TFLM concepts
+- [Examples](examples/index.md): see recommended starting points for Ambiq application bring-up
+- [Benchmarks](benchmarks/index.md): review performance-focused documentation for supported Ambiq targets
 
-## 🚀  Key Features
+## Why heliaRT
 
-- **Optimized Performance**: Utilizes MVE and DSP hardware capabilities to enhance computational efficiency and speed.
-- **Energy Efficiency**: Designed to minimize power usage, extending the battery life of edge devices.
-- **Broad Compatibility**: Supports a wide range of Ambiq's Apollo SoCs, ensuring versatile applications across different hardware.
+- Optimized specifically for Ambiq Apollo devices
+- Focused on low-power embedded inference
+- Available as both source and prebuilt integration paths
+- Aligned with Ambiq developer workflows such as neuralSPOT AutoDeploy and Zephyr
 
-Explore our [Getting Started guide](usage/index.md) to dive into the development with heliaRT, or check out the [Benchmarks section](benchmarks/index.md) to see how heliaRT performs under various conditions. Whether you are developing for wearable technology or other smart devices, heliaRT provides a robust framework for embedding AI into your projects.
+## Supported Ambiq Targets
 
-## 📚 Quick Links
+heliaRT is maintained for Ambiq Apollo devices, including:
 
-- **Install heliaRT** and getting up and running in minutes. &nbsp; [:material-clock-fast: Install heliaRT](usage/index.md){ .md-button }
+- Apollo3
+- Apollo4
+- Apollo4 Plus
+- Apollo510
 
-- **Usage Examples** showcasing real-world applications and best practices. &nbsp; [:material-book-open-page-variant: Usage Examples](examples/index.md){ .md-button }
+## Recommended Flows
 
-- **Performance Benchmarks** comparing heliaRT to other frameworks. &nbsp; [:material-chart-bar: Performance Benchmarks](benchmarks/index.md){ .md-button }
+### Start with neuralSPOT
 
+Use [neuralSPOT setup](usage/neuralspot.md) with `ns_autodeploy` when you want the fastest path to profiling a `.tflite` model on Ambiq hardware.
 
-## Getting Started
+### Integrate into Zephyr
 
-Jumpstart your development with [neuralSPOT](https://github.com/AmbiqAI/neuralSPOT), a robust AI SDK optimized for Ambiq's ultra-low-power Apollo SoCs. This toolkit provides comprehensive resources, including the latest stable releases of heliaRT, fully configured for both GCC and Arm Clang across debug and release builds. For a detailed step-by-step guide, refer to our [Getting Started documentation](usage/index.md).
+Use [Zephyr setup](usage/zephyr.md) for a west-workspace-based guide covering both the raw heliaRT Zephyr module and the prebuilt release bundle.
 
+### Build from source
 
-## Operator Support Matrix
+Use [Getting Started](usage/index.md) when you need direct control over architecture, toolchain, and build configuration.
 
-Below is a detailed matrix that outlines the support for various operators across different backends and data types within heliaRT. Each entry indicates whether an operator is supported (`Yes`), not supported (`No`), or not applicable (`N/A`) for the specified data type and backend. "N/A" is used where the operation does not logically apply to the data type, whereas "No" indicates that the operation could be supported but currently isn't.
+## Documentation Highlights
 
-The implementations are categorized under three main technologies:
-- **C**: Standard C implementation.
-- **DSP**: Utilizes Digital Signal Processing instructions.
-- **MVE**: Uses Matrix Vector Extensions.
-
-| Operator          | C <br> int8 | C<br>int16 | C<br>int4* | DSP<br>int8 | DSP<br>int16 | DSP<br>int4* | MVE<br>int8 | MVE<br>int16 | MVE<br>int4* |
-| ----------------- | ----------- | ---------- |------------|-------------| -------------|--------------|-------------| -------------|--------------|
-| add               | Yes         | Yes        | N/A        | Yes         | Yes          | N/A          | Yes         | Yes          | N/A          |
-| batch_matmul      | Yes         | Yes        | No         | Yes         | Yes          | No           | Yes         | Yes          | No           |
-| batch_to_space_nd | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| cast              | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| comparisons       | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| concatenation     | Yes         | Yes        | No         | Yes         | Yes          | No           | Yes         | Yes          | No           |
-| conv              | Yes         | Yes        | Yes        | Yes         | Yes          | Yes          | Yes         | Yes          | Yes          |
-| cumsum            | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| depth_to_space    | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| depthwise_conv    | Yes         | Yes        | Yes        | Yes         | Yes          | Yes          | Yes         | Yes          | Yes          |
-| dequantize        | Yes         | Yes        | No         | No          | No           | No           | Yes         | Yes          | No           |
-| elementwise       | Yes         | Yes        | No         | No          | No           | No           | Yes         | Yes          | No           |
-| elu               | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| embedding_lookup  | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| expand_dims       | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| fill              | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| fully_connected   | Yes         | Yes        | Yes        | Yes         | Yes          | Yes          | Yes         | Yes          | Yes          |
-| gather_nd         | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| gather            | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| hard_swish        | Yes         | No         | No         | No          | No           | No           | No          | No           | No           |
-| l2norm            | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| leaky_relu        | Yes         | Yes        | No         | Yes         | No           | No           | Yes         | Yes          | No           |
-| log_softmax       | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| logistic          | Yes         | Yes        | No         | Yes         | No           | No           | Yes         | Yes          | No           |
-| lstm              | Yes         | Yes        | No         | Yes         | Yes          | No           | Yes         | Yes          | No           |
-| minimum           | Yes         | Yes        | N/A        | No          | No           | N/A          | Yes         | Yes          | N/A          |
-| maximum           | Yes         | Yes        | N/A        | No          | No           | N/A          | Yes         | Yes          | N/A          |
-| mirror_pad        | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| mul               | Yes         | Yes        | N/A        | Yes         | Yes          | N/A          | Yes         | Yes          | N/A          |
-| neg               | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| pack              | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| pad               | Yes         | Yes        | N/A        | No          | No           | N/A          | Yes         | Yes          | N/A          |
-| max_pooling       | Yes         | Yes        | N/A        | Yes         | Yes          | N/A          | Yes         | Yes          | N/A          |
-| avg_pooling       | Yes         | Yes        | N/A        | Yes         | Yes          | N/A          | Yes         | Yes          | N/A          |
-| prelu             | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| resize_bilinear   | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| select            | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| slice             | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| softmax           | Yes         | Yes        | No         | Yes         | Yes          | No           | Yes         | Yes          | No           |
-| space_to_batch_nd | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| space_to_depth    | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| split             | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| square_difference | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| strided_slice     | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| sub               | Yes         | Yes        | No         | Yes         | No           | N/A          | No          | No           | No           |
-| svdf              | Yes         | Yes        | No         | Yes         | Yes          | No           | Yes         | Yes          | No           |
-| tanh              | Yes         | Yes        | No         | Yes         | No           | No           | Yes         | Yes          | No           |
-| transpose_conv    | Yes         | No         | No         | Yes         | No           | No           | Yes         | No           | No           |
-| tranpose          | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| unpack            | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-| zeros_like        | Yes         | Yes        | No         | No          | No           | No           | No          | No           | No           |
-
+- [Getting Started](usage/index.md)
+- [Features](features/index.md)
+- [Examples](examples/index.md)
+- [Benchmarks](benchmarks/index.md)
+- [Continuous Integration](continuous_integration.md)
+- [Python Development Guide](python.md)
 
 ---
 
-> **Ready to dive in?**
-> Head over to the [Getting Started](./usage/index.md) guide and generate your first module in minutes.
-
-## 📜 License
+> **Ready to get started?**
+> Head over to the [Getting Started](./usage/index.md) guide and bring up heliaRT on Ambiq hardware.

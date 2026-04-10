@@ -1,4 +1,4 @@
-name: NeuralSPOT TFLM RT Assets
+name: NeuralSPOT heliaRT Assets
 
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: neuralspot-tflm-assets-${{ inputs.tag || inputs.ref || github.sha }}
+  group: neuralspot-helia-rt-assets-${{ inputs.tag || inputs.ref || github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -40,30 +40,10 @@ jobs:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
 
     steps:
-      - name: Resolve ref and tag
-        id: meta
-        shell: bash
-        run: |
-          set -euo pipefail
-          ref_in='${{ inputs.ref }}'
-          tag_in='${{ inputs.tag }}'
-          if [[ -z "${ref_in}" ]]; then
-            echo "::error ::Input ref is required."; exit 1;
-          fi
-          if [[ -z "${tag_in}" ]]; then
-            tag_in="${ref_in}"
-          fi
-          safe_tag="${tag_in//\//-}"
-          if [[ -z "${safe_tag}" ]]; then
-            echo "::error ::Resolved tag is empty after sanitization."; exit 1;
-          fi
-          echo "ref=${ref_in}" >> "$GITHUB_OUTPUT"
-          echo "tag=${safe_tag}" >> "$GITHUB_OUTPUT"
-
       - name: Check out code
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.meta.outputs.ref }}
+          ref: ${{ inputs.ref }}
 
       - name: Mark workspace safe
         run: git config --global --add safe.directory '*'
@@ -103,34 +83,26 @@ jobs:
           path: out/${{ matrix.arch }}/${{ matrix.toolchain }}/${{ matrix.build }}/**
 
   neuralspot-package:
-    name: Package neuralSPOT tflm bundle
+    name: Package neuralSPOT heliaRT bundle
     needs: neuralspot-build
     runs-on: ubuntu-latest
     defaults:
       run:
         shell: bash
     steps:
-      - name: Determine ref/tag
-        id: info
-        shell: bash
-        run: |
-          set -euo pipefail
-          REF="${{ inputs.ref }}"
-          TAG="${{ inputs.tag }}"
-          if [[ -z "${REF}" ]]; then
-            echo "::error ::Input ref is required."; exit 1;
-          fi
-          if [[ -z "${TAG}" ]]; then
-            TAG="${REF}"
-          fi
-          echo "ref=${REF}" >> "$GITHUB_OUTPUT"
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
-
       - name: Check out code (to fetch neuralspot/module.mk)
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.info.outputs.ref }}
+          ref: ${{ inputs.ref }}
+
+      - name: Determine ref/tag
+        id: info
+        run: |
+          tensorflow/lite/micro/tools/ci_build/resolve_release_meta.sh \
+            --ref '${{ inputs.ref }}' \
+            --tag '${{ inputs.tag }}' \
+            --sanitize-tag
+          echo "sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
 
       - name: Download all neuralSPOT combos
         uses: actions/download-artifact@v4
@@ -138,62 +110,21 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: Assemble neuralSPOT bundle (lib + tflm + module.mk)
+      - name: Assemble neuralSPOT bundle (lib + sources + module.mk)
         run: |
-          set -euo pipefail
-          TAG='${{ steps.info.outputs.tag }}'
-          SHA='${{ steps.info.outputs.sha }}'
-          BUNDLE="neuralspot-tflm-rt-${TAG}"
-          mkdir -p "${BUNDLE}/lib"
-
-          echo "== Collecting libraries into ${BUNDLE}/lib =="
-          find artifacts -type f -path "*/lib/*.a" -print -exec cp -v {} "${BUNDLE}/lib/" \;
-
-          echo "== Selecting one tflm tree into ${BUNDLE}/ =="
-          CAND="$(find artifacts -type d -path '*/tflm' | sort | head -n1 || true)"
-          [[ -z "$CAND" ]] && { echo "::error ::No tflm tree found in artifacts"; exit 1; }
-          cp -a "${CAND}/." "${BUNDLE}/"
-
-          echo "== Prune ns-cmsis-nn to headers only =="
-          NS_CMSIS_NN_DIR="${BUNDLE}/third_party/ns_cmsis_nn"
-          if [[ -d "${NS_CMSIS_NN_DIR}" ]]; then
-            find "${NS_CMSIS_NN_DIR}" -type f \
-              ! \( \
-                \( -path "${NS_CMSIS_NN_DIR}/Include/*" -a \( -name '*.h' -o -name '*.hpp' \) \) \
-                -o -name 'LICENSE' \
-              \) \
-              -delete
-            find "${NS_CMSIS_NN_DIR}" -depth -type d -empty -delete
-          fi
-
-          echo "== Copy neuralSPOT module.mk to bundle root =="
-          if [[ -f "neuralspot/module.mk" ]]; then
-            cp neuralspot/module.mk "${BUNDLE}/module.mk"
-          else
-            echo "::error ::neuralspot/module.mk not found"; exit 1
-          fi
-
-          echo "== Write MANIFEST =="
-          {
-            echo "neuralspot-tflm-rt ${TAG}"
-            echo "Commit: ${SHA}"
-            echo
-            echo "Libraries:"
-            ls -1 "${BUNDLE}/lib"
-          } > "${BUNDLE}/MANIFEST.txt"
-
-          echo "== Final bundle structure =="
-          find "${BUNDLE}" -maxdepth 2 -type f -print
+          tensorflow/lite/micro/tools/ci_build/package_neuralspot_bundle.sh \
+            --artifacts-dir artifacts \
+            --checkout-dir "${GITHUB_WORKSPACE}" \
+            --tag '${{ steps.info.outputs.tag }}' \
+            --sha '${{ steps.info.outputs.sha }}' \
+            --bundle-prefix neuralspot-helia-rt \
+            --upload-dir upload
 
       - name: Zip neuralSPOT bundle
-        run: |
-          TAG='${{ steps.info.outputs.tag }}'
-          ZIP="neuralspot-tflm-rt-${TAG}.zip"
-          zip -r "${ZIP}" "neuralspot-tflm-rt-${TAG}"
-          mkdir -p upload && mv "${ZIP}" upload/
+        run: ls -1 upload/*.zip
 
       - name: Upload neuralSPOT bundle artifact
         uses: actions/upload-artifact@v4
         with:
-          name: neuralSPOT-tflm-bundle-${{ steps.info.outputs.tag }}
+          name: neuralSPOT-helia-rt-bundle-${{ steps.info.outputs.tag }}
           path: upload/*.zip
