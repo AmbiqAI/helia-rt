@@ -135,7 +135,7 @@ jobs:
             --checkout-dir "${GITHUB_WORKSPACE}" \
             --tag '${{ steps.info.outputs.tag }}' \
             --sha '${{ steps.info.outputs.sha }}' \
-            --bundle-prefix neuralspot-helios-rt \
+            --bundle-prefix neuralspot-helia-rt \
             --upload-dir upload
 
       - name: List neuralSPOT bundle
@@ -155,5 +155,5 @@ jobs:
           source tensorflow/lite/micro/tools/ci_build/release_asset_helpers.sh
           upload_bundle_to_release \
             '${{ steps.info.outputs.tag }}' \
-            "upload/neuralspot-helios-rt-${{ steps.info.outputs.tag }}.zip" \
+            "upload/neuralspot-helia-rt-${{ steps.info.outputs.tag }}.zip" \
             "${GITHUB_REPOSITORY}"
