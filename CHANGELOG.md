@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.0](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.9.0...heliaRT-v1.10.0) (2026-04-10)
+
+
+### Features
+
+* Zephyr 3-backend default, unified release bundle, ambiq→helia rename ([#88](https://github.com/AmbiqAI/helia-rt/issues/88)) ([0341c50](https://github.com/AmbiqAI/helia-rt/commit/0341c508264f33eba6c127d7960731bacd9fec3e))
+
 ## [1.9.0](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.8.0...heliaRT-v1.9.0) (2026-04-10)
 
 
