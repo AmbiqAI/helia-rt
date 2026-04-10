@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.9.0](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.8.0...heliaRT-v1.9.0) (2026-04-10)
+
+
+### Features
+
+* **zephyr:** default raw module to CMSIS-NN with HELIA opt-in ([#86](https://github.com/AmbiqAI/helia-rt/issues/86)) ([d2abfda](https://github.com/AmbiqAI/helia-rt/commit/d2abfdae1e655eeca7101df215daa54387ab2b2a))
+
+## [1.8.0](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.7.0...heliaRT-v1.8.0) (2026-04-08)
+
+
+### Features
+
+* add manual neuralSPOT asset packaging workflow ([#83](https://github.com/AmbiqAI/helia-rt/issues/83)) ([c5bad96](https://github.com/AmbiqAI/helia-rt/commit/c5bad96a62236053a5e6c1c56632f5fe2b4ee4b5))
+* Allow manually generating builds including reference cmsis-nn implementation ([#80](https://github.com/AmbiqAI/helia-rt/issues/80)) ([720909a](https://github.com/AmbiqAI/helia-rt/commit/720909a277912768703ce83b5762cba3468e1432))
+
 ## [1.7.0](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.6.0...heliaRT-v1.7.0) (2025-11-05)
 
 
