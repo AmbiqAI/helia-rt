@@ -65,7 +65,7 @@ Several workflows can be triggered manually with `workflow_dispatch`.
 Common manual entry points:
 
 - [run_ci.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/run_ci.yml): manual entry point for the reusable `ci.yml` workflow
-- [run_ambiq.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/run_ambiq.yml): manual entry point for Ambiq build and test flows
+- [run_helia.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/run_helia.yml): manual entry point for helia build and test flows
 - [cortex_m.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/cortex_m.yml): manual Cortex-M validation
 - [cortex_m_arm_compiler.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/cortex_m_arm_compiler.yml): manual Arm Compiler 6 Cortex-M validation
 - [docs.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/docs.yml): documentation build and publish workflow
