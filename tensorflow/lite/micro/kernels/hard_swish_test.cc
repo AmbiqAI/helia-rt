@@ -311,7 +311,7 @@ TF_LITE_MICRO_TEST(SimpleHardSwishTestInt8) {
   }
 }
 
-#if defined(AMBIQ)
+#if defined(HELIA)
 
 TF_LITE_MICRO_TEST(SimpleHardSwishTestInt16) {
   std::minstd_rand random_engine;

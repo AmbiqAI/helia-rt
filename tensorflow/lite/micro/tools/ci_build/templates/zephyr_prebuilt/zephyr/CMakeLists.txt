@@ -14,7 +14,7 @@ if(CONFIG_HELIA_RT)
   )
 
   zephyr_library_compile_definitions(NS_CMSIS_NN)
-  zephyr_library_compile_definitions(AMBIQ)
+  zephyr_library_compile_definitions(HELIA)
 
   if(CONFIG_CPU_CORTEX_M55)
     set(HELIA_RT_ARCH_TOKEN cm55)

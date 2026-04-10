@@ -192,7 +192,7 @@ source tensorflow/lite/micro/tools/ci_build/helper_functions.sh
 TOOLCHAIN=gcc
 TARGET=cortex_m_corstone_300
 TARGET_ARCH=cortex-m55
-CO_PROCESSOR=ambiq
+CO_PROCESSOR=helia
 OPTIMIZED_KERNEL_DIR=cmsis_nn
 
 readable_run make  -j$(nproc) -f tensorflow/lite/micro/tools/make/Makefile \

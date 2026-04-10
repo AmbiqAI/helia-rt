@@ -19,13 +19,13 @@ The main PR entry point is `tests_entry.yml`.
 
 Current behavior:
 
-- `ambiq_test.yml` runs for pull requests through [tests_entry.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/tests_entry.yml)
+- `helia_test.yml` runs for pull requests through [tests_entry.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/tests_entry.yml)
 - the broader `ci.yml` suite is only invoked on PRs when the PR has the `ci:run_full` label
 
 Relevant workflows:
 
 - [tests_entry.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/tests_entry.yml)
-- [ambiq_test.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/ambiq_test.yml)
+- [helia_test.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/helia_test.yml)
 - [ci.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/ci.yml)
 
 ## Label-Gated Full CI

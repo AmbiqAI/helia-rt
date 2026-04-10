@@ -2,10 +2,10 @@
 # Build (and optionally test) TFLM for a given target arch + toolchain.
 # Defaults: arch=cortex-m55, toolchain=gcc, optimize=BOTH, tests=ON
 # Examples:
-#   ./test_ambiq.sh                         # build + test, both SPEED and SIZE
-#   ./test_ambiq.sh --no-tests              # build only (both variants)
-#   ./test_ambiq.sh -a cortex-m4 -t gcc     # build + test for m4
-#   ./test_ambiq.sh -O SPEED --build-only   # build only, SPEED variant
+#   ./test_helia.sh                         # build + test, both SPEED and SIZE
+#   ./test_helia.sh --no-tests              # build only (both variants)
+#   ./test_helia.sh -a cortex-m4 -t gcc     # build + test for m4
+#   ./test_helia.sh -O SPEED --build-only   # build only, SPEED variant
 
 set -Eeuo pipefail
 
@@ -24,13 +24,13 @@ RUN_TESTS=1           # 1=enabled (default), 0=disabled
 ARM_UBL_LICENSE_IDENTIFIER="${ARM_UBL_LICENSE_IDENTIFIER:-}"
 
 CO_PROCESSOR=
-OPTIMIZED_KERNEL_DIR=ambiq
+OPTIMIZED_KERNEL_DIR=helia
 TARGET=cortex_m_corstone_300
 
 # --------------------------- Arg parsing --------------------------------------
 usage() {
   cat <<'USAGE'
-Usage: ambiq_test.sh [options]
+Usage: helia_test.sh [options]
 
 Options:
   -a, --arch <cortex-m55|cortex-m4|cortex-m4+fp|...>   Target CPU arch (default: cortex-m55)
@@ -41,10 +41,10 @@ Options:
   -h, --help                                           Show this help
 
 Examples:
-  ./ambiq_test.sh
-  ./ambiq_test.sh -a cortex-m4 -t gcc
-  ./ambiq_test.sh --no-tests
-  ./ambiq_test.sh -O SPEED --build-only
+  ./helia_test.sh
+  ./helia_test.sh -a cortex-m4 -t gcc
+  ./helia_test.sh --no-tests
+  ./helia_test.sh -O SPEED --build-only
 USAGE
 }
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ------------------------------------------------------------------------------
-# build_ambiq.sh
+# build_helia.sh
 #
 # Build static library for a single {arch, build, toolchain} combination.
 # Outputs to the given --outdir:
@@ -10,14 +10,14 @@
 #
 # Examples:
 #   1) GCC, M55, release:
-#      build_ambiq.sh -a cortex-m55 -b release -t gcc -o ./out/m55/gcc/release
+#      build_helia.sh -a cortex-m55 -b release -t gcc -o ./out/m55/gcc/release
 #
 #   2) ArmClang, M4+FP, debug:
-#      build_ambiq.sh --arch cortex-m4+fp --build debug \
+#      build_helia.sh --arch cortex-m4+fp --build debug \
 #                     --toolchain armclang --outdir ./out/m4/armclang/debug
 #
 #   3) GCC, M55, release using CMSIS-NN kernels:
-#      build_ambiq.sh -a cortex-m55 -b release -t gcc -k cmsis_nn \
+#      build_helia.sh -a cortex-m55 -b release -t gcc -k cmsis_nn \
 #                     -o ./out/m55/gcc/release
 #
 # Notes:
@@ -36,7 +36,7 @@ OUTDIR=""
 ARM_UBL_LICENSE_IDENTIFIER="${ARM_UBL_LICENSE_IDENTIFIER:-}"
 
 CO_PROCESSOR=
-OPTIMIZED_KERNEL_DIR="ambiq"
+OPTIMIZED_KERNEL_DIR="helia"
 TARGET="cortex_m_generic"
 
 # --------------------------- Arg parsing --------------------------------------
@@ -54,7 +54,7 @@ Required:
   -o, --outdir      Output directory for this build (unique per combo)
 
 Other:
-  -k, --optimized-kernel-dir  Kernel specialization dir (default: ambiq; e.g. cmsis_nn)
+  -k, --optimized-kernel-dir  Kernel specialization dir (default: helia; e.g. cmsis_nn)
   -h, --help        Show this help
 
 Environment:

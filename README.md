@@ -3,7 +3,7 @@
 heliaRT is Ambiq's optimized TensorFlow Lite for Microcontrollers runtime for Apollo platforms. It is designed to help developers bring efficient inference to ultra-low-power Ambiq silicon, with tuned kernels that take advantage of Apollo CPU, DSP, and MVE capabilities where available.
 
 [![CI](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ci.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ci.yml)
-[![Unit Tests](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ambiq.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ambiq.yml)
+[![Unit Tests](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_helia.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_helia.yml)
 
 
 ## Why heliaRT?
@@ -55,8 +55,8 @@ This table provides a summary of the build status for heliaRT across various pla
 | Build Type         | Status |
 | ------------------ | ------ |
 | **CI on Linux**    | [![CI Status](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ci.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ci.yml) |
-| **Apollo3/4 (CM4)** | [![Apollo4 Tests](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ambiq.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ambiq.yml) |
-| **Apollo510 (CM55)** | [![Apollo510 Tests](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ambiq.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ambiq.yml) |
+| **Apollo3/4 (CM4)** | [![Apollo4 Tests](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_helia.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_helia.yml) |
+| **Apollo510 (CM55)** | [![Apollo510 Tests](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_helia.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_helia.yml) |
 
 Each badge links directly to the detailed results of the respective builds, allowing for quick access to the latest test outcomes and build logs.
 

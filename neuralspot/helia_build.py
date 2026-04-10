@@ -25,7 +25,7 @@ def main():
 
     # params = parser.parse_typed_args()
     # print(params)
-    
+
     release_types = ["debug", "release", "release_with_logs"]
     ns_release_names = ["debug", "release", "release-with-logs"]
     compilers = ["gcc", "armclang"]
@@ -37,17 +37,17 @@ def main():
         for processor in processors:
             co_processor_flag = ""
             if processor == "cortex-m55":
-                co_processor_flag = "ambiq"
+                co_processor_flag = "helia"
             for release_type in release_types:
                 print(f"Building {compiler} {processor} {co_processor_flag} {release_type}")
                 print(f"make -f ./tensorflow/lite/micro/tools/make/Makefile TARGET=cortex_m_generic TARGET_ARCH={processor} TOOLCHAIN={compiler} OPTIMIZED_KERNEL_DIR=cmsis_nn  CO_PROCESSOR={co_processor_flag} BUILD_TYPE={release_type} microlite")
                 os.system(f"make -f ./tensorflow/lite/micro/tools/make/Makefile TARGET=cortex_m_generic TARGET_ARCH={processor} TOOLCHAIN={compiler} OPTIMIZED_KERNEL_DIR=cmsis_nn CO_PROCESSOR={co_processor_flag} BUILD_TYPE={release_type} microlite -j8")
-            
+
     # create the treedir
     # if params.treedir:
     print ("Creating treedir")
-    print ("python3 ./tensorflow/lite/micro/tools/project_generation/create_tflm_tree.py --makefile_options \"TARGET=cortex_m_generic TARGET_ARCH=cortex-m55 OPTIMIZED_KERNEL_DIR=cmsis_nn CO_PROCESSOR=ambiq\" treedir")
-    os.system('python3 ./tensorflow/lite/micro/tools/project_generation/create_tflm_tree.py --makefile_options "TARGET=cortex_m_generic TARGET_ARCH=cortex-m55 OPTIMIZED_KERNEL_DIR=cmsis_nn CO_PROCESSOR=ambiq" treedir')
+    print ("python3 ./tensorflow/lite/micro/tools/project_generation/create_tflm_tree.py --makefile_options \"TARGET=cortex_m_generic TARGET_ARCH=cortex-m55 OPTIMIZED_KERNEL_DIR=cmsis_nn CO_PROCESSOR=helia\" treedir")
+    os.system('python3 ./tensorflow/lite/micro/tools/project_generation/create_tflm_tree.py --makefile_options "TARGET=cortex_m_generic TARGET_ARCH=cortex-m55 OPTIMIZED_KERNEL_DIR=cmsis_nn CO_PROCESSOR=helia" treedir')
 
     # delete all .c and .cc files in treedir
     print ("Deleting all .c and .cc files in treedir")
@@ -78,8 +78,8 @@ def main():
                 elif processor == "cortex-m55":
                     ns_processor = "cm55"
                     label = "m55"
-                    co_processor_str = 'ambiq_' # inject 'ambiq' in the build folder name
-                
+                    co_processor_str = 'helia_' # inject 'helia' in the build folder name
+
                 # replace _ with - in release type
                 ns_release_type = release_type.replace("_", "-")
 
@@ -94,7 +94,7 @@ def main():
 
     # copy directories from treedir to tflm_path subdirectories
     os.system(f"cp -r treedir/* {tflm_path}")
-    
+
     print (f"Copying to {tflm_path}")
     os.system(f"cp -r treedir/* {tflm_path}")
     print (tflm_path)

@@ -1,4 +1,4 @@
-name: heliaRT Build
+name: heliaRT Unit Tests
 
 on:
 
@@ -20,12 +20,8 @@ on:
         required: false
         default: ""
 
-permissions:
-  contents: read
-
 jobs:
-  ambiq_build:
-    name: build-${{ matrix.arch }}-${{ matrix.toolchain }}
+  helia_test:
     runs-on: ubuntu-latest-md
     container:
       image: ghcr.io/ambiqai/helia-rt-ci:latest
@@ -34,30 +30,19 @@ jobs:
       fail-fast: false
       max-parallel: 4
       matrix:
-        arch: [ "cortex-m55", "cortex-m4+fp", "cortex-m0" ]
+        arch: [ "cortex-m55", "cortex-m4+fp", "cortex-m3" ]
         toolchain: [ "gcc" ]
 
     env:
       NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
 
-    steps:
-      - name: Select ref
-        id: sel
-        shell: bash
-        run: |
-          if [[ -n "${{ inputs.trigger-sha }}" ]]; then
-            echo "ref=${{ inputs.trigger-sha }}" >> "$GITHUB_OUTPUT"
-          elif [[ -n "${{ inputs.ref }}" ]]; then
-            echo "ref=${{ inputs.ref }}" >> "$GITHUB_OUTPUT"
-          else
-            # default to the current commit of this workflow run
-            echo "ref=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-          fi
+    name: test-${{ matrix.arch }}-${{ matrix.toolchain }}
 
+    steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ steps.sel.outputs.ref }}
+          ref: ${{ inputs.trigger-sha }}
 
       - name: Mark workspace as safe for Git
         run: git config --global --add safe.directory "*"
@@ -69,10 +54,7 @@ jobs:
           key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc') }}
           restore-keys: ${{ runner.os }}-third-party-downloads-
 
-      - name: Build (${{ matrix.arch }} / ${{ matrix.toolchain }})
+      - name: Testing (${{ matrix.arch }} / ${{ matrix.toolchain }})
         run: |
-          chmod +x tensorflow/lite/micro/tools/ci_build/test_ambiq.sh
-          tensorflow/lite/micro/tools/ci_build/test_ambiq.sh \
-            -a "${{ matrix.arch }}" \
-            -t "${{ matrix.toolchain }}" \
-            --no-tests
+          /bin/sh -c "tensorflow/lite/micro/tools/ci_build/test_helia.sh \
+          -a ${{ matrix.arch }} -t ${{ matrix.toolchain }}"

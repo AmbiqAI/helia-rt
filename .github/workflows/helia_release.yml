@@ -87,7 +87,7 @@ jobs:
         run: |
           set -euo pipefail
           OUTDIR="${GITHUB_WORKSPACE}/out/${{ matrix.arch }}/${{ matrix.toolchain }}/${{ matrix.build }}"
-          tensorflow/lite/micro/tools/ci_build/build_ambiq.sh \
+          tensorflow/lite/micro/tools/ci_build/build_helia.sh \
             -a "${{ matrix.arch }}" \
             -b "${{ matrix.build }}" \
             -t "${{ matrix.toolchain }}" \
