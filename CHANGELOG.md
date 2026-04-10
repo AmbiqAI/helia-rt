@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.8.0...heliaRT-v1.9.0) (2026-04-10)
+
+
+### Features
+
+* **zephyr:** default raw module to CMSIS-NN with HELIA opt-in ([#86](https://github.com/AmbiqAI/helia-rt/issues/86)) ([d2abfda](https://github.com/AmbiqAI/helia-rt/commit/d2abfdae1e655eeca7101df215daa54387ab2b2a))
+
 ## [1.8.0](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.7.0...heliaRT-v1.8.0) (2026-04-08)
 
 
