@@ -1,4 +1,4 @@
-name: NeuralSPOT heliaRT Assets
+name: heliaRT Assets (CMSIS-NN, manual)
 
 on:
   workflow_dispatch:
@@ -110,21 +110,21 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: Assemble neuralSPOT bundle (lib + sources + module.mk)
+      - name: Assemble heliaRT bundle (lib + sources + module.mk)
         run: |
-          tensorflow/lite/micro/tools/ci_build/package_neuralspot_bundle.sh \
+          tensorflow/lite/micro/tools/ci_build/package_helia_bundle.sh \
             --artifacts-dir artifacts \
             --checkout-dir "${GITHUB_WORKSPACE}" \
             --tag '${{ steps.info.outputs.tag }}' \
             --sha '${{ steps.info.outputs.sha }}' \
-            --bundle-prefix neuralspot-helia-rt \
+            --bundle-prefix helia-rt-cmsis-nn \
             --upload-dir upload
 
-      - name: Zip neuralSPOT bundle
+      - name: List bundle
         run: ls -1 upload/*.zip
 
-      - name: Upload neuralSPOT bundle artifact
+      - name: Upload bundle artifact
         uses: actions/upload-artifact@v4
         with:
-          name: neuralSPOT-helia-rt-bundle-${{ steps.info.outputs.tag }}
+          name: helia-rt-cmsis-nn-bundle-${{ steps.info.outputs.tag }}
           path: upload/*.zip

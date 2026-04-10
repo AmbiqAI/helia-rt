@@ -5,7 +5,7 @@
 # Build static library for a single {arch, build, toolchain} combination.
 # Outputs to the given --outdir:
 #   <OUTDIR>/
-#     lib/libtensorflow-microlite-<cmX>-<toolchain>-<build>.a
+#     lib/libhelia-rt-<cmX>-<toolchain>-<build>.a
 #     tflm/                      # reduced headers/sources for type-hinting
 #
 # Examples:
@@ -171,8 +171,8 @@ if [[ ! -f "${LIB_PATH}" ]]; then
   exit 4
 fi
 
-cp "${LIB_PATH}" "${OUTDIR}/lib/libtensorflow-microlite-${TARGET_SHORT}-${TOOLCHAIN}-${BUILD_NAME}.a"
-echo "Copied lib -> ${OUTDIR}/lib/libtensorflow-microlite-${TARGET_SHORT}-${TOOLCHAIN}-${BUILD_NAME}.a"
+cp "${LIB_PATH}" "${OUTDIR}/lib/libhelia-rt-${TARGET_SHORT}-${TOOLCHAIN}-${BUILD_NAME}.a"
+echo "Copied lib -> ${OUTDIR}/lib/libhelia-rt-${TARGET_SHORT}-${TOOLCHAIN}-${BUILD_NAME}.a"
 
 # ---- Create reduced TFLM tree into OUTDIR/tflm ----
 python3 "${TFLM_SRC_DIR}/tensorflow/lite/micro/tools/project_generation/create_tflm_tree.py" \

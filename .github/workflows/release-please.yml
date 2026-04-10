@@ -24,19 +24,10 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-  neuralspot-release:
+  helia-release:
     needs: release
     if: ${{ needs.release.outputs.release_created == 'true' }}
-    uses: ./.github/workflows/ns_release.yml
-    with:
-      ref: ${{ needs.release.outputs.tag_name }}
-      tag: ${{ needs.release.outputs.tag_name }}
-      upload_to_release: true
-    secrets: inherit
-  zephyr-release:
-    needs: release
-    if: ${{ needs.release.outputs.release_created == 'true' }}
-    uses: ./.github/workflows/zephyr_release.yml
+    uses: ./.github/workflows/helia_release.yml
     with:
       ref: ${{ needs.release.outputs.tag_name }}
       tag: ${{ needs.release.outputs.tag_name }}

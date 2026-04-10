@@ -92,8 +92,8 @@ Use the prebuilt bundle when you want:
 Download and extract the GitHub release asset:
 
 ```bash
-unzip zephyr-helia-rt-<tag>.zip -d <ws>/modules
-mv <ws>/modules/zephyr-helia-rt-<tag> <ws>/modules/helia-rt
+unzip helia-rt-<tag>.zip -d <ws>/modules
+mv <ws>/modules/helia-rt-<tag> <ws>/modules/helia-rt
 ```
 
 With the prebuilt bundle, HELIA acceleration is already embedded in the archive, so you do not add a separate private backend module.

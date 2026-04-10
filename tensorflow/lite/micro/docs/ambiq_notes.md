@@ -48,9 +48,9 @@ neuralSPOT only needs the static libraries and minimal code tree.
 ```bash
 cd neuralSPOT/extern/tensorflow/new_version_dir
 mkdir lib
-cp .../tflite_micro/gen/cortex_m_generic_cortex-m4+fp_debug/lib/libtensorflow-microlite-debug.a lib/libtensorflow-microlite-cm4-gcc-debug.a
-cp .../tflite_micro/gen/cortex_m_generic_cortex-m4+fp_release/lib/libtensorflow-microlite.a lib/libtensorflow-microlite-cm4-gcc-release.a
-cp .../tflite_micro/gen/cortex_m_generic_cortex-m4+fp_release_with_logs/lib/libtensorflow-microlite-withlogs.a lib/libtensorflow-microlite-cm4-gcc-release-with-logs.a
+cp .../tflite_micro/gen/cortex_m_generic_cortex-m4+fp_debug/lib/libtensorflow-microlite-debug.a lib/libhelia-rt-cm4-gcc-debug.a
+cp .../tflite_micro/gen/cortex_m_generic_cortex-m4+fp_release/lib/libtensorflow-microlite.a lib/libhelia-rt-cm4-gcc-release.a
+cp .../tflite_micro/gen/cortex_m_generic_cortex-m4+fp_release_with_logs/lib/libtensorflow-microlite-withlogs.a lib/libhelia-rt-cm4-gcc-release-with-logs.a
 cp -R .../tflite_micro/treedir . # treedir is from the 'minimal code tree' step above
 cp ../0264234_Nov_15_2023/module.mk . # use an existing module.mk as a starting point
 ```

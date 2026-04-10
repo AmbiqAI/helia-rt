@@ -53,7 +53,7 @@ for BUILD in "${BUILDS[@]}"; do
         exit 1
       fi
 
-      cp "$LIB_PATH" "$BUILD_LIB_DIR/libtensorflow-microlite-${TARGET_NAME}-${TOOLCHAIN}-${BUILD_NAME}.a"
+      cp "$LIB_PATH" "$BUILD_LIB_DIR/libhelia-rt-${TARGET_NAME}-${TOOLCHAIN}-${BUILD_NAME}.a"
     done
   done
 done

@@ -83,7 +83,7 @@ def main():
                 # replace _ with - in release type
                 ns_release_type = release_type.replace("_", "-")
 
-                dest_lib_name = f"libtensorflow-microlite-{ns_processor}-{compiler}-{co_processor_str}{ns_release_type}.a"
+                dest_lib_name = f"libhelia-rt-{ns_processor}-{compiler}-{co_processor_str}{ns_release_type}.a"
                 source_lib = f"gen/cortex_m_generic_{processor}_{release_type}_cmsis_nn_{co_processor_str}{compiler}/lib/libtensorflow-microlite.a"
                 print(f"Copying {source_lib} to {os.path.join(tflm_path, 'lib', dest_lib_name)}")
                 os.system(f"cp {source_lib} {os.path.join(tflm_path, 'lib', dest_lib_name)}")

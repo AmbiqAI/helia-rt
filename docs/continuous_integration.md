@@ -77,10 +77,8 @@ Release automation and asset packaging are handled separately from routine presu
 Relevant workflows:
 
 - [release-please.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/release-please.yml)
-- [ns_release.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/ns_release.yml)
-- [zephyr_release.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/zephyr_release.yml)
-- [ns_tflm_rt_assets.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/ns_tflm_rt_assets.yml)
-- [zephyr_tflm_rt_assets.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/zephyr_tflm_rt_assets.yml)
+- [helia_release.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/helia_release.yml)
+- [zephyr_tflm_rt_assets.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/zephyr_tflm_rt_assets.yml) (manual dispatch)
 
 ## Sync Workflow
 
