@@ -60,4 +60,4 @@ INCLUDES += \
   -I$(NS_CMSIS_NN_PATH)/Include
 
 MICROLITE_CC_HDRS += \
-  tensorflow/lite/micro/kernels/ambiq/ambiq_common.h
+  tensorflow/lite/micro/kernels/helia/helia_common.h

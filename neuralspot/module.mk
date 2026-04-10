@@ -24,4 +24,4 @@ endif
 TOOLCHAIN_NAME := $(if $(filter arm,$(TOOLCHAIN)),armclang,gcc)
 
 # Construct final static library path
-lib_prebuilt += $(subdirectory)/lib/libtensorflow-microlite-$(TFP)-$(TOOLCHAIN_NAME)-$(BUILD_TYPE).a
+lib_prebuilt += $(subdirectory)/lib/libhelia-rt-$(TFP)-$(TOOLCHAIN_NAME)-$(BUILD_TYPE).a

@@ -1,4 +1,4 @@
-name: NeuralSPOT Release
+name: HeliaRT Release
 
 on:
   workflow_call:
@@ -35,12 +35,12 @@ permissions:
   contents: write
 
 concurrency:
-  group: neuralspot-assets-${{ inputs.tag || inputs.ref || github.sha }}
+  group: helia-release-${{ inputs.tag || inputs.ref || github.sha }}
   cancel-in-progress: false
 
 jobs:
-  neuralspot-build:
-    name: Build neuralSPOT module (${{ matrix.arch }} • ${{ matrix.toolchain }} • ${{ matrix.build }})
+  build:
+    name: Build heliaRT (${{ matrix.arch }} • ${{ matrix.toolchain }} • ${{ matrix.build }})
     runs-on: ubuntu-latest-md
     container:
       image: ghcr.io/ambiqai/helia-rt-ci:latest
@@ -83,11 +83,11 @@ jobs:
             exit 1
           fi
 
-      - name: Build neuralSPOT static libs
+      - name: Build heliaRT static lib
         run: |
           set -euo pipefail
           OUTDIR="${GITHUB_WORKSPACE}/out/${{ matrix.arch }}/${{ matrix.toolchain }}/${{ matrix.build }}"
-          tensorflow/lite/micro/tools/ci_build/build_ambiq.sh \
+          tensorflow/lite/micro/tools/ci_build/build_helia.sh \
             -a "${{ matrix.arch }}" \
             -b "${{ matrix.build }}" \
             -t "${{ matrix.toolchain }}" \
@@ -95,21 +95,21 @@ jobs:
           echo "Produced files:"
           find "${OUTDIR}" -maxdepth 3 -type f -print
 
-      - name: Upload neuralSPOT combo (raw dir)
+      - name: Upload build combo
         uses: actions/upload-artifact@v4
         with:
-          name: neuralSPOT-combo-${{ matrix.arch }}-${{ matrix.toolchain }}-${{ matrix.build }}
+          name: helia-rt-combo-${{ matrix.arch }}-${{ matrix.toolchain }}-${{ matrix.build }}
           path: out/${{ matrix.arch }}/${{ matrix.toolchain }}/${{ matrix.build }}/**
 
-  neuralspot-package:
-    name: Package neuralSPOT bundle
-    needs: neuralspot-build
+  package:
+    name: Package heliaRT bundle
+    needs: build
     runs-on: ubuntu-latest
     defaults:
       run:
         shell: bash
     steps:
-      - name: Check out code (to fetch neuralspot/module.mk)
+      - name: Check out code
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
@@ -122,29 +122,28 @@ jobs:
             --tag '${{ inputs.tag }}'
           echo "sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
 
-      - name: Download all neuralSPOT combos
+      - name: Download all build combos
         uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
 
-      - name: Assemble neuralSPOT bundle (lib + tflm + module.mk)
+      - name: Assemble unified heliaRT bundle
         run: |
-          tensorflow/lite/micro/tools/ci_build/package_neuralspot_bundle.sh \
+          tensorflow/lite/micro/tools/ci_build/package_helia_bundle.sh \
             --artifacts-dir artifacts \
             --checkout-dir "${GITHUB_WORKSPACE}" \
             --tag '${{ steps.info.outputs.tag }}' \
             --sha '${{ steps.info.outputs.sha }}' \
-            --bundle-prefix neuralspot-helios-rt \
             --upload-dir upload
 
-      - name: List neuralSPOT bundle
+      - name: List bundle
         run: ls -1 upload/*.zip
 
-      - name: Upload neuralSPOT bundle artifact
+      - name: Upload bundle artifact
         uses: actions/upload-artifact@v4
         with:
-          name: neuralSPOT-bundle-${{ steps.info.outputs.tag }}
+          name: helia-rt-bundle-${{ steps.info.outputs.tag }}
           path: upload/*.zip
 
       - name: Upload bundle to release (gh)
@@ -155,5 +154,5 @@ jobs:
           source tensorflow/lite/micro/tools/ci_build/release_asset_helpers.sh
           upload_bundle_to_release \
             '${{ steps.info.outputs.tag }}' \
-            "upload/neuralspot-helios-rt-${{ steps.info.outputs.tag }}.zip" \
+            "upload/helia-rt-${{ steps.info.outputs.tag }}.zip" \
             "${GITHUB_REPOSITORY}"

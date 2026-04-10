@@ -29,7 +29,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_arena_constants.h"
 #include "tensorflow/lite/micro/micro_log.h"
-#include "tensorflow/lite/micro/kernels/ambiq/ambiq_common.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_common.h"
 
 namespace tflite {
 namespace {

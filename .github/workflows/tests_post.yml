@@ -12,15 +12,15 @@ jobs:
 
   build_docker_image:
     if: github.event.pull_request.merged == true
-    uses: ./.github/workflows/ambiq_build_docker_image.yml
+    uses: ./.github/workflows/helia_build_docker_image.yml
     with:
       trigger-sha: ${{ github.event.pull_request.head.sha }}
 
-  ambiq_test:
+  helia_test:
     if: always() && github.event.pull_request.merged == true ||
         (github.event.action == 'labeled' &&
          github.event.label.name == 'ci:run_full')
-    uses: ./.github/workflows/ambiq_test.yml
+    uses: ./.github/workflows/helia_test.yml
     with:
       trigger-sha: ${{ github.event.pull_request.head.sha }}
     secrets:
@@ -34,7 +34,7 @@ jobs:
       token: ${{ secrets.GITHUB_TOKEN }}
 
   issue_on_error:
-    needs: [ambiq_test, cortex_m_ci_full]
+    needs: [helia_test, cortex_m_ci_full]
     if: ${{ always() && contains(needs.*.result, 'failure') &&
             github.event.pull_request.merged == true }}
     uses: ./.github/workflows/issue_on_error.yml

@@ -6,7 +6,7 @@
 # (same arch/toolchain/build combos) without GitHub Actions matrix.
 #
 # Flavors:
-#   - helia-rt  -> OPTIMIZED_KERNEL_DIR=ambiq
+#   - helia-rt  -> OPTIMIZED_KERNEL_DIR=helia
 #   - tflm      -> OPTIMIZED_KERNEL_DIR=cmsis_nn
 #
 # Examples:
@@ -21,7 +21,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TFLM_SRC_DIR="${SCRIPT_DIR}/../../../../.."
-BUILD_SCRIPT="${SCRIPT_DIR}/build_ambiq.sh"
+BUILD_SCRIPT="${SCRIPT_DIR}/build_helia.sh"
 NEURALSPOT_MODULE_MK="${TFLM_SRC_DIR}/neuralspot/module.mk"
 
 DEFAULT_ARCHES=(cortex-m4+fp cortex-m55)
@@ -40,7 +40,7 @@ usage() {
 Usage: ns_local_build.sh [options]
 
 Options:
-  --flavor <helia-rt|tflm>   Build flavor. helia-rt=ambiq, tflm=cmsis_nn (default: tflm)
+  --flavor <helia-rt|tflm>   Build flavor. helia-rt=helia, tflm=cmsis_nn (default: tflm)
   --tag <value>              Tag suffix used in bundle/zip names (default: local)
   -o, --outdir <path>        Output root for combos, bundle, and zip
   --arches a,b               Comma-separated arches (default: cortex-m4+fp,cortex-m55)
@@ -113,8 +113,8 @@ done
 OPTIMIZED_KERNEL_DIR=""
 BUNDLE_PREFIX=""
 case "${FLAVOR}" in
-  helia-rt|helios-rt|ambiq)
-    OPTIMIZED_KERNEL_DIR="ambiq"
+  helia-rt|helios-rt|helia)
+    OPTIMIZED_KERNEL_DIR="helia"
     BUNDLE_PREFIX="neuralspot-helia-rt"
     ;;
   tflm|cmsis-nn|cmsis_nn)
@@ -159,7 +159,7 @@ for arch in "${ARCHES[@]}"; do
     for build_type in "${BUILDS[@]}"; do
       COUNT=$((COUNT + 1))
       OUT_COMBO="${COMBO_ROOT}/${arch}/${toolchain}/${build_type}"
-      echo "[${COUNT}/${TOTAL}] build_ambiq.sh -a ${arch} -t ${toolchain} -b ${build_type} -k ${OPTIMIZED_KERNEL_DIR}"
+      echo "[${COUNT}/${TOTAL}] build_helia.sh -a ${arch} -t ${toolchain} -b ${build_type} -k ${OPTIMIZED_KERNEL_DIR}"
       "${BUILD_SCRIPT}" \
         -a "${arch}" \
         -b "${build_type}" \

@@ -46,7 +46,7 @@ struct TransposeContext {
 TfLiteStatus TransposePrepare(TfLiteContext* context, TfLiteNode* node);
 TFLMRegistration Register_TRANSPOSE();
 
-#if defined(CMSIS_NN) || defined(AMBIQ)
+#if defined(CMSIS_NN) || defined(HELIA)
 TFLMRegistration Register_TRANSPOSE_INT8();
 #else
 inline TFLMRegistration Register_TRANSPOSE_INT8() {

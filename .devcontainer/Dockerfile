@@ -82,6 +82,9 @@ RUN /install/install_bazelisk.sh
 
 RUN /install/install_buildifier.sh
 
+# Install uv (Python package manager) directly to avoid nanolayer GLIBC issues on Bullseye
+RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/local/bin" sh
+
 # Add a non-root user 'ambiqai' with passwordless sudo access
 RUN useradd -m -s /bin/bash -G sudo ambiqai && \
     echo "ambiqai ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ambiqai && \

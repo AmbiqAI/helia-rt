@@ -1,4 +1,4 @@
-name: Zephyr heliaRT Assets
+name: heliaRT Assets (manual)
 
 on:
   workflow_dispatch:
@@ -16,8 +16,8 @@ permissions:
   contents: read
 
 jobs:
-  zephyr-assets:
-    uses: ./.github/workflows/zephyr_release.yml
+  helia-assets:
+    uses: ./.github/workflows/helia_release.yml
     with:
       ref: ${{ inputs.ref }}
       tag: ${{ inputs.tag }}

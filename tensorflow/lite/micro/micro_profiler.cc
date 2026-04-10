@@ -67,7 +67,7 @@ void MicroProfiler::LogCsv() const {
 #if !defined(TF_LITE_STRIP_ERROR_STRINGS)
   MicroPrintf("\"Event\",\"Tag\",\"Ticks\"");
   for (int i = 0; i < num_events_; ++i) {
-#if defined(HEXAGON) || defined(CMSIS_NN) || defined(AMBIQ)
+#if defined(HEXAGON) || defined(CMSIS_NN) || defined(HELIA)
     int ticks = end_ticks_[i] - start_ticks_[i];
     MicroPrintf("%d,%s,%d", i, tags_[i], ticks);
 #else

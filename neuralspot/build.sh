@@ -17,7 +17,7 @@ mkdir -p "$BUILD_DIR"
 mkdir -p "$BUILD_LIB_DIR"
 
 readonly TARGET="cortex_m_generic"
-readonly OPTIM_KERNEL="ambiq"
+readonly OPTIM_KERNEL="helia"
 readonly TARGET_ARCHS=("cortex-m4+fp" "cortex-m55")
 readonly BUILDS=("debug" "release" "release_with_logs")
 ARM_UBL_LICENSE_IDENTIFIER=${ARM_UBL_LICENSE_IDENTIFIER:-}
@@ -53,7 +53,7 @@ for BUILD in "${BUILDS[@]}"; do
         exit 1
       fi
 
-      cp "$LIB_PATH" "$BUILD_LIB_DIR/libtensorflow-microlite-${TARGET_NAME}-${TOOLCHAIN}-${BUILD_NAME}.a"
+      cp "$LIB_PATH" "$BUILD_LIB_DIR/libhelia-rt-${TARGET_NAME}-${TOOLCHAIN}-${BUILD_NAME}.a"
     done
   done
 done

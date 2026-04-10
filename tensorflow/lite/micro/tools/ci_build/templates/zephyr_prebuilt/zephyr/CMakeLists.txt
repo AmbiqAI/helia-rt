@@ -14,7 +14,7 @@ if(CONFIG_HELIA_RT)
   )
 
   zephyr_library_compile_definitions(NS_CMSIS_NN)
-  zephyr_library_compile_definitions(AMBIQ)
+  zephyr_library_compile_definitions(HELIA)
 
   if(CONFIG_CPU_CORTEX_M55)
     set(HELIA_RT_ARCH_TOKEN cm55)
@@ -46,7 +46,7 @@ if(CONFIG_HELIA_RT)
   endif()
 
   set(HELIA_RT_PREBUILT_LIB
-    ${HELIA_RT_DIR}/lib/libhelia-rt-zephyr-${HELIA_RT_ARCH_TOKEN}-${HELIA_RT_TOOLCHAIN_TOKEN}-${HELIA_RT_BUILD_TOKEN}.a)
+    ${HELIA_RT_DIR}/lib/libhelia-rt-${HELIA_RT_ARCH_TOKEN}-${HELIA_RT_TOOLCHAIN_TOKEN}-${HELIA_RT_BUILD_TOKEN}.a)
 
   if(NOT EXISTS "${HELIA_RT_PREBUILT_LIB}")
     message(FATAL_ERROR

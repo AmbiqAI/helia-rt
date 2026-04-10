@@ -29,7 +29,7 @@ TARGET_ARCH=cortex-m55
 TOOLCHAIN=gcc
 BUILD_TYPE=release
 TARGET=cortex_m_generic
-OPTIMIZED_KERNEL=ambiq
+OPTIMIZED_KERNEL=helia
 ```
 
 ## Download Dependencies

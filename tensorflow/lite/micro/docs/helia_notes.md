@@ -1,4 +1,4 @@
-# Ambiq Tensorflow Lite for Microcontrollers
+# heliaRT — Developer Notes
 ## Dev Notes
 ### 11/11/24
 1. Pull in Ambiq-specific makefile mods (optimization and Windows support)
@@ -24,22 +24,22 @@ Adding a new version is a fairly straightforward process (more details below):
 To compile the 3 needed version (release, release_with_logs, and debug):
 ```bash
 cd tflite-micro
-make -f tensorflow/lite/micro/tools/make/Makefile TARGET=cortex_m_generic TARGET_ARCH=cortex-m4+fp OPTIMIZED_KERNEL_DIR=cmsis_nn BUILD_TYPE=release CORE_OPTIMIZATION_LEVEL=-O3 KERNEL_OPTIMIZATION_LEVEL=-O3 THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL=-O3 microlite
-make -f tensorflow/lite/micro/tools/make/Makefile TARGET=cortex_m_generic TARGET_ARCH=cortex-m4+fp OPTIMIZED_KERNEL_DIR=cmsis_nn BUILD_TYPE=release_with_logs CORE_OPTIMIZATION_LEVEL=-O3 KERNEL_OPTIMIZATION_LEVEL=-O3 THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL=-O3 microlite
-make -f tensorflow/lite/micro/tools/make/Makefile TARGET=cortex_m_generic TARGET_ARCH=cortex-m4+fp OPTIMIZED_KERNEL_DIR=cmsis_nn BUILD_TYPE=debug microlite
+make -f tensorflow/lite/micro/tools/make/Makefile TARGET=cortex_m_generic TARGET_ARCH=cortex-m4+fp OPTIMIZED_KERNEL_DIR=helia BUILD_TYPE=release CORE_OPTIMIZATION_LEVEL=-O3 KERNEL_OPTIMIZATION_LEVEL=-O3 THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL=-O3 microlite
+make -f tensorflow/lite/micro/tools/make/Makefile TARGET=cortex_m_generic TARGET_ARCH=cortex-m4+fp OPTIMIZED_KERNEL_DIR=helia BUILD_TYPE=release_with_logs CORE_OPTIMIZATION_LEVEL=-O3 KERNEL_OPTIMIZATION_LEVEL=-O3 THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL=-O3 microlite
+make -f tensorflow/lite/micro/tools/make/Makefile TARGET=cortex_m_generic TARGET_ARCH=cortex-m4+fp OPTIMIZED_KERNEL_DIR=helia BUILD_TYPE=debug microlite
 ```
 
-The will generate a static libraries at
-- tflite_micro/gen/cortex_m_generic_cortex-m4+fp_release/lib/libtensorflow-microlite.a
-- tflite_micro/gen/cortex_m_generic_cortex-m4+fp_release_with_logs/lib/libtensorflow-microlite.a
-- tflite_micro/gen/cortex_m_generic_cortex-m4+fp_debug/lib/libtensorflow-microlite.a
+This will generate static libraries at:
+- gen/cortex_m_generic_cortex-m4+fp_release_helia_gcc/lib/libtensorflow-microlite.a
+- gen/cortex_m_generic_cortex-m4+fp_release_with_logs_helia_gcc/lib/libtensorflow-microlite.a
+- gen/cortex_m_generic_cortex-m4+fp_debug_helia_gcc/lib/libtensorflow-microlite.a
 
 ## Create TFLM minimal code tree
 TFLM includes a script to generate a code tree with only the header and license files needed to link the library in. Run it thusly:
 
 ```bash
 cd tflite-micro
-python ./tensorflow/lite/micro/tools/project_generation/create_tflm_tree.py --makefile_options "TARGET=cortex_m_generic TARGET_ARCH=cortex-m4+fp OPTIMIZED_KERNEL_DIR=cmsis_nn" treedir
+python ./tensorflow/lite/micro/tools/project_generation/create_tflm_tree.py --makefile_options "TARGET=cortex_m_generic TARGET_ARCH=cortex-m4+fp OPTIMIZED_KERNEL_DIR=helia" treedir
 ```
 
 ## Copy needed files into neuralSPOT
@@ -48,9 +48,9 @@ neuralSPOT only needs the static libraries and minimal code tree.
 ```bash
 cd neuralSPOT/extern/tensorflow/new_version_dir
 mkdir lib
-cp .../tflite_micro/gen/cortex_m_generic_cortex-m4+fp_debug/lib/libtensorflow-microlite-debug.a lib/libtensorflow-microlite-cm4-gcc-debug.a
-cp .../tflite_micro/gen/cortex_m_generic_cortex-m4+fp_release/lib/libtensorflow-microlite.a lib/libtensorflow-microlite-cm4-gcc-release.a
-cp .../tflite_micro/gen/cortex_m_generic_cortex-m4+fp_release_with_logs/lib/libtensorflow-microlite-withlogs.a lib/libtensorflow-microlite-cm4-gcc-release-with-logs.a
+cp .../tflite_micro/gen/cortex_m_generic_cortex-m4+fp_debug/lib/libtensorflow-microlite-debug.a lib/libhelia-rt-cm4-gcc-debug.a
+cp .../tflite_micro/gen/cortex_m_generic_cortex-m4+fp_release/lib/libtensorflow-microlite.a lib/libhelia-rt-cm4-gcc-release.a
+cp .../tflite_micro/gen/cortex_m_generic_cortex-m4+fp_release_with_logs/lib/libtensorflow-microlite-withlogs.a lib/libhelia-rt-cm4-gcc-release-with-logs.a
 cp -R .../tflite_micro/treedir . # treedir is from the 'minimal code tree' step above
 cp ../0264234_Nov_15_2023/module.mk . # use an existing module.mk as a starting point
 ```
@@ -192,7 +192,7 @@ source tensorflow/lite/micro/tools/ci_build/helper_functions.sh
 TOOLCHAIN=gcc
 TARGET=cortex_m_corstone_300
 TARGET_ARCH=cortex-m55
-CO_PROCESSOR=ambiq
+CO_PROCESSOR=helia
 OPTIMIZED_KERNEL_DIR=cmsis_nn
 
 readable_run make  -j$(nproc) -f tensorflow/lite/micro/tools/make/Makefile \

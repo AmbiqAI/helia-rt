@@ -19,13 +19,13 @@ The main PR entry point is `tests_entry.yml`.
 
 Current behavior:
 
-- `ambiq_test.yml` runs for pull requests through [tests_entry.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/tests_entry.yml)
+- `helia_test.yml` runs for pull requests through [tests_entry.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/tests_entry.yml)
 - the broader `ci.yml` suite is only invoked on PRs when the PR has the `ci:run_full` label
 
 Relevant workflows:
 
 - [tests_entry.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/tests_entry.yml)
-- [ambiq_test.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/ambiq_test.yml)
+- [helia_test.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/helia_test.yml)
 - [ci.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/ci.yml)
 
 ## Label-Gated Full CI
@@ -65,7 +65,7 @@ Several workflows can be triggered manually with `workflow_dispatch`.
 Common manual entry points:
 
 - [run_ci.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/run_ci.yml): manual entry point for the reusable `ci.yml` workflow
-- [run_ambiq.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/run_ambiq.yml): manual entry point for Ambiq build and test flows
+- [run_helia.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/run_helia.yml): manual entry point for helia build and test flows
 - [cortex_m.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/cortex_m.yml): manual Cortex-M validation
 - [cortex_m_arm_compiler.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/cortex_m_arm_compiler.yml): manual Arm Compiler 6 Cortex-M validation
 - [docs.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/docs.yml): documentation build and publish workflow
@@ -77,10 +77,8 @@ Release automation and asset packaging are handled separately from routine presu
 Relevant workflows:
 
 - [release-please.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/release-please.yml)
-- [ns_release.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/ns_release.yml)
-- [zephyr_release.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/zephyr_release.yml)
-- [ns_tflm_rt_assets.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/ns_tflm_rt_assets.yml)
-- [zephyr_tflm_rt_assets.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/zephyr_tflm_rt_assets.yml)
+- [helia_release.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/helia_release.yml)
+- [zephyr_tflm_rt_assets.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/zephyr_tflm_rt_assets.yml) (manual dispatch)
 
 ## Sync Workflow
 
