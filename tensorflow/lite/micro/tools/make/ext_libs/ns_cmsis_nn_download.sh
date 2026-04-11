@@ -47,6 +47,38 @@ fi
 # Set GIT_COMMIT to NS_CMSIS_NN_COMMIT if set, otherwise use default
 GIT_COMMIT=${NS_CMSIS_NN_COMMIT:-ca1e137b7136b32eae9fef112b484ab93a2e3765}
 
+# clone_ns_cmsis_nn: attempt git clone and surface a clear error on failure.
+clone_ns_cmsis_nn() {
+  local dest="${1}"
+  if git clone ${NS_CMSIS_NN_URL} "${dest}" >&2 2>&1; then
+    return 0
+  fi
+  cat >&2 <<'EOF'
+
+================================================================================
+ERROR: Failed to clone the ns-cmsis-nn repository.
+
+The HELIA optimized-kernel backend (OPTIMIZED_KERNEL_DIR=helia) requires the
+private AmbiqAI/ns-cmsis-nn module. Access is provided to Ambiq licensees.
+
+If you do not have access, you can build with the open-source CMSIS-NN backend
+or the reference kernels instead:
+
+  make ... OPTIMIZED_KERNEL_DIR=cmsis_nn   # Arm CMSIS-NN (open source)
+  make ... OPTIMIZED_KERNEL_DIR=           # Reference kernels only
+
+For Zephyr builds, select the backend in prj.conf:
+
+  CONFIG_HELIA_RT_BACKEND_CMSIS_NN=y       # Arm CMSIS-NN (open source)
+  CONFIG_HELIA_RT_BACKEND_REFERENCE=y      # Reference kernels only
+
+For access to ns-cmsis-nn, contact support.aitg@ambiq.com.
+================================================================================
+
+EOF
+  exit 1
+}
+
 should_download=$(check_should_download ${DOWNLOADS_DIR})
 
 if [[ ${should_download} == "no" ]]; then
@@ -65,14 +97,14 @@ elif [ -d ${DOWNLOADED_NS_CMSIS_NN_PATH} ]; then
   else
     echo >&2 "ns-cmsis-nn is at ${CURRENT_COMMIT} but expected ${GIT_COMMIT}, redownloading."
     rm -rf ${DOWNLOADED_NS_CMSIS_NN_PATH}
-    git clone ${NS_CMSIS_NN_URL} ${DOWNLOADED_NS_CMSIS_NN_PATH} >&2
+    clone_ns_cmsis_nn ${DOWNLOADED_NS_CMSIS_NN_PATH}
     pushd ${DOWNLOADED_NS_CMSIS_NN_PATH} > /dev/null
     git checkout ${GIT_COMMIT} >&2
     popd > /dev/null
   fi
 
 else
-  git clone ${NS_CMSIS_NN_URL} ${DOWNLOADED_NS_CMSIS_NN_PATH} >&2
+  clone_ns_cmsis_nn ${DOWNLOADED_NS_CMSIS_NN_PATH}
   pushd ${DOWNLOADED_NS_CMSIS_NN_PATH} > /dev/null
   git checkout ${GIT_COMMIT} >&2
   popd > /dev/null

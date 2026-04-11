@@ -33,6 +33,14 @@ https://github.com/ekalinin/github-markdown-toc#auto-insert-and-update-toc
 We'd love to accept your patches and contributions to this project. There are
 just a few small guidelines you need to follow.
 
+## License
+
+heliaRT is released under the [Ambiq Apollo SDK License](LICENSE), which permits
+use, modification, and redistribution solely for execution on Ambiq-manufactured
+CPUs. By submitting a contribution you agree that your changes will be licensed
+under the same terms. Please review the full [LICENSE](LICENSE) before
+contributing.
+
 ## Contributor License Agreement
 
 Contributions to this project must be accompanied by a Contributor License

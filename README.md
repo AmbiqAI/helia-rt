@@ -10,6 +10,10 @@ heliaRT is Ambiq's optimized TensorFlow Lite for Microcontrollers runtime for Ap
 
 heliaRT focuses on efficient inference for Ambiq edge devices. By aligning the runtime with Apollo hardware capabilities, heliaRT helps reduce integration friction while improving performance and energy efficiency on supported Ambiq targets.
 
+## License
+
+heliaRT is released under the [Ambiq Apollo SDK License](LICENSE). The license permits free use, modification, and redistribution **solely for execution on Ambiq-manufactured CPUs** (including the Apollo series). Use on non-Ambiq hardware is not permitted. See the full [LICENSE](LICENSE) file for details.
+
 ## Key Features
 
 - **Optimized Performance**: Utilizes MVE and DSP hardware capabilities to enhance computational efficiency and speed.
@@ -101,6 +105,8 @@ The three backends correspond to Zephyr Kconfig choices:
 - **Reference** (`HELIA_RT_BACKEND_REFERENCE`): Generic TFLM C kernels. Works on any architecture.
 - **CMSIS-NN** (`HELIA_RT_BACKEND_CMSIS_NN`): Open-source Arm CMSIS-NN optimized kernels. Cortex-M only.
 - **HELIA** (`HELIA_RT_BACKEND_HELIA`): Ambiq-optimized kernels (heliaCORE / ns-cmsis-nn). Cortex-M only. Requires Ambiq-provided module.
+
+> **Note:** The **Reference** and **CMSIS-NN** backends are fully open and available to all users. The **HELIA** backend requires the private `ns-cmsis-nn` module, which is provided to Ambiq licensees. If you build with `OPTIMIZED_KERNEL_DIR=helia` (the default in CI scripts) without access to this module, the build will fail with a clear error message explaining available alternatives. To build without the HELIA backend, use `OPTIMIZED_KERNEL_DIR=cmsis_nn` or leave it empty for reference kernels only. Contact [support.aitg@ambiq.com](mailto:support.aitg@ambiq.com) for access to the HELIA module.
 
 Data type key: **i8** = int8 activations/weights, **i16** = int16 activations, **i4** = int4 weights, **f32** = float32.
 
