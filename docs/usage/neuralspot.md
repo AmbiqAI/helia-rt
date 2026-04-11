@@ -66,4 +66,5 @@ From this path, users typically want to learn:
 
 Learn more about `ns_autodeploy` in the Ambiq `neuralSPOT` documentation:
 
+- [From TF to EVB — testing, profiling, and deploying AI models](https://ambiqai.github.io/neuralSPOT/docs/From%20TF%20to%20EVB%20-%20testing%2C%20profiling%2C%20and%20deploying%20AI%20models.html)
 - [neuralSPOT tools documentation](https://ambiqai.github.io/neuralSPOT/tools/index.html)

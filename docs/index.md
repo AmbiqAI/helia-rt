@@ -34,7 +34,7 @@ heliaRT is maintained for Ambiq Apollo devices, including:
 
 ### Start with neuralSPOT
 
-Use [neuralSPOT setup](usage/neuralspot.md) with `ns_autodeploy` when you want the fastest path to profiling a `.tflite` model on Ambiq hardware.
+Use [neuralSPOT setup](usage/neuralspot.md) with `ns_autodeploy` when you want the fastest path to profiling a `.tflite` model on Ambiq hardware. See the [neuralSPOT AutoDeploy guide](https://ambiqai.github.io/neuralSPOT/docs/From%20TF%20to%20EVB%20-%20testing%2C%20profiling%2C%20and%20deploying%20AI%20models.html) for an end-to-end walkthrough.
 
 ### Integrate into Zephyr
 
