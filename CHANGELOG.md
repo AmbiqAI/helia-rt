@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.10.1](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.10.0...heliaRT-v1.10.1) (2026-04-11)
+
+
+### Bug Fixes
+
+* **ci:** remove stale zephyr-release job and replaced scripts ([#90](https://github.com/AmbiqAI/helia-rt/issues/90)) ([22472cd](https://github.com/AmbiqAI/helia-rt/commit/22472cdd4b5cbef333b7c7c94abfeb5919a5aab3))
+* **ci:** use literal 'main' in docs.yml push trigger ([#92](https://github.com/AmbiqAI/helia-rt/issues/92)) ([3d71155](https://github.com/AmbiqAI/helia-rt/commit/3d7115521b5a22e37e66c7f6afce0e7a3e8afa9d))
+* clear error message for private HELIA backend, document license ([#94](https://github.com/AmbiqAI/helia-rt/issues/94)) ([1bfae7b](https://github.com/AmbiqAI/helia-rt/commit/1bfae7bc1f42f24087d636098cff7e00b87348ff))
+
 ## [1.10.0](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.9.0...heliaRT-v1.10.0) (2026-04-10)
 
 
