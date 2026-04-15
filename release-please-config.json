@@ -2,7 +2,7 @@
   "bootstrap-sha": "645d1c2164a63368a5c60ec41fe7fbba320951a0",
   "packages": {
     ".": {
-      "component": "HeliaRT",
+      "component": "heliaRT",
       "release-type": "simple",
       "include-component-in-tag": true,
       "include-v-in-tag": true,

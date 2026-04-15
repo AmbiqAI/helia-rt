@@ -1,4 +1,4 @@
-name: HeliaRT Docker Image
+name: heliaRT Docker Image
 
 on:
   workflow_call:

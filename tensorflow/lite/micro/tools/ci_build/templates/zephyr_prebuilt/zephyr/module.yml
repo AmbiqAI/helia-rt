@@ -1,0 +1,4 @@
+name: helia_rt
+build:
+  cmake: zephyr
+  kconfig: zephyr/Kconfig

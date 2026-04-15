@@ -32,7 +32,7 @@ TfLiteStatus PadPrepare(TfLiteContext* context, TfLiteNode* node);
 TFLMRegistration Register_PAD();
 TFLMRegistration Register_PADV2();
 
-#if defined(CMSIS_NN) || defined(AMBIQ)
+#if defined(CMSIS_NN) || defined(HELIA)
 TFLMRegistration Register_PAD_INT8();
 #else
 inline TFLMRegistration Register_PAD_INT8() { return Register_PAD(); }

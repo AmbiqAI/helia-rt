@@ -16,8 +16,8 @@ on:
 
 jobs:
 
-  ambiq-test:
-    uses: ./.github/workflows/ambiq_test.yml
+  helia-test:
+    uses: ./.github/workflows/helia_test.yml
     with:
       trigger-sha: ${{ github.event.pull_request.head.sha }}
     secrets:

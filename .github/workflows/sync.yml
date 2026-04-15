@@ -24,10 +24,10 @@ jobs:
       (github.event_name == 'schedule' && github.repository == 'AmbiqAI/helia-rt')
 
     steps:
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           token: ${{ secrets.TFLM_BOT_REPO_TOKEN }}
 
@@ -39,8 +39,8 @@ jobs:
       - name: Sync the code
         run: |
           ./ci/sync_from_upstream_tf.sh
-          git config --local user.name "TFLM-bot"
-          git config --local user.email "tflm-github-bot@ambiq.com"
+          git config --local user.name "heliaRT-bot"
+          git config --local user.email "helia-rt-bot@ambiq.com"
           git add *
 
           if [[ $(git status --porcelain | wc -l) == 0 ]]; then
@@ -58,8 +58,8 @@ jobs:
           token: ${{ secrets.TFLM_BOT_REPO_TOKEN }}
           title: Automated sync from github.com/tensorflow/tensorflow
           commit-message: Automated sync from github.com/tensorflow/tensorflow
-          committer: TFLM-bot <tflm-github-bot@ambiq.com>
-          author: TFLM-bot <tflm-github-bot@ambiq.com>
+          committer: heliaRT-bot <helia-rt-bot@ambiq.com>
+          author: heliaRT-bot <helia-rt-bot@ambiq.com>
           body: "BUG=automated sync from upstream\nNO_CHECK_TFLITE_FILES=automated sync from upstream"
           labels: bot:sync-tf, ci:run
           reviewers: apage224

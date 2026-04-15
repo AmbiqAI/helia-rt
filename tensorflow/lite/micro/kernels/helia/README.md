@@ -3,7 +3,7 @@
 # General Info
 NS-CMSIS-NN is a library containing kernel optimizations for Arm(R) Cortex(R)-M
 processors, developed by Ambiq. To use NS-CMSIS-NN optimized kernels instead of reference kernels, add
-`OPTIMIZED_KERNEL_DIR=ambiq` to the make command line. See examples below.
+`OPTIMIZED_KERNEL_DIR=helia` to the make command line. See examples below.
 
 For more information about the optimizations, check out
 [CMSIS-NN documentation](https://github.com/ARM-software/CMSIS-NN/blob/main/README.md),
@@ -14,7 +14,7 @@ this specific target, check out the [Corstone-300 readme](https://github.com/ten
 
 Downloaded NS-CMSIS-NN code is built:
 ```
-make -f tensorflow/lite/micro/tools/make/Makefile OPTIMIZED_KERNEL_DIR=ambiq TARGET=cortex_m_corstone_300 TARGET_ARCH=cortex-m55 kernel_conv_test
+make -f tensorflow/lite/micro/tools/make/Makefile OPTIMIZED_KERNEL_DIR=helia TARGET=cortex_m_corstone_300 TARGET_ARCH=cortex-m55 kernel_conv_test
 ```
 
 # Build for speed or size
@@ -27,13 +27,13 @@ More info on the target used in this example: https://github.com/tensorflow/tfli
 Bulding for speed (default):
 Note that speed is default so if leaving out GLOBAL_KERNEL_OPTIMIZE completely that will be the default.
 ```
-make -f tensorflow/lite/micro/tools/make/Makefile TARGET=cortex_m_generic TARGET_ARCH=cortex-m55 OPTIMIZED_KERNEL_DIR=ambiq GLOBAL_KERNEL_OPTIMIZE=SPEED microlite
+make -f tensorflow/lite/micro/tools/make/Makefile TARGET=cortex_m_generic TARGET_ARCH=cortex-m55 OPTIMIZED_KERNEL_DIR=helia GLOBAL_KERNEL_OPTIMIZE=SPEED microlite
 
 ```
 
 Bulding for size:
 ```
-make -f tensorflow/lite/micro/tools/make/Makefile TARGET=cortex_m_generic TARGET_ARCH=cortex-m55 OPTIMIZED_KERNEL_DIR=ambiq GLOBAL_KERNEL_OPTIMIZE=SIZE microlite
+make -f tensorflow/lite/micro/tools/make/Makefile TARGET=cortex_m_generic TARGET_ARCH=cortex-m55 OPTIMIZED_KERNEL_DIR=helia GLOBAL_KERNEL_OPTIMIZE=SIZE microlite
 
 ```
 Building for size, but overriding the FC kernel to be built for speed:
@@ -41,7 +41,7 @@ Building for size, but overriding the FC kernel to be built for speed:
 ```
 make -f tensorflow/lite/micro/tools/make/Makefile \
   TARGET=cortex_m_generic TARGET_ARCH=cortex-m55 \
-  OPTIMIZED_KERNEL_DIR=ambiq \
+  OPTIMIZED_KERNEL_DIR=helia \
   GLOBAL_KERNEL_OPTIMIZE=SIZE \   # default all kernels to size‑optimized
   FC_OPT=SPEED \                  # but build fully‑connected for speed
   microlite

@@ -1,0 +1,25 @@
+name: heliaRT Assets (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref (branch, commit, or tag) to build"
+        required: true
+        default: main
+      tag:
+        description: "Asset tag name (defaults to ref)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  helia-assets:
+    uses: ./.github/workflows/helia_release.yml
+    with:
+      ref: ${{ inputs.ref }}
+      tag: ${{ inputs.tag }}
+      upload_to_release: false
+    secrets: inherit

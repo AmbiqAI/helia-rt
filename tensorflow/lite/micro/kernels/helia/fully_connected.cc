@@ -29,7 +29,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_arena_constants.h"
 #include "tensorflow/lite/micro/micro_log.h"
-#include "tensorflow/lite/micro/kernels/ambiq/ambiq_common.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_common.h"
 
 namespace tflite {
 namespace {
@@ -133,7 +133,11 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   if (input->type == kTfLiteInt16) {
     TF_LITE_ENSURE_EQ(context, input->params.zero_point, 0);
     TF_LITE_ENSURE_EQ(context, output->params.zero_point, 0);
-    buf_size = arm_fully_connected_s16_get_buffer_size(&filter_dims);
+    if (data->reference_op_data.is_per_channel) {
+      buf_size = arm_fully_connected_per_channel_s16_get_buffer_size(&filter_dims);
+    } else {
+      buf_size = arm_fully_connected_s16_get_buffer_size(&filter_dims);
+    }
   } else if (input->type == kTfLiteInt8 && filter->type != kTfLiteInt4) {
     const bool is_conv_1x1_possible =
         output_dim_count > 2 && data->accum_depth % 4 == 0;

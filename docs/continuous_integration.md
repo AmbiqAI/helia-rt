@@ -1,52 +1,111 @@
-# Continuous Integration Docs Contents
-* [User Facing CI](#user-facing-ci)
-  * [`ci:run` - Run Tests](##`ci:run`)
-  * [`ci:ready_to_merge` - Send To Merge Queue](#ci:ready_to_merge)
-* [Manually Running Tests](#manually-running-tests)
-* [Sync From Tensorflow Repository](#sync-from-the-tensorflow-repository)
-* [Merge Queue Details](#merge-queue-details)
+# Continuous Integration
 
-# User Facing CI
-The continuous integration system is controlled by applying labels to PRs. There are only two important labels: `ci:run` runs the testing suite, and `ci:ready_to_merge` places a PR in the merge queue.
-  ## `ci:run`
-  The `ci:run` label runs the [main testing suite](../.github/workflows/ci.yml) against the PR. For details of the tests involved, examine the linked file. The `ci:run` tag is self-removing.
-  ## `ci:ready_to_merge`
-  After all tests from `ci:run` have passed, the Google CLA has been agreed to, and a reviewer has approved the PR, applying the `ci:ready_to_merge` label will enter the PR into the merge queue. Unless there is a conflict with other PR's in the queue, this should be a fire and forget operation. In the case of a conflict due to code that is merged before a given PR, you will need to troubleshoot your code manually.
+This page describes the CI workflows that exist in this repository today and how they are typically used.
 
-# Manually Running Tests
-Tests can also be run manually on the command line within a docker container, which can be built with:
-   ```
-   docker build -t tflm-ci -f ci/Dockerfile.micro .
-   ```
+## CI Overview
 
-   or use the tflm-ci docker image from [here](https://github.com/users/TFLM-bot/packages/container/package/tflm-ci).
+The repository uses a mix of:
 
-  You will still need to copy or mount your fork of tflite-micro on to this docker container prior to running any tests. To run the built Docker image interactively and mount your local copy of tflite-micro on the container, run:
-  ```
-  docker run -v /path/to/local/tflite-micro:/path/to/docker/tflite-micro -it tflm-ci /bin/bash
-  ```
-  This way changes from your local fork will be reflected in the Docker container.
+- PR-triggered workflows for routine validation
+- label-gated workflows for heavier test coverage
+- manually dispatched workflows for ad hoc runs
+- release and documentation workflows
 
-  You can also view or remove your instantiated containers by doing:
-  ```
-  docker ps --all
-  docker rm <docker image ID>
-  ```
-# Sync From The Tensorflow Repository
-While TfLite Micro and TfLite are in separate GitHub repositories, the two
-projects continue to share common code.
+The main GitHub Actions workflow files live under `.github/workflows/`.
 
-The [TensorFlow repo](https://github.com/tensorflow/tensorflow) is the single source of truth for this
-shared code. As a result, any changes to this shared code must be made in the
-[TensorFlow repo](https://github.com/tensorflow/tensorflow) which will then automatically sync'd via a scheduled
-[GitHub workflow](../.github/workflows/sync.yml).
-# Merge Queue Details
-This section is probably only of interest if you plan to be doing surgery on the CI system.
-## Mergify
-We use [Mergify](https://mergify.com/) for our merge queue. [The documentation](https://docs.mergify.com/) is reasonably straight forward.
-## Config File
-Our [mergify.yml](../.github/mergify.yml) is fairly standard. It triggers on `ci:ready_to_merge` label and requires all branch protection checks to pass before a PR can be added to the queue. When the PR is merged it removes the label.
-## `ci:run` In Queue
-The one slightly complicated wrinkle in our system is the test suite being run only when the `ci:run` label is applied. As soon as the tests are run, the label is [removed](../.github/workflows/remove-labels.yml).
+## Pull Request Validation
 
-As the queue processes each PR, it creates a temporary branch and merges in the results of the previous passing PRs my merging main. This merge resets all the test results, so the `ci:run` tag must be [reapplied](../.github/workflows/apply_cirun.yml) in queue.
+The main PR entry point is `tests_entry.yml`.
+
+Current behavior:
+
+- `helia_test.yml` runs for pull requests through [tests_entry.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/tests_entry.yml)
+- the broader `ci.yml` suite is only invoked on PRs when the PR has the `ci:run_full` label
+
+Relevant workflows:
+
+- [tests_entry.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/tests_entry.yml)
+- [helia_test.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/helia_test.yml)
+- [ci.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/ci.yml)
+
+## Label-Gated Full CI
+
+The label used in the current repository is `ci:run_full`.
+
+When a pull request has `ci:run_full`:
+
+- `tests_entry.yml` calls the broader `ci.yml` workflow
+- additional Cortex-M workflows are also wired to run on labeled PR events
+
+Relevant workflows:
+
+- [cortex_m.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/cortex_m.yml)
+- [cortex_m_arm_compiler.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/cortex_m_arm_compiler.yml)
+
+`ci:run` still appears in a few automation paths for bot-created PRs, but it is not the main user-facing full-CI label described by the active PR entry workflows.
+
+## Post-Merge Validation
+
+The post-merge entry point is `tests_post.yml`.
+
+This workflow runs on closed pull requests and is intended for longer-running validation after merge. It currently fans out into:
+
+- Docker image build updates
+- Ambiq test runs
+- Cortex-M validation
+
+Relevant workflow:
+
+- [tests_post.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/tests_post.yml)
+
+## Manual Workflow Entry Points
+
+Several workflows can be triggered manually with `workflow_dispatch`.
+
+Common manual entry points:
+
+- [run_ci.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/run_ci.yml): manual entry point for the reusable `ci.yml` workflow
+- [run_helia.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/run_helia.yml): manual entry point for helia build and test flows
+- [cortex_m.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/cortex_m.yml): manual Cortex-M validation
+- [cortex_m_arm_compiler.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/cortex_m_arm_compiler.yml): manual Arm Compiler 6 Cortex-M validation
+- [docs.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/docs.yml): documentation build and publish workflow
+
+## Release and Asset Workflows
+
+Release automation and asset packaging are handled separately from routine presubmit CI.
+
+Relevant workflows:
+
+- [release-please.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/release-please.yml)
+- [helia_release.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/helia_release.yml)
+- [zephyr_tflm_rt_assets.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/zephyr_tflm_rt_assets.yml) (manual dispatch)
+
+## Sync Workflow
+
+This repository also keeps a sync workflow for pulling shared changes from TensorFlow-related upstream sources.
+
+Relevant workflow:
+
+- [sync.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/sync.yml)
+
+## Error Reporting
+
+Several workflows call a shared issue-reporting workflow when a run fails in the main repository.
+
+Relevant workflow:
+
+- [issue_on_error.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/issue_on_error.yml)
+
+## Local Validation
+
+For local verification, the exact command depends on the workflow you are trying to mirror. In practice, the most useful approach is to inspect the referenced workflow file and then run the underlying script or build command locally.
+
+For example, the reusable CI workflow delegates to scripts under:
+
+- `tensorflow/lite/micro/tools/ci_build/`
+
+## Notes
+
+- This page documents the workflows that are present in the repository now.
+- If a workflow file changes, this page should be updated to match the current trigger and entry-point model.
+- GitHub Actions file links here intentionally point to GitHub rather than relative local paths, so the published docs site does not produce broken links.
