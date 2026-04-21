@@ -1,0 +1,61 @@
+schema_version: 1
+
+module:
+  name: nsx-heliart
+  type: algorithm
+  version: "1.6.0"
+
+support:
+  ambiqsuite: true
+  zephyr: false
+
+summary: >-
+  Ambiq-optimized TensorFlow Lite for Microcontrollers (TFLM) runtime.
+  Prebuilt static libraries with ns-cmsis-nn optimized kernels.
+
+capabilities:
+  - inference
+  - tflm
+  - machine_learning
+  - litert
+
+use_cases:
+  - on-device ML inference
+  - tflite model deployment on Ambiq SoCs
+  - keyword spotting and anomaly detection models
+
+agent_keywords:
+  - tflm
+  - tensorflow
+  - inference
+  - litert
+  - machine_learning
+  - heliart
+  - tflite
+
+build:
+  cmake:
+    package: nsx_heliart
+    targets:
+      - nsx::heliart
+
+depends:
+  required:
+    - nsx-core
+    - nsx-soc-hal
+  optional: []
+
+compatibility:
+  boards:
+    - "*"
+  socs:
+    - apollo3
+    - apollo3p
+    - apollo4l
+    - apollo4p
+    - apollo5b
+    - apollo510
+    - apollo510b
+    - apollo330P
+  toolchains:
+    - arm-none-eabi-gcc
