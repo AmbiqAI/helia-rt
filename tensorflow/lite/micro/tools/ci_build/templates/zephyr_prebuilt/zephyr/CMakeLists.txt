@@ -56,6 +56,6 @@ if(CONFIG_HELIA_RT)
 
   add_library(helia_rt_prebuilt STATIC IMPORTED GLOBAL)
   set_target_properties(helia_rt_prebuilt PROPERTIES IMPORTED_LOCATION "${HELIA_RT_PREBUILT_LIB}")
-  target_link_libraries(helia_rt PUBLIC helia_rt_prebuilt)
+  zephyr_link_libraries(helia_rt_prebuilt)
 
 endif()
