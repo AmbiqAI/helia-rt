@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.0](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.10.1...heliaRT-v1.11.0) (2026-04-23)
+
+
+### Features
+
+* Add zephyr integration documentation ([c372d63](https://github.com/AmbiqAI/helia-rt/commit/c372d63d23767a1bc38b6761b74cdc8e9482c91d))
+
 ## [1.10.1](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.10.0...heliaRT-v1.10.1) (2026-04-11)
 
 
