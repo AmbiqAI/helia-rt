@@ -12,7 +12,8 @@ if(CONFIG_HELIA_RT)
     ${HELIA_RT_DIR}/third_party/kissfft
     ${HELIA_RT_DIR}/third_party/ns_cmsis_nn/Include
   )
-
+  
+  zephyr_compile_definitions(TF_LITE_STATIC_MEMORY)
   zephyr_library_compile_definitions(NS_CMSIS_NN)
   zephyr_library_compile_definitions(HELIA)
 
@@ -55,6 +56,6 @@ if(CONFIG_HELIA_RT)
 
   add_library(helia_rt_prebuilt STATIC IMPORTED GLOBAL)
   set_target_properties(helia_rt_prebuilt PROPERTIES IMPORTED_LOCATION "${HELIA_RT_PREBUILT_LIB}")
-  target_link_libraries(helia_rt PUBLIC helia_rt_prebuilt)
+  zephyr_link_libraries(helia_rt_prebuilt)
 
 endif()
