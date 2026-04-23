@@ -1,6 +1,6 @@
 #ifndef TENSORFLOW_LITE_MICRO_HELIART_VERSION_H_
 #define TENSORFLOW_LITE_MICRO_HELIART_VERSION_H_
 
-#define HELIART_VERSION "v1.11.0"  // x-release-please-version
+#define HELIART_VERSION "v1.10.1"  // x-release-please-version
 
 #endif  // TENSORFLOW_LITE_MICRO_HELIART_VERSION_H_
