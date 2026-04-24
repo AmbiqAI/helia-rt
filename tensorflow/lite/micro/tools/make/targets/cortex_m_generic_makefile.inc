@@ -161,7 +161,6 @@ ifeq ($(TOOLCHAIN), armclang)
     --target=arm-arm-none-eabi \
     -fshort-enums \
     -gdwarf-4     \
-    -fshort-wchar \
     -mcpu=$(TARGET_ARCH)
 
   CXXFLAGS += $(FLAGS_ARMC)

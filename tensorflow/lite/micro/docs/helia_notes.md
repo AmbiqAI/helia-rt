@@ -92,7 +92,6 @@ First, cortex_m_generic_makefile.inc:
 128,130d127
 <     -fshort-enums \
 <     -gdwarf-4 \
-<     -fshort-wchar \
 ```
 
 Also (see below, this no longer works on latest)
