@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.1](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.11.0...heliaRT-v1.11.1) (2026-04-24)
+
+
+### Bug Fixes
+
+* **ci:** restore helia_release.yml workflow (dropped in PR [#90](https://github.com/AmbiqAI/helia-rt/issues/90)) ([#102](https://github.com/AmbiqAI/helia-rt/issues/102)) ([cf4b218](https://github.com/AmbiqAI/helia-rt/commit/cf4b218e4e5003e15484aaefc79ae00085787f32))
+
 ## [1.11.0](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.10.1...heliaRT-v1.11.0) (2026-04-23)
 
 
