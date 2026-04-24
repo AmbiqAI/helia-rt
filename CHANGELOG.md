@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.2](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.11.1...heliaRT-v1.11.2) (2026-04-24)
+
+
+### Bug Fixes
+
+* **armclang:** remove -fshort-wchar from FLAGS_ARMC ([#104](https://github.com/AmbiqAI/helia-rt/issues/104)) ([221d1b3](https://github.com/AmbiqAI/helia-rt/commit/221d1b3dceec73f8ff05458a69ad46a5b75d8bfb))
+
 ## [1.11.1](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.11.0...heliaRT-v1.11.1) (2026-04-24)
 
 
