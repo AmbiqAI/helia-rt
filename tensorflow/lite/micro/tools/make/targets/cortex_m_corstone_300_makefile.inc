@@ -181,6 +181,40 @@ else ifeq ($(TOOLCHAIN), gcc)
   ldflags_to_remove = -Wl,--fatal-warnings
   LDFLAGS := $(filter-out $(ldflags_to_remove),$(LDFLAGS))
 
+else ifeq ($(TOOLCHAIN), atfe)
+  TARGET_DEFAULT_TOOLCHAIN_ROOT := $(DOWNLOADS_DIR)/arm_toolchain_embedded/bin/
+  TARGET_TOOLCHAIN_ROOT := $(TARGET_DEFAULT_TOOLCHAIN_ROOT)
+  ifeq ($(TARGET_TOOLCHAIN_ROOT), $(TARGET_DEFAULT_TOOLCHAIN_ROOT))
+    DOWNLOAD_RESULT := $(shell $(MAKEFILE_DIR)/arm_toolchain_embedded_download.sh $(DOWNLOADS_DIR) $(TENSORFLOW_ROOT))
+    ifneq ($(DOWNLOAD_RESULT), SUCCESS)
+      $(error Something went wrong with the ATfE download: $(DOWNLOAD_RESULT))
+    endif
+  endif
+
+  CXX_TOOL := clang++
+  CC_TOOL  := clang
+  AR_TOOL  := llvm-ar
+  # Use the clang driver as the linker so it pulls in picolibc/newlib-nano
+  # and crt0.o automatically; LDFLAGS pass through with -Wl,...
+
+  # ATfE rejects -mfpu=auto; let -mcpu drive FPU/MVE feature selection.
+  FLAGS_ATFE = \
+    --target=arm-none-eabi \
+    -fshort-enums \
+    -mcpu=$(MCPU_OPTION)
+
+  CXXFLAGS += $(FLAGS_ATFE)
+  CCFLAGS += $(FLAGS_ATFE)
+
+  LDFLAGS += \
+    -T $(ETHOS_U_CORE_PLATFORM)/platform_parsed.ld \
+    -Wl,-Map=gen/$(TARGET).map,--cref \
+    -Wl,--gc-sections \
+    --entry Reset_Handler
+
+  ldflags_to_remove = -Wl,--fatal-warnings
+  LDFLAGS := $(filter-out $(ldflags_to_remove),$(LDFLAGS))
+
 else
   $(error "TOOLCHAIN=$(TOOLCHAIN) is not supported.")
 endif

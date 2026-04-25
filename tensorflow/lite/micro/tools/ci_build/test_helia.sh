@@ -34,7 +34,7 @@ Usage: test_helia.sh [options]
 
 Options:
   -a, --arch <cortex-m55|cortex-m4|cortex-m4+fp|...>   Target CPU arch (default: cortex-m55)
-  -t, --toolchain <gcc|clang|...>                      Toolchain (default: gcc)
+  -t, --toolchain <gcc|armclang|atfe>                  Toolchain (default: gcc)
   -O, --opt <SPEED|SIZE|BOTH>                          Kernel optimization (default: BOTH)
       --no-tests | --build-only                        Disable tests; build only
   -L, --arm-ubl-license-id, --arm-ubl-license-identifier <VALUE>
@@ -68,6 +68,21 @@ case "${OPT_CHOICE}" in
   *) echo "Invalid --opt '${OPT_CHOICE}'. Use SPEED|SIZE|BOTH." >&2; exit 2 ;;
 esac
 
+case "${TOOLCHAIN}" in
+  gcc|armclang|atfe) ;;
+  *) echo "Invalid --toolchain '${TOOLCHAIN}'. Use gcc|armclang|atfe." >&2; exit 2 ;;
+esac
+
+# ATfE: prefer pre-installed copy at /opt/atfe (CI image) over runtime download.
+ATFE_OVERRIDE=()
+if [[ "${TOOLCHAIN}" == "atfe" ]]; then
+  ATFE_PREINSTALL="${ATFE_PREINSTALL:-/opt/atfe}"
+  if [[ -x "${ATFE_PREINSTALL}/bin/clang" ]]; then
+    echo "Using pre-installed ATfE at ${ATFE_PREINSTALL}"
+    ATFE_OVERRIDE=("TARGET_TOOLCHAIN_ROOT=${ATFE_PREINSTALL}/bin/")
+  fi
+fi
+
 # ------------------------- Inline-asm gating ----------------------------------
 enable_requantize_inline_asm=false
 case "${TARGET_ARCH}" in
@@ -84,6 +99,7 @@ common_args=(
   TARGET="${TARGET}"
   TARGET_ARCH="${TARGET_ARCH}"
   TOOLCHAIN="${TOOLCHAIN}"
+  ${ATFE_OVERRIDE[@]+"${ATFE_OVERRIDE[@]}"}
 )
 
 # Ensure third_party deps are present (download step)

@@ -22,7 +22,7 @@ readonly TARGET_ARCHS=("cortex-m4+fp" "cortex-m55")
 readonly BUILDS=("debug" "release" "release_with_logs")
 ARM_UBL_LICENSE_IDENTIFIER=${ARM_UBL_LICENSE_IDENTIFIER:-}
 
-TOOLCHAINS=("gcc" "armclang")
+TOOLCHAINS=("gcc" "armclang" "atfe")
 
 cd "$DIR"
 
