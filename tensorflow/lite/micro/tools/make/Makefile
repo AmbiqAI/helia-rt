@@ -158,6 +158,12 @@ ifeq ($(TOOLCHAIN), armclang)
   CORE_OPTIMIZATION_LEVEL := -Ofast
   KERNEL_OPTIMIZATION_LEVEL := -Ofast
   THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := -Ofast
+else ifeq ($(TOOLCHAIN), atfe)
+  # Clang 22 (ATfE 22.1.0) deprecated -Ofast and rejects it under -Werror.
+  # -O3 -ffast-math is the documented replacement.
+  CORE_OPTIMIZATION_LEVEL := -O3 -ffast-math
+  KERNEL_OPTIMIZATION_LEVEL := -O3 -ffast-math
+  THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := -O3 -ffast-math
 else
   CORE_OPTIMIZATION_LEVEL := -Os
   KERNEL_OPTIMIZATION_LEVEL := -O2
@@ -944,6 +950,21 @@ ifeq ($(TOOLCHAIN), armclang)
   $(BINDIR)%.bin: $(BINDIR)%
 		@mkdir -p $(dir $@)
 		$(FROMELF) --bin --output=$@ $<
+else ifeq ($(TOOLCHAIN), atfe)
+  # ATfE clang shares armclang's diagnostic for inf/nan use under fast-math
+  # options; demote to a warning to keep -Werror builds green.
+  CXXFLAGS += -Wno-error=nan-infinity-disabled
+  CCFLAGS  += -Wno-error=nan-infinity-disabled
+  # ns-cmsis-nn (and other GCC-targeted upstream sources) use GCC-only
+  # attributes such as __attribute__((optimize(...))). Clang ignores these
+  # but -Werror promotes the warning. Keep it a warning under ATfE.
+  CXXFLAGS += -Wno-error=unknown-attributes
+  CCFLAGS  += -Wno-error=unknown-attributes
+  # ATfE ships llvm-objcopy under <root>/bin (no target prefix).
+  OBJCOPY := ${TARGET_TOOLCHAIN_ROOT}llvm-objcopy
+  $(BINDIR)%.bin: $(BINDIR)%
+		@mkdir -p $(dir $@)
+		$(OBJCOPY) $< $@ -O binary
 else
   OBJCOPY := ${TARGET_TOOLCHAIN_ROOT}$(TARGET_TOOLCHAIN_PREFIX)objcopy
   $(BINDIR)%.bin: $(BINDIR)%

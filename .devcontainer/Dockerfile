@@ -82,6 +82,23 @@ RUN /install/install_bazelisk.sh
 
 RUN /install/install_buildifier.sh
 
+# Install Arm Toolchain for Embedded (ATfE) — LLVM/Clang based bare-metal toolchain.
+# Pinned to 22.1.0 (LLVM 22.1.0). Lives at /opt/atfe/bin which scripts auto-detect.
+ARG ATFE_VERSION=22.1.0
+RUN set -eux; \
+    case "$(uname -m)" in \
+      x86_64)  ATFE_ARCHIVE="ATfE-${ATFE_VERSION}-Linux-x86_64.tar.xz" ;; \
+      aarch64) ATFE_ARCHIVE="ATfE-${ATFE_VERSION}-Linux-AArch64.tar.xz" ;; \
+      *) echo "Unsupported arch for ATfE: $(uname -m)"; exit 1 ;; \
+    esac; \
+    mkdir -p /opt/atfe; \
+    wget -q "https://github.com/arm/arm-toolchain/releases/download/release-${ATFE_VERSION}-ATfE/${ATFE_ARCHIVE}" -O /tmp/atfe.tar.xz; \
+    tar -xJf /tmp/atfe.tar.xz -C /opt/atfe --strip-components=1; \
+    rm -f /tmp/atfe.tar.xz; \
+    /opt/atfe/bin/clang --version
+ENV PATH=/opt/atfe/bin:${PATH}
+ENV ATFE_PREINSTALL=/opt/atfe
+
 # Install uv (Python package manager) directly to avoid nanolayer GLIBC issues on Bullseye
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/local/bin" sh
 

@@ -28,7 +28,7 @@ def main():
 
     release_types = ["debug", "release", "release_with_logs"]
     ns_release_names = ["debug", "release", "release-with-logs"]
-    compilers = ["gcc", "armclang"]
+    compilers = ["gcc", "armclang", "atfe"]
     processors = ["cortex-m4+fp", "cortex-m55"]
 
     # if params.build_tflm:

@@ -3,7 +3,7 @@ schema_version: 1
 module:
   name: nsx-heliart
   type: algorithm
-  version: "1.6.0"
+  version: "1.11.2"
 
 support:
   ambiqsuite: true
@@ -59,3 +59,5 @@ compatibility:
     - apollo330P
   toolchains:
     - arm-none-eabi-gcc
+    - armclang
+    - atfe

@@ -20,8 +20,14 @@ else
   BUILD_TYPE := release
 endif
 
-# Determine toolchain name (neuralSPOT uses arm instead of armclang)
-TOOLCHAIN_NAME := $(if $(filter arm,$(TOOLCHAIN)),armclang,gcc)
+# Determine toolchain name (neuralSPOT uses 'arm' for armclang and 'atfe' for ATfE)
+ifeq ($(TOOLCHAIN),arm)
+  TOOLCHAIN_NAME := armclang
+else ifeq ($(TOOLCHAIN),atfe)
+  TOOLCHAIN_NAME := atfe
+else
+  TOOLCHAIN_NAME := gcc
+endif
 
 # Construct final static library path
 lib_prebuilt += $(subdirectory)/lib/libhelia-rt-$(TFP)-$(TOOLCHAIN_NAME)-$(BUILD_TYPE).a
