@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.0](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.11.2...heliaRT-v1.12.0) (2026-04-25)
+
+
+### Features
+
+* land ATfE toolchain + NSX-module-ship on main ([#109](https://github.com/AmbiqAI/helia-rt/issues/109)) ([f7aa52d](https://github.com/AmbiqAI/helia-rt/commit/f7aa52d1d68a78ec8edb6afd062e70961ebe772a))
+
 ## [1.11.2](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.11.1...heliaRT-v1.11.2) (2026-04-24)
 
 
