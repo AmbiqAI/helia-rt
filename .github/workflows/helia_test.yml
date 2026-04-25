@@ -31,7 +31,11 @@ jobs:
       max-parallel: 4
       matrix:
         arch: [ "cortex-m55", "cortex-m4+fp", "cortex-m3" ]
-        toolchain: [ "gcc" ]
+        toolchain: [ "gcc", "atfe" ]
+        exclude:
+          # ATfE doesn't ship a v7-M (cortex-m3) target out of the box.
+          - arch: "cortex-m3"
+            toolchain: "atfe"
 
     env:
       NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}

@@ -49,11 +49,11 @@ jobs:
         shell: bash
     strategy:
       fail-fast: false
-      max-parallel: 12
+      max-parallel: 18
       matrix:
         arch: [ "cortex-m4+fp", "cortex-m55" ]
         build: [ "debug", "release", "release_with_logs" ]
-        toolchain: [ "gcc", "armclang" ]
+        toolchain: [ "gcc", "armclang", "atfe" ]
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}

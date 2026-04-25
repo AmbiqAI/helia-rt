@@ -20,8 +20,14 @@
 #      build_helia.sh -a cortex-m55 -b release -t gcc -k cmsis_nn \
 #                     -o ./out/m55/gcc/release
 #
+#   4) ATfE (LLVM/Clang), M55, release:
+#      build_helia.sh -a cortex-m55 -b release -t atfe \
+#                     -o ./out/m55/atfe/release
+#
 # Notes:
 #   - For --toolchain armclang you must export ARM_UBL_LICENSE_IDENTIFIER.
+#   - For --toolchain atfe, ATfE is auto-detected at /opt/atfe/bin (CI image)
+#     or downloaded into the TFLM downloads dir on first build.
 #   - Designed for CI matrix runs: each combo writes to a unique OUTDIR.
 # ------------------------------------------------------------------------------
 
@@ -50,7 +56,7 @@ Usage: $0 -a <arch> -b <build> -t <toolchain> -o <outdir>
 Required:
   -a, --arch        cortex-m4+fp | cortex-m55
   -b, --build       debug | release | release_with_logs
-  -t, --toolchain   gcc | armclang
+  -t, --toolchain   gcc | armclang | atfe
   -o, --outdir      Output directory for this build (unique per combo)
 
 Other:
@@ -99,10 +105,27 @@ done
 [[ -n "${TOOLCHAIN}" ]] || { echo "Missing --toolchain"; usage; exit 2; }
 [[ -n "${OUTDIR}"    ]] || { echo "Missing --outdir"; usage; exit 2; }
 
+# Validate toolchain
+case "${TOOLCHAIN}" in
+  gcc|armclang|atfe) ;;
+  *) echo "ERROR: unsupported --toolchain: ${TOOLCHAIN} (expected gcc|armclang|atfe)" >&2; exit 2 ;;
+esac
+
 # ArmClang license check (fail fast)
 if [[ "${TOOLCHAIN}" == "armclang" && -z "${ARM_UBL_LICENSE_IDENTIFIER:-}" ]]; then
   echo "ERROR: --toolchain armclang requires env ARM_UBL_LICENSE_IDENTIFIER to be set." >&2
   exit 3
+fi
+
+# ATfE: prefer a pre-installed copy (e.g. baked into the CI container at
+# /opt/atfe). When found, point make at it so we skip the runtime download.
+ATFE_MAKE_OVERRIDE=()
+if [[ "${TOOLCHAIN}" == "atfe" ]]; then
+  ATFE_PREINSTALL="${ATFE_PREINSTALL:-/opt/atfe}"
+  if [[ -x "${ATFE_PREINSTALL}/bin/clang" ]]; then
+    echo "Using pre-installed ATfE at ${ATFE_PREINSTALL}"
+    ATFE_MAKE_OVERRIDE=("TARGET_TOOLCHAIN_ROOT=${ATFE_PREINSTALL}/bin/")
+  fi
 fi
 
 
@@ -140,6 +163,7 @@ make -f "${MAKE_DIR}/Makefile" \
   TARGET_ARCH="${ARCH}" \
   TOOLCHAIN="${TOOLCHAIN}" \
   OPTIMIZED_KERNEL_DIR="${OPTIMIZED_KERNEL_DIR}" \
+  ${ATFE_MAKE_OVERRIDE[@]+"${ATFE_MAKE_OVERRIDE[@]}"} \
   third_party_downloads
 
 # ---------------------------- Clean previous build outputs -------------------
@@ -155,6 +179,7 @@ make -j"${JOBS}" -f "${MAKE_DIR}/Makefile" \
   OPTIMIZED_KERNEL_DIR="${OPTIMIZED_KERNEL_DIR}" \
   ${CMSIS_FLAG} \
   BUILD_TYPE="${BUILD}" \
+  ${ATFE_MAKE_OVERRIDE[@]+"${ATFE_MAKE_OVERRIDE[@]}"} \
   microlite
 
 # ---------------------------- Copy outputs --------------------------------------
