@@ -117,8 +117,8 @@ set(HELIART_TFLM_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." CACHE PATH
 # guaranteed to be defined no matter where the prebuilt is in the link
 # order.
 add_library(nsx_heliart_glue OBJECT
-    ${HELIART_TFLM_ROOT}/tensorflow/lite/micro/micro_log.cc
-    ${HELIART_TFLM_ROOT}/tensorflow/lite/micro/cortex_m_generic/debug_log.cc
+    "${HELIART_TFLM_ROOT}/tensorflow/lite/micro/micro_log.cc"
+    "${HELIART_TFLM_ROOT}/tensorflow/lite/micro/cortex_m_generic/debug_log.cc"
 )
 
 # Glue compilation needs board flags + soc/core deps.
@@ -129,10 +129,10 @@ target_link_libraries(nsx_heliart_glue PRIVATE
 )
 
 target_include_directories(nsx_heliart_glue PRIVATE
-    ${HELIART_TFLM_ROOT}
-    ${HELIART_TFLM_ROOT}/third_party
-    ${HELIART_TFLM_ROOT}/third_party/flatbuffers/include
-    ${HELIART_TFLM_ROOT}/third_party/gemmlowp
+    "${HELIART_TFLM_ROOT}"
+    "${HELIART_TFLM_ROOT}/third_party"
+    "${HELIART_TFLM_ROOT}/third_party/flatbuffers/include"
+    "${HELIART_TFLM_ROOT}/third_party/gemmlowp"
 )
 
 target_compile_definitions(nsx_heliart_glue PRIVATE
@@ -162,10 +162,10 @@ target_link_libraries(nsx_heliart INTERFACE
 )
 
 target_include_directories(nsx_heliart INTERFACE
-    ${HELIART_TFLM_ROOT}
-    ${HELIART_TFLM_ROOT}/third_party
-    ${HELIART_TFLM_ROOT}/third_party/flatbuffers/include
-    ${HELIART_TFLM_ROOT}/third_party/gemmlowp
+    "${HELIART_TFLM_ROOT}"
+    "${HELIART_TFLM_ROOT}/third_party"
+    "${HELIART_TFLM_ROOT}/third_party/flatbuffers/include"
+    "${HELIART_TFLM_ROOT}/third_party/gemmlowp"
 )
 
 target_compile_definitions(nsx_heliart INTERFACE
