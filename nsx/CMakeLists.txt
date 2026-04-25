@@ -106,52 +106,67 @@ set(HELIART_TFLM_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." CACHE PATH
 # DebugLog() undefined. We compile the platform glue here so the linker
 # resolves it.
 #
-# We deliberately use an OBJECT library (not STATIC) so the resulting .o
-# files are placed directly on the consumer's link line. With a STATIC
-# wrapper, single-pass static linkers (GNU ld, lld) would scan the wrapper
-# archive before the prebuilt, find no demands, skip the glue object, then
-# fail on the prebuilt's undefined references with no opportunity to go
-# back. OBJECT files are always added unconditionally and ordered after
-# the prebuilt below, so MicroPrintf / DebugLog are guaranteed to resolve.
+# Using an OBJECT library (not STATIC) lets us inject the resulting .o
+# files directly onto consumer link lines (see target_sources below).
+# Plain object files are always pulled in unconditionally, so single-pass
+# static linkers (GNU ld, lld) cannot skip them the way they would skip
+# unused members of a sibling archive — MicroPrintf / DebugLog are
+# guaranteed to be defined no matter where the prebuilt is in the link
+# order.
 add_library(nsx_heliart_glue OBJECT
     ${HELIART_TFLM_ROOT}/tensorflow/lite/micro/micro_log.cc
     ${HELIART_TFLM_ROOT}/tensorflow/lite/micro/cortex_m_generic/debug_log.cc
 )
 
-target_link_libraries(nsx_heliart_glue
-    PUBLIC
-        ${NSX_BOARD_FLAGS_TARGET}
-    PRIVATE
-        nsx_soc_hal
-        nsx_core
+# Glue compilation needs board flags + soc/core deps.
+target_link_libraries(nsx_heliart_glue PRIVATE
+    ${NSX_BOARD_FLAGS_TARGET}
+    nsx_soc_hal
+    nsx_core
 )
 
-target_include_directories(nsx_heliart_glue
-    PUBLIC
-        $<BUILD_INTERFACE:${HELIART_TFLM_ROOT}>
-        $<BUILD_INTERFACE:${HELIART_TFLM_ROOT}/third_party>
-        $<BUILD_INTERFACE:${HELIART_TFLM_ROOT}/third_party/flatbuffers/include>
-        $<BUILD_INTERFACE:${HELIART_TFLM_ROOT}/third_party/gemmlowp>
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/nsx/modules/nsx-heliart>
+target_include_directories(nsx_heliart_glue PRIVATE
+    ${HELIART_TFLM_ROOT}
+    ${HELIART_TFLM_ROOT}/third_party
+    ${HELIART_TFLM_ROOT}/third_party/flatbuffers/include
+    ${HELIART_TFLM_ROOT}/third_party/gemmlowp
 )
 
-target_compile_definitions(nsx_heliart_glue
-    PUBLIC
-        TF_LITE_STATIC_MEMORY
-        NS_TFSTRUCTURE_RECENT
-        NS_TFLM_NEW_MICRO_PROFILER
+target_compile_definitions(nsx_heliart_glue PRIVATE
+    TF_LITE_STATIC_MEMORY
+    NS_TFSTRUCTURE_RECENT
+    NS_TFLM_NEW_MICRO_PROFILER
 )
 
 # --- Public-facing INTERFACE target ---
-# Order matters: prebuilt first (provides demands for MicroPrintf/DebugLog),
-# glue second (its OBJECT files satisfy those demands).
+# This module is intended to be consumed via add_subdirectory() from the
+# bundle/source tree (no install/export contract).
 add_library(nsx_heliart INTERFACE)
-set_target_properties(nsx_heliart PROPERTIES EXPORT_NAME heliart)
 add_library(nsx::heliart ALIAS nsx_heliart)
 
-target_link_libraries(nsx_heliart INTERFACE
-    nsx_heliart_prebuilt
-    nsx_heliart_glue
+# Inject glue .o files into consumer link lines via INTERFACE_SOURCES.
+# NOTE: putting nsx_heliart_glue in INTERFACE_LINK_LIBRARIES does NOT
+# propagate its .o files (CMake treats OBJECT libs in INTERFACE link
+# lists as interface-only). $<TARGET_OBJECTS:...> via target_sources is
+# the documented way to forward the actual object files.
+target_sources(nsx_heliart INTERFACE
+    $<TARGET_OBJECTS:nsx_heliart_glue>
 )
 
-install(TARGETS nsx_heliart EXPORT nsxTargets)
+target_link_libraries(nsx_heliart INTERFACE
+    ${NSX_BOARD_FLAGS_TARGET}
+    nsx_heliart_prebuilt
+)
+
+target_include_directories(nsx_heliart INTERFACE
+    ${HELIART_TFLM_ROOT}
+    ${HELIART_TFLM_ROOT}/third_party
+    ${HELIART_TFLM_ROOT}/third_party/flatbuffers/include
+    ${HELIART_TFLM_ROOT}/third_party/gemmlowp
+)
+
+target_compile_definitions(nsx_heliart INTERFACE
+    TF_LITE_STATIC_MEMORY
+    NS_TFSTRUCTURE_RECENT
+    NS_TFLM_NEW_MICRO_PROFILER
+)

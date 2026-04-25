@@ -84,13 +84,14 @@ else
 fi
 
 echo "== Copying NSX module files =="
-if [[ -d "${CHECKOUT_DIR}/nsx" ]]; then
-  mkdir -p "${BUNDLE_DIR}/nsx"
-  cp "${CHECKOUT_DIR}/nsx/CMakeLists.txt"  "${BUNDLE_DIR}/nsx/CMakeLists.txt"
-  cp "${CHECKOUT_DIR}/nsx/nsx-module.yaml" "${BUNDLE_DIR}/nsx/nsx-module.yaml"
-else
-  die "nsx/ directory not found"
+if [[ ! -d "${CHECKOUT_DIR}/nsx" ]]; then
+  die "nsx/ directory not found at ${CHECKOUT_DIR}/nsx"
 fi
+[[ -f "${CHECKOUT_DIR}/nsx/CMakeLists.txt"  ]] || die "nsx/CMakeLists.txt not found"
+[[ -f "${CHECKOUT_DIR}/nsx/nsx-module.yaml" ]] || die "nsx/nsx-module.yaml not found"
+mkdir -p "${BUNDLE_DIR}/nsx"
+cp "${CHECKOUT_DIR}/nsx/CMakeLists.txt"  "${BUNDLE_DIR}/nsx/CMakeLists.txt"
+cp "${CHECKOUT_DIR}/nsx/nsx-module.yaml" "${BUNDLE_DIR}/nsx/nsx-module.yaml"
 
 echo "== Copying Zephyr module files =="
 mkdir -p "${BUNDLE_DIR}/zephyr"
