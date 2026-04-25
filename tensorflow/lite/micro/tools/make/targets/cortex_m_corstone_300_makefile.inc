@@ -210,7 +210,7 @@ else ifeq ($(TOOLCHAIN), atfe)
     -T $(ETHOS_U_CORE_PLATFORM)/platform_parsed.ld \
     -Wl,-Map=gen/$(TARGET).map,--cref \
     -Wl,--gc-sections \
-    --entry Reset_Handler
+    -Wl,--entry=Reset_Handler
 
   ldflags_to_remove = -Wl,--fatal-warnings
   LDFLAGS := $(filter-out $(ldflags_to_remove),$(LDFLAGS))

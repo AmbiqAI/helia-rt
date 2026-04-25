@@ -227,7 +227,9 @@ else ifeq ($(TOOLCHAIN), atfe)
 
   CXXFLAGS += $(FLAGS_ATFE)
   CCFLAGS += $(FLAGS_ATFE)
-  LDFLAGS += $(ARM_LDFLAGS)
+  # Do NOT propagate $(ARM_LDFLAGS) here: those are armlink-specific
+  # -Wl,--cpu=... values that lld/clang reject. CPU selection is already
+  # handled in compile flags via -mcpu=$(TARGET_ARCH) above.
 
 else
   $(error "TOOLCHAIN=$(TOOLCHAIN) is not supported.")
