@@ -101,26 +101,32 @@ set_target_properties(nsx_heliart_prebuilt PROPERTIES
 set(HELIART_TFLM_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." CACHE PATH
     "Root directory containing tensorflow/ and third_party/ for nsx-heliart")
 
-# --- Public-facing target ---
-# The prebuilt .a contains the TFLM runtime but leaves MicroPrintf()
-# undefined.  We compile the platform glue here so the linker resolves it.
-add_library(nsx_heliart STATIC
+# --- Platform glue (OBJECT library) ---
+# The prebuilt .a contains the TFLM runtime but leaves MicroPrintf() and
+# DebugLog() undefined. We compile the platform glue here so the linker
+# resolves it.
+#
+# We deliberately use an OBJECT library (not STATIC) so the resulting .o
+# files are placed directly on the consumer's link line. With a STATIC
+# wrapper, single-pass static linkers (GNU ld, lld) would scan the wrapper
+# archive before the prebuilt, find no demands, skip the glue object, then
+# fail on the prebuilt's undefined references with no opportunity to go
+# back. OBJECT files are always added unconditionally and ordered after
+# the prebuilt below, so MicroPrintf / DebugLog are guaranteed to resolve.
+add_library(nsx_heliart_glue OBJECT
     ${HELIART_TFLM_ROOT}/tensorflow/lite/micro/micro_log.cc
     ${HELIART_TFLM_ROOT}/tensorflow/lite/micro/cortex_m_generic/debug_log.cc
 )
-set_target_properties(nsx_heliart PROPERTIES EXPORT_NAME heliart)
-add_library(nsx::heliart ALIAS nsx_heliart)
 
-target_link_libraries(nsx_heliart
+target_link_libraries(nsx_heliart_glue
     PUBLIC
         ${NSX_BOARD_FLAGS_TARGET}
-        nsx_heliart_prebuilt
     PRIVATE
         nsx_soc_hal
         nsx_core
 )
 
-target_include_directories(nsx_heliart
+target_include_directories(nsx_heliart_glue
     PUBLIC
         $<BUILD_INTERFACE:${HELIART_TFLM_ROOT}>
         $<BUILD_INTERFACE:${HELIART_TFLM_ROOT}/third_party>
@@ -129,11 +135,23 @@ target_include_directories(nsx_heliart
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/nsx/modules/nsx-heliart>
 )
 
-target_compile_definitions(nsx_heliart
+target_compile_definitions(nsx_heliart_glue
     PUBLIC
         TF_LITE_STATIC_MEMORY
         NS_TFSTRUCTURE_RECENT
         NS_TFLM_NEW_MICRO_PROFILER
 )
 
-install(TARGETS nsx_heliart nsx_heliart_prebuilt EXPORT nsxTargets)
+# --- Public-facing INTERFACE target ---
+# Order matters: prebuilt first (provides demands for MicroPrintf/DebugLog),
+# glue second (its OBJECT files satisfy those demands).
+add_library(nsx_heliart INTERFACE)
+set_target_properties(nsx_heliart PROPERTIES EXPORT_NAME heliart)
+add_library(nsx::heliart ALIAS nsx_heliart)
+
+target_link_libraries(nsx_heliart INTERFACE
+    nsx_heliart_prebuilt
+    nsx_heliart_glue
+)
+
+install(TARGETS nsx_heliart EXPORT nsxTargets)
