@@ -38,10 +38,13 @@ set(_HELIART_TOOLCHAIN "gcc")
 if(CMAKE_C_COMPILER_ID STREQUAL "ARMClang" OR
    CMAKE_C_COMPILER MATCHES "armclang")
     set(_HELIART_TOOLCHAIN "armclang")
-elseif(CMAKE_C_COMPILER_ID STREQUAL "Clang" OR
-       CMAKE_C_COMPILER MATCHES "/atfe/|arm_toolchain_embedded")
-    # Arm Toolchain for Embedded (ATfE) is LLVM/Clang-based but, unlike
-    # armclang, does NOT define __ARMCC_VERSION. CMake reports it as "Clang".
+elseif(CMAKE_C_COMPILER MATCHES "arm_toolchain_embedded|[Aa][Tt][Ff][Ee]")
+    # Arm Toolchain for Embedded (ATfE). The installer paths we support are
+    # the in-tree download (`<helia>/.../arm_toolchain_embedded/...`) and
+    # the system install (e.g. `/Applications/ATfE-x.y.z/...`). We match by
+    # path rather than CMAKE_C_COMPILER_ID alone because that is also
+    # `Clang` for many other LLVM-based embedded toolchains, which would
+    # otherwise be misclassified as ATfE here.
     set(_HELIART_TOOLCHAIN "atfe")
 endif()
 

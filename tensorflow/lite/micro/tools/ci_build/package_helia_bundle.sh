@@ -103,7 +103,7 @@ if [[ -f "${CHECKOUT_DIR}/LICENSE" ]]; then
   cp "${CHECKOUT_DIR}/LICENSE" "${BUNDLE_DIR}/LICENSE"
 fi
 
-MANIFEST_EXTRA=$'Backend: HELIA (Ambiq optimized, embedded ns-cmsis-nn)\nSupported matrix: cortex-m4+fp, cortex-m55 x gcc, armclang, atfe x debug, release, release_with_logs\n\nIntegration:\n  NSX          — nsx/nsx-module.yaml\n  Zephyr west  — zephyr/module.yml\n  NeuralSPOT   — module.mk'
+MANIFEST_EXTRA=$'Backend: HELIA (Ambiq optimized, embedded ns-cmsis-nn)\nSupported matrix: cortex-m4+fp, cortex-m55 x gcc, armclang, atfe x debug, release, release-with-logs\n\nIntegration:\n  NSX          — nsx/nsx-module.yaml\n  Zephyr west  — zephyr/module.yml\n  NeuralSPOT   — module.mk'
 echo "== Writing MANIFEST =="
 write_manifest "${BUNDLE_PREFIX}" "${TAG}" "${SHA}" "${BUNDLE_DIR}/lib" "${BUNDLE_DIR}/MANIFEST.txt" "${MANIFEST_EXTRA}"
 
