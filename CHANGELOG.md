@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.12.0](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.11.2...heliaRT-v1.12.0) (2026-04-25)
+
+
+### Features
+
+* land ATfE toolchain + NSX-module-ship on main ([#109](https://github.com/AmbiqAI/helia-rt/issues/109)) ([f7aa52d](https://github.com/AmbiqAI/helia-rt/commit/f7aa52d1d68a78ec8edb6afd062e70961ebe772a))
+
+## [1.11.2](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.11.1...heliaRT-v1.11.2) (2026-04-24)
+
+
+### Bug Fixes
+
+* **armclang:** remove -fshort-wchar from FLAGS_ARMC ([#104](https://github.com/AmbiqAI/helia-rt/issues/104)) ([221d1b3](https://github.com/AmbiqAI/helia-rt/commit/221d1b3dceec73f8ff05458a69ad46a5b75d8bfb))
+
+## [1.11.1](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.11.0...heliaRT-v1.11.1) (2026-04-24)
+
+
+### Bug Fixes
+
+* **ci:** restore helia_release.yml workflow (dropped in PR [#90](https://github.com/AmbiqAI/helia-rt/issues/90)) ([#102](https://github.com/AmbiqAI/helia-rt/issues/102)) ([cf4b218](https://github.com/AmbiqAI/helia-rt/commit/cf4b218e4e5003e15484aaefc79ae00085787f32))
+
+## [1.11.0](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.10.1...heliaRT-v1.11.0) (2026-04-23)
+
+
+### Features
+
+* Add zephyr integration documentation ([c372d63](https://github.com/AmbiqAI/helia-rt/commit/c372d63d23767a1bc38b6761b74cdc8e9482c91d))
+
 ## [1.10.1](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.10.0...heliaRT-v1.10.1) (2026-04-11)
 
 

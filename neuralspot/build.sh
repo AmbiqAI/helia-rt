@@ -22,7 +22,7 @@ readonly TARGET_ARCHS=("cortex-m4+fp" "cortex-m55")
 readonly BUILDS=("debug" "release" "release_with_logs")
 ARM_UBL_LICENSE_IDENTIFIER=${ARM_UBL_LICENSE_IDENTIFIER:-}
 
-TOOLCHAINS=("gcc" "armclang")
+TOOLCHAINS=("gcc" "armclang" "atfe")
 
 cd "$DIR"
 
@@ -64,6 +64,15 @@ sudo python3 "$TFLM_SRC_DIR/tensorflow/lite/micro/tools/project_generation/creat
   "$BUILD_DIR"
 
 cp "$DIR/module.mk" "$BUILD_DIR/module.mk"
+
+# --- NSX module bundle ---
+NSX_DIR="$TFLM_SRC_DIR/nsx"
+NSX_BUILD_DIR="$BUILD_DIR/nsx-heliart"
+echo "Creating NSX module bundle at $NSX_BUILD_DIR" >&2
+mkdir -p "$NSX_BUILD_DIR"
+cp "$NSX_DIR/nsx-module.yaml" "$NSX_BUILD_DIR/nsx-module.yaml"
+cp "$NSX_DIR/CMakeLists.txt"  "$NSX_BUILD_DIR/CMakeLists.txt"
+# Libs and tflm tree are added by the packaging step (GHA or manual).
 
 echo "TFLM build completed successfully" >&2
 

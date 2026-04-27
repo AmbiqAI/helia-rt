@@ -38,7 +38,14 @@ Use [neuralSPOT setup](usage/neuralspot.md) with `ns_autodeploy` when you want t
 
 ### Integrate into Zephyr
 
-Use [Zephyr setup](usage/zephyr.md) for a west-workspace-based guide covering both the raw heliaRT Zephyr module and the prebuilt release bundle.
+Start with [Zephyr setup](usage/zephyr.md) to choose between the supported heliaRT integration paths:
+
+- source module + open `cmsis-nn`
+- source module + `ns-cmsis-nn` (HELIA)
+- prebuilt release module
+
+Then use [Zephyr example](examples/zephyr.md) for the exact application recipe, including module placement, `CMakeLists.txt`, `prj.conf`, minimal bring-up code, build, flash, and UART logs.
+
 
 ### Build from source
 

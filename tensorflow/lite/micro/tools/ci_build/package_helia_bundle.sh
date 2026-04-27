@@ -83,6 +83,16 @@ else
   die "neuralspot/module.mk not found"
 fi
 
+echo "== Copying NSX module files =="
+if [[ ! -d "${CHECKOUT_DIR}/nsx" ]]; then
+  die "nsx/ directory not found at ${CHECKOUT_DIR}/nsx"
+fi
+[[ -f "${CHECKOUT_DIR}/nsx/CMakeLists.txt"  ]] || die "nsx/CMakeLists.txt not found"
+[[ -f "${CHECKOUT_DIR}/nsx/nsx-module.yaml" ]] || die "nsx/nsx-module.yaml not found"
+mkdir -p "${BUNDLE_DIR}/nsx"
+cp "${CHECKOUT_DIR}/nsx/CMakeLists.txt"  "${BUNDLE_DIR}/nsx/CMakeLists.txt"
+cp "${CHECKOUT_DIR}/nsx/nsx-module.yaml" "${BUNDLE_DIR}/nsx/nsx-module.yaml"
+
 echo "== Copying Zephyr module files =="
 mkdir -p "${BUNDLE_DIR}/zephyr"
 cp "${TEMPLATE_DIR}/zephyr/module.yml"     "${BUNDLE_DIR}/zephyr/module.yml"
@@ -93,7 +103,7 @@ if [[ -f "${CHECKOUT_DIR}/LICENSE" ]]; then
   cp "${CHECKOUT_DIR}/LICENSE" "${BUNDLE_DIR}/LICENSE"
 fi
 
-MANIFEST_EXTRA=$'Backend: HELIA (Ambiq optimized, embedded ns-cmsis-nn)\nSupported matrix: cortex-m4+fp, cortex-m55 x gcc, armclang x debug, release, release_with_logs\n\nIntegration:\n  Zephyr west  — zephyr/module.yml\n  NeuralSPOT   — module.mk'
+MANIFEST_EXTRA=$'Backend: HELIA (Ambiq optimized, embedded ns-cmsis-nn)\nSupported matrix: cortex-m4+fp, cortex-m55 x gcc, armclang, atfe x debug, release, release-with-logs\n\nIntegration:\n  NSX          — nsx/nsx-module.yaml\n  Zephyr west  — zephyr/module.yml\n  NeuralSPOT   — module.mk'
 echo "== Writing MANIFEST =="
 write_manifest "${BUNDLE_PREFIX}" "${TAG}" "${SHA}" "${BUNDLE_DIR}/lib" "${BUNDLE_DIR}/MANIFEST.txt" "${MANIFEST_EXTRA}"
 

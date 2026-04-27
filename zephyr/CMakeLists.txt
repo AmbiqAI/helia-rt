@@ -40,9 +40,6 @@ if(CONFIG_HELIA_RT)
     endif()
 
     set(HELIA_RT_OPTIMIZED_KERNEL_DIR helia)
-    list(APPEND HELIA_RT_BACKEND_EXTRA_SOURCES
-      ${HELIA_RT_KERNEL_ROOT}/helia/conv2d_common.cc
-    )
     zephyr_library_compile_definitions(NS_CMSIS_NN)
     zephyr_library_compile_definitions(HELIA)
   endif()
