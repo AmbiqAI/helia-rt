@@ -25,3 +25,6 @@ neuralspot-*-local-*/
 neuralspot-*-local-*.zip
 tflm-vanilla.zip
 site/
+
+# Local NSX-module packaging test extractions
+heliaRT-test-*/
