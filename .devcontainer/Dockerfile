@@ -16,7 +16,13 @@
 
 # Using a multistage build so that the build tools required for stage 1 don't make the
 # CI container unnecessarily large.
-FROM python:3.10-bullseye AS qemu_builder
+#
+# Base image: Debian 12 "bookworm" (glibc 2.36, libstdc++ from GCC 12). Required by
+# Arm Toolchain for Embedded (ATfE) 22.1.0 prebuilt binaries, which need GLIBC_2.34
+# and GLIBCXX_3.4.30 / CXXABI_1.3.13. Bullseye (glibc 2.31, libstdc++ from GCC 10)
+# is too old: clang/clang++ load but every compile aborts with
+#   `version 'GLIBC_2.34' not found` / `version 'GLIBCXX_3.4.30' not found`.
+FROM python:3.10-bookworm AS qemu_builder
 RUN apt-get update
 
 RUN apt-get install -y ninja-build wget xz-utils
@@ -28,7 +34,8 @@ COPY ci/install_qemu.sh ./
 RUN ./install_qemu.sh /tmp/qemu_install
 
 # This stage is the final CI container.
-FROM python:3.10-bullseye as tflm-ci
+# See note above on why bookworm (not bullseye) is required for ATfE 22.1.0.
+FROM python:3.10-bookworm as tflm-ci
 
 RUN apt-get update
 
@@ -99,7 +106,7 @@ RUN set -eux; \
 ENV PATH=/opt/atfe/bin:${PATH}
 ENV ATFE_PREINSTALL=/opt/atfe
 
-# Install uv (Python package manager) directly to avoid nanolayer GLIBC issues on Bullseye
+# Install uv (Python package manager) directly (no nanolayer dependency).
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/local/bin" sh
 
 # Add a non-root user 'ambiqai' with passwordless sudo access
