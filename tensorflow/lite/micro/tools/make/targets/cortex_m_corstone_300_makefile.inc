@@ -194,8 +194,9 @@ else ifeq ($(TOOLCHAIN), atfe)
   CXX_TOOL := clang++
   CC_TOOL  := clang
   AR_TOOL  := llvm-ar
-  # Use the clang driver as the linker so it pulls in picolibc/newlib-nano
-  # and crt0.o automatically; LDFLAGS pass through with -Wl,...
+  # Use the clang driver as the linker so it pulls in picolibc and the
+  # picolibc crt0/semihost libraries via -l flags below; LDFLAGS pass
+  # through with -Wl,...
 
   # ATfE rejects -mfpu=auto; let -mcpu drive FPU/MVE feature selection.
   FLAGS_ATFE = \
@@ -206,11 +207,35 @@ else ifeq ($(TOOLCHAIN), atfe)
   CXXFLAGS += $(FLAGS_ATFE)
   CCFLAGS += $(FLAGS_ATFE)
 
+  # Linker setup for ATfE / picolibc on Corstone-300.
+  #
+  # `-nostartfiles` suppresses clang's automatic crt0.o (whose default
+  # `_start` clobbers the CMSIS Reset_Handler vector). The CMSIS
+  # `Reset_Handler` (from startup_ARMCM55.c) remains the ELF entry and
+  # invokes picolibc's `_start` via `__PROGRAM_START()`. We then pull in
+  # the semihost-flavored picolibc startup (`libcrt0-semihost.a`) and
+  # the semihost syscall stubs (`libsemihost.a`, which also provides
+  # `stderr` / `stdin` / `stdout` consumed by debug_log.cc). `-lc -lm`
+  # keep picolibc itself in the link group.
+  #
+  # The ATfE-specific linker script adds a PT_TLS phdr (required by
+  # picolibc's TLS errno) plus PROVIDE() aliases for the symbols crt0
+  # and CMSIS' clang startup expect (`__data_*`, `__bss_*`,
+  # `__stack_limit`, `__tls_base`, `__arm32_tls_tcb_offset`, ...).
+  ATFE_LINKER_SCRIPT := $(TENSORFLOW_ROOT)tensorflow/lite/micro/cortex_m_corstone_300/corstone_300_atfe.ld
+
   LDFLAGS += \
-    -T $(ETHOS_U_CORE_PLATFORM)/platform_parsed.ld \
+    -nostartfiles \
+    -T $(ATFE_LINKER_SCRIPT) \
     -Wl,-Map=gen/$(TARGET).map,--cref \
     -Wl,--gc-sections \
     -Wl,--entry=Reset_Handler
+
+  # Order matters: -lcrt0-semihost provides _start; -lc / -lm reference
+  # _write/_read/etc. from -lsemihost, so semihost must come last (or be
+  # inside a group). Use -Wl,--start-group to be safe with picolibc's
+  # cross-references.
+  MICROLITE_LIBS += -Wl,--start-group -lcrt0-semihost -lc -lm -lsemihost -Wl,--end-group
 
   ldflags_to_remove = -Wl,--fatal-warnings
   LDFLAGS := $(filter-out $(ldflags_to_remove),$(LDFLAGS))
