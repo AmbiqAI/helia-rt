@@ -34,9 +34,16 @@
  *     `__data_source`, `__bss_start`, `__bss_size`, `__stack`,
  *     `__stack_limit`, `__stack_seal`, `__tls_base`,
  *     `__arm32_tls_tcb_offset`, `__heap_start`, `__heap_end`).
+ *   - Splits `.vectors` (KEEP'd at start of ITCM so the CPU can fetch
+ *     the initial SP and Reset_Handler from VTOR=0) from the bulk of
+ *     `.text` / `.ARM.extab` / `.ARM.exidx`, which are placed in DDR.
+ *     The picolibc + libsemihost + libc++ runtime plus generated
+ *     SeaNet integration kernels exceed ITCM's 512 KiB; DDR (rwx,
+ *     cached on Cortex-M55) absorbs the overflow with negligible
+ *     runtime impact. The GCC linker script keeps `.text` in ITCM
+ *     because newlib-nano's footprint is small enough to fit.
  *
- * Memory map and section placement remain identical to the GCC build so
- * that the resulting ELF still boots on FVP_Corstone_SSE-300_Ethos-U55.
+ * The resulting ELF still boots on FVP_Corstone_SSE-300_Ethos-U55.
  */
 
 __STACK_SIZE = 0x00030000;
@@ -55,9 +62,21 @@ ENTRY(Reset_Handler)
 
 SECTIONS
 {
-  .text :
+  /* The reset vector table must be at the start of ITCM so the CPU can
+   * fetch the initial SP and Reset_Handler address from VTOR=0 (ITCM is
+   * aliased at 0x00000000 on Corstone-300). The bulk of `.text` is
+   * placed in DDR below because clang's picolibc-based libc + libsemihost
+   * footprint plus the SeaNet integration tests' generated kernels can
+   * exceed ITCM's 512 KiB. The Cortex-M55 caches DDR, so this has
+   * negligible runtime impact for the integration tests.
+   */
+  .vectors :
   {
     KEEP(*(.vectors))
+  } > ITCM
+
+  .text :
+  {
     *(.text*)
     KEEP(*(.init))
     KEEP(*(.fini))
@@ -72,19 +91,19 @@ SECTIONS
     *(SORT(.dtors.*))
     *(.dtors)
     KEEP(*(.eh_frame*))
-  } > ITCM
+  } > DDR
 
   .ARM.extab :
   {
     *(.ARM.extab* .gnu.linkonce.armextab.*)
-  } > ITCM
+  } > DDR
 
   .ARM.exidx :
   {
     __exidx_start = .;
     *(.ARM.exidx* .gnu.linkonce.armexidx.*)
     __exidx_end = .;
-  } > ITCM
+  } > DDR
 
   .copy.table :
   {

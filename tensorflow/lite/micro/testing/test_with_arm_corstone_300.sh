@@ -37,6 +37,11 @@ FVP+="-C mps3_board.telnetterminal0.start_telnet=0 "
 FVP+='-C mps3_board.uart0.out_file="-" '
 FVP+='-C mps3_board.uart0.unbuffered_output=1 '
 FVP+='-C mps3_board.uart0.shutdown_on_eot=1 '
+# Enable semihosting so picolibc's libsemihost (used by the ATfE
+# toolchain) can route stdout/stderr through SYS_WRITEC/SYS_WRITE0
+# to the FVP host. GCC builds use the MPS3 UART instead and are
+# unaffected by this setting.
+FVP+='-C cpu0.semihosting-enable=1 '
 FVP+='--stat'
 ${FVP} ${BINARY_TO_TEST} | tee ${MICRO_LOG_FILENAME}
 
