@@ -7,6 +7,7 @@ if(CONFIG_HELIA_RT)
 
   zephyr_include_directories(
     ${HELIA_RT_DIR}/.
+    ${HELIA_RT_DIR}/include
     ${HELIA_RT_DIR}/third_party_static/gemmlowp
     ${HELIA_RT_DIR}/third_party_static/flatbuffers/include
     ${HELIA_RT_DIR}/third_party_static/ruy
