@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.12.1](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.12.0...heliaRT-v1.12.1) (2026-04-29)
+
+
+### Bug Fixes
+
+* **atfe:** make Corstone-300 ATfE matrix green end-to-end ([#115](https://github.com/AmbiqAI/helia-rt/issues/115)) ([698a0b8](https://github.com/AmbiqAI/helia-rt/commit/698a0b8df1e1eadd817fdd5e4263638714a32ac2))
+* **ci:** bump CI base image to debian bookworm for ATfE 22.1.0 ([#112](https://github.com/AmbiqAI/helia-rt/issues/112)) ([f79c753](https://github.com/AmbiqAI/helia-rt/commit/f79c753ff99b60c488372025bb3da138fc47e13b))
+* **corstone-300:** add ATfE-specific linker script and picolibc semihost link ([#114](https://github.com/AmbiqAI/helia-rt/issues/114)) ([36788a2](https://github.com/AmbiqAI/helia-rt/commit/36788a2b4822fb3310135861d3a530819eece284))
+
 ## [1.12.0](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.11.2...heliaRT-v1.12.0) (2026-04-25)
 
 
