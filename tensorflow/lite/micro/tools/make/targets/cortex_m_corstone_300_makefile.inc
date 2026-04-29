@@ -199,10 +199,19 @@ else ifeq ($(TOOLCHAIN), atfe)
   # through with -Wl,...
 
   # ATfE rejects -mfpu=auto; let -mcpu drive FPU/MVE feature selection.
+  # Disable MVE auto-vectorization on cortex-m55: clang 22's MVE vectorizer
+  # miscompiles `(int)int8_value * float_scale` loops by emitting
+  # `vcvt.f32.s32 qN, qN, #12` (i.e., dividing by 2^12) when the correct
+  # shift count is -log2(scale). It also matches the picolibc multilib
+  # selection (armv8.1m.main_hard_fpdp_nomve_unaligned).
+  ATFE_MCPU := $(MCPU_OPTION)
+  ifneq ($(filter cortex-m55%,$(TARGET_ARCH)),)
+    ATFE_MCPU := $(MCPU_OPTION)+nomve
+  endif
   FLAGS_ATFE = \
     --target=arm-none-eabi \
-    -fshort-enums \
-    -mcpu=$(MCPU_OPTION)
+    -mcpu=$(ATFE_MCPU) \
+    -fshort-enums
 
   CXXFLAGS += $(FLAGS_ATFE)
   CCFLAGS += $(FLAGS_ATFE)
@@ -224,6 +233,11 @@ else ifeq ($(TOOLCHAIN), atfe)
   # `__stack_limit`, `__tls_base`, `__arm32_tls_tcb_offset`, ...).
   ATFE_LINKER_SCRIPT := $(TENSORFLOW_ROOT)tensorflow/lite/micro/cortex_m_corstone_300/corstone_300_atfe.ld
 
+  # Note: we intentionally do NOT pass `-nostdlib++`. TFLM uses a few
+  # libc++ symbols (`operator new`, `std::__throw_*`, ...) that ATfE
+  # provides via the multilib's `libc++.a` / `libc++abi.a`. clang++
+  # auto-links these and `--gc-sections` strips them when unused, so
+  # the TCM/DDR cost is zero for tests that don't reference libc++.
   LDFLAGS += \
     -nostartfiles \
     -T $(ATFE_LINKER_SCRIPT) \
@@ -264,8 +278,19 @@ CCFLAGS += -D$(ARM_CPU)
 CXXFLAGS += -DCMSIS_DEVICE_ARM_CORTEX_M_XX_HEADER_FILE=\"$(ARM_CPU).h\"
 
 THIRD_PARTY_CC_SRCS += \
-  $(ETHOS_U_CORE_PLATFORM)/retarget.c \
   $(ETHOS_U_CORE_PLATFORM)/uart.c
+
+# `retarget.c` (from ethos-u-core-platform) supplies armclang/newlib-style
+# stdio retargeting (`fputc`, `fgetc`, `_sys_*`). Under ATfE we use
+# picolibc's tinystdio routed through `libsemihost` (SYS_WRITEC/SYS_WRITE),
+# whose `fgetc` (in libc.a) collides with retarget.c's, breaking the
+# `tflm_benchmark` link. Skip it for ATfE; semihosted output goes to the
+# FVP host stdout, which the test runner already captures alongside UART
+# output. GCC and armclang still need it.
+ifneq ($(TOOLCHAIN), atfe)
+  THIRD_PARTY_CC_SRCS += \
+    $(ETHOS_U_CORE_PLATFORM)/retarget.c
+endif
 
 ifeq ($(CO_PROCESSOR), ethos_u)
   ETHOSU_ARCH=u55
