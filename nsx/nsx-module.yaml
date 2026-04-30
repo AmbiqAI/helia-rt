@@ -3,7 +3,7 @@ schema_version: 1
 module:
   name: nsx-heliart
   type: algorithm
-  version: "1.12.1" # x-release-please-version
+  version: "1.12.2" # x-release-please-version
 
 support:
   ambiqsuite: true

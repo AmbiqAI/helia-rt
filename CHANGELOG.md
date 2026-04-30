@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.2](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.12.1...heliaRT-v1.12.2) (2026-04-30)
+
+
+### Bug Fixes
+
+* **nsx:** make nsx-module robust for flattened bundle layouts ([#116](https://github.com/AmbiqAI/helia-rt/issues/116)) ([73a3fe9](https://github.com/AmbiqAI/helia-rt/commit/73a3fe941307dcc13897a9026682b3cec7ac739c))
+
 ## [1.12.1](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.12.0...heliaRT-v1.12.1) (2026-04-29)
 
 
