@@ -23,8 +23,11 @@ if(NOT DEFINED NSX_SOC_FAMILY)
 endif()
 
 # --- Resolve Cortex-M core tag from SoC family ---
+# apollo5* / apollo330* / apollo510* are all Cortex-M55. The apollo510 alt
+# would otherwise be redundant with apollo5, but is kept implicit (covered
+# by ^apollo5) — listing it separately previously was just shadowed.
 set(_HELIART_CORE "")
-if(NSX_SOC_FAMILY MATCHES "^apollo5|^apollo330|^apollo510")
+if(NSX_SOC_FAMILY MATCHES "^apollo5|^apollo330")
     set(_HELIART_CORE "cm55")
 elseif(NSX_SOC_FAMILY MATCHES "^apollo4|^apollo3")
     set(_HELIART_CORE "cm4")
@@ -55,7 +58,7 @@ set_property(CACHE HELIART_VARIANT PROPERTY STRINGS
     "debug" "release-with-logs" "release")
 
 # --- Locate the prebuilt static library ---
-# v1.11.x naming: libhelia-rt-{core}-{tc}-{variant}.a
+# Bundle naming: libhelia-rt-{core}-{tc}-{variant}.a
 #
 # Library search order:
 #   1. ${HELIART_LIB_DIR}     — explicit override from the consumer
@@ -95,14 +98,39 @@ set_target_properties(nsx_heliart_prebuilt PROPERTIES
 )
 
 # --- Locate the TFLM source tree ---
-# In the source repo,   nsx/ and tensorflow/ are siblings (root = ../).
-# In release bundles,   tflm/ is copied to the bundle root by
-#                       package_helia_bundle.sh, so tensorflow/, third_party/
-#                       are still siblings of nsx/ (root = ../).
-# HELIART_TFLM_ROOT can be overridden if a consumer places the tree
-# somewhere else.
-set(HELIART_TFLM_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." CACHE PATH
-    "Root directory containing tensorflow/ and third_party/ for nsx-heliart")
+# Search order (mirrors the library lookup above):
+#   1. ${HELIART_TFLM_ROOT}              — explicit override from the consumer
+#   2. ${CMAKE_CURRENT_LIST_DIR}         — flattened layout (some NSX module
+#                                          consumers copy nsx/CMakeLists.txt
+#                                          to the bundle root and place
+#                                          tensorflow/ alongside it)
+#   3. ${CMAKE_CURRENT_LIST_DIR}/..      — source repo + release bundle
+#                                          (nsx/ is a sibling of tensorflow/)
+#
+# HELIART_TFLM_ROOT is exposed as a CACHE PATH so a consumer can override
+# it explicitly without editing this file.
+set(_HELIART_TFLM_SEARCH_DIRS
+    "${HELIART_TFLM_ROOT}"
+    "${CMAKE_CURRENT_LIST_DIR}"
+    "${CMAKE_CURRENT_LIST_DIR}/.."
+)
+set(_HELIART_TFLM_RESOLVED "")
+foreach(_dir IN LISTS _HELIART_TFLM_SEARCH_DIRS)
+    if(_dir AND EXISTS "${_dir}/tensorflow/lite/micro/micro_log.cc")
+        set(_HELIART_TFLM_RESOLVED "${_dir}")
+        break()
+    endif()
+endforeach()
+if(NOT _HELIART_TFLM_RESOLVED)
+    message(FATAL_ERROR
+        "nsx-heliart: TFLM source tree not found.\n"
+        "Looked in: ${_HELIART_TFLM_SEARCH_DIRS}\n"
+        "Set -DHELIART_TFLM_ROOT=<dir> to a directory containing\n"
+        "  tensorflow/lite/micro/micro_log.cc")
+endif()
+set(HELIART_TFLM_ROOT "${_HELIART_TFLM_RESOLVED}" CACHE PATH
+    "Root directory containing tensorflow/ and third_party/ for nsx-heliart"
+    FORCE)
 
 # --- Platform glue (OBJECT library) ---
 # The prebuilt .a contains the TFLM runtime but leaves MicroPrintf() and
