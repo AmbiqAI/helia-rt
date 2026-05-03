@@ -33,6 +33,14 @@ https://github.com/ekalinin/github-markdown-toc#auto-insert-and-update-toc
 We'd love to accept your patches and contributions to this project. There are
 just a few small guidelines you need to follow.
 
+## License
+
+heliaRT is released under the [Ambiq Apollo SDK License](LICENSE), which permits
+use, modification, and redistribution solely for execution on Ambiq-manufactured
+CPUs. By submitting a contribution you agree that your changes will be licensed
+under the same terms. Please review the full [LICENSE](LICENSE) before
+contributing.
+
 ## Contributor License Agreement
 
 Contributions to this project must be accompanied by a Contributor License
@@ -75,8 +83,8 @@ We also recommend that contributors take a look at the
 
 We strongly recommend that contributors:
 
-1.  Initiate a conversation with the TFLM team via a
-    [TF Lite Micro Github issue](https://github.com/tensorflow/tensorflow/issues/new?labels=comp%3Amicro&template=70-tflite-micro-issue.md)
+1.  Initiate a conversation with the heliaRT team via a
+    [heliaRT Github issue](https://github.com/AmbiqAI/helia-rt/issues/new/choose)
     as early as possible.
 
     *   This enables us to give guidance on how to proceed, prevent duplicated
@@ -121,7 +129,7 @@ Pull requests that fix bugs are always welcome and often uncontroversial, unless
 there is a conflict between different requirements from the platform, or if
 fixing a bug needs a bigger architectural change.
 
-1.  Create a [Github issue](https://github.com/tensorflow/tflite-micro/issues/new/choose)
+1.  Create a [Github issue](https://github.com/AmbiqAI/helia-rt/issues/new/choose)
     to determine the scope of the bug fix.
 1.  Send a PR (if that is determined to be the best path forward).
 1.  Bugfix PRs should be accompanied by a test case that fails prior to the fix
@@ -152,7 +160,7 @@ other OSes may work.
 
 ## Prerequisites
 
-TFLM's primary build system is [Bazel](https://bazel.build). Add
+heliaRT's primary build system is [Bazel](https://bazel.build). Add
 [Bazelisk](https://github.com/bazelbuild/bazelisk) as the `bazel` executable in
 your PATH ([e.g., copy it to `/usr/local/bin/bazel`](ci/install_bazelisk.sh)) to
 automatically download and run the correct Bazel version as specified in
@@ -165,32 +173,32 @@ Below are some tips that might be useful and improve the development experience.
 * Add the [Refined GitHub](https://github.com/sindresorhus/refined-github)
   plugin to make the github experience even better.
 
-* Code search the [TfLite Micro codebase](https://sourcegraph.com/github.com/tensorflow/tflite-micro@main)
-  on Sourcegraph. And optionally install the [plugin that enables GitHub integration](https://docs.sourcegraph.com/integration/github#github-integration-with-sourcegraph).
+* Code search the [heliaRT codebase](https://github.com/AmbiqAI/helia-rt)
+  on GitHub.
 
 * Install
   [Buildifier](https://github.com/bazelbuild/buildtools/blob/master/buildifier/README.md)
   ([e.g.](ci/install_buildifier.sh)) to format Bazel BUILD and .bzl files.
 
 * Install the latest clang and clang-format. For example, [here](ci/Dockerfile.micro)
-  is what we do for the TFLM continuous integration Docker container.
+  is the what we do for the TFLM continuous integration Docker container.
 
 * Get a copy of [cpplint](https://github.com/google/styleguide/tree/gh-pages/cpplint)
   or install it:
 
+* Install Pillow.  For example, [here](ci/Dockerfile.micro) is what we do for
+  the TFLM continuous integration Docker container.
+
   ```
   pip install cpplint
   ```
-
-* Install Pillow.  For example, [here](ci/Dockerfile.micro) is what we do for
-  the TFLM continuous integration Docker container.
 
 * [yapf](https://github.com/google/yapf/) should be used for formatting Python
   code. For example:
 
   ```
   pip install yapf
-  yapf log_parser.py -i
+  yapf log_parser.py -i'
   ```
 
 * Add a git hook to check for code style etc. prior to creating a pull request:
@@ -246,10 +254,10 @@ Below are some tips that might be useful and improve the development experience.
     *   Having an extra merge commit is ok as the github review tool handles
         that gracefully.
 
-    Assuming that you forked tensorflow and added a remote called upstream with:
+    Assuming that you forked helia-rt and added a remote called upstream with:
 
     ```
-    git remote add upstream https://github.com/tensorflow/tflite-micro.git
+    git remote add upstream https://github.com/AmbiqAI/helia-rt.git
     ```
 
     Fetch the latest changes from upstream and merge into your local branch.
@@ -278,7 +286,7 @@ Below are some tips that might be useful and improve the development experience.
 
 ## Reviewer notes
 
-*   [GitHub CLI](https://cli.github.com) can be useful to quickly checkout a PR
+*   [GIthub CLI](https://cli.github.com) can be useful to quickly checkout a PR
     to test locally.
 
     `gh pr checkout <PR number>`
@@ -294,14 +302,14 @@ Below are some tips that might be useful and improve the development experience.
     And a sketch of the steps:
 
     ```
-    git remote add <remote_name> git@github.com:<PR author>/tflite-micro.git
+    git remote add <remote_name> git@github.com:<PR author>/helia-rt.git
     git fetch <remote_name>
 
     git checkout -b <local-branch-name> <remote_name>/<PR branch name>
 
     # make changes and commit to local branch
 
-    # push changes to remote branch
+    # push changes to remove branch
 
     git push <remote_name> <PR branch name>
 

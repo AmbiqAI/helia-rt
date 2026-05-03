@@ -23,6 +23,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 
+#if defined(HELIA)
+#include "Include/arm_nnsupportfunctions.h"
+#endif
+
 namespace tflite {
 
 namespace {}  // namespace
@@ -76,7 +80,13 @@ TfLiteStatus MicroResourceVariables::Read(int id,
   MicroResourceVariable variable = resource_variables_[id];
   TFLITE_DCHECK(EvalTensorBytes(tensor) == variable.bytes);
   TFLITE_DCHECK(variable.resource_buffer != nullptr);
+#if defined(HELIA)
+  arm_memcpy_s8(reinterpret_cast<int8_t*>(tensor->data.raw),
+                reinterpret_cast<int8_t*>(variable.resource_buffer),
+                variable.bytes);
+#else
   memcpy(tensor->data.raw, variable.resource_buffer, variable.bytes);
+#endif
   return kTfLiteOk;
 }
 
@@ -107,7 +117,12 @@ TfLiteStatus MicroResourceVariables::Allocate(int id, TfLiteContext* context,
       variable.default_value = zero_point;
     }
     // TODO(b/269669735): Explains why casting zero_point to int8 and memset.
+#if defined(HELIA)
+    arm_memset_s8(reinterpret_cast<int8_t*>(variable.resource_buffer),
+                  variable.default_value, variable.bytes);
+#else
     memset(variable.resource_buffer, variable.default_value, variable.bytes);
+#endif
   }
 
   return kTfLiteOk;
@@ -130,7 +145,12 @@ TfLiteStatus MicroResourceVariables::Assign(int id, size_t count_bytes,
   }
   TFLITE_DCHECK(count_bytes == variable.bytes);
   TFLITE_DCHECK(input_buffer != nullptr);
+#if defined(HELIA)
+  arm_memcpy_s8(reinterpret_cast<int8_t*>(variable.resource_buffer),
+                reinterpret_cast<const int8_t*>(input_buffer), variable.bytes);
+#else
   memcpy(variable.resource_buffer, input_buffer, variable.bytes);
+#endif
   return kTfLiteOk;
 }
 
@@ -138,7 +158,12 @@ TfLiteStatus MicroResourceVariables::ResetAll() {
   for (int i = 0; i < num_resource_variables_; i++) {
     MicroResourceVariable variable = resource_variables_[i];
     // TODO(b/269669735): Explains why casting zero_point to int8 and memset.
+#if defined(HELIA)
+    arm_memset_s8(reinterpret_cast<int8_t*>(variable.resource_buffer),
+                  variable.default_value, variable.bytes);
+#else
     memset(variable.resource_buffer, variable.default_value, variable.bytes);
+#endif
   }
   return kTfLiteOk;
 }

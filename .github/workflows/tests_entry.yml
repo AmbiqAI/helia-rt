@@ -1,0 +1,30 @@
+# tests_entry.yml
+# Entry point to the test suites
+#
+# - If ci:run_full label is on PR, run the ci workflow as well.
+#
+# This script runs the test scripts directly. Scheduled or manual runs use
+# run_<scriptname>.yml as the entry point.
+
+name: Tests Entry Point
+on:
+  pull_request_target:
+    types:
+      - opened
+      - synchronize
+      - labeled
+
+jobs:
+
+  helia-test:
+    uses: ./.github/workflows/helia_test.yml
+    with:
+      trigger-sha: ${{ github.event.pull_request.head.sha }}
+    secrets:
+      NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
+
+  ci-run:
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'ci:run_full') }}
+    uses: ./.github/workflows/ci.yml
+    with:
+      trigger-sha: ${{ github.event.pull_request.head.sha }}

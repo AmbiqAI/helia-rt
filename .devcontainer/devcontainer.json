@@ -1,0 +1,37 @@
+{
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "openai.chatgpt",
+                "GitHub.copilot",
+                "GitHub.copilot-chat",
+                "tamasfe.even-better-toml",
+                "mechatroner.rainbow-csv",
+                "ms-python.python",
+                "charliermarsh.ruff",
+                "jeff-hykin.better-cpp-syntax",
+                "ms-vscode.cpptools",
+                "ms-vscode.cpptools-extension-pack",
+                "twxs.cmake",
+                "marus25.cortex-debug",
+                "mcu-debug.debug-tracker-vscode",
+                "mcu-debug.memory-view",
+                "mcu-debug.debug-tracker-vscode",
+                "mcu-debug.rtos-views",
+                "mcu-debug.peripheral-viewer",
+                "ms-vscode.makefile-tools"
+            ]
+        }
+    },
+    "postCreateCommand": "./.devcontainer/install.sh",
+    "features": {
+        "ghcr.io/devcontainers/features/github-cli:1": {
+            "installDirectlyFromGitHubRelease": true,
+            "version": "latest"
+        }
+    }
+}

@@ -1,0 +1,158 @@
+site_name: heliaRT
+site_dir: "site"
+site_url: "https://ambiqai.github.io/helia-rt"
+site_description: heliaRT, optimized TFLM tailored for Ambiq SoCs
+repo_name: "AmbiqAI/helia-rt"
+repo_url: "https://github.com/AmbiqAI/helia-rt"
+edit_uri: ""
+copyright: Copyright &copy; 2025-2026 Ambiq
+
+nav:
+  - Home: index.md
+  - Overview:
+      - Getting Started: usage/index.md
+      - Features: features/index.md
+  - Setup:
+      - Zephyr: usage/zephyr.md
+      - neuralSPOT: usage/neuralspot.md
+      - Source Builds: usage/source.md
+  - Examples:
+      - Overview: examples/index.md
+      - Zephyr: examples/zephyr.md
+      - neuralSPOT: examples/neuralspot.md
+      - Source Integration: examples/source.md
+  - Reference:
+      - Benchmarks: benchmarks/index.md
+      - Continuous Integration: continuous_integration.md
+      - Python Development: python.md
+      - Generated Files: automatically_generated_files.md
+
+theme:
+  name: material
+  favicon: assets/helia-rt-icon.png
+  logo: assets/helia-rt-icon-white.png
+  icon:
+      repo: fontawesome/brands/github-alt
+  font:
+    text: Roboto
+    code: Roboto Mono
+  palette:
+    - media: "(prefers-color-scheme)"
+      primary: cyan
+      accent: blue
+      toggle:
+        icon: material/brightness-auto
+        name: Use system theme
+    - media: "(prefers-color-scheme: light)"
+      primary: cyan
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to light theme
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: cyan
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to dark theme
+  features:
+    - content.code.annotate
+    - content.code.copy
+    - content.tooltips
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+    - navigation.top
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.prune
+    - navigation.path
+    - navigation.footer
+    - navigation.tracking
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.indexes
+    - navigation.expand  # navigation.expand or navigation.sections
+    - content.tabs.link # all code tabs change simultaneously
+    - announce.dismiss
+
+plugins:
+  - search
+  - literate-nav:
+      nav_file: summary.md
+  - mkdocstrings:
+      handlers:
+        python:
+          import:
+          - https://docs.python.org/3/objects.inv
+          - https://numpy.org/doc/stable/objects.inv
+          options:
+            show_bases: false
+            docstring_style: google
+            docstring_section_style: list
+            line_length: 120
+            show_root_heading: false
+            heading_level: 2
+            merge_init_into_class: true
+            show_root_full_path: false
+            parameter_headings: true
+            show_symbol_type_heading: true
+            group_by_category: true
+            show_category_heading: true
+            modernize_annotations: true
+            members_order: source
+            filters: ["!^_", "^__init__$"]
+            separate_signature: true
+            show_signature: true
+            show_signature_annotations: true
+            show_docstring_attributes: true
+            show_source: false
+
+extra_css:
+  - css/mkdocstrings.css
+  - css/termynal.css
+  - css/custom.css
+
+extra_javascript:
+  - js/termynal.js
+  - js/custom.js
+  - https://cdn.plot.ly/plotly-2.33.0.min.js
+  - https://cdn.jsdelivr.net/npm/chart.js
+  - js/chart-init.js
+
+
+extra:
+  generator: false
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      base_path: 'docs/'
+  - pymdownx.superfences:
+      custom_fences:
+        - name: vegalite
+          class: vegalite
+          format: !!python/name:mkdocs_charts_plugin.fences.fence_vegalite
+        - name: mermaid
+          class: mermaid
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - tables
+  - md_in_html
+  - sane_lists
+  - pymdownx.tasklist:
+      custom_checkbox: true

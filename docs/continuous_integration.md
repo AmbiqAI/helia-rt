@@ -1,62 +1,111 @@
 # Continuous Integration
 
-This document outlines the Continuous Integration (CI) system for TFLite Micro, including how to trigger tests, the merge queue process, and how to run tests locally.
+This page describes the CI workflows that exist in this repository today and how they are typically used.
 
-## CI Workflow
+## CI Overview
 
-The CI system behaves differently depending on your role. This "Tiered" approach ensures security for external contributions while maintaining velocity for maintainers.
+The repository uses a mix of:
 
-### 1. Maintainers & Trusted Contributors
-*   **Automatic Execution**: All tests (Basic and Privileged) run automatically on every push.
-*   **No Approval Needed**: The system recognizes your permissions and bypasses the environment gate.
+- PR-triggered workflows for routine validation
+- label-gated workflows for heavier test coverage
+- manually dispatched workflows for ad hoc runs
+- release and documentation workflows
 
-### 2. External Contributors
-*   **Basic Tests**: Low-risk checks (Linting, File checks) run automatically on every push.
-*   **Privileged Tests**: Hardware-in-the-loop tests (Cortex-M, Xtensa, Hexagon, RISC-V) and Windows builds require manual approval.
-    *   **Status**: Your PR will show a "Pending" status for the `approval-gate` job.
-    *   **Action**: A maintainer must review the code and click **"Review Deployment"** -> **"Approve"** on the PR page.
-    *   **New Pushes**: Pushing new code resets the approval, requiring a maintainer to re-approve the specific commit.
+The main GitHub Actions workflow files live under `.github/workflows/`.
 
-## Labels
+## Pull Request Validation
 
-| Label | Description |
-| :--- | :--- |
-| `ci:ready` | **Trigger CI**: Applied by a maintainer when an external PR is ready for testing. This label wakes up the CI workflow and generates an approval request for the privileged test suite. |
-| `ci:full` | **Extended Scope**: Applied by a maintainer to expand the test scope. By default, CI runs a `basic` set of tests. Adding this label includes all hardware targets (e.g., RISC-V, Hexagon). |
+The main PR entry point is `tests_entry.yml`.
 
-## GitHub Merge Queue
+Current behavior:
 
-We use [GitHub Merge Queue](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue) to manage landings.
+- `helia_test.yml` runs for pull requests through [tests_entry.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/tests_entry.yml)
+- the broader `ci.yml` suite is only invoked on PRs when the PR has the `ci:run_full` label
 
-*   **Process**: Once a PR is approved and all required checks pass, maintainers click **"Merge when ready"** to add it to the queue.
-*   **Validation**: The [merge_group.yml](../.github/workflows/merge_group.yml) workflow runs the full test suite on a temporary merge branch. This ensures that the combination of multiple PRs doesn't break `main` before they are merged.
+Relevant workflows:
 
-## Sync From TensorFlow
+- [tests_entry.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/tests_entry.yml)
+- [helia_test.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/helia_test.yml)
+- [ci.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/ci.yml)
 
-TFLite Micro shares code with the main TensorFlow repository.
+## Label-Gated Full CI
 
-*   **Source of Truth**: The [TensorFlow repo](https://github.com/tensorflow/tensorflow) is the source for shared code.
-*   **Process**: Any changes to shared code **must** be made in the TensorFlow repo first. They are automatically synced to TFLite Micro via the scheduled [sync.yml](../.github/workflows/sync.yml) workflow.
+The label used in the current repository is `ci:run_full`.
 
-## Manually Running Tests (Docker)
+When a pull request has `ci:run_full`:
 
-You can reproduce CI environments locally using the TFLM CI Docker container.
+- `tests_entry.yml` calls the broader `ci.yml` workflow
+- additional Cortex-M workflows are also wired to run on labeled PR events
 
-1.  **Build the image**:
-    ```bash
-    docker build -t tflm-ci -f ci/Dockerfile.micro .
-    ```
-    *Alternatively, pull the pre-built image from [GitHub Packages](https://github.com/users/TFLM-bot/packages/container/package/tflm-ci).*
+Relevant workflows:
 
-2.  **Run interactively**:
-    Mount your local TFLite Micro directory to the container to run tests against your changes:
-    ```bash
-    docker run -v /path/to/local/tflite-micro:/path/to/docker/tflite-micro -it tflm-ci /bin/bash
-    ```
+- [cortex_m.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/cortex_m.yml)
+- [cortex_m_arm_compiler.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/cortex_m_arm_compiler.yml)
 
-3.  **Cleanup**:
-    View and remove stopped containers:
-    ```bash
-    docker ps --all
-    docker rm <docker image ID>
-    ```
+`ci:run` still appears in a few automation paths for bot-created PRs, but it is not the main user-facing full-CI label described by the active PR entry workflows.
+
+## Post-Merge Validation
+
+The post-merge entry point is `tests_post.yml`.
+
+This workflow runs on closed pull requests and is intended for longer-running validation after merge. It currently fans out into:
+
+- Docker image build updates
+- Ambiq test runs
+- Cortex-M validation
+
+Relevant workflow:
+
+- [tests_post.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/tests_post.yml)
+
+## Manual Workflow Entry Points
+
+Several workflows can be triggered manually with `workflow_dispatch`.
+
+Common manual entry points:
+
+- [run_ci.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/run_ci.yml): manual entry point for the reusable `ci.yml` workflow
+- [run_helia.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/run_helia.yml): manual entry point for helia build and test flows
+- [cortex_m.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/cortex_m.yml): manual Cortex-M validation
+- [cortex_m_arm_compiler.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/cortex_m_arm_compiler.yml): manual Arm Compiler 6 Cortex-M validation
+- [docs.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/docs.yml): documentation build and publish workflow
+
+## Release and Asset Workflows
+
+Release automation and asset packaging are handled separately from routine presubmit CI.
+
+Relevant workflows:
+
+- [release-please.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/release-please.yml)
+- [helia_release.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/helia_release.yml)
+- [zephyr_tflm_rt_assets.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/zephyr_tflm_rt_assets.yml) (manual dispatch)
+
+## Sync Workflow
+
+This repository also keeps a sync workflow for pulling shared changes from TensorFlow-related upstream sources.
+
+Relevant workflow:
+
+- [sync.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/sync.yml)
+
+## Error Reporting
+
+Several workflows call a shared issue-reporting workflow when a run fails in the main repository.
+
+Relevant workflow:
+
+- [issue_on_error.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/issue_on_error.yml)
+
+## Local Validation
+
+For local verification, the exact command depends on the workflow you are trying to mirror. In practice, the most useful approach is to inspect the referenced workflow file and then run the underlying script or build command locally.
+
+For example, the reusable CI workflow delegates to scripts under:
+
+- `tensorflow/lite/micro/tools/ci_build/`
+
+## Notes
+
+- This page documents the workflows that are present in the repository now.
+- If a workflow file changes, this page should be updated to match the current trigger and entry-point model.
+- GitHub Actions file links here intentionally point to GitHub rather than relative local paths, so the published docs site does not produce broken links.

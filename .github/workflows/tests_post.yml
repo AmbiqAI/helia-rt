@@ -1,0 +1,50 @@
+name: Post Tests
+# This is for tests that run on a PR post merge. This to optimize CI test suite time
+# for exceptionally long running test processes. Errors will still generate an
+# issue against the PR/commit so will be caught.
+
+on:
+  pull_request_target:
+    types:
+      - closed
+
+jobs:
+
+  build_docker_image:
+    if: github.event.pull_request.merged == true
+    uses: ./.github/workflows/helia_build_docker_image.yml
+    with:
+      trigger-sha: ${{ github.event.pull_request.head.sha }}
+
+  helia_test:
+    if: always() && github.event.pull_request.merged == true ||
+        (github.event.action == 'labeled' &&
+         github.event.label.name == 'ci:run_full')
+    uses: ./.github/workflows/helia_test.yml
+    with:
+      trigger-sha: ${{ github.event.pull_request.head.sha }}
+    secrets:
+      NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
+
+  cortex_m_ci_full:
+    uses: ./.github/workflows/cortex_m.yml
+    with:
+      trigger-sha: ${{ github.event.pull_request.head.sha }}
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}
+
+  issue_on_error:
+    needs: [helia_test, cortex_m_ci_full]
+    if: ${{ always() && contains(needs.*.result, 'failure') &&
+            github.event.pull_request.merged == true }}
+    uses: ./.github/workflows/issue_on_error.yml
+    with:
+      repo: ${{ github.repository}}
+      workflow: ${{ github.workflow }}
+      run_number: ${{ github.run_number }}
+      run_id: ${{ github.run_id }}
+      flag_label: ci:bot_issue
+      pr_number: ${{ github.event.number }}
+      pr_link: ${{ github.event.pull_request._links.html.href }}
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}

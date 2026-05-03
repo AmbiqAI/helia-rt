@@ -80,7 +80,7 @@ $(eval $(call microlite_test,kernel_signal_filter_bank_log_test,\
   $(TENSORFLOW_ROOT)signal/micro/kernels/filter_bank_log_flexbuffers_generated_data.h))
 
 $(eval $(call microlite_test,kernel_signal_filter_bank_square_root_test,\
-  $(TENSORFLOW_ROOT)signal/micro/kernels/filter_bank_square_root_test.cc))  
+  $(TENSORFLOW_ROOT)signal/micro/kernels/filter_bank_square_root_test.cc))
 
 $(eval $(call microlite_test,kernel_signal_filter_bank_spectral_subtraction_test,\
   $(TENSORFLOW_ROOT)signal/micro/kernels/filter_bank_spectral_subtraction_test.cc \
@@ -188,6 +188,14 @@ $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/zeros_like_test.cc
 
 ifeq ($(ENABLE_COMPRESSION), yes)
 MICROLITE_KERNEL_SIMPLE_TEST_SRCS += $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/decompress_test.cc
+endif
+
+# Optional per-OPTIMIZED_KERNEL_DIR test extensions. Allows backends to register
+# additional kernel tests (e.g. coverage for types only their kernel supports)
+# without modifying the upstream test list. The .inc file should append paths
+# to MICROLITE_KERNEL_SIMPLE_TEST_SRCS.
+ifneq ($(OPTIMIZED_KERNEL_DIR),)
+-include $(MAKEFILE_DIR)/ext_libs/$(OPTIMIZED_KERNEL_DIR)_tests.inc
 endif
 
 # Generate simple kernel test targets in a common way

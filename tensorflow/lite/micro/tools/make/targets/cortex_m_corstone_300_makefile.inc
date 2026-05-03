@@ -1,4 +1,4 @@
-# Copyright 2025 The TensorFlow Authors. All Rights Reserved.
+# Copyright 2024 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -94,6 +94,23 @@ ARM_CPU := $(subst cortex-m,ARMCM,$(MCPU_OPTION))
 ARM_CPU := $(subst +nofp,,$(ARM_CPU))
 
 ifeq ($(TOOLCHAIN), armclang)
+
+  TARGET_DEFAULT_TOOLCHAIN_ROOT := $(DOWNLOADS_DIR)/arm_compiler/bin/
+  TARGET_TOOLCHAIN_ROOT := $(TARGET_DEFAULT_TOOLCHAIN_ROOT)
+  ifeq ($(TARGET_TOOLCHAIN_ROOT), $(TARGET_DEFAULT_TOOLCHAIN_ROOT))
+    DOWNLOAD_RESULT := $(shell $(MAKEFILE_DIR)/arm_clang_download.sh ${DOWNLOADS_DIR} ${TENSORFLOW_ROOT})
+    ifneq ($(DOWNLOAD_RESULT), SUCCESS)
+      $(error Something went wrong with the arm clang download: $(DOWNLOAD_RESULT))
+    endif
+
+    # If ARM_UBL_LICENSE_IDENTIFIER is set, activate the license.
+    ifneq ($(ARM_UBL_LICENSE_IDENTIFIER),)
+      # print the license identifier
+      $(info "Activating the license with the identifier: $(ARM_UBL_LICENSE_IDENTIFIER)")
+      ACTIVATE_LICENSE := $(shell $(TARGET_TOOLCHAIN_ROOT)armlm activate --code $(ARM_UBL_LICENSE_IDENTIFIER))
+    endif
+  endif
+
   CXX_TOOL  := armclang
   CC_TOOL   := armclang
   AR_TOOL   := armar
@@ -164,6 +181,11 @@ else ifeq ($(TOOLCHAIN), gcc)
   ldflags_to_remove = -Wl,--fatal-warnings
   LDFLAGS := $(filter-out $(ldflags_to_remove),$(LDFLAGS))
 
+else ifeq ($(TOOLCHAIN), atfe)
+  # Helia-rt: ATfE (Arm Toolchain for Embedded / LLVM-Clang) support.
+  # See helia/patches/inline_drift.md.
+  include $(MAKEFILE_DIR)/targets/cortex_m_corstone_300_atfe.inc
+
 else
   $(error "TOOLCHAIN=$(TOOLCHAIN) is not supported.")
 endif
@@ -188,8 +210,19 @@ CCFLAGS += -D$(ARM_CPU)
 CXXFLAGS += -DCMSIS_DEVICE_ARM_CORTEX_M_XX_HEADER_FILE=\"$(ARM_CPU).h\"
 
 THIRD_PARTY_CC_SRCS += \
-  $(ETHOS_U_CORE_PLATFORM)/retarget.c \
   $(ETHOS_U_CORE_PLATFORM)/uart.c
+
+# `retarget.c` (from ethos-u-core-platform) supplies armclang/newlib-style
+# stdio retargeting (`fputc`, `fgetc`, `_sys_*`). Under ATfE we use
+# picolibc's tinystdio routed through `libsemihost` (SYS_WRITEC/SYS_WRITE),
+# whose `fgetc` (in libc.a) collides with retarget.c's, breaking the
+# `tflm_benchmark` link. Skip it for ATfE; semihosted output goes to the
+# FVP host stdout, which the test runner already captures alongside UART
+# output. GCC and armclang still need it.
+ifneq ($(TOOLCHAIN), atfe)
+  THIRD_PARTY_CC_SRCS += \
+    $(ETHOS_U_CORE_PLATFORM)/retarget.c
+endif
 
 ifeq ($(CO_PROCESSOR), ethos_u)
   ETHOSU_ARCH=u55

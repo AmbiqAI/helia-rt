@@ -1,98 +1,172 @@
-<!--ts-->
-- [TensorFlow Lite for Microcontrollers](#tensorflow-lite-for-microcontrollers)
-- [Build Status](#build-status)
-  - [CI Status](#ci-status)
-  - [Community Supported TFLM Examples](#community-supported-tflm-examples)
-- [Contributing](#contributing)
-- [Getting Help](#getting-help)
-- [Additional Documentation](#additional-documentation)
-- [RFCs](#rfcs)
+# heliaRT
 
-<!-- Added by: advaitjain, at: Mon 04 Oct 2021 11:23:57 AM PDT -->
+heliaRT is Ambiq's optimized TensorFlow Lite for Microcontrollers runtime for Apollo platforms. It is designed to help developers bring efficient inference to ultra-low-power Ambiq silicon, with tuned kernels that take advantage of Apollo CPU, DSP, and MVE capabilities where available.
 
-<!--te-->
-
-# TensorFlow Lite for Microcontrollers
-
-TensorFlow Lite for Microcontrollers is a port of TensorFlow Lite designed to
-run machine learning models on DSPs, microcontrollers and other devices with
-limited memory.
-
-Additional Links:
- * [Tensorflow github repository](https://github.com/tensorflow/tensorflow/)
- * [TFLM at tensorflow.org](https://www.tensorflow.org/lite/microcontrollers)
-
-# Build Status
-
-## CI Status
-| Group | Status |
-| :--- | :--- |
-| Core | [![CI](https://github.com/tensorflow/tflite-micro/actions/workflows/run_core.yml/badge.svg)](https://github.com/tensorflow/tflite-micro/actions/workflows/run_core.yml) [![CI](https://github.com/tensorflow/tflite-micro/actions/workflows/run_windows.yml/badge.svg)](https://github.com/tensorflow/tflite-micro/actions/workflows/run_windows.yml)  [![Sync](https://github.com/tensorflow/tflite-micro/actions/workflows/sync.yml/badge.svg)](https://github.com/tensorflow/tflite-micro/actions/workflows/sync.yml) |
-| Targets | [![Cortex-M](https://github.com/tensorflow/tflite-micro/actions/workflows/run_cortex_m.yml/badge.svg)](https://github.com/tensorflow/tflite-micro/actions/workflows/run_cortex_m.yml) [![RISC-V](https://github.com/tensorflow/tflite-micro/actions/workflows/run_riscv.yml/badge.svg)](https://github.com/tensorflow/tflite-micro/actions/workflows/run_riscv.yml) [![Hexagon](https://github.com/tensorflow/tflite-micro/actions/workflows/run_hexagon.yml/badge.svg)](https://github.com/tensorflow/tflite-micro/actions/workflows/run_hexagon.yml) [![Xtensa](https://github.com/tensorflow/tflite-micro/actions/workflows/run_xtensa.yml/badge.svg)](https://github.com/tensorflow/tflite-micro/actions/workflows/run_xtensa.yml) |
-| Misc | [![Generate Integration Test](https://github.com/tensorflow/tflite-micro/actions/workflows/generate_integration_tests.yml/badge.svg)](https://github.com/tensorflow/tflite-micro/actions/workflows/generate_integration_tests.yml) |
+[![CI](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ci.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ci.yml)
+[![Unit Tests](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_helia.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_helia.yml)
 
 
-## Community Supported TFLM Examples
-This table captures platforms that TFLM has been ported to. Please see
-[New Platform Support](tensorflow/lite/micro/docs/new_platform_support.md) for
-additional documentation.
+## Why heliaRT?
 
-Platform      |    Status     |
------------     | --------------|
-Arduino         | [![Arduino](https://github.com/tensorflow/tflite-micro-arduino-examples/actions/workflows/ci.yml/badge.svg)](https://github.com/tensorflow/tflite-micro-arduino-examples/actions/workflows/ci.yml) [![Antmicro](https://github.com/antmicro/tensorflow-arduino-examples/actions/workflows/test_examples.yml/badge.svg)](https://github.com/antmicro/tensorflow-arduino-examples/actions/workflows/test_examples.yml) |
-[Coral Dev Board Micro](https://coral.ai/products/dev-board-micro) | [TFLM + EdgeTPU Examples for Coral Dev Board Micro](https://github.com/google-coral/coralmicro) |
-Espressif Systems Dev Boards  | [![ESP Dev Boards](https://github.com/espressif/tflite-micro-esp-examples/actions/workflows/ci.yml/badge.svg)](https://github.com/espressif/tflite-micro-esp-examples/actions/workflows/ci.yml) |
-Ingenic MIPS Boards | [![Ingenic MIPS Boards](https://github.com/yinzara/ingenic-tflite-micro/actions/workflows/ci.yml/badge.svg)](https://github.com/yinzara/ingenic-tflite-micro/tree/main/examples/hello_world) |
-Renesas Boards | [TFLM Examples for Renesas Boards](https://github.com/renesas/tflite-micro-renesas) |
-Silicon Labs Dev Kits        | [TFLM Examples for Silicon Labs Dev Kits](https://github.com/SiliconLabs/tflite-micro-efr32-examples)
-Sparkfun Edge   | [![Sparkfun Edge](https://github.com/advaitjain/tflite-micro-sparkfun-edge-examples/actions/workflows/ci.yml/badge.svg?event=schedule)](https://github.com/advaitjain/tflite-micro-sparkfun-edge-examples/actions/workflows/ci.yml)
-Texas Instruments Dev Boards | [![Texas Instruments Dev Boards](https://github.com/TexasInstruments/tensorflow-lite-micro-examples/actions/workflows/ci.yml/badge.svg?event=status)](https://github.com/TexasInstruments/tensorflow-lite-micro-examples/actions/workflows/ci.yml)
+heliaRT focuses on efficient inference for Ambiq edge devices. By aligning the runtime with Apollo hardware capabilities, heliaRT helps reduce integration friction while improving performance and energy efficiency on supported Ambiq targets.
+
+## License
+
+heliaRT is released under the [Ambiq Apollo SDK License](LICENSE). The license permits free use, modification, and redistribution **solely for execution on Ambiq-manufactured CPUs** (including the Apollo series). Use on non-Ambiq hardware is not permitted. See the full [LICENSE](LICENSE) file for details.
+
+## Key Features
+
+- **Optimized Performance**: Utilizes MVE and DSP hardware capabilities to enhance computational efficiency and speed.
+- **Energy Efficiency**: Designed to minimize power usage, extending the battery life of edge devices.
+- **Broad Ambiq Coverage**: Supports a range of Ambiq Apollo SoCs through source and prebuilt integration paths.
+
+Start with the [Getting Started guide](docs/usage/index.md) to choose a neuralSPOT, Zephyr, or source-build path for heliaRT on Ambiq hardware.
+
+## Getting Started
+
+The recommended getting-started paths are:
+
+- profile a model with `ns_autodeploy`
+- integrate heliaRT into a Zephyr application
+- build heliaRT from source for a custom integration
+
+See the full [Getting Started documentation](docs/usage/index.md) for step-by-step instructions.
+
+The main setup guides are:
+
+- [Zephyr setup](docs/usage/zephyr.md)
+- [neuralSPOT setup](docs/usage/neuralspot.md)
+- [Source builds](docs/usage/source.md)
+- [Features overview](docs/features/index.md)
 
 
-# Contributing
-See our [contribution documentation](CONTRIBUTING.md).
+## Supported SoCs
 
-# Getting Help
+heliaRT is specifically optimized to leverage the advanced features of Ambiq's ultra-low-power SoCs. Below is the list of SoCs that are fully supported:
 
-A [Github issue](https://github.com/tensorflow/tflite-micro/issues/new/choose)
-should be the primary method of getting in touch with the TensorFlow Lite Micro
-(TFLM) team.
+- **Apollo3**: Ideal for battery-operated mobile devices with its highly efficient power management capabilities.
+- **Apollo4**: Enhances performance with higher processing capabilities and improved memory architecture.
+- **Apollo4 Plus**: Features a Cortex-M4 core, offering a balance of power and performance for complex processing tasks.
+- **Apollo510**: Equipped with a Cortex-M55 core and MVE Helium capabilities, designed for next-level computation needs and edge AI applications.
 
-The following resources may also be useful:
+These optimizations ensure that heliaRT can provide excellent performance and energy efficiency on Ambiq's cutting-edge hardware platforms.
 
-1.  SIG Micro [email group](https://groups.google.com/a/tensorflow.org/g/micro)
-    and
-    [monthly meetings](http://doc/1YHq9rmhrOUdcZnrEnVCWvd87s2wQbq4z17HbeRl-DBc).
 
-1.  SIG Micro [gitter chat room](https://gitter.im/tensorflow/sig-micro).
+## Official Build Status
 
-1. For questions that are not specific to TFLM, please consult the broader TensorFlow project, e.g.:
-   * Create a topic on the [TensorFlow Discourse forum](https://discuss.tensorflow.org)
-   * Send an email to the [TensorFlow Lite mailing list](https://groups.google.com/a/tensorflow.org/g/tflite)
-   * Create a [TensorFlow issue](https://github.com/tensorflow/tensorflow/issues/new/choose)
-   * Create a [Model Optimization Toolkit](https://github.com/tensorflow/model-optimization) issue
+This table provides a summary of the build status for heliaRT across various platforms and configurations, ensuring both compatibility and optimal performance.
 
-# Additional Documentation
+| Build Type         | Status |
+| ------------------ | ------ |
+| **CI on Linux**    | [![CI Status](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ci.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ci.yml) |
+| **Apollo3/4 (CM4)** | [![Apollo4 Tests](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_helia.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_helia.yml) |
+| **Apollo510 (CM55)** | [![Apollo510 Tests](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_helia.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_helia.yml) |
 
- * [Continuous Integration](docs/continuous_integration.md)
- * [Benchmarks](tensorflow/lite/micro/benchmarks/README.md)
- * [Profiling](tensorflow/lite/micro/docs/profiling.md)
- * [Memory Management](tensorflow/lite/micro/docs/memory_management.md)
- * [Logging](tensorflow/lite/micro/docs/logging.md)
- * [Porting Reference Kernels from TfLite to TFLM](tensorflow/lite/micro/docs/porting_reference_ops.md)
- * [Optimized Kernel Implementations](tensorflow/lite/micro/docs/optimized_kernel_implementations.md)
- * [New Platform Support](tensorflow/lite/micro/docs/new_platform_support.md)
- * Platform/IP support
-   * [Arm IP support](tensorflow/lite/micro/docs/arm.md)
- * [Software Emulation with Renode](tensorflow/lite/micro/docs/renode.md)
- * [Software Emulation with QEMU](tensorflow/lite/micro/docs/qemu.md)
- * [Compression](tensorflow/lite/micro/docs/compression.md)
-   * [MNIST Compression Tutorial](tensorflow/lite/micro/compression/mnist_compression_tutorial.ipynb)
- * [Python Dev Guide](docs/python.md)
- * [Automatically Generated Files](docs/automatically_generated_files.md)
- * [Python Interpreter Guide](python/tflite_micro/README.md)
+Each badge links directly to the detailed results of the respective builds, allowing for quick access to the latest test outcomes and build logs.
 
-# RFCs
 
-1. [Pre-allocated tensors](tensorflow/lite/micro/docs/rfc/001_preallocated_tensors.md)
-1. [TensorFlow Lite for Microcontrollers Port of 16x8 Quantized Operators](tensorflow/lite/micro/docs/rfc/002_16x8_quantization_port.md)
+## Getting Help
+
+If you encounter issues or need assistance, the following resources are available:
+
+- **Primary Support**: [Submit a GitHub Issue](https://github.com/AmbiqAI/helia-rt/issues/new/choose) for direct support on heliaRT related queries.
+- **Community and Discussions**:
+  - Contact Ambiq AITG [email group](mailto:support.aitg@ambiq.com)
+- **TensorFlow Community**:
+  - Pose general questions on the [TensorFlow Discourse forum](https://discuss.tensorflow.org).
+  - Engage with the broader TensorFlow community via the [TensorFlow Lite mailing list](https://groups.google.com/a/tensorflow.org/g/tflite).
+  - Report broader TensorFlow issues on the [official TensorFlow GitHub page](https://github.com/tensorflow/tensorflow/issues/new/choose).
+  - Discuss optimization techniques on the [Model Optimization Toolkit GitHub page](https://github.com/tensorflow/model-optimization).
+
+## Documentation
+
+Explore the main documentation entry points:
+
+- [Getting Started](docs/usage/index.md): Step-by-step guide to begin with heliaRT.
+- [Continuous Integration](docs/continuous_integration.md): Details on our CI processes and infrastructure.
+- [Benchmarks](docs/benchmarks/index.md): Performance-focused documentation for supported Ambiq targets.
+- [Profiling](tensorflow/lite/micro/docs/profiling.md): Techniques to profile and optimize your TFLM applications.
+- [Memory Management](tensorflow/lite/micro/docs/memory_management.md): Strategies for effective memory use in constrained environments.
+- [Logging](tensorflow/lite/micro/docs/logging.md): How to implement and utilize logging within heliaRT projects.
+- [Porting Reference Kernels from TfLite to TFLM](tensorflow/lite/micro/docs/porting_reference_ops.md): Guide on adapting TensorFlow Lite kernels for microcontrollers.
+- [Optimized Kernel Implementations](tensorflow/lite/micro/docs/optimized_kernel_implementations.md): Discusses the optimized kernels specific to various architectures.
+- [New Platform Support](tensorflow/lite/micro/docs/new_platform_support.md): Instructions for adding heliaRT support to new hardware platforms.
+- [heliaRT Python Development Guide](docs/python.md): Insights into using Python for heliaRT development.
+- [Automatically Generated Files](docs/automatically_generated_files.md): Information about the files generated during the build process.
+- [Python Interpreter Guide](python/tflite_micro/README.md): Detailed guide for using the Python interpreter with TFLM.
+
+
+## Operator Support Matrix
+
+Below is the operator support matrix for heliaRT's three kernel backends. Each operator is available in all backends at the Reference level. The **CMSIS-NN** and **HELIA** columns indicate where optimized implementations replace the generic reference kernels.
+
+The three backends correspond to Zephyr Kconfig choices:
+
+- **Reference** (`HELIA_RT_BACKEND_REFERENCE`): Generic TFLM C kernels. Works on any architecture.
+- **CMSIS-NN** (`HELIA_RT_BACKEND_CMSIS_NN`): Open-source Arm CMSIS-NN optimized kernels. Cortex-M only.
+- **HELIA** (`HELIA_RT_BACKEND_HELIA`): Ambiq-optimized kernels (heliaCORE / ns-cmsis-nn). Cortex-M only. Requires Ambiq-provided module.
+
+> **Note:** The **Reference** and **CMSIS-NN** backends are fully open and available to all users. The **HELIA** backend requires the private `ns-cmsis-nn` module, which is provided to Ambiq licensees. If you build with `OPTIMIZED_KERNEL_DIR=helia` (the default in CI scripts) without access to this module, the build will fail with a clear error message explaining available alternatives. To build without the HELIA backend, use `OPTIMIZED_KERNEL_DIR=cmsis_nn` or leave it empty for reference kernels only. Contact [support.aitg@ambiq.com](mailto:support.aitg@ambiq.com) for access to the HELIA module.
+
+Data type key: **i8** = int8 activations/weights, **i16** = int16 activations, **i4** = int4 weights, **f32** = float32.
+
+Operators without an optimized variant in a backend fall through to the Reference implementation.
+
+### Compute-Heavy Ops
+
+| Operator | Reference | CMSIS-NN | HELIA | Notes |
+| --- | --- | --- | --- | --- |
+| conv | f32, i8, i16, i4 | f32, i8, i16, i4 | f32, i8, i16, i4 | HELIA: weight repacking at Prepare |
+| depthwise_conv | f32, i8, i16, i4 | f32, i8, i16, i4 | f32, i8, i16, i4 | HELIA: weight repacking at Prepare |
+| fully_connected | f32, i8, i16, i4 | f32, i8, i16, i4 | f32, i8, **i16(w8+w16)**, i4 | HELIA uniquely supports A16W16 |
+| batch_matmul | f32, i8, i16 | f32, i8, i16 | f32, i8, i16 | |
+| transpose_conv | f32, i8, i16 | f32, i8, i16 | f32, i8, i16 | |
+| svdf | f32, i8 | f32, i8 | f32, i8 | |
+| unidirectional_sequence_lstm | f32, i8 | f32, i8 | f32, i8 | |
+
+### Pooling and Reduce
+
+| Operator | Reference | CMSIS-NN | HELIA | Notes |
+| --- | --- | --- | --- | --- |
+| avg_pool | f32, i8, i16 | f32, i8, i16 | f32, i8, i16 | |
+| max_pool | f32, i8, i16 | f32, i8, i16 | f32, i8, i16 | |
+| softmax | f32, i8, i16 | f32, i8, i16 | f32, i8, i16 | |
+| reduce (mean/max) | f32, i8 | *(Reference)* | f32, i8 | HELIA-only optimized |
+
+### Activations
+
+| Operator | Reference | CMSIS-NN | HELIA | Notes |
+| --- | --- | --- | --- | --- |
+| relu / relu6 | f32, i8, i16 | *(Reference)* | f32, i8, i16 | HELIA-only optimized |
+| logistic | f32, i8, i16 | *(Reference)* | f32, i8, i16 | HELIA-only optimized |
+| tanh | f32, i8, i16 | *(Reference)* | f32, i8, i16 | HELIA-only optimized |
+| hard_swish | f32, i8 | *(Reference)* | f32, i8, i16 | HELIA extends to i16 |
+| leaky_relu | f32, i8, i16 | *(Reference)* | f32, i8, i16 | HELIA-only optimized |
+
+### Elementwise Arithmetic
+
+| Operator | Reference | CMSIS-NN | HELIA | Notes |
+| --- | --- | --- | --- | --- |
+| add | f32, i8, i16 | f32, i8, i16 | f32, i8, i16 | |
+| mul | f32, i8, i16 | f32, i8, i16 | f32, i8, i16 | |
+| sub | f32, i8, i16 | *(Reference)* | f32, i8, i16 | HELIA-only optimized |
+| maximum / minimum | f32, i8 | f32, i8 | f32, i8 | |
+| comparisons | f32, i8 | *(Reference)* | f32, i8 | HELIA-only optimized |
+
+### Data Movement / Shape
+
+| Operator | Reference | CMSIS-NN | HELIA | Notes |
+| --- | --- | --- | --- | --- |
+| pad | f32, i8, i16 | f32, i8, i16 | f32, i8, i16 | |
+| transpose | f32, i8, i16 | f32, i8, i16 | f32, i8, i16 | |
+| concatenation | f32, i8, i16 | *(Reference)* | f32, i8, i16 | HELIA-only optimized |
+| reshape | all | *(Reference)* | all | HELIA-only optimized |
+| split / split_v | all | *(Reference)* | all | HELIA-only optimized |
+| pack | all | *(Reference)* | all | HELIA-only optimized |
+| squeeze | all | *(Reference)* | all | HELIA-only optimized |
+| strided_slice | all | *(Reference)* | all | HELIA-only optimized |
+| dequantize | i8→f32, i16→f32 | *(Reference)* | i8→f32, i16→f32 | HELIA-only optimized |
+| fill | all | *(Reference)* | all | HELIA-only optimized |
+| zeros_like | f32, i8, i16 | *(Reference)* | f32, i8, i16 | HELIA-only optimized |
+
+All operators not listed above (e.g., cast, elu, gather, slice, unpack, etc.) are available via the Reference backend on all data types they support. See the TFLM documentation for the full reference operator list.

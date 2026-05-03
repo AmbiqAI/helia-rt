@@ -121,15 +121,45 @@ ifneq ($(filter cortex-m55%,$(TARGET_ARCH)),)
   endif
 endif
 
-# Toolchain specfic flags
+# Detect if host is Windows (Git Bash, WSL, or native)
+ifeq ($(OS),Windows_NT)
+  EXE := .exe
+else
+  UNAME_S := $(shell uname -s)
+  ifeq ($(UNAME_S),Windows)
+    EXE := .exe
+  else
+    EXE :=
+  endif
+endif
+
+# Toolchain specific flags
 ifeq ($(TOOLCHAIN), armclang)
-  CXX_TOOL  := armclang
-  CC_TOOL   := armclang
-  AR_TOOL   := armar
-  LD        := armlink
+  TARGET_DEFAULT_TOOLCHAIN_ROOT := $(DOWNLOADS_DIR)/arm_compiler/bin/
+  TARGET_TOOLCHAIN_ROOT := $(TARGET_DEFAULT_TOOLCHAIN_ROOT)
+  ifeq ($(TARGET_TOOLCHAIN_ROOT), $(TARGET_DEFAULT_TOOLCHAIN_ROOT))
+    DOWNLOAD_RESULT := $(shell $(MAKEFILE_DIR)/arm_clang_download.sh ${DOWNLOADS_DIR} ${TENSORFLOW_ROOT})
+    ifneq ($(DOWNLOAD_RESULT), SUCCESS)
+      $(error Something went wrong with the arm clang download: $(DOWNLOAD_RESULT))
+    endif
+
+    # If ARM_UBL_LICENSE_IDENTIFIER is set, activate the license.
+    ifneq ($(ARM_UBL_LICENSE_IDENTIFIER),)
+      # print the license identifier
+      $(info "Activating the license with the identifier: $(ARM_UBL_LICENSE_IDENTIFIER)")
+      ACTIVATE_LICENSE := $(shell $(TARGET_TOOLCHAIN_ROOT)armlm activate --code $(ARM_UBL_LICENSE_IDENTIFIER))
+    endif
+  endif
+
+  CXX_TOOL := armclang$(EXE)
+  CC_TOOL  := armclang$(EXE)
+  AR_TOOL  := armar$(EXE)
+  LD       := armlink$(EXE)
 
   FLAGS_ARMC = \
     --target=arm-arm-none-eabi \
+    -fshort-enums \
+    -gdwarf-4     \
     -mcpu=$(TARGET_ARCH)
 
   CXXFLAGS += $(FLAGS_ARMC)
@@ -168,6 +198,37 @@ else ifeq ($(TOOLCHAIN), gcc)
   endif
   CXXFLAGS += $(FLAGS_GCC)
   CCFLAGS += $(FLAGS_GCC)
+
+else ifeq ($(TOOLCHAIN), atfe)
+  # Arm Toolchain for Embedded (ATfE) is an LLVM/Clang-based bare-metal
+  # toolchain. Tools live under <root>/bin and use the standard llvm-* names.
+  TARGET_DEFAULT_TOOLCHAIN_ROOT := $(DOWNLOADS_DIR)/arm_toolchain_embedded/bin/
+  TARGET_TOOLCHAIN_ROOT := $(TARGET_DEFAULT_TOOLCHAIN_ROOT)
+  ifeq ($(TARGET_TOOLCHAIN_ROOT), $(TARGET_DEFAULT_TOOLCHAIN_ROOT))
+    DOWNLOAD_RESULT := $(shell $(MAKEFILE_DIR)/arm_toolchain_embedded_download.sh ${DOWNLOADS_DIR} ${TENSORFLOW_ROOT})
+    ifneq ($(DOWNLOAD_RESULT), SUCCESS)
+      $(error Something went wrong with the ATfE download: $(DOWNLOAD_RESULT))
+    endif
+  endif
+
+  CXX_TOOL := clang++$(EXE)
+  CC_TOOL  := clang$(EXE)
+  AR_TOOL  := llvm-ar$(EXE)
+  LD       := ld.lld$(EXE)
+
+  # ATfE rejects -mfpu=auto; pass -mcpu + -mfloat-abi only and let the
+  # compiler infer FPU/MVE features from the cpu name.
+  FLAGS_ATFE = \
+    --target=arm-none-eabi \
+    -fshort-enums \
+    -gdwarf-4     \
+    -mcpu=$(TARGET_ARCH)
+
+  CXXFLAGS += $(FLAGS_ATFE)
+  CCFLAGS += $(FLAGS_ATFE)
+  # Do NOT propagate $(ARM_LDFLAGS) here: those are armlink-specific
+  # -Wl,--cpu=... values that lld/clang reject. CPU selection is already
+  # handled in compile flags via -mcpu=$(TARGET_ARCH) above.
 
 else
   $(error "TOOLCHAIN=$(TOOLCHAIN) is not supported.")

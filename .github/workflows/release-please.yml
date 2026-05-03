@@ -1,0 +1,35 @@
+name: release-please
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - name: Release Please (manifest)
+        id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          command: manifest
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+  helia-release:
+    needs: release
+    if: ${{ needs.release.outputs.release_created == 'true' }}
+    uses: ./.github/workflows/helia_release.yml
+    with:
+      ref: ${{ needs.release.outputs.tag_name }}
+      tag: ${{ needs.release.outputs.tag_name }}
+      upload_to_release: true
+    secrets: inherit

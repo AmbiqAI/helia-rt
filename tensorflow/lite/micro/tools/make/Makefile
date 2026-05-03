@@ -86,7 +86,13 @@ OPTIMIZED_KERNEL_DIR :=
 # Note that this is optional. If having one implementation, nothing needs to be done.
 # OPTIMIZE_KERNELS_FOR has only two valid values, KERNELS_OPTIMIZED_FOR_SIZE and KERNELS_OPTIMIZED_FOR_SPEED where the
 # former is default.
-OPTIMIZE_KERNELS_FOR := KERNELS_OPTIMIZED_FOR_SPEED
+# helia: parameterize via GLOBAL_KERNEL_OPTIMIZE so the helia CI scripts
+# (test_helia.sh / build_helia.sh) can flip SPEED/SIZE without patching
+# upstream. Default value matches upstream's static SPEED default. The
+# per-kernel CONV_OPT/FC_OPT knobs and CMSIS_NN_USE_REQUANTIZE_INLINE_ASSEMBLY
+# live in tools/make/ext_libs/helia.inc.
+GLOBAL_KERNEL_OPTIMIZE ?= SPEED
+OPTIMIZE_KERNELS_FOR := KERNELS_OPTIMIZED_FOR_$(GLOBAL_KERNEL_OPTIMIZE)
 
 # Override this variable from the command line in case the optimized kernels are
 # in a different directory.
@@ -572,6 +578,10 @@ $(BINDIR)%.test_target: $(BINDIR)%_test
 # of the linker into a binary image that can be loaded directly.
 ifeq ($(TOOLCHAIN), armclang)
   CXXFLAGS += -ffp-mode=full
+  # helia: armclang's nan/inf-under-fast-math diagnostic is promoted to
+  # an error by upstream's -Werror. Demote to warning to keep helia
+  # builds green; same suppression applied to ATfE in targets/atfe.inc.
+  CXXFLAGS += -Wno-error=nan-infinity-disabled
   FROMELF := $(TARGET_TOOLCHAIN_ROOT)$(TARGET_TOOLCHAIN_PREFIX)fromelf
   $(BINDIR)%.bin: $(BINDIR)%
 		$(Q)$(MKDIR_P) $(dir $@)
@@ -581,6 +591,14 @@ else
   $(BINDIR)%.bin: $(BINDIR)%
 		$(Q)$(MKDIR_P) $(dir $@)
 		$(Q)$(OBJCOPY) $< $@ -O binary
+endif
+
+# helia: ATfE-toolchain shim (warning suppressions, llvm-objcopy override,
+# .bin rule replacement, test_helpers.o -O0 workaround). Included here so
+# its OBJCOPY assignment and `$(BINDIR)%.bin` pattern rule override the
+# upstream `else` branch above for TOOLCHAIN=atfe.
+ifeq ($(TOOLCHAIN), atfe)
+  include $(MAKEFILE_DIR)/targets/atfe.inc
 endif
 
 # Create kernel test targets.

@@ -14,21 +14,26 @@ on:
         type: string
     secrets:
       tflm-bot-token:
-        required: false
+        required: true
 
 jobs:
   check_tflite_files:
     runs-on: ubuntu-latest
     name: Check PR Modifies TfLite Files
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.trigger-sha }}
 
       - name: Check Files
         if: ${{ !contains(inputs.pr-body, 'NO_CHECK_TFLITE_FILES=') }}
-        env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          PR_NUMBER: ${{ inputs.pr-number }}
-          TFLM_BOT_TOKEN: ${{ secrets.tflm-bot-token || github.token }}
-        run: tensorflow/lite/micro/tools/ci_build/check_tflite_files.sh
+        run: |
+          URL="https://api.github.com/repos/${{ github.repository }}/pulls/${{ inputs.pr-number }}/files"
+          PR_FILES=$(curl -s -X GET -H "Authorization: Bearer ${{ secrets.tflm-bot-token }}" $URL | jq -r '.[] | .filename')
+          rm -rf tmp_pull_request_files.txt
+          echo "${PR_FILES}" >> tmp_pull_request_files.txt
+          rm -rf .git
+          docker run --rm -v `pwd`:/helia-rt -w /helia-rt ghcr.io/ambiqai/helia-rt-ci:latest python3 ci/check_tflite_files.py tmp_pull_request_files.txt
+          TFLITE_FILE_TEST_STATUS=$?
+          rm -f tmp_pull_request_files.txt
+          exit ${TFLITE_FILE_TEST_STATUS}

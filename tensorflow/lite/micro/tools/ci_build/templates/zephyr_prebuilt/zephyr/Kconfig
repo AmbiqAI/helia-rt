@@ -1,0 +1,30 @@
+config ZEPHYR_HELIA_RT_MODULE
+	bool
+
+menuconfig HELIA_RT
+	bool "Helia RT (prebuilt TFLM with HELIA acceleration)"
+	select REQUIRES_FULL_LIBCPP
+	help
+		This option enables the prebuilt heliaRT Zephyr module with
+		embedded HELIA (Ambiq-optimized) kernels.
+
+if HELIA_RT
+
+choice HELIA_RT_PREBUILT_BUILD_FLAVOR
+	prompt "Helia RT prebuilt flavor"
+	default HELIA_RT_PREBUILT_BUILD_RELEASE
+	help
+		Select the prebuilt archive flavor to link against.
+
+config HELIA_RT_PREBUILT_BUILD_DEBUG
+	bool "Debug"
+
+config HELIA_RT_PREBUILT_BUILD_RELEASE
+	bool "Release"
+
+config HELIA_RT_PREBUILT_BUILD_RELEASE_WITH_LOGS
+	bool "Release with logs"
+
+endchoice
+
+endif # HELIA_RT

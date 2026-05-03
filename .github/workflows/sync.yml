@@ -8,9 +8,9 @@
 name: Sync from Upstream TF
 
 on:
-  schedule:
-    # 2pm UTC is 7am or 8am PT depending on daylight savings.
-    - cron: '0 14 * * *'
+  # schedule:
+  #   # 2pm UTC is 7am or 8am PT depending on daylight savings.
+  #   - cron: '0 14 * * *'
 
   # Allow manually triggering of the workflow.
   workflow_dispatch: {}
@@ -21,47 +21,45 @@ jobs:
 
     if: |
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'schedule' && github.repository == 'tensorflow/tflite-micro')
+      (github.event_name == 'schedule' && github.repository == 'AmbiqAI/helia-rt')
 
     steps:
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           token: ${{ secrets.TFLM_BOT_REPO_TOKEN }}
-      - uses: bazel-contrib/setup-bazel@0.18.0
-        with:
-          bazelisk-cache: true
-          disk-cache: true
-          repository-cache: true
 
       - name: Install dependencies for sync
         run: |
+          sudo ./ci/install_bazelisk.sh
           pip3 install numpy
+
       - name: Sync the code
         run: |
           ./ci/sync_from_upstream_tf.sh
-          git config --local user.name "TFLM-bot"
-          git config --local user.email "tflm-github-bot@google.com"
+          git config --local user.name "heliaRT-bot"
+          git config --local user.email "helia-rt-bot@ambiq.com"
           git add *
+
           if [[ $(git status --porcelain | wc -l) == 0 ]]; then
             echo "no changes"
           else
             git commit -m "Sync from upstream TF."
           fi
+
       - name: Create Pull Request
         id: create-pr
-        uses: peter-evans/create-pull-request@c0f553fe549906ede9cf27b5156039d195d2ece0  # v8
+        uses: peter-evans/create-pull-request@052fc72b4198ba9fbc81b818c6e1859f747d49a8
         with:
           branch: sync-from-upstream-tf
           delete-branch: true
           token: ${{ secrets.TFLM_BOT_REPO_TOKEN }}
           title: Automated sync from github.com/tensorflow/tensorflow
           commit-message: Automated sync from github.com/tensorflow/tensorflow
-          committer: TFLM-bot <tflm-github-bot@google.com>
-          author: TFLM-bot <tflm-github-bot@google.com>
+          committer: heliaRT-bot <helia-rt-bot@ambiq.com>
+          author: heliaRT-bot <helia-rt-bot@ambiq.com>
           body: "BUG=automated sync from upstream\nNO_CHECK_TFLITE_FILES=automated sync from upstream"
-          labels: bot:sync-tf, ci:ready
-          reviewers: suleshahid
-
+          labels: bot:sync-tf, ci:run
+          reviewers: apage224

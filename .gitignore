@@ -7,9 +7,21 @@
 *__pycache__*
 venv
 gen
+build
+out
 
 # Ignore the directory in which `clangd` stores its local index.
 /.cache/
 
 # Ignore the `external` symlink added by `bazel-compile-commands-extractor`
 /external
+
+
+.DS_Store
+.aider*
+
+# Local neuralSPOT packaging outputs.
+neuralspot-*-local-*/
+neuralspot-*-local-*.zip
+tflm-vanilla.zip
+site/

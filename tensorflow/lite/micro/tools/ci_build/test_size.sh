@@ -61,7 +61,7 @@ size ${CURRENT_BINARY} >${ROOT_DIR}/ci/size_log.txt
 
 # Get a clone of the main repo as the reference.
 REF_ROOT_DIR="$(mktemp -d ${ROOT_DIR}/../main_ref.XXXXXX)"
-git clone https://github.com/tensorflow/tflite-micro.git ${REF_ROOT_DIR}
+git clone https://github.com/AmbiqAI/helia-rt.git ${REF_ROOT_DIR}
 
 # Build a binary for the main repo.
 cd ${REF_ROOT_DIR}

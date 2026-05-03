@@ -1,0 +1,41 @@
+config ZEPHYR_HELIA_RT_MODULE
+	bool
+
+menuconfig HELIA_RT
+	bool "Helia RT (Ambiq optimized TFLM)"
+	select REQUIRES_FULL_LIBCPP
+	help
+		This option enables heliaRT.
+
+if HELIA_RT
+
+choice HELIA_RT_KERNEL_BACKEND
+	prompt "Helia RT kernel backend"
+	default HELIA_RT_BACKEND_CMSIS_NN if CPU_CORTEX_M && CMSIS_NN
+	default HELIA_RT_BACKEND_REFERENCE
+	help
+		Reference works on any architecture. CMSIS-NN uses the open-source
+		Arm CMSIS-NN backend. HELIA uses Ambiq's private acceleration
+		module, currently distributed as ns-cmsis-nn.
+
+config HELIA_RT_BACKEND_REFERENCE
+	bool "Reference (generic TFLM kernels)"
+
+config HELIA_RT_BACKEND_CMSIS_NN
+	bool "CMSIS-NN (open-source Arm optimized kernels)"
+	depends on CPU_CORTEX_M && CMSIS_NN
+	help
+		Uses the open-source Arm CMSIS-NN backend through a separate
+		CMSIS-NN Zephyr module.
+
+config HELIA_RT_BACKEND_HELIA
+	bool "HELIA (Ambiq optimized kernels)"
+	depends on CPU_CORTEX_M && NS_CMSIS_NN
+	imply NS_CMSIS_NN_ALL
+	help
+		Uses Ambiq's HELIA acceleration module. This is currently
+		distributed as ns-cmsis-nn.
+
+endchoice
+
+endif # HELIA_RT

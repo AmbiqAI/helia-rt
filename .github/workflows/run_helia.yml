@@ -1,0 +1,37 @@
+name: Run-Helia
+
+on:
+
+  workflow_dispatch: {}
+
+jobs:
+  call-helia-build:
+    if: ${{ github.repository == 'AmbiqAI/helia-rt' }}
+    uses: ./.github/workflows/helia_build.yml
+    with:
+      trigger-sha: ${{ github.sha }}
+    secrets:
+      NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
+      ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
+
+  call-helia-test:
+    if: ${{ github.repository == 'AmbiqAI/helia-rt' }}
+    uses: ./.github/workflows/helia_test.yml
+    with:
+      trigger-sha: ${{ github.sha }}
+    secrets:
+      NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
+      ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
+
+  issue-on-error:
+    needs: [call-helia-build, call-helia-test]
+    if: ${{ always() && (needs.call-helia-build.result == 'failure' || needs.call-helia-test.result == 'failure') }}
+    uses: ./.github/workflows/issue_on_error.yml
+    with:
+      repo: ${{ github.repository }}
+      workflow: ${{ github.workflow }}
+      run_id: ${{ github.run_id }}
+      run_number: ${{ github.run_number }}
+      flag_label: ci:bot_issue
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}
