@@ -600,7 +600,6 @@ $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/tflite_bridge/*.cc) \
 $(TFL_CC_SRCS)
 
 MICROLITE_CC_HDRS := \
-$(wildcard $(TENSORFLOW_ROOT)include/*.h) \
 $(wildcard $(TENSORFLOW_ROOT)signal/micro/kernels/*.h) \
 $(wildcard $(TENSORFLOW_ROOT)signal/src/*.h) \
 $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/*.h) \

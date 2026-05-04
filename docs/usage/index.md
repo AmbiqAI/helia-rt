@@ -7,6 +7,7 @@ Welcome to the heliaRT getting-started guide. heliaRT keeps the familiar TensorF
 Choose the setup path that matches how you want to evaluate or integrate heliaRT:
 
 - [Zephyr setup](zephyr.md): integrate heliaRT into a Zephyr west workspace using either the raw module or the prebuilt release bundle.
+- [Apollo memory placement](memory_placement.md): place model data and tensor arenas with Zephyr-native linker section tags and linker fragments.
 - [neuralSPOT setup](neuralspot.md): profile and deploy a `.tflite` model with `ns_autodeploy` using a fast Ambiq-oriented workflow.
 - [Source builds](source.md): build heliaRT directly when you need a custom environment or tighter control over the build.
 
@@ -41,6 +42,8 @@ The main differences are in packaging, supported integration paths, and Ambiq-op
 
 - [Features](../features/index.md)
 - [Zephyr setup](zephyr.md)
+- [Apollo memory placement](memory_placement.md)
 - [neuralSPOT setup](neuralspot.md)
 - [Source builds](source.md)
 - [Examples](../examples/index.md)
+

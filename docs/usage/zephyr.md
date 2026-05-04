@@ -81,6 +81,9 @@ Use this when you want:
 The Zephyr example page shows the exact `ZEPHYR_EXTRA_MODULES` setup for each
 integration path.
 
+For model and tensor arena placement on Apollo memory regions, see
+[Apollo memory placement](memory_placement.md).
+
 ## Notes
 
 - Do not add both source and prebuilt heliaRT module variants to the same application.
