@@ -102,4 +102,61 @@ function apply_patch_to_folder() {
   popd > /dev/null
 }
 
+# ---------------------------------------------------------------------------
+# Seed-file helpers for reproducible third-party downloads.
+#
+# Each download directory stores a small stamp file (.tflm_seed) that records
+# the URL+MD5 (or commit hash) used to populate it.  On subsequent runs the
+# stamp is compared against the expected value; a mismatch triggers automatic
+# re-download so stale caches can never silently break the build.
+#
+# Set  TFLM_FORCE_REDOWNLOAD=1  to unconditionally re-download everything
+# (useful for experimentation or cache-busting).
+# ---------------------------------------------------------------------------
+TFLM_SEED_FILE=".tflm_seed"
+
+# Write a seed stamp into a download directory.
+#   $1 - download directory
+#   $2 - seed string (URL + MD5, commit hash, etc.)
+function write_seed() {
+  echo "${2}" > "${1}/${TFLM_SEED_FILE}"
+}
+
+# Check whether a download directory matches its expected seed.
+# Returns 0 (up-to-date) or 1 (stale / missing / force-redownload).
+#   $1 - download directory
+#   $2 - expected seed string
+function check_seed() {
+  if [[ "${TFLM_FORCE_REDOWNLOAD:-0}" == "1" ]]; then
+    return 1
+  fi
+  local seed_file="${1}/${TFLM_SEED_FILE}"
+  if [[ -f "${seed_file}" ]] && [[ "$(cat "${seed_file}")" == "${2}" ]]; then
+    return 0
+  fi
+  return 1
+}
+
+# Verify an existing download directory against its expected seed.  If the
+# directory exists but is stale, remove it so the caller can re-download.
+# Prints a human-readable status message to stderr.
+# After this function returns:
+#   - directory exists  → it is verified, caller should skip the download
+#   - directory absent  → caller should proceed with the download
+#   $1 - download directory
+#   $2 - expected seed string
+#   $3 - human-readable library name (for log messages)
+function verify_or_remove() {
+  if [ -d "${1}" ]; then
+    if check_seed "${1}" "${2}"; then
+      echo >&2 "${3}: ${1} is up-to-date, skipping download."
+      return 0
+    fi
+    echo >&2 "${3}: stale download in ${1} (seed mismatch), removing for re-download."
+    rm -rf "${1}"
+    return 1
+  fi
+  return 1
+}
+
 

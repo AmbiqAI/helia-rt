@@ -44,9 +44,25 @@ fi
 DOWNLOADED_CMSIS_PATH=${DOWNLOADS_DIR}/cmsis
 DOWNLOADED_CORTEX_DFP_PATH=${DOWNLOADS_DIR}/cmsis/Cortex_DFP
 
+CMSIS_COMMIT="5782d6f8057906d360f4b95ec08a2354afe5c9b9"
+CMSIS_URL="http://github.com/ARM-software/CMSIS_6/archive/${CMSIS_COMMIT}.zip"
+CMSIS_MD5="563e7c6465f63bdc034359e9b536b366"
+
+CMSIS_DFP_COMMIT="c2c70a97a20fb355815e2ead3d4a40e35a4a3cdf"
+CMSIS_DFP_URL="http://github.com/ARM-software/Cortex_DFP/archive/${CMSIS_DFP_COMMIT}.zip"
+CMSIS_DFP_MD5="3cbb6955b6d093a2fe078ef2341f6b89"
+
+CMSIS_SEED="${CMSIS_URL} ${CMSIS_MD5} ${CMSIS_DFP_URL} ${CMSIS_DFP_MD5}"
+
 if [ -d ${DOWNLOADED_CMSIS_PATH} ]; then
-  echo >&2 "${DOWNLOADED_CMSIS_PATH} already exists, skipping the download."
-else
+  if check_seed "${DOWNLOADED_CMSIS_PATH}" "${CMSIS_SEED}"; then
+    echo >&2 "${DOWNLOADED_CMSIS_PATH} already exists and matches expected version, skipping."
+    echo "SUCCESS"
+    exit 0
+  fi
+  echo >&2 "Stale CMSIS in ${DOWNLOADED_CMSIS_PATH} (seed mismatch), re-downloading."
+  rm -rf "${DOWNLOADED_CMSIS_PATH}"
+fi
 
   # Create a temporary directory with the unique name for better isolation
   TEMP_DIR=$(mktemp -d /tmp/$(basename $0 .sh).XXXXXX)
@@ -54,29 +70,21 @@ else
   # Set up cleanup trap for all exit conditions
   trap 'rm -rf "${TEMP_DIR}"' EXIT INT TERM
 
-  ZIP_PREFIX="5782d6f8057906d360f4b95ec08a2354afe5c9b9"
-  CMSIS_URL="http://github.com/ARM-software/CMSIS_6/archive/${ZIP_PREFIX}.zip"
-  CMSIS_MD5="563e7c6465f63bdc034359e9b536b366"
-
   # wget is much faster than git clone of the entire repo. So we wget a specific
   # version and can then apply a patch, as needed.
-  wget ${CMSIS_URL} -O ${TEMP_DIR}/${ZIP_PREFIX}.zip >&2
-  check_md5 ${TEMP_DIR}/${ZIP_PREFIX}.zip ${CMSIS_MD5}
+  wget ${CMSIS_URL} -O ${TEMP_DIR}/${CMSIS_COMMIT}.zip >&2
+  check_md5 ${TEMP_DIR}/${CMSIS_COMMIT}.zip ${CMSIS_MD5}
 
-  unzip -qo ${TEMP_DIR}/${ZIP_PREFIX}.zip -d ${TEMP_DIR} >&2
-  mv ${TEMP_DIR}/CMSIS_6-${ZIP_PREFIX} ${DOWNLOADED_CMSIS_PATH}
+  unzip -qo ${TEMP_DIR}/${CMSIS_COMMIT}.zip -d ${TEMP_DIR} >&2
+  mv ${TEMP_DIR}/CMSIS_6-${CMSIS_COMMIT} ${DOWNLOADED_CMSIS_PATH}
 
   # Also pull the related CMSIS Cortex_DFP component for generic Arm Cortex-M device support
-  ZIP_PREFIX="c2c70a97a20fb355815e2ead3d4a40e35a4a3cdf"
-  CMSIS_DFP_URL="http://github.com/ARM-software/Cortex_DFP/archive/${ZIP_PREFIX}.zip"
-  CMSIS_DFP_MD5="3cbb6955b6d093a2fe078ef2341f6b89"
+  wget ${CMSIS_DFP_URL} -O ${TEMP_DIR}/${CMSIS_DFP_COMMIT}.zip >&2
+  check_md5 ${TEMP_DIR}/${CMSIS_DFP_COMMIT}.zip ${CMSIS_DFP_MD5}
 
-  wget ${CMSIS_DFP_URL} -O ${TEMP_DIR}/${ZIP_PREFIX}.zip >&2
-  check_md5 ${TEMP_DIR}/${ZIP_PREFIX}.zip ${CMSIS_DFP_MD5}
+  unzip -qo ${TEMP_DIR}/${CMSIS_DFP_COMMIT}.zip -d ${TEMP_DIR} >&2
+  mv ${TEMP_DIR}/Cortex_DFP-${CMSIS_DFP_COMMIT} ${DOWNLOADED_CORTEX_DFP_PATH}
 
-  unzip -qo ${TEMP_DIR}/${ZIP_PREFIX}.zip -d ${TEMP_DIR} >&2
-  mv ${TEMP_DIR}/Cortex_DFP-${ZIP_PREFIX} ${DOWNLOADED_CORTEX_DFP_PATH}
-
-fi
+  write_seed "${DOWNLOADED_CMSIS_PATH}" "${CMSIS_SEED}"
 
 echo "SUCCESS"

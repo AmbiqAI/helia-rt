@@ -41,6 +41,7 @@ DOWNLOADED_CMSIS_NN_PATH=${DOWNLOADS_DIR}/cmsis_nn
 ZIP_PREFIX_NN="e096196a0c49f065abc03d943c583cd50de424ba"
 CMSIS_NN_URL="http://github.com/ARM-software/CMSIS-NN/archive/${ZIP_PREFIX_NN}.zip"
 CMSIS_NN_MD5="d2a6bc4330fed5653c74fc5dae31fd3a"
+CMSIS_NN_SEED="${CMSIS_NN_URL} ${CMSIS_NN_MD5}"
 
 should_download=$(check_should_download ${DOWNLOADS_DIR})
 
@@ -50,7 +51,26 @@ elif [ ! -d ${DOWNLOADS_DIR} ]; then
   echo "The top-level downloads directory: ${DOWNLOADS_DIR} does not exist."
   exit 1
 elif [ -d ${DOWNLOADED_CMSIS_NN_PATH} ]; then
-  echo >&2 "${DOWNLOADED_CMSIS_NN_PATH} already exists, skipping the download."
+  if check_seed "${DOWNLOADED_CMSIS_NN_PATH}" "${CMSIS_NN_SEED}"; then
+    echo >&2 "${DOWNLOADED_CMSIS_NN_PATH} already exists and matches expected version, skipping."
+  else
+    echo >&2 "Stale CMSIS-NN in ${DOWNLOADED_CMSIS_NN_PATH} (seed mismatch), re-downloading."
+    rm -rf "${DOWNLOADED_CMSIS_NN_PATH}"
+
+    # Create a temporary directory with the unique name for better isolation
+    TEMP_DIR=$(mktemp -d /tmp/$(basename $0 .sh).XXXXXX)
+
+    # Set up cleanup trap for all exit conditions
+    trap 'rm -rf "${TEMP_DIR}"' EXIT INT TERM
+
+    wget ${CMSIS_NN_URL} -O ${TEMP_DIR}/${ZIP_PREFIX_NN}.zip >&2
+    check_md5 ${TEMP_DIR}/${ZIP_PREFIX_NN}.zip ${CMSIS_NN_MD5}
+
+    unzip -qo ${TEMP_DIR}/${ZIP_PREFIX_NN}.zip -d ${TEMP_DIR} >&2
+    mv ${TEMP_DIR}/CMSIS-NN-${ZIP_PREFIX_NN} ${DOWNLOADED_CMSIS_NN_PATH}
+
+    write_seed "${DOWNLOADED_CMSIS_NN_PATH}" "${CMSIS_NN_SEED}"
+  fi
 else
 
   # Create a temporary directory with the unique name for better isolation
@@ -66,6 +86,8 @@ else
 
   unzip -qo ${TEMP_DIR}/${ZIP_PREFIX_NN}.zip -d ${TEMP_DIR} >&2
   mv ${TEMP_DIR}/CMSIS-NN-${ZIP_PREFIX_NN} ${DOWNLOADED_CMSIS_NN_PATH}
+
+  write_seed "${DOWNLOADED_CMSIS_NN_PATH}" "${CMSIS_NN_SEED}"
 fi
 
 echo "SUCCESS"

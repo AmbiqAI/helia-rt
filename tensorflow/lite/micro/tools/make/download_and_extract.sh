@@ -24,6 +24,8 @@
 
 set -e
 
+source "$(dirname "${BASH_SOURCE[0]}")/bash_helpers.sh"
+
 # Patches the Ambiq Micro SDK to work around build issues.
 patch_am_sdk() {
   local am_dir="${1}"
@@ -88,10 +90,15 @@ download_and_extract() {
   local tempdir2=$(mktemp -d)
   local tempfile=${tempdir}/temp_file
   local curl_retries=5
+  local seed="${url} ${expected_md5}"
 
-  # Destionation already downloaded.
+  # Check for an existing download; verify its seed stamp.
   if [ -d ${dir} ]; then
+    if check_seed "${dir}" "${seed}"; then
       exit 0
+    fi
+    echo "Stale download in ${dir} (seed mismatch), re-downloading." >&2
+    rm -rf "${dir}"
   fi
 
   command -v curl >/dev/null 2>&1 || {
@@ -161,6 +168,9 @@ download_and_extract() {
 
   # Delete any potential BUILD files, which would interfere with Bazel builds.
   find "${dir}" -type f -name '*BUILD' -delete
+
+  # Record the seed so future runs can detect version mismatches.
+  write_seed "${dir}" "${seed}"
 
   if [[ ${action} == "patch_am_sdk" ]]; then
     patch_am_sdk ${dir}

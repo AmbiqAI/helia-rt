@@ -51,12 +51,20 @@ function delete_build_files() {
 
 DOWNLOADED_FLATBUFFERS_PATH=${DOWNLOADS_DIR}/flatbuffers
 
+ZIP_PREFIX="v25.9.23"
+FLATBUFFERS_URL="https://github.com/google/flatbuffers/archive/refs/tags/${ZIP_PREFIX}.zip"
+FLATBUFFERS_MD5="023eca1e211d64007124420cd6be29c7"
+FLATBUFFERS_SEED="${FLATBUFFERS_URL} ${FLATBUFFERS_MD5}"
+
 if [ -d ${DOWNLOADED_FLATBUFFERS_PATH} ]; then
-  echo >&2 "${DOWNLOADED_FLATBUFFERS_PATH} already exists, skipping the download."
-else
-  ZIP_PREFIX="v25.9.23"
-  FLATBUFFERS_URL="https://github.com/google/flatbuffers/archive/refs/tags/${ZIP_PREFIX}.zip"
-  FLATBUFFERS_MD5="023eca1e211d64007124420cd6be29c7"
+  if check_seed "${DOWNLOADED_FLATBUFFERS_PATH}" "${FLATBUFFERS_SEED}"; then
+    echo >&2 "${DOWNLOADED_FLATBUFFERS_PATH} already exists and matches expected version, skipping."
+    echo "SUCCESS"
+    exit 0
+  fi
+  echo >&2 "Stale flatbuffers in ${DOWNLOADED_FLATBUFFERS_PATH} (seed mismatch), re-downloading."
+  rm -rf "${DOWNLOADED_FLATBUFFERS_PATH}"
+fi
 
   TEMPDIR="$(mktemp -d)"
   TEMPFILE="${TEMPDIR}/${ZIP_PREFIX}.zip"
@@ -73,6 +81,7 @@ else
   apply_patch_to_folder ./ ../../flatbuffers.patch "TFLM patch"
 
   popd > /dev/null
-fi
+
+  write_seed "${DOWNLOADED_FLATBUFFERS_PATH}" "${FLATBUFFERS_SEED}"
 
 echo "SUCCESS"

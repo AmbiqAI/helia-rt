@@ -42,13 +42,23 @@ fi
 
 DOWNLOADED_PIGWEED_PATH=${DOWNLOADS_DIR}/pigweed
 
+PIGWEED_COMMIT="47268dff45019863e20438ca3746c6c62df6ef09"
+PIGWEED_SEED="pigweed ${PIGWEED_COMMIT}"
+
 if [ -d ${DOWNLOADED_PIGWEED_PATH} ]; then
-  echo >&2 "${DOWNLOADED_PIGWEED_PATH} already exists, skipping the download."
-else
+  if check_seed "${DOWNLOADED_PIGWEED_PATH}" "${PIGWEED_SEED}"; then
+    echo >&2 "${DOWNLOADED_PIGWEED_PATH} already exists and matches expected version, skipping."
+    echo "SUCCESS"
+    exit 0
+  fi
+  echo >&2 "Stale pigweed in ${DOWNLOADED_PIGWEED_PATH} (seed mismatch), re-downloading."
+  rm -rf "${DOWNLOADED_PIGWEED_PATH}"
+fi
+
   git clone https://pigweed.googlesource.com/pigweed/pigweed ${DOWNLOADED_PIGWEED_PATH} >&2
   pushd ${DOWNLOADED_PIGWEED_PATH} > /dev/null
 
-  git checkout 47268dff45019863e20438ca3746c6c62df6ef09 >&2
+  git checkout ${PIGWEED_COMMIT} >&2
   rm -rf ${DOWNLOADED_PIGWEED_PATH}/.git
   rm -f `find . -name BUILD`
 
@@ -56,6 +66,7 @@ else
   apply_patch_to_folder ./ ../../pigweed.patch "TFLM patch"
 
   popd > /dev/null
-fi
+
+  write_seed "${DOWNLOADED_PIGWEED_PATH}" "${PIGWEED_SEED}"
 
 echo "SUCCESS"
