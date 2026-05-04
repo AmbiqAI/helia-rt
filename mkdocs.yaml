@@ -14,6 +14,7 @@ nav:
       - Features: features/index.md
   - Setup:
       - Zephyr: usage/zephyr.md
+      - Apollo Memory Placement: usage/memory_placement.md
       - neuralSPOT: usage/neuralspot.md
       - Source Builds: usage/source.md
   - Examples:
