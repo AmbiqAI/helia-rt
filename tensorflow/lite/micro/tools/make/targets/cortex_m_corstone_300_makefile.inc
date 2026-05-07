@@ -194,23 +194,62 @@ else ifeq ($(TOOLCHAIN), atfe)
   CXX_TOOL := clang++
   CC_TOOL  := clang
   AR_TOOL  := llvm-ar
-  # Use the clang driver as the linker so it pulls in picolibc/newlib-nano
-  # and crt0.o automatically; LDFLAGS pass through with -Wl,...
+  # Use the clang driver as the linker so it pulls in picolibc and the
+  # picolibc crt0/semihost libraries via -l flags below; LDFLAGS pass
+  # through with -Wl,...
 
   # ATfE rejects -mfpu=auto; let -mcpu drive FPU/MVE feature selection.
+  # Disable MVE auto-vectorization on cortex-m55: clang 22's MVE vectorizer
+  # miscompiles `(int)int8_value * float_scale` loops by emitting
+  # `vcvt.f32.s32 qN, qN, #12` (i.e., dividing by 2^12) when the correct
+  # shift count is -log2(scale). It also matches the picolibc multilib
+  # selection (armv8.1m.main_hard_fpdp_nomve_unaligned).
+  ATFE_MCPU := $(MCPU_OPTION)
+  ifneq ($(filter cortex-m55%,$(TARGET_ARCH)),)
+    ATFE_MCPU := $(MCPU_OPTION)+nomve
+  endif
   FLAGS_ATFE = \
     --target=arm-none-eabi \
-    -fshort-enums \
-    -mcpu=$(MCPU_OPTION)
+    -mcpu=$(ATFE_MCPU) \
+    -fshort-enums
 
   CXXFLAGS += $(FLAGS_ATFE)
   CCFLAGS += $(FLAGS_ATFE)
 
+  # Linker setup for ATfE / picolibc on Corstone-300.
+  #
+  # `-nostartfiles` suppresses clang's automatic crt0.o (whose default
+  # `_start` clobbers the CMSIS Reset_Handler vector). The CMSIS
+  # `Reset_Handler` (from startup_ARMCM55.c) remains the ELF entry and
+  # invokes picolibc's `_start` via `__PROGRAM_START()`. We then pull in
+  # the semihost-flavored picolibc startup (`libcrt0-semihost.a`) and
+  # the semihost syscall stubs (`libsemihost.a`, which also provides
+  # `stderr` / `stdin` / `stdout` consumed by debug_log.cc). `-lc -lm`
+  # keep picolibc itself in the link group.
+  #
+  # The ATfE-specific linker script adds a PT_TLS phdr (required by
+  # picolibc's TLS errno) plus PROVIDE() aliases for the symbols crt0
+  # and CMSIS' clang startup expect (`__data_*`, `__bss_*`,
+  # `__stack_limit`, `__tls_base`, `__arm32_tls_tcb_offset`, ...).
+  ATFE_LINKER_SCRIPT := $(TENSORFLOW_ROOT)tensorflow/lite/micro/cortex_m_corstone_300/corstone_300_atfe.ld
+
+  # Note: we intentionally do NOT pass `-nostdlib++`. TFLM uses a few
+  # libc++ symbols (`operator new`, `std::__throw_*`, ...) that ATfE
+  # provides via the multilib's `libc++.a` / `libc++abi.a`. clang++
+  # auto-links these and `--gc-sections` strips them when unused, so
+  # the TCM/DDR cost is zero for tests that don't reference libc++.
   LDFLAGS += \
-    -T $(ETHOS_U_CORE_PLATFORM)/platform_parsed.ld \
+    -nostartfiles \
+    -T $(ATFE_LINKER_SCRIPT) \
     -Wl,-Map=gen/$(TARGET).map,--cref \
     -Wl,--gc-sections \
     -Wl,--entry=Reset_Handler
+
+  # Order matters: -lcrt0-semihost provides _start; -lc / -lm reference
+  # _write/_read/etc. from -lsemihost, so semihost must come last (or be
+  # inside a group). Use -Wl,--start-group to be safe with picolibc's
+  # cross-references.
+  MICROLITE_LIBS += -Wl,--start-group -lcrt0-semihost -lc -lm -lsemihost -Wl,--end-group
 
   ldflags_to_remove = -Wl,--fatal-warnings
   LDFLAGS := $(filter-out $(ldflags_to_remove),$(LDFLAGS))
@@ -239,8 +278,19 @@ CCFLAGS += -D$(ARM_CPU)
 CXXFLAGS += -DCMSIS_DEVICE_ARM_CORTEX_M_XX_HEADER_FILE=\"$(ARM_CPU).h\"
 
 THIRD_PARTY_CC_SRCS += \
-  $(ETHOS_U_CORE_PLATFORM)/retarget.c \
   $(ETHOS_U_CORE_PLATFORM)/uart.c
+
+# `retarget.c` (from ethos-u-core-platform) supplies armclang/newlib-style
+# stdio retargeting (`fputc`, `fgetc`, `_sys_*`). Under ATfE we use
+# picolibc's tinystdio routed through `libsemihost` (SYS_WRITEC/SYS_WRITE),
+# whose `fgetc` (in libc.a) collides with retarget.c's, breaking the
+# `tflm_benchmark` link. Skip it for ATfE; semihosted output goes to the
+# FVP host stdout, which the test runner already captures alongside UART
+# output. GCC and armclang still need it.
+ifneq ($(TOOLCHAIN), atfe)
+  THIRD_PARTY_CC_SRCS += \
+    $(ETHOS_U_CORE_PLATFORM)/retarget.c
+endif
 
 ifeq ($(CO_PROCESSOR), ethos_u)
   ETHOSU_ARCH=u55

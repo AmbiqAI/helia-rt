@@ -67,7 +67,7 @@ jobs:
         run: git config --global --add safe.directory "*"
 
       - name: Cache third-party downloads
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: tensorflow/lite/micro/tools/make/downloads
           key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc') }}
