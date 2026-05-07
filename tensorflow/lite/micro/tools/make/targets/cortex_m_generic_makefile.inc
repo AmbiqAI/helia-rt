@@ -161,6 +161,7 @@ ifeq ($(TOOLCHAIN), armclang)
     -fshort-enums \
     -fshort-wchar \
     -gdwarf-4     \
+    -Wno-unused-private-field \
     -mcpu=$(TARGET_ARCH)
 
   CXXFLAGS += $(FLAGS_ARMC)
@@ -279,4 +280,3 @@ ifneq ($(TARGET_ARCH), project_generation)
     $(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/micro_speech/Makefile.inc
   MICRO_LITE_EXAMPLE_TESTS := $(filter-out $(EXCLUDED_EXAMPLE_TESTS), $(MICRO_LITE_EXAMPLE_TESTS))
 endif
-

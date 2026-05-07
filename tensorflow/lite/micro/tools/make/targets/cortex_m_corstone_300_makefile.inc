@@ -120,6 +120,7 @@ ifeq ($(TOOLCHAIN), armclang)
     --target=arm-arm-none-eabi \
     -fshort-enums \
     -fshort-wchar \
+    -gdwarf-4 \
     -Wno-unused-private-field \
     -mcpu=$(MCPU_OPTION)
 

@@ -50,7 +50,8 @@ FLAGS_ATFE = \
   --target=arm-none-eabi \
   -mcpu=$(ATFE_MCPU) \
   -fshort-enums \
-  -fshort-wchar
+  -fshort-wchar \
+  -gdwarf-4
 
 CXXFLAGS += $(FLAGS_ATFE)
 CCFLAGS += $(FLAGS_ATFE)
