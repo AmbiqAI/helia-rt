@@ -118,7 +118,8 @@ jobs:
         run: |
           tensorflow/lite/micro/tools/ci_build/resolve_release_meta.sh \
             --ref '${{ inputs.ref }}' \
-            --tag '${{ inputs.tag }}'
+            --tag '${{ inputs.tag }}' \
+            --sanitize-tag
           echo "sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
 
       - name: Download all build combos
