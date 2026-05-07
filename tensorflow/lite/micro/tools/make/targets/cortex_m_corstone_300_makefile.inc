@@ -118,6 +118,8 @@ ifeq ($(TOOLCHAIN), armclang)
 
   FLAGS_ARMC = \
     --target=arm-arm-none-eabi \
+    -fshort-enums \
+    -fshort-wchar \
     -Wno-unused-private-field \
     -mcpu=$(MCPU_OPTION)
 

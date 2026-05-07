@@ -49,7 +49,8 @@ endif
 FLAGS_ATFE = \
   --target=arm-none-eabi \
   -mcpu=$(ATFE_MCPU) \
-  -fshort-enums
+  -fshort-enums \
+  -fshort-wchar
 
 CXXFLAGS += $(FLAGS_ATFE)
 CCFLAGS += $(FLAGS_ATFE)
