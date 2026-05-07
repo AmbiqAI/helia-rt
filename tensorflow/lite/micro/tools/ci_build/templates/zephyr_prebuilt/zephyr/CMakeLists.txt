@@ -14,6 +14,7 @@ if(CONFIG_HELIA_RT)
   )
   
   zephyr_compile_definitions(TF_LITE_STATIC_MEMORY)
+  zephyr_compile_options(-fshort-enums)
   zephyr_library_compile_definitions(NS_CMSIS_NN)
   zephyr_library_compile_definitions(HELIA)
 
