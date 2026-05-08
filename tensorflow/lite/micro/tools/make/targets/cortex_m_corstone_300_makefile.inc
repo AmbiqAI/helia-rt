@@ -116,10 +116,13 @@ ifeq ($(TOOLCHAIN), armclang)
   AR_TOOL   := armar
   LD        := armlink
 
+  # helia-rt: -fshort-wchar intentionally omitted to match the ABI of
+  # `cortex_m_generic` (the target used to produce released prebuilts).
+  # Keep these two targets in sync so kernel tests that pass on corstone
+  # also pass when integrated via the generic prebuilt (e.g. Zephyr).
   FLAGS_ARMC = \
     --target=arm-arm-none-eabi \
     -fshort-enums \
-    -fshort-wchar \
     -gdwarf-4 \
     -Wno-unused-private-field \
     -mcpu=$(MCPU_OPTION)

@@ -46,11 +46,14 @@ ATFE_MCPU := $(MCPU_OPTION)
 ifneq ($(filter cortex-m55%,$(TARGET_ARCH)),)
   ATFE_MCPU := $(MCPU_OPTION)+nomve
 endif
+# helia-rt: -fshort-wchar intentionally omitted to match the ABI of
+# `cortex_m_generic` (the target used to produce released prebuilts).
+# Keep these two targets in sync so kernel tests that pass on corstone
+# also pass when integrated via the generic prebuilt (e.g. Zephyr).
 FLAGS_ATFE = \
   --target=arm-none-eabi \
   -mcpu=$(ATFE_MCPU) \
   -fshort-enums \
-  -fshort-wchar \
   -gdwarf-4
 
 CXXFLAGS += $(FLAGS_ATFE)
