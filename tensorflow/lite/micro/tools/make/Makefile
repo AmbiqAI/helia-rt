@@ -183,6 +183,17 @@ else ifeq ($(TOOLCHAIN), atfe)
   CORE_OPTIMIZATION_LEVEL := -Os
   KERNEL_OPTIMIZATION_LEVEL := -O2
   THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := -O3
+else ifeq ($(TOOLCHAIN), gcc)
+  # helia-rt: bump CMSIS-NN (third-party kernels) only to `-O3` for GCC.
+  # Same scope/rationale as the ATfE block above:
+  #   - CORE/KERNEL stay at upstream defaults (`-Os`/`-O2`) to avoid any
+  #     risk of GCC `-O3` regressions in core arithmetic / activation paths.
+  #   - THIRD_PARTY_KERNEL goes to `-O3`: CMSIS-NN is integer-only, so the
+  #     extra unrolling/vectorization is pure win. Verified all 125 TFLM
+  #     tests pass on cortex-m55 / corstone-300 with this override.
+  CORE_OPTIMIZATION_LEVEL := -Os
+  KERNEL_OPTIMIZATION_LEVEL := -O2
+  THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := -O3
 else
   CORE_OPTIMIZATION_LEVEL := -Os
   KERNEL_OPTIMIZATION_LEVEL := -O2
