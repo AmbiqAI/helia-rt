@@ -104,8 +104,18 @@ endef
 # Unpacks an entry in a list of strings created by add_third_party_download, and
 # defines a dependency rule to download the library. The download_and_extract.sh
 # script is used to handle to downloading and unpacking.
+#
+# helia-rt: the recipe target is marked .PHONY so the script is invoked on
+# every build. download_and_extract.sh fast-exits via check_seed when the
+# directory already matches the expected URL+MD5, so this is cheap. Without
+# .PHONY, a CI cache restore that recreates the downloads/<dir> directory
+# (with stale contents from an older flatbuffers / gemmlowp / etc. version)
+# would satisfy the make target by directory existence alone, the recipe
+# would never run, and the seed check would never fire -- leading to
+# stale-cache build failures like the one fixed in PR #121.
 # 1 - Information about the library, separated by '!'s.
 define create_download_rule
+.PHONY: $(word 3, $(subst !, ,$(1)))
 $(word 3, $(subst !, ,$(1))):
 	$(DOWNLOAD_SCRIPT) $(subst !, ,$(1))
 THIRD_PARTY_TARGETS += $(word 3, $(subst !, ,$(1)))
