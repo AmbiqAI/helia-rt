@@ -159,7 +159,6 @@ ifeq ($(TOOLCHAIN), armclang)
   FLAGS_ARMC = \
     --target=arm-arm-none-eabi \
     -fshort-enums \
-    -fshort-wchar \
     -gdwarf-4     \
     -Wno-unused-private-field \
     -mcpu=$(TARGET_ARCH)
@@ -223,7 +222,6 @@ else ifeq ($(TOOLCHAIN), atfe)
   FLAGS_ATFE = \
     --target=arm-none-eabi \
     -fshort-enums \
-    -fshort-wchar \
     -gdwarf-4     \
     -mcpu=$(TARGET_ARCH)
 
