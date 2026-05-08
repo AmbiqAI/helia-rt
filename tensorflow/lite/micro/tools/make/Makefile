@@ -151,6 +151,12 @@ ifneq ($(OPTIMIZE_KERNELS_FOR),)
   ADDITIONAL_DEFINES += -D$(shell echo $(OPTIMIZE_KERNELS_FOR) | tr [a-z] [A-Z])
 endif
 
+# >>> helia-rt opt-level overrides (keep blast radius small + obvious) >>>
+# Upstream defaults (the `else` branch below) are `-Os` core / `-O2` kernels.
+# helia-rt diverges from upstream ONLY in the two toolchain-specific blocks
+# below. Anything outside those blocks should track upstream verbatim so that
+# future syncs from tflite-micro/main don't silently reintroduce regressions.
+# If a future sync rewrites this section, restore both helia-rt blocks.
 ifeq ($(TOOLCHAIN), armclang)
   # helia-rt: armclang's `-Ofast` is materially faster than `-O2` on CMSIS-NN
   # convolution inner loops (~1-3.5% on conv-heavy models like IC/VWW/KWS).
@@ -160,11 +166,29 @@ ifeq ($(TOOLCHAIN), armclang)
   CORE_OPTIMIZATION_LEVEL := -Ofast
   KERNEL_OPTIMIZATION_LEVEL := -Ofast
   THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := -Ofast
+else ifeq ($(TOOLCHAIN), atfe)
+  # helia-rt: bump CMSIS-NN (third-party kernels) only to `-O3` for ATfE.
+  # Scope is intentionally narrow:
+  #   - CORE stays `-Os`: `-O3 -ffast-math` was tried and rejected; plain
+  #     `-O3` on `QuantizeMultiplier()` (kernels/internal/quantization_util.cc)
+  #     interacts badly with `-ffast-math` and we don't want to risk it.
+  #   - KERNEL stays `-O2`: clang 22 (ATfE 22.1.0) miscompiles `elu.cc` and a
+  #     few other activation kernels at `-O3`. Keep TFLM kernels at `-O2`.
+  #   - THIRD_PARTY_KERNEL goes to `-O3`: CMSIS-NN is pure integer/SIMD with
+  #     no float, no `frexp`, no transcendentals -- none of the failure modes
+  #     above apply. `-O3` enables loop unrolling + SLP vectorization on the
+  #     hot conv inner loops with no correctness risk.
+  # Do NOT promote CORE or KERNEL to `-O3` without re-running the kernel test
+  # suite; the failure modes above are silent (numerical drift, not crashes).
+  CORE_OPTIMIZATION_LEVEL := -Os
+  KERNEL_OPTIMIZATION_LEVEL := -O2
+  THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := -O3
 else
   CORE_OPTIMIZATION_LEVEL := -Os
   KERNEL_OPTIMIZATION_LEVEL := -O2
   THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := -O2
 endif
+# <<< helia-rt opt-level overrides <<<
 
 # Warn if deprecated optimization level is set.
 OPTIMIZATION_LEVEL :=
