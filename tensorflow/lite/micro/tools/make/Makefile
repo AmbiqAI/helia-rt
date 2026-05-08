@@ -152,12 +152,19 @@ ifneq ($(OPTIMIZE_KERNELS_FOR),)
 endif
 
 ifeq ($(TOOLCHAIN), armclang)
-  CORE_OPTIMIZATION_LEVEL := -Oz
+  # helia-rt: armclang's `-Ofast` is materially faster than `-O2` on CMSIS-NN
+  # convolution inner loops (~1-3.5% on conv-heavy models like IC/VWW/KWS).
+  # Upstream's default of `-Oz`/`-O2` regresses those workloads on armclang
+  # while leaving GCC and ATfE (clang) essentially unchanged. Override here
+  # to keep the helia-rt armclang ABI tuned for speed.
+  CORE_OPTIMIZATION_LEVEL := -Ofast
+  KERNEL_OPTIMIZATION_LEVEL := -Ofast
+  THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := -Ofast
 else
   CORE_OPTIMIZATION_LEVEL := -Os
+  KERNEL_OPTIMIZATION_LEVEL := -O2
+  THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := -O2
 endif
-KERNEL_OPTIMIZATION_LEVEL := -O2
-THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := -O2
 
 # Warn if deprecated optimization level is set.
 OPTIMIZATION_LEVEL :=
