@@ -78,6 +78,33 @@ jobs:
         run: |
           tensorflow/lite/micro/tools/ci_build/test_bazel_asan.sh
 
+  static_export_drift_check:
+    runs-on: ubuntu-latest-md
+    name: third_party_static drift check (presubmit)
+    container:
+      image: ghcr.io/ambiqai/helia-rt-ci:latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.trigger-sha }}
+      - name: Re-run static export
+        run: |
+          ./zephyr_static_export.sh
+      - name: Fail if third_party_static/ drifted from downloads/
+        # If this step fails, run `./zephyr_static_export.sh` locally and
+        # commit the resulting changes. This typically happens after an
+        # upstream tflm sync that bumped a third-party version (most often
+        # flatbuffers), where the committed `third_party_static/` copy
+        # was not refreshed alongside the upstream pin.
+        run: |
+          if ! git diff --quiet third_party_static/; then
+            echo "::error::third_party_static/ is out of sync with downloads/."
+            echo "::error::Run ./zephyr_static_export.sh locally and commit the result."
+            git diff --stat third_party_static/
+            exit 1
+          fi
+          echo "third_party_static/ is in sync with downloads/."
+
   # TODO(b/178621680): enable ubsan once bazel + clang + ubsan errors are fixed.
   # bazel_ubsan:
   #   runs-on: ubuntu-latest-md
