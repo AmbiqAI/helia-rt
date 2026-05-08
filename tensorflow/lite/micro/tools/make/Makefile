@@ -184,16 +184,19 @@ else ifeq ($(TOOLCHAIN), atfe)
   KERNEL_OPTIMIZATION_LEVEL := -O2
   THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := -O3
 else ifeq ($(TOOLCHAIN), gcc)
-  # helia-rt: bump CMSIS-NN (third-party kernels) only to `-O3` for GCC.
-  # Same scope/rationale as the ATfE block above:
-  #   - CORE/KERNEL stay at upstream defaults (`-Os`/`-O2`) to avoid any
-  #     risk of GCC `-O3` regressions in core arithmetic / activation paths.
-  #   - THIRD_PARTY_KERNEL goes to `-O3`: CMSIS-NN is integer-only, so the
-  #     extra unrolling/vectorization is pure win. Verified all 125 TFLM
-  #     tests pass on cortex-m55 / corstone-300 with this override.
+  # helia-rt: keep GCC at upstream defaults.
+  # We tried `THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := -O3` here for a small
+  # (~2-3%) RT win on KWS/IC, but GCC 14's `-O3` aggressively unrolls and
+  # vectorises the CMSIS-NN inner loops, inflating .text by ~5-6 KB per
+  # integration test and overflowing the corstone-300 ITCM region (16 KB)
+  # for cortex-m4+fp / cortex-m55 integration_tests linker images.
+  # ATfE (clang 22) does NOT exhibit the same code-size blowup at `-O3`,
+  # which is why the ATfE block above keeps `-O3` for THIRD_PARTY_KERNEL.
+  # If you re-attempt this for GCC, gate it on a non-ITCM-constrained
+  # link script or pair it with `-fno-tree-vectorize`/`-fno-unroll-loops`.
   CORE_OPTIMIZATION_LEVEL := -Os
   KERNEL_OPTIMIZATION_LEVEL := -O2
-  THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := -O3
+  THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := -O2
 else
   CORE_OPTIMIZATION_LEVEL := -Os
   KERNEL_OPTIMIZATION_LEVEL := -O2
