@@ -156,6 +156,9 @@ ifeq ($(TOOLCHAIN), armclang)
   AR_TOOL  := armar$(EXE)
   LD       := armlink$(EXE)
 
+  # helia-rt: -Wno-unused-private-field mirrors the corstone-300 armclang
+  # target so warnings stay consistent across the two paths. Keep both
+  # FLAGS_ARMC blocks in sync (see cortex_m_corstone_300_makefile.inc).
   FLAGS_ARMC = \
     --target=arm-arm-none-eabi \
     -fshort-enums \
