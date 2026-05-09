@@ -540,6 +540,10 @@
   padding-bottom: 3rem;
 }
 
+.final-links > p {
+  display: contents;
+}
+
 .final-links a {
   display: flex;
   flex-direction: column;
