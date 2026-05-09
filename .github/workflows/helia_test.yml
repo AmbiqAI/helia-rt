@@ -31,6 +31,7 @@ jobs:
       matrix:
         arch: [ "cortex-m55", "cortex-m4+fp", "cortex-m3" ]
         toolchain: [ "gcc", "atfe" ]
+        opt: [ "SPEED", "SIZE" ]
         exclude:
           # ATfE doesn't ship a v7-M (cortex-m3) target out of the box.
           - arch: "cortex-m3"
@@ -40,7 +41,7 @@ jobs:
       NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
 
-    name: test-${{ matrix.arch }}-${{ matrix.toolchain }}
+    name: test-${{ matrix.arch }}-${{ matrix.toolchain }}-${{ matrix.opt }}
 
     steps:
       - uses: actions/checkout@v6
@@ -75,11 +76,12 @@ jobs:
           # recent prior cache for this toolchain+arch slot. Safe with
           # ccache: it hashes preprocessed content + compiler mtime/size,
           # so stale hits are not possible (unlike third-party-downloads).
-          key: ${{ runner.os }}-ccache-${{ matrix.toolchain }}-${{ matrix.arch }}-${{ github.run_id }}
+          key: ${{ runner.os }}-ccache-${{ matrix.toolchain }}-${{ matrix.arch }}-${{ matrix.opt }}-${{ github.run_id }}
           restore-keys: |
+            ${{ runner.os }}-ccache-${{ matrix.toolchain }}-${{ matrix.arch }}-${{ matrix.opt }}-
             ${{ runner.os }}-ccache-${{ matrix.toolchain }}-${{ matrix.arch }}-
 
-      - name: Testing (${{ matrix.arch }} / ${{ matrix.toolchain }})
+      - name: Testing (${{ matrix.arch }} / ${{ matrix.toolchain }} / ${{ matrix.opt }})
         env:
           CCACHE_WRAP_DIR: ${{ runner.temp }}/ccwrap
           CCACHE_BASEDIR: ${{ github.workspace }}
@@ -92,7 +94,7 @@ jobs:
           ccache -o max_size=${CCACHE_MAXSIZE} || true
           ccache -z || true
           /bin/sh -c "tensorflow/lite/micro/tools/ci_build/test_helia.sh \
-          -a ${{ matrix.arch }} -t ${{ matrix.toolchain }}"
+          -a ${{ matrix.arch }} -t ${{ matrix.toolchain }} -O ${{ matrix.opt }}"
 
       - name: Show ccache stats
         if: always()
