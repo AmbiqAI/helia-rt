@@ -13,7 +13,7 @@ jobs:
 
     name: Bazel (presubmit)
     steps:
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.10'
       - uses: actions/checkout@v6
@@ -33,7 +33,7 @@ jobs:
 
     name: Bazel msan (presubmit)
     steps:
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.10'
       - uses: actions/checkout@v6
@@ -58,7 +58,7 @@ jobs:
 
     name: Bazel asan (presubmit)
     steps:
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.10'
       - uses: actions/checkout@v6
