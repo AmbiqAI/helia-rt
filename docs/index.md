@@ -12,7 +12,7 @@ hide:
 
 <p class="hero-kicker"><span></span> HELIA AI runtime for Ambiq silicon</p>
 
-# Run TensorFlow Lite for Microcontrollers faster on Apollo.
+# Proven LiteRT workflows. Turbocharged on Ambiq silicon.
 
 heliaRT is Ambiq's optimized TFLM runtime: the same `.tflite` models and MicroInterpreter API, backed by HELIA kernels tuned for Cortex-M and Apollo SPOT silicon.
 
