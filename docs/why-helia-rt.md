@@ -151,21 +151,21 @@ heliaRT is not a new model format or a new application framework. It is the runt
 
 ## Next steps
 
-<div class="why-next-grid" markdown>
+<div class="why-next-grid">
 
-<a href="getting-started/" markdown>
-### Pick an integration path
-Start with Zephyr, neuralSPOT-X, CMSIS-Pack, or source builds depending on how your project is structured.
+<a href="getting-started/">
+    <strong>Pick an integration path</strong>
+    <span>Start with Zephyr, neuralSPOT-X, CMSIS-Pack, or source builds depending on how your project is structured.</span>
 </a>
 
-<a href="guides/upgrading-from-litert/" markdown>
-### Upgrade from upstream LiteRT
-Follow the migration guide for swapping the runtime dependency while preserving the application-facing API.
+<a href="guides/upgrading-from-litert/">
+    <strong>Upgrade from upstream LiteRT</strong>
+    <span>Follow the migration guide for swapping the runtime dependency while preserving the application-facing API.</span>
 </a>
 
-<a href="reference/operator-coverage/" markdown>
-### Check operator coverage
-Review which operators use Reference, CMSIS-NN, and HELIA paths before planning benchmark work.
+<a href="reference/operator-coverage/">
+    <strong>Check operator coverage</strong>
+    <span>Review which operators use Reference, CMSIS-NN, and HELIA paths before planning benchmark work.</span>
 </a>
 
 </div>

@@ -753,17 +753,18 @@ body:has(.why-page) .md-sidebar--secondary,
 .md-typeset .why-compare-card h3,
 .md-typeset .why-feature-grid h3,
 .md-typeset .why-ship-panel h3,
-.md-typeset .why-next-grid h3 {
+.md-typeset .why-next-grid strong {
   margin: 0 0 0.55rem;
   color: var(--hr-ink);
   font-size: 1.05rem;
+  font-weight: 760;
   letter-spacing: -0.02em;
 }
 
 .why-compare-card p,
 .why-feature-grid p,
 .why-ship-panel p,
-.why-next-grid p {
+.why-next-grid span {
   margin: 0;
   color: var(--hr-muted);
   line-height: 1.62;
@@ -780,10 +781,6 @@ body:has(.why-page) .md-sidebar--secondary,
   color: inherit;
   text-decoration: none !important;
   transition: transform 0.18s ease, border-color 0.18s ease;
-}
-
-.why-next-grid > p {
-  display: contents;
 }
 
 .why-next-grid a:hover {
