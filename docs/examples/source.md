@@ -27,4 +27,4 @@ Use this path instead of a prebuilt bundle when:
 - you want to debug or modify runtime internals
 - you want tighter control over archive generation and packaging
 
-For the source-build guide, see [Source builds](../usage/source.md).
+For the source-build guide, see [Source builds](../getting-started/source.md).

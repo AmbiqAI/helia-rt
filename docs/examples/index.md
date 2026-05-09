@@ -19,6 +19,6 @@ Examples focus on:
 
 ## Recommended Starting Points
 
-- Start with [neuralSPOT setup](../usage/neuralspot.md) if you want the shortest path to profile a model.
-- Start with [Zephyr setup](../usage/zephyr.md) if you are integrating heliaRT into an application workspace.
-- Start with [source builds](../usage/source.md) if you need a custom build environment.
+- Start with [neuralSPOT setup](../getting-started/neuralspot.md) if you want the shortest path to profile a model.
+- Start with [Zephyr setup](../getting-started/zephyr.md) if you are integrating heliaRT into an application workspace.
+- Start with [source builds](../getting-started/source.md) if you need a custom build environment.

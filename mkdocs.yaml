@@ -9,23 +9,42 @@ copyright: Copyright &copy; 2025-2026 Ambiq
 
 nav:
   - Home: index.md
-  - Overview:
-      - Getting Started: usage/index.md
-      - Features: features/index.md
-  - Setup:
-      - Zephyr: usage/zephyr.md
-      - neuralSPOT: usage/neuralspot.md
-      - Source Builds: usage/source.md
+  - Why heliaRT: why-helia-rt.md
+  - Getting Started:
+      - Overview: getting-started/index.md
+      - Zephyr: getting-started/zephyr.md
+      - CMSIS-Pack: getting-started/cmsis-pack.md
+      - neuralSPOT: getting-started/neuralspot.md
+      - Source Builds: getting-started/source.md
+  - Guides:
+      - Overview: guides/index.md
+      - Static vs Source: guides/static-vs-source.md
+      - SPEED vs SIZE: guides/speed-vs-size.md
+      - Toolchains: guides/toolchains.md
+      - Kernel Selection: guides/kernel-selection.md
+      - Memory Placement: guides/memory-placement.md
+      - Upgrading from LiteRT: guides/upgrading-from-litert.md
+      - Troubleshooting: guides/troubleshooting.md
   - Examples:
       - Overview: examples/index.md
       - Zephyr: examples/zephyr.md
       - neuralSPOT: examples/neuralspot.md
+      - CMake: examples/cmake.md
       - Source Integration: examples/source.md
   - Reference:
-      - Benchmarks: benchmarks/index.md
-      - Continuous Integration: continuous_integration.md
-      - Python Development: python.md
-      - Generated Files: automatically_generated_files.md
+      - Overview: reference/index.md
+      - Operator Coverage: reference/operator-coverage.md
+      - Silicon Support: reference/silicon-support.md
+      - Benchmarks: reference/benchmarks/index.md
+      - API Surface: reference/api.md
+      - Continuous Integration: reference/continuous-integration.md
+      - Python Development: reference/python-development.md
+      - Generated Files: reference/generated-files.md
+  - Contributing:
+      - Overview: contributing/index.md
+      - Architecture: contributing/architecture.md
+      - Upstream Sync: contributing/upstream-sync.md
+      - Release Process: contributing/release-process.md
 
 theme:
   name: material

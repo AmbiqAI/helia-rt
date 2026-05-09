@@ -33,7 +33,7 @@ This is often the fastest way to choose between model variants before applicatio
 
 ## Example 3: Hand-Off to Zephyr
 
-Once profiling stabilizes, move to [Zephyr setup](../usage/zephyr.md) when you need:
+Once profiling stabilizes, move to [Zephyr setup](../getting-started/zephyr.md) when you need:
 
 - application-level control
 - board services and RTOS integration

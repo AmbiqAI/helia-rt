@@ -9,10 +9,10 @@ heliaRT is Ambiq's optimized TensorFlow Lite for Microcontrollers runtime for Ap
 
 ## Start Here
 
-- [Getting Started](usage/index.md): choose a setup path for Zephyr, neuralSPOT, or source builds
+- [Getting Started](getting-started/index.md): choose a setup path for Zephyr, neuralSPOT, or source builds
 - [Features](features/index.md): understand how heliaRT maps onto familiar TFLM concepts
 - [Examples](examples/index.md): see recommended starting points for Ambiq application bring-up
-- [Benchmarks](benchmarks/index.md): review performance-focused documentation for supported Ambiq targets
+- [Benchmarks](reference/benchmarks/index.md): review performance-focused documentation for supported Ambiq targets
 
 ## Why heliaRT
 
@@ -34,11 +34,11 @@ heliaRT is maintained for Ambiq Apollo devices, including:
 
 ### Start with neuralSPOT
 
-Use [neuralSPOT setup](usage/neuralspot.md) with `ns_autodeploy` when you want the fastest path to profiling a `.tflite` model on Ambiq hardware. See the [neuralSPOT AutoDeploy guide](https://ambiqai.github.io/neuralSPOT/docs/From%20TF%20to%20EVB%20-%20testing%2C%20profiling%2C%20and%20deploying%20AI%20models.html) for an end-to-end walkthrough.
+Use [neuralSPOT setup](getting-started/neuralspot.md) with `ns_autodeploy` when you want the fastest path to profiling a `.tflite` model on Ambiq hardware. See the [neuralSPOT AutoDeploy guide](https://ambiqai.github.io/neuralSPOT/docs/From%20TF%20to%20EVB%20-%20testing%2C%20profiling%2C%20and%20deploying%20AI%20models.html) for an end-to-end walkthrough.
 
 ### Integrate into Zephyr
 
-Start with [Zephyr setup](usage/zephyr.md) to choose between the supported heliaRT integration paths:
+Start with [Zephyr setup](getting-started/zephyr.md) to choose between the supported heliaRT integration paths:
 
 - source module + open `cmsis-nn`
 - source module + `ns-cmsis-nn` (HELIA)
@@ -49,18 +49,18 @@ Then use [Zephyr example](examples/zephyr.md) for the exact application recipe, 
 
 ### Build from source
 
-Use [Getting Started](usage/index.md) when you need direct control over architecture, toolchain, and build configuration.
+Use [Getting Started](getting-started/index.md) when you need direct control over architecture, toolchain, and build configuration.
 
 ## Documentation Highlights
 
-- [Getting Started](usage/index.md)
+- [Getting Started](getting-started/index.md)
 - [Features](features/index.md)
 - [Examples](examples/index.md)
-- [Benchmarks](benchmarks/index.md)
-- [Continuous Integration](continuous_integration.md)
-- [Python Development Guide](python.md)
+- [Benchmarks](reference/benchmarks/index.md)
+- [Continuous Integration](reference/continuous-integration.md)
+- [Python Development Guide](reference/python-development.md)
 
 ---
 
 > **Ready to get started?**
-> Head over to the [Getting Started](./usage/index.md) guide and bring up heliaRT on Ambiq hardware.
+> Head over to the [Getting Started](./getting-started/index.md) guide and bring up heliaRT on Ambiq hardware.

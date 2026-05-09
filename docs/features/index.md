@@ -53,8 +53,8 @@ Users can start in the way that best matches their project stage:
 
 ## Choosing a Path
 
-Use [Zephyr setup](../usage/zephyr.md) if you are integrating heliaRT into a west workspace.
+Use [Zephyr setup](../getting-started/zephyr.md) if you are integrating heliaRT into a west workspace.
 
-Use [neuralSPOT setup](../usage/neuralspot.md) if you want the fastest path to evaluate and profile a model on Ambiq hardware.
+Use [neuralSPOT setup](../getting-started/neuralspot.md) if you want the fastest path to evaluate and profile a model on Ambiq hardware.
 
 Use [Examples](../examples/index.md) when you want working integration patterns rather than general setup guidance.
