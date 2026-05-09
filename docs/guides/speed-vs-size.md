@@ -1,30 +1,80 @@
 # SPEED vs SIZE Build Variants
 
-<!-- TODO: Step 5 — Full content -->
+Every heliaRT release publishes two optimisation profiles. Pick the one that matches your workload's constraints.
 
-!!! note "Work in progress"
-    This page is part of the documentation refresh tracked in [#135](https://github.com/AmbiqAI/helia-rt/issues/135).
+## The Two Variants
 
-## Overview
+| Variant | Compiler flags | Optimises for |
+|---|---|---|
+| **SPEED** (`release`) | `-O2` / `-Ofast` | Minimum inference latency |
+| **SIZE** (`release_with_logs` / custom `-Os`) | `-Os` / `-Oz` | Smallest Flash footprint |
 
-heliaRT provides two build variants:
-
-- **SPEED** — compiler flags optimise for minimum latency (`-O2` / `-Ofast`).
-- **SIZE** — compiler flags optimise for smallest code footprint (`-Os` / `-Oz`).
-
-## How to Select
-
-<!-- TODO: Show Zephyr Kconfig, CMake flag, and Makefile flag for each -->
+!!! tip "Debug builds"
+    A third build type — `debug` (`-O0 -g`) — is also published for development. Never ship it in production.
 
 ## Trade-Offs
 
+```mermaid
+quadrantChart
+    title SPEED vs SIZE
+    x-axis "Smaller code" --> "Faster inference"
+    y-axis "Lower power" --> "Higher throughput"
+    SIZE: [0.25, 0.35]
+    SPEED: [0.75, 0.75]
+```
+
 | Metric | SPEED | SIZE |
 |---|---|---|
-| Inference latency | Lower | Higher |
-| Flash footprint | Larger | Smaller |
-| Typical use case | Real-time audio / always-on | Battery / flash-constrained |
+| Inference latency | ▼ Lower | ▲ Higher |
+| Flash usage | ▲ Larger | ▼ Smaller |
+| RAM usage | ~Same | ~Same |
+| Best for | Real-time audio, always-on wake-word | Battery-first, Flash-constrained |
+
+## How to Select
+
+=== "Prebuilt archive"
+
+    Download the variant you need from the [release bundle](https://github.com/AmbiqAI/helia-rt/releases):
+
+    ```
+    helia-rt-<tag>/cortex-m55/atfe/release/          ← SPEED
+    helia-rt-<tag>/cortex-m55/atfe/release_with_logs/ ← SIZE + logging
+    ```
+
+=== "Source / Makefile"
+
+    ```bash
+    # SPEED
+    make ... BUILD_TYPE=release microlite
+
+    # SIZE
+    make ... BUILD_TYPE=release_with_logs microlite
+    ```
+
+=== "Zephyr"
+
+    Standard Zephyr optimisation flags apply:
+
+    ```cfg
+    # prj.conf
+    CONFIG_SPEED_OPTIMIZATIONS=y    # SPEED
+    # or
+    CONFIG_SIZE_OPTIMIZATIONS=y     # SIZE
+    ```
+
+## Kernel-Level Knobs
+
+The HELIA backend exposes per-kernel optimisation overrides:
+
+```makefile
+# Override individual kernels (values: SPEED or SIZE)
+CONV_OPT=SPEED
+FC_OPT=SIZE
+```
+
+This lets you optimise latency-critical operators (Conv2D) for SPEED while keeping less critical ones optimised for SIZE.
 
 ## Next Steps
 
-- [Static vs Source](static-vs-source.md)
-- [Toolchains](toolchains.md)
+- [Static vs Source](static-vs-source.md) — distribution format details
+- [Toolchains](toolchains.md) — toolchain choice also affects code size and speed

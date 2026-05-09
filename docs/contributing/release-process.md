@@ -1,33 +1,81 @@
 # Release Process
 
-<!-- TODO: Step 9 — Full content -->
-
-!!! note "Work in progress"
-    This page is part of the documentation refresh tracked in [#135](https://github.com/AmbiqAI/helia-rt/issues/135).
-
-## Overview
-
 heliaRT uses [release-please](https://github.com/googleapis/release-please) for automated version bumps and changelog generation.
 
 ## How It Works
 
-1. Conventional commits (`feat:`, `fix:`, `chore:`) on `main` trigger release-please.
-2. A bot PR is opened (or updated) with version bumps and CHANGELOG entries.
-3. Merging the bot PR cuts a GitHub Release with a tag.
-4. The `helia_release.yml` workflow builds and attaches prebuilt archives to the release.
+```mermaid
+flowchart LR
+    A["Conventional commits\non main"] --> B["release-please bot\nopens/updates PR"]
+    B --> C["Review + merge\nrelease PR"]
+    C --> D["GitHub Release\ncreated with tag"]
+    D --> E["helia_release.yml\nbuilds artifacts"]
+    E --> F["18 archives\nattached to release"]
+```
 
-## Version Files
+### 1. Conventional Commits
 
-- `.release-please-manifest.json`
-- `CHANGELOG.md`
-- `tensorflow/lite/micro/heliart_version.h`
-- `nsx/nsx-module.yaml`
+Use prefixes on `main`:
 
-## Artifact Naming
+| Prefix | Bump | Example |
+|---|---|---|
+| `feat:` | Minor | `feat: add int16 hard_swish kernel` |
+| `fix:` | Patch | `fix: correct quantize rounding` |
+| `feat!:` / `BREAKING CHANGE:` | Major | Breaking API change |
+| `chore:` / `docs:` / `ci:` | No bump | Internal changes |
 
-<!-- TODO: Show the naming convention for release archives per arch/toolchain/variant -->
+### 2. Release-Please PR
+
+The bot opens a PR that:
+
+- Bumps the version in all managed files
+- Updates `CHANGELOG.md` with commit messages
+- Stays open and auto-updates as new commits land on `main`
+
+### 3. Version Files
+
+release-please updates these files:
+
+| File | What changes |
+|---|---|
+| `CHANGELOG.md` | New changelog section |
+| `.release-please-manifest.json` | Version number |
+| `tensorflow/lite/micro/heliart_version.h` | `HELIART_VERSION` macro |
+
+### 4. Artifact Build Matrix
+
+When the release PR merges, `helia_release.yml` builds **18 combinations**:
+
+| Architecture | Toolchain | Build Type |
+|---|---|---|
+| `cortex-m4+fp` | gcc, armclang, atfe | debug, release, release_with_logs |
+| `cortex-m55` | gcc, armclang, atfe | debug, release, release_with_logs |
+
+Each combination produces a `libtensorflow-microlite.a` archive. All 18 are bundled into a single release zip:
+
+```
+helia-rt-v1.13.0.zip
+├── cortex-m4+fp/
+│   ├── gcc/
+│   │   ├── debug/
+│   │   ├── release/
+│   │   └── release_with_logs/
+│   ├── armclang/
+│   └── atfe/
+├── cortex-m55/
+│   └── ... (same structure)
+└── include/
+```
+
+## Cutting a Release
+
+1. Ensure `main` has all desired changes.
+2. Review the open release-please PR — check the changelog entries.
+3. Merge the release-please PR.
+4. Wait for `helia_release.yml` to complete (~30 min).
+5. Verify the release artifacts on the [Releases page](https://github.com/AmbiqAI/helia-rt/releases).
 
 ## Next Steps
 
-- [Upstream Sync](upstream-sync.md)
-- [Architecture](architecture.md)
+- [Upstream Sync](upstream-sync.md) — how upstream changes flow into releases
+- [Architecture](architecture.md) — source layout

@@ -1,16 +1,63 @@
 # :material-book-search: Reference
 
-<!-- TODO: Step 7 — Expand index -->
+Detailed reference material for heliaRT internals, configuration, and infrastructure.
 
-!!! note "Work in progress"
-    This page is part of the documentation refresh tracked in [#135](https://github.com/AmbiqAI/helia-rt/issues/135).
+<div class="grid cards" markdown>
 
-| Page | Summary |
-|---|---|
-| [Operator Coverage](operator-coverage.md) | REF / CMSIS-NN / HELIA kernel matrix |
-| [Silicon Support](silicon-support.md) | Per-SoC feature matrix (TCM, MVE, toolchains) |
-| [Benchmarks](benchmarks/index.md) | Performance data for supported targets |
-| [API Surface](api.md) | heliaRT-only public API beyond upstream TFLM |
-| [Continuous Integration](continuous-integration.md) | CI workflows and infrastructure |
-| [Python Development](python-development.md) | Python interpreter and development guide |
-| [Generated Files](generated-files.md) | Automatically generated build artefacts |
+- :material-table:{ .lg .middle } **Operator Coverage**
+
+    ---
+
+    REF / CMSIS-NN / HELIA kernel matrix — what's optimised and what falls back.
+
+    [:octicons-arrow-right-24: Operator Coverage](operator-coverage.md)
+
+- :material-chip:{ .lg .middle } **Silicon Support**
+
+    ---
+
+    Per-SoC feature matrix: cores, MVE, DSP, toolchains, memory regions.
+
+    [:octicons-arrow-right-24: Silicon Support](silicon-support.md)
+
+- :material-chart-bar:{ .lg .middle } **Benchmarks**
+
+    ---
+
+    Performance data for supported targets and configurations.
+
+    [:octicons-arrow-right-24: Benchmarks](benchmarks/index.md)
+
+- :material-api:{ .lg .middle } **API Surface**
+
+    ---
+
+    heliaRT-specific headers, macros, and Kconfig options.
+
+    [:octicons-arrow-right-24: API](api.md)
+
+- :material-sync:{ .lg .middle } **Continuous Integration**
+
+    ---
+
+    CI workflows, test matrix, and infrastructure.
+
+    [:octicons-arrow-right-24: CI](continuous-integration.md)
+
+- :material-language-python:{ .lg .middle } **Python Development**
+
+    ---
+
+    Python interpreter builds and development environment.
+
+    [:octicons-arrow-right-24: Python](python-development.md)
+
+- :material-file-cog:{ .lg .middle } **Generated Files**
+
+    ---
+
+    Automatically generated build artefacts and how they are produced.
+
+    [:octicons-arrow-right-24: Generated Files](generated-files.md)
+
+</div>

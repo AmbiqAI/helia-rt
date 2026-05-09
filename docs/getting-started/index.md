@@ -1,46 +1,76 @@
 # :material-rocket-launch: Getting Started
 
-Welcome to the heliaRT getting-started guide. heliaRT keeps the familiar TensorFlow Lite for Microcontrollers programming model and adds Ambiq-focused runtime and kernel optimizations for Apollo platforms.
+heliaRT keeps the familiar LiteRT for Microcontrollers programming model and adds Ambiq-tuned kernels for Apollo platforms. Pick the integration path that matches your project.
 
-## Start Here
+## Pick Your Path
 
-Choose the setup path that matches how you want to evaluate or integrate heliaRT:
+<div class="grid cards" markdown>
 
-- [Zephyr setup](zephyr.md): integrate heliaRT into a Zephyr west workspace using either the raw module or the prebuilt release bundle.
-- [neuralSPOT setup](neuralspot.md): profile and deploy a `.tflite` model with `ns_autodeploy` using a fast Ambiq-oriented workflow.
-- [Source builds](source.md): build heliaRT directly when you need a custom environment or tighter control over the build.
+- :material-home-automation:{ .lg .middle } **Zephyr Module**
+
+    ---
+
+    Source module or prebuilt bundle via `west`. Switch backend with a single Kconfig.
+
+    **Best for:** product integration, Zephyr-based applications.
+
+    [:octicons-arrow-right-24: Zephyr setup](zephyr.md)
+
+- :material-package-variant:{ .lg .middle } **CMSIS-Pack**
+
+    ---
+
+    Install via CMSIS-Pack Manager. _(Coming soon)_
+
+    **Best for:** Keil MDK, CMSIS-Toolbox users.
+
+    [:octicons-arrow-right-24: Details](cmsis-pack.md)
+
+- :material-rocket-launch:{ .lg .middle } **neuralSPOT**
+
+    ---
+
+    Profile and deploy a `.tflite` model with `ns_autodeploy` in minutes.
+
+    **Best for:** fast model evaluation on Ambiq EVBs.
+
+    [:octicons-arrow-right-24: neuralSPOT setup](neuralspot.md)
+
+- :material-hammer-wrench:{ .lg .middle } **Source / CMake**
+
+    ---
+
+    Full control over target, toolchain, and build type. Link the `.a` into any project.
+
+    **Best for:** custom build systems, source-level debugging.
+
+    [:octicons-arrow-right-24: Source builds](source.md)
+
+</div>
 
 ## Core Concepts
 
-If you have already used TFLM, the high-level model is the same:
+If you've used TFLM before, you already know the model:
 
-- `.tflite` flatbuffer models
-- operator resolvers
-- tensor arenas
-- `MicroInterpreter`-based inference
-- embedded-friendly logging and profiling
+| Concept | Same in heliaRT? |
+|---|---|
+| `.tflite` flatbuffer models | ✓ |
+| `MicroMutableOpResolver` | ✓ |
+| `MicroInterpreter` | ✓ |
+| Statically-allocated tensor arenas | ✓ |
+| Embedded logging and profiling | ✓ |
 
-The main differences are in packaging, supported integration paths, and Ambiq-optimized kernels.
-
-## Setup Paths at a Glance
-
-| Path | Best for | Notes |
-| --- | --- | --- |
-| Zephyr raw module | Source-visible integration and custom builds | Public-safe source path uses `Reference` or open `CMSIS-NN`; `HELIA` requires a separate Ambiq-provided module |
-| Zephyr prebuilt bundle | Fast-start Zephyr integration | Ambiq-optimized kernels embedded in the archive |
-| neuralSPOT with `ns_autodeploy` | Quick profiling and deployment | Good first step when evaluating a model on hardware |
-| Source build | Custom build systems and low-level integration | Most flexible, but most manual |
+The key additions are [three kernel backends](../guides/kernel-selection.md) (Reference, CMSIS-NN, HELIA), [two build variants](../guides/speed-vs-size.md) (SPEED, SIZE), and [three toolchain options](../guides/toolchains.md) (GCC, armclang, ATfE).
 
 ## Recommended Order
 
-1. Start with [neuralSPOT setup](neuralspot.md) if your first goal is profiling and basic model validation.
-2. Move to [Zephyr setup](zephyr.md) when you are integrating heliaRT into a product or application workspace.
-3. Use [source builds](source.md) when you need direct control over toolchains, archives, or custom packaging.
+1. **Evaluating a model?** Start with [neuralSPOT](neuralspot.md) and `ns_autodeploy`.
+2. **Building a product?** Move to [Zephyr](zephyr.md) for module-based integration.
+3. **Need full control?** Use [source builds](source.md) with custom toolchain and target flags.
 
 ## Related Pages
 
-- [Features](../features/index.md)
-- [Zephyr setup](zephyr.md)
-- [neuralSPOT setup](neuralspot.md)
-- [Source builds](source.md)
-- [Examples](../examples/index.md)
+- [Why heliaRT](../why-helia-rt.md) — the pitch
+- [Features](../features/index.md) — capabilities overview
+- [Examples](../examples/index.md) — working integration patterns
+- [Upgrading from upstream LiteRT](../guides/upgrading-from-litert.md) — step-by-step swap guide
