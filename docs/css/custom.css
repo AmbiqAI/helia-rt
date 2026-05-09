@@ -592,6 +592,8 @@
 
 @media (max-width: 680px) {
   .landing-hero { padding-top: 3rem; }
+  .section-block,
+  .logo-rail { padding-inline: 1rem; }
   .takeaway-grid,
   .workflow,
   .platform-grid,
