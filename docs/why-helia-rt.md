@@ -7,7 +7,7 @@ heliaRT is a **drop-in replacement** for upstream LiteRT for Microcontrollers (T
 Upstream TFLM ships two kernel backends:
 
 - **Reference** — portable C, works everywhere, not fast.
-- **CMSIS-NN** — Arm-optimised, good on Cortex-M, but only covers a subset of operators.
+- **CMSIS-NN** — Arm-optimized, good on Cortex-M, but only covers a subset of operators.
 
 Many operators (activations, reduce, concat, reshape, split, dequantize, …) have **no** CMSIS-NN path — they silently fall back to Reference. On latency-sensitive workloads running on Apollo hardware, that's leaving performance on the table.
 
@@ -20,18 +20,18 @@ graph LR
     A[Your App] --> B[heliaRT]
     B --> C{Backend?}
     C -->|Reference| D[Generic C]
-    C -->|CMSIS-NN| E[Arm optimised]
+    C -->|CMSIS-NN| E[Arm optimized]
     C -->|HELIA| F[Ambiq tuned]
     F --> G[heliaCORE<br/>ns-cmsis-nn]
     G --> H[MVE / DSP / FPU]
 ```
 
 !!! success "Drop-in upgrade"
-    heliaRT uses the **exact same API** as upstream TFLM — `MicroInterpreter`, `Model`, `MicroMutableOpResolver`, tensor arenas, `.tflite` models. Swap the dependency, rebuild, ship. No retraining, no re-quantisation, no code changes.
+    heliaRT uses the **exact same API** as upstream TFLM — `MicroInterpreter`, `Model`, `MicroMutableOpResolver`, tensor arenas, `.tflite` models. Swap the dependency, rebuild, ship. No retraining, no re-quantization, no code changes.
 
 ## What HELIA Adds
 
-| Category | HELIA-exclusive optimisations | Upstream has |
+| Category | HELIA-exclusive optimizations | Upstream has |
 |---|---|---|
 | **Activations** | `relu` · `relu6` · `logistic` · `tanh` · `leaky_relu` · `hard_swish` (+i16) | Reference only |
 | **Reduce** | `reduce_mean` · `reduce_max` | Reference only |

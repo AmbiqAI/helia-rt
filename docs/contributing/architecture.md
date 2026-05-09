@@ -13,7 +13,7 @@ helia-rt/
 │   │       ├── helia_common.h
 │   │       ├── conv.cc
 │   │       ├── fully_connected.cc
-│   │       └── ...                 # 36 optimised kernels
+│   │       └── ...                 # 36 ops, 230+ kernel variants
 │   ├── tools/make/
 │   │   └── ext_libs/
 │   │       └── helia.inc           # ★ Makefile backend wiring
@@ -79,14 +79,14 @@ endfunction()
 
 2. **Preserve the TFLM API** — no public API changes that break upstream compatibility. `MicroInterpreter`, `OpResolver`, and the `.tflite` format are identical.
 
-3. **Backend as extension** — HELIA kernels are additive. They don't fork CMSIS-NN; they provide an independent set of optimised implementations that coexist with CMSIS-NN and Reference.
+3. **Backend as extension** — HELIA kernels are additive. They don't fork CMSIS-NN; they provide an independent set of optimized implementations that coexist with CMSIS-NN and Reference.
 
 4. **Upstream workflows are disabled via API** — not by editing YAML files. The `ci/disable_upstream_workflows.sh` script uses the GitHub API to disable upstream workflows, keeping the YAML files unmodified and reducing merge conflicts.
 
 ## Adding a New Kernel
 
 1. Create `tensorflow/lite/micro/kernels/helia/<op>.cc`
-2. Implement the optimised kernel, following the signature of the Reference version
+2. Implement the optimized kernel, following the signature of the Reference version
 3. The build system will automatically pick it up — no other wiring needed
 4. Add tests (see `kernels/helia/tests/` for examples)
 5. Update the [operator coverage matrix](../reference/operator-coverage.md)

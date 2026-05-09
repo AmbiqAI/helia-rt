@@ -1,12 +1,12 @@
 # Operator Coverage
 
-heliaRT provides three kernel backends. Every operator has a **Reference** implementation. The **CMSIS-NN** and **HELIA** columns show where optimised implementations replace the generic code.
+heliaRT provides three kernel backends. Every operator has a **Reference** implementation. The **CMSIS-NN** and **HELIA** columns show where optimized implementations replace the generic code.
 
 !!! info "How to read this table"
     - **REF** = Reference (generic C, all architectures)
     - **CMSIS** = open-source Arm CMSIS-NN (Cortex-M only)
-    - **HELIA** = Ambiq-optimised heliaCORE (Cortex-M only)
-    - :white_check_mark: = optimised kernel exists
+    - **HELIA** = Ambiq-optimized heliaCORE (Cortex-M only)
+    - :white_check_mark: = optimized kernel exists
     - :material-minus: = falls back to Reference
 
 ## Compute Operators
@@ -65,7 +65,7 @@ heliaRT provides three kernel backends. Every operator has a **Reference** imple
 | `ZEROS_LIKE` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
 | `DEQUANTIZE` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
 
-## Quantisation
+## Quantization
 
 | Operator | REF | CMSIS | HELIA | Notes |
 |---|:---:|:---:|:---:|---|
@@ -79,7 +79,7 @@ heliaRT provides three kernel backends. Every operator has a **Reference** imple
 
 ## Summary
 
-| Backend | Optimised kernels | Coverage |
+| Backend | Optimized kernels | Coverage |
 |---|:---:|---|
 | Reference | 109 | All operators (generic C) |
 | CMSIS-NN | 14 | Core compute-heavy ops |

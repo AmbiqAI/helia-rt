@@ -102,9 +102,9 @@ Failed to allocate memory for tensor arena
 
 **Possible causes:**
 
-- **Quantisation mismatch:** model expects int8 input but you're feeding float (or vice versa). Check `input->type`.
-- **Wrong input scaling:** the input must match the model's quantisation parameters (`input->params.scale` and `zero_point`).
-- **Model not compatible:** ensure the `.tflite` was quantised for int8/int16 TFLM, not float-only TFLite.
+- **Quantization mismatch:** model expects int8 input but you're feeding float (or vice versa). Check `input->type`.
+- **Wrong input scaling:** the input must match the model's quantization parameters (`input->params.scale` and `zero_point`).
+- **Model not compatible:** ensure the `.tflite` was quantized for int8/int16 TFLM, not float-only TFLite.
 
 ### Model loads but no inference output
 

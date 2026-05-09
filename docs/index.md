@@ -13,7 +13,7 @@ hide:
 
 <p class="hero-eyebrow"><span class="dot"></span> v1.13 · Apollo510 ready · ATfE supported</p>
 
-<h1 class="hero-title">Ambiq-optimised <span class="grad">AI inference</span><br/>for Cortex-M</h1>
+<h1 class="hero-title">Ambiq-optimized <span class="grad">AI inference</span><br/>for Cortex-M</h1>
 
 <p class="hero-tagline">Accelerated <strong>TensorFlow Lite for Microcontrollers</strong> runtime with Ambiq-tuned kernels — purpose-built for Apollo silicon.</p>
 
@@ -28,8 +28,8 @@ hide:
 
 <div class="stat" markdown>
 <span class="stat-icon">:material-chip:</span>
-<span class="stat-num">36</span>
-<span class="stat-label">Optimised kernels</span>
+<span class="stat-num">230+</span>
+<span class="stat-label">Kernel variants</span>
 </div>
 
 <div class="stat" markdown>
@@ -68,14 +68,14 @@ The stack is co-designed top-to-bottom: model architectures, kernels, runtime, a
 
 <div class="stack-layer stack-layer--models" markdown>
 <span class="stack-tag">HELIA AI · Models</span>
-<span class="stack-title">Model zoo · Quantisation recipes · Deployment tools</span>
+<span class="stack-title">Model zoo · Quantization recipes · Deployment tools</span>
 <span class="stack-meta">neuralSPOT-X · ns_autodeploy · model templates</span>
 </div>
 
 <div class="stack-layer stack-layer--runtime" markdown>
 <span class="stack-tag">HELIA AI · Runtime <span class="stack-pill">You are here</span></span>
 <span class="stack-title">heliaRT — TFLM runtime + HELIA kernels</span>
-<span class="stack-meta">Optimised operators, vectorised paths, multi-toolchain builds</span>
+<span class="stack-meta">Optimized operators, vectorized paths, multi-toolchain builds</span>
 </div>
 
 <div class="stack-layer stack-layer--silicon" markdown>
@@ -91,9 +91,9 @@ The stack is co-designed top-to-bottom: model architectures, kernels, runtime, a
 
 ## <span class="eyebrow">01 — Foundation</span><br/>Why heliaRT { .section-heading }
 
-heliaRT pairs the familiar **TensorFlow Lite for Microcontrollers** programming model with a kernel backend tuned by Ambiq for Apollo silicon. Models built with the standard LiteRT tooling run unchanged — and run faster, with a larger pool of operators getting the optimised path instead of falling back to generic Reference C.
+heliaRT pairs the familiar **TensorFlow Lite for Microcontrollers** programming model with a kernel backend tuned by Ambiq for Apollo silicon. Models built with the standard LiteRT tooling run unchanged — and run faster, with a larger pool of operators getting the optimized path instead of falling back to generic Reference C.
 
-The runtime is the same one you already know: `MicroInterpreter`, `OpResolver`, statically-allocated tensor arenas, `.tflite` flatbuffers. What changes is what happens *underneath* — more operators take the fast path, on more hardware, with more toolchains.
+The runtime is the same one you already know: `MicroInterpreter`, `OpResolver`, statically-allocated tensor arenas, `.tflite` flatbuffers. What changes is what happens *underneath* — more operators take the fast path, with int8 and int16 quantization variants getting their own hand-tuned kernels.
 
 <div class="two-col" markdown>
 
@@ -101,7 +101,7 @@ The runtime is the same one you already know: `MicroInterpreter`, `OpResolver`, 
 
 **What stays the same**
 
-- `.tflite` model format — no retraining, no re-quantisation
+- `.tflite` model format — no retraining, no re-quantization
 - `MicroInterpreter` lifecycle (allocate → invoke → read)
 - `MicroMutableOpResolver` registration pattern
 - Tensor arena sizing and static allocation
@@ -109,8 +109,8 @@ The runtime is the same one you already know: `MicroInterpreter`, `OpResolver`, 
 
 **What gets better**
 
-- HELIA backend covers **36 operators** vs CMSIS-NN's 14
-- Activations, reduce, and data-movement ops take a vectorised path instead of falling back to Reference C
+- HELIA backend covers **36 operators** (**230+ kernel variants** counting int8 / int16 / float paths) vs CMSIS-NN's 14 operators
+- Activations, reduce, and data-movement ops take a vectorized path instead of falling back to Reference C
 - Builds matrix-tested across **18** (arch × toolchain × build-type) combos every release
 - Distribution as **both** source modules and prebuilt static libraries
 
@@ -146,7 +146,7 @@ interpreter.Invoke();
 
 ## <span class="eyebrow">02 — Silicon</span><br/>Built for the Apollo family { .section-heading }
 
-heliaRT runs across every Cortex-M-based Ambiq SoC family. The HELIA backend is most impactful on Apollo510, where Cortex-M55 + Helium (MVE) lets vectorised kernels deliver the largest speedups — but every SoC benefits from the broader operator coverage.
+heliaRT runs across every Cortex-M-based Ambiq SoC family. The HELIA backend is most impactful on Apollo510, where Cortex-M55 + Helium (MVE) lets vectorized kernels deliver the largest speedups — but every SoC benefits from the broader operator coverage.
 
 <div class="chip-row" markdown>
 
@@ -343,9 +343,9 @@ heliaRT's HELIA backend covers categories that upstream CMSIS-NN doesn't touch �
 </div>
 
 <div class="op-matrix-foot">
-  <span><strong>36</strong> ops in HELIA</span>
-  <span><strong>14</strong> in CMSIS-NN</span>
-  <span><strong>22</strong> additional ops on the fast path</span>
+  <span><strong>36</strong> operators in HELIA</span>
+  <span><strong>230+</strong> kernel variants (int8 / int16 / float)</span>
+  <span><strong>+22</strong> operators vs CMSIS-NN</span>
 </div>
 
 </div>

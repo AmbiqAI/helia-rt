@@ -26,7 +26,7 @@ flowchart TD
     H -->|No| E
 ```
 
-For each operator, the build system checks whether an optimised implementation exists in the selected backend directory. If it does, that implementation is compiled instead of the Reference one. If not, the Reference kernel is used automatically.
+For each operator, the build system checks whether an optimized implementation exists in the selected backend directory. If it does, that implementation is compiled instead of the Reference one. If not, the Reference kernel is used automatically.
 
 ## Selecting a Backend
 
@@ -54,20 +54,20 @@ For each operator, the build system checks whether an optimised implementation e
 
 ## HELIA Kernel Coverage
 
-The HELIA backend currently provides optimised implementations for **36 kernels**:
+The HELIA backend currently provides optimized implementations for **36 operators** — expanding to **230+ kernel variants** when counting per-dtype paths (int8 / int16 / float):
 
 ??? info "Full list"
     `activations` · `add` · `batch_matmul` · `comparisons` · `concatenation` · `conv` · `depthwise_conv` · `dequantize` · `fill` · `fully_connected` · `hard_swish` · `leaky_relu` · `logistic` · `maximum_minimum` · `mul` · `pack` · `pad` · `pooling` · `quantize_common` · `reduce` · `reshape` · `softmax` · `split` · `split_v` · `squeeze` · `strided_slice` · `sub` · `svdf` · `tanh` · `transpose` · `transpose_conv` · `unidirectional_sequence_lstm` · `zeros_like`
 
 [:octicons-arrow-right-24: Full operator coverage matrix](../reference/operator-coverage.md)
 
-## Per-Kernel Optimisation Knobs
+## Per-Kernel Optimization Knobs
 
 The HELIA backend supports per-kernel SPEED/SIZE overrides:
 
 ```makefile
-CONV_OPT=SPEED    # optimise Conv2D for latency
-FC_OPT=SIZE       # optimise FullyConnected for code size
+CONV_OPT=SPEED    # optimize Conv2D for latency
+FC_OPT=SIZE       # optimize FullyConnected for code size
 ```
 
 These default to `GLOBAL_KERNEL_OPTIMIZE` when not set.

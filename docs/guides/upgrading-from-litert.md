@@ -14,7 +14,7 @@ heliaRT is a **drop-in replacement** for upstream LiteRT for Microcontrollers. T
 
 ## What Stays the Same
 
-- `.tflite` model format — no retraining or re-quantisation needed
+- `.tflite` model format — no retraining or re-quantization needed
 - `MicroInterpreter` lifecycle (`AllocateTensors` → `Invoke` → read output)
 - `MicroMutableOpResolver` registration pattern
 - Tensor arena sizing and static memory planning

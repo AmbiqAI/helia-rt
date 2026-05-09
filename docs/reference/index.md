@@ -8,7 +8,7 @@ Detailed reference material for heliaRT internals, configuration, and infrastruc
 
     ---
 
-    REF / CMSIS-NN / HELIA kernel matrix — what's optimised and what falls back.
+    REF / CMSIS-NN / HELIA kernel matrix — what's optimized and what falls back.
 
     [:octicons-arrow-right-24: Operator Coverage](operator-coverage.md)
 

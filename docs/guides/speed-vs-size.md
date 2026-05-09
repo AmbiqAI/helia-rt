@@ -1,10 +1,10 @@
 # SPEED vs SIZE Build Variants
 
-Every heliaRT release publishes two optimisation profiles. Pick the one that matches your workload's constraints.
+Every heliaRT release publishes two optimization profiles. Pick the one that matches your workload's constraints.
 
 ## The Two Variants
 
-| Variant | Compiler flags | Optimises for |
+| Variant | Compiler flags | Optimizes for |
 |---|---|---|
 | **SPEED** (`release`) | `-O2` / `-Ofast` | Minimum inference latency |
 | **SIZE** (`release_with_logs` / custom `-Os`) | `-Os` / `-Oz` | Smallest Flash footprint |
@@ -53,7 +53,7 @@ quadrantChart
 
 === "Zephyr"
 
-    Standard Zephyr optimisation flags apply:
+    Standard Zephyr optimization flags apply:
 
     ```cfg
     # prj.conf
@@ -64,7 +64,7 @@ quadrantChart
 
 ## Kernel-Level Knobs
 
-The HELIA backend exposes per-kernel optimisation overrides:
+The HELIA backend exposes per-kernel optimization overrides:
 
 ```makefile
 # Override individual kernels (values: SPEED or SIZE)
@@ -72,7 +72,7 @@ CONV_OPT=SPEED
 FC_OPT=SIZE
 ```
 
-This lets you optimise latency-critical operators (Conv2D) for SPEED while keeping less critical ones optimised for SIZE.
+This lets you optimize latency-critical operators (Conv2D) for SPEED while keeping less critical ones optimized for SIZE.
 
 ## Next Steps
 

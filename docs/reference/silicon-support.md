@@ -12,7 +12,7 @@ heliaRT runs on all Ambiq Apollo SoC families with Cortex-M cores.
 | **Atomiq** | _(planned)_ | | | | | |
 
 !!! tip "Apollo510 for best performance"
-    Apollo510's Cortex-M55 includes Arm Helium (MVE), which enables vectorised math in both CMSIS-NN and HELIA kernels. This is where heliaRT delivers the largest speedup over Reference.
+    Apollo510's Cortex-M55 includes Arm Helium (MVE), which enables vectorized math in both CMSIS-NN and HELIA kernels. This is where heliaRT delivers the largest speedup over Reference.
 
 ## Backend Availability per SoC
 
@@ -51,6 +51,6 @@ Each Apollo SoC provides multiple memory regions. Where you place the tensor are
 
 ## Next Steps
 
-- [Operator Coverage](operator-coverage.md) — which kernels are optimised per backend
+- [Operator Coverage](operator-coverage.md) — which kernels are optimized per backend
 - [Toolchains](../guides/toolchains.md) — install and select your toolchain
 - [Benchmarks](benchmarks/index.md) — measured performance data

@@ -35,8 +35,8 @@ For detailed API documentation, refer to the [upstream TFLM API docs](https://gi
 |---|---|---|
 | `CMSIS_NN` | HELIA backend | NN library exposes CMSIS-NN API surface |
 | `HELIA` | HELIA backend | Build uses `OPTIMIZED_KERNEL_DIR=helia` |
-| `CONV_KERNEL_OPTIMIZED_FOR_SPEED` | Per-kernel knob | Conv2D optimised for latency |
-| `FC_KERNEL_OPTIMIZED_FOR_SIZE` | Per-kernel knob | FullyConnected optimised for code size |
+| `CONV_KERNEL_OPTIMIZED_FOR_SPEED` | Per-kernel knob | Conv2D optimized for latency |
+| `FC_KERNEL_OPTIMIZED_FOR_SIZE` | Per-kernel knob | FullyConnected optimized for code size |
 
 ### Zephyr Kconfig Options
 
@@ -49,5 +49,5 @@ For detailed API documentation, refer to the [upstream TFLM API docs](https://gi
 
 ## Next Steps
 
-- [Operator Coverage](operator-coverage.md) — which operators have optimised kernels
+- [Operator Coverage](operator-coverage.md) — which operators have optimized kernels
 - [Upgrading from LiteRT](../guides/upgrading-from-litert.md) — migration guide
