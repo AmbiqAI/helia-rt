@@ -6,15 +6,21 @@ hide:
 
 <div class="hero" markdown>
 
-![heliaRT](./assets/helia-rt-banner-light.png#only-light){ width="380" }
-![heliaRT](./assets/helia-rt-banner-dark.png#only-dark){ width="380" }
+<div class="hero-bg" aria-hidden="true"></div>
 
-# Ambiq-optimised AI inference for Cortex-M
+![heliaRT](./assets/helia-rt-banner-light.png#only-light){ .hero-logo width="260" }
+![heliaRT](./assets/helia-rt-banner-dark.png#only-dark){ .hero-logo width="260" }
+
+<p class="hero-eyebrow"><span class="dot"></span> v1.13 · Apollo510 ready · ATfE supported</p>
+
+<h1 class="hero-title">Ambiq-optimised <span class="grad">AI inference</span><br/>for Cortex-M</h1>
 
 <p class="hero-tagline">Accelerated <strong>TensorFlow Lite for Microcontrollers</strong> runtime with Ambiq-tuned kernels — purpose-built for Apollo silicon.</p>
 
-[:octicons-arrow-right-24: Get Started](getting-started/index.md){ .md-button .md-button--primary }
-[:octicons-book-24: Why heliaRT](why-helia-rt.md){ .md-button }
+<p class="hero-cta">
+<a href="getting-started/" class="md-button md-button--primary">Get Started&nbsp;→</a>
+<a href="why-helia-rt/" class="md-button">Why heliaRT</a>
+</p>
 
 </div>
 
@@ -46,9 +52,7 @@ hide:
 
 </div>
 
----
-
-## Why heliaRT { .section-heading }
+## <span class="eyebrow">01 — Foundation</span><br/>Why heliaRT { .section-heading }
 
 heliaRT pairs the familiar **TensorFlow Lite for Microcontrollers** programming model with a kernel backend tuned by Ambiq for Apollo silicon. Models built with the standard LiteRT tooling run unchanged — and run faster, with a larger pool of operators getting the optimised path instead of falling back to generic Reference C.
 
@@ -103,31 +107,33 @@ interpreter.Invoke();
 
 </div>
 
----
-
-## Built for the Apollo family { .section-heading }
+## <span class="eyebrow">02 — Silicon</span><br/>Built for the Apollo family { .section-heading }
 
 heliaRT runs across every Cortex-M-based Ambiq SoC family. The HELIA backend is most impactful on Apollo510, where Cortex-M55 + Helium (MVE) lets vectorised kernels deliver the largest speedups — but every SoC benefits from the broader operator coverage.
 
 <div class="chip-row" markdown>
 
 <div class="chip chip--ok" markdown>
-:material-check-circle:{ .chip-icon } **Apollo3 / 3p**<br/>
+<span class="chip-dot"></span>
+<span class="chip-title">Apollo3 / 3p</span>
 <span class="chip-meta">Cortex-M4F · DSP</span>
 </div>
 
 <div class="chip chip--ok" markdown>
-:material-check-circle:{ .chip-icon } **Apollo4 / 4p**<br/>
+<span class="chip-dot"></span>
+<span class="chip-title">Apollo4 / 4p</span>
 <span class="chip-meta">Cortex-M4F · DSP</span>
 </div>
 
 <div class="chip chip--star" markdown>
-:material-star:{ .chip-icon } **Apollo510**<br/>
+<span class="chip-dot"></span>
+<span class="chip-title">Apollo510 <span class="chip-badge">Recommended</span></span>
 <span class="chip-meta">Cortex-M55 · MVE / Helium</span>
 </div>
 
 <div class="chip chip--planned" markdown>
-:material-clock-outline:{ .chip-icon } **Atomiq**<br/>
+<span class="chip-dot"></span>
+<span class="chip-title">Atomiq</span>
 <span class="chip-meta">Planned</span>
 </div>
 
@@ -135,26 +141,27 @@ heliaRT runs across every Cortex-M-based Ambiq SoC family. The HELIA backend is 
 
 [:octicons-arrow-right-24: Full silicon matrix](reference/silicon-support.md)
 
----
-
-## Three toolchains, one matrix { .section-heading }
+## <span class="eyebrow">03 — Toolchains</span><br/>Three toolchains, one matrix { .section-heading }
 
 Every release ships pre-built artifacts for all three supported toolchains — pick whichever fits your build environment. **ATfE** is our recommendation: open-source, LLVM-based, and consistently 10–20 % faster than GCC on Cortex-M55 MVE workloads.
 
 <div class="chip-row" markdown>
 
-<div class="chip" markdown>
-:material-language-c:{ .chip-icon } **GCC**<br/>
+<div class="chip chip--ok" markdown>
+<span class="chip-dot"></span>
+<span class="chip-title">GCC</span>
 <span class="chip-meta">arm-none-eabi · open source · baseline</span>
 </div>
 
-<div class="chip" markdown>
-:material-package-variant-closed:{ .chip-icon } **Arm Compiler 6**<br/>
+<div class="chip chip--ok" markdown>
+<span class="chip-dot"></span>
+<span class="chip-title">Arm Compiler 6</span>
 <span class="chip-meta">armclang · commercial · ~5–15 % faster</span>
 </div>
 
 <div class="chip chip--star" markdown>
-:material-star:{ .chip-icon } **ATfE**<br/>
+<span class="chip-dot"></span>
+<span class="chip-title">ATfE <span class="chip-badge">Recommended</span></span>
 <span class="chip-meta">LLVM-Embedded · open source · ~10–20 % faster</span>
 </div>
 
@@ -162,9 +169,7 @@ Every release ships pre-built artifacts for all three supported toolchains — p
 
 [:octicons-arrow-right-24: Toolchain guide](guides/toolchains.md)
 
----
-
-## Pick your integration path { .section-heading }
+## <span class="eyebrow">04 — Integration</span><br/>Pick your integration path { .section-heading }
 
 heliaRT meets you where you build. Drop it into a Zephyr workspace, deploy through Ambiq's neuralSPOT toolkit, link a prebuilt static library into a custom CMake project, or — coming soon — install via CMSIS-Pack.
 
@@ -204,9 +209,7 @@ heliaRT meets you where you build. Drop it into a Zephyr workspace, deploy throu
 
 </div>
 
----
-
-## Quick start — Zephyr { .section-heading }
+## <span class="eyebrow">05 — Quick start</span><br/>Three files. Three commands. { .section-heading }
 
 Three files. Three commands. A model running on Apollo510.
 
@@ -240,9 +243,7 @@ Three files. Three commands. A model running on Apollo510.
 [:octicons-arrow-right-24: Other integration paths](getting-started/index.md) ·
 [:octicons-arrow-right-24: Upgrading from upstream LiteRT](guides/upgrading-from-litert.md)
 
----
-
-## Operator coverage at a glance { .section-heading }
+## <span class="eyebrow">06 — Coverage</span><br/>Operator coverage at a glance { .section-heading }
 
 heliaRT's HELIA backend covers categories that upstream CMSIS-NN doesn't touch — most notably activations, reduce, and data-movement ops that would otherwise fall back to slow Reference C.
 
@@ -258,9 +259,7 @@ heliaRT's HELIA backend covers categories that upstream CMSIS-NN doesn't touch �
 
 [:octicons-arrow-right-24: Full operator matrix](reference/operator-coverage.md)
 
----
-
-## Resources { .section-heading }
+## <span class="eyebrow">07 — Learn more</span><br/>Resources { .section-heading }
 
 <div class="grid cards" markdown>
 
