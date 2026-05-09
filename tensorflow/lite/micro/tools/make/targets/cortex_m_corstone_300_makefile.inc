@@ -177,9 +177,18 @@ else ifeq ($(TOOLCHAIN), gcc)
   CXXFLAGS += $(FLAGS_GCC)
   CCFLAGS += $(FLAGS_GCC)
 
+  # helia-rt: use a helia-owned linker script that splits `.vectors`
+  # (kept in ITCM at VTOR=0) from the rest of `.text` (placed in DDR,
+  # which Cortex-M55 caches). This mirrors the layout used by the
+  # ATfE target (`corstone_300_atfe.ld`) so both toolchains can run
+  # the same integration tests at the same kernel optimisation level
+  # without overflowing ITCM's 512 KiB. See the file header of
+  # `corstone_300_gcc.ld` for the diff against upstream's
+  # `ethos_u_core_platform/.../platform_parsed.ld`.
+  GCC_LINKER_SCRIPT := $(TENSORFLOW_ROOT)tensorflow/lite/micro/cortex_m_corstone_300/corstone_300_gcc.ld
   LDFLAGS += \
     --specs=nosys.specs \
-    -T $(ETHOS_U_CORE_PLATFORM)/platform_parsed.ld \
+    -T $(GCC_LINKER_SCRIPT) \
     -Wl,-Map=gen/$(TARGET).map,--cref \
     -Wl,--gc-sections \
     --entry Reset_Handler
