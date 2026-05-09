@@ -14,6 +14,14 @@ on:
       - synchronize
       - labeled
 
+# Cancel an in-flight run for this PR when a newer commit is pushed.
+# Keyed on the PR number (or branch ref for non-PR triggers) so each PR
+# has its own concurrency lane and unrelated PRs don't block each other.
+# Saves ~25min x 10 matrix jobs every fixup push.
+concurrency:
+  group: tests-entry-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
 
   helia-test:
