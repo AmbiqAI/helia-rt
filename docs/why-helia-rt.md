@@ -1,16 +1,18 @@
-# Why heliaRT
+---
+hide:
+    - title
+    - toc
+---
+
+#
 
 <div class="why-page" markdown>
 
 <section class="why-hero" markdown>
 
-<p class="why-eyebrow">Why heliaRT</p>
-
 ## Keep the LiteRT workflow. Move more work onto Ambiq-optimized paths.
 
-heliaRT is Ambiq's silicon-adjacent runtime layer for LiteRT for Micro. It is built for teams that already have embedded inference running, but need better latency, broader optimized operator coverage, and a release path that lines up with Apollo silicon, Zephyr, neuralSPOT-X, and Ambiq toolchains.
-
-The core promise is intentionally practical: keep the same `.tflite` models, `MicroInterpreter` lifecycle, resolver pattern, and tensor arena model, then route supported operations through HELIA kernels tuned for Ambiq platforms.
+heliaRT is Ambiq's silicon-adjacent runtime layer for LiteRT for Micro. It keeps the same `.tflite` models, `MicroInterpreter` lifecycle, resolver pattern, and tensor arena model while routing supported operations through HELIA kernels tuned for Apollo silicon.
 
 <div class="why-hero-actions" markdown>
 [Start integrating](getting-started/index.md){ .md-button .md-button--primary }

@@ -611,9 +611,15 @@
   margin: 0 auto;
 }
 
+body:has(.why-page) .md-sidebar--secondary,
+.md-content__inner:has(.why-page) > h1:first-child,
+.md-typeset h1:empty {
+  display: none;
+}
+
 .why-hero {
   margin: 0 0 1.5rem;
-  padding: clamp(2rem, 5vw, 3.5rem);
+  padding: 2rem;
   border-radius: 24px;
   background: linear-gradient(135deg, rgba(0, 193, 179, 0.18), rgba(29, 153, 255, 0.12)), var(--hr-dark);
   color: #fff;
@@ -630,27 +636,32 @@
 }
 
 .md-typeset .why-hero h2 {
-  max-width: 820px;
+  max-width: 680px;
   margin: 0 0 1rem;
   color: #fff;
-  font-size: clamp(2rem, 4.4vw, 3.65rem);
+  font-size: 1.85rem;
   font-weight: 780;
   letter-spacing: -0.045em;
   line-height: 1;
 }
 
 .why-hero p:not(.why-eyebrow) {
-  max-width: 860px;
+  max-width: 760px;
+  margin: 0 0 1rem;
   color: #d4deeb;
-  font-size: 1.02rem;
-  line-height: 1.72;
+  font-size: 0.86rem;
+  line-height: 1.55;
 }
 
 .why-hero-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
-  margin-top: 1.4rem;
+  margin-top: 1rem;
+}
+
+.why-hero-actions > p {
+  display: contents;
 }
 
 .md-typeset .why-hero-actions .md-button {
