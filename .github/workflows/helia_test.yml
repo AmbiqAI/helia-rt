@@ -20,6 +20,13 @@ on:
         required: false
         default: ""
 
+# Cancel an in-flight run when a newer commit is pushed to the same ref.
+# Saves ~25min x 10 matrix jobs every time someone force-pushes or pushes
+# a fixup commit while CI is still running.
+concurrency:
+  group: helia-test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   helia_test:
     runs-on: ubuntu-latest-md
