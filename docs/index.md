@@ -232,10 +232,20 @@ CMSIS-NN covers the common convolutional core. HELIA adds optimized paths for ac
 
 </section>
 
-<section class="section-block final-links" markdown>
+<section class="section-block final-section" markdown>
+
+<p class="section-eyebrow">Next steps</p>
+
+## Go deeper when you are ready to build
+
+The landing page gives the product shape; these pages get you into implementation details, working examples, and measurement data.
+
+<div class="final-links" markdown>
 
 <a href="guides/"><strong>Guides</strong><span>Backend selection, SPEED vs SIZE, toolchains, memory placement, troubleshooting.</span></a>
 <a href="examples/"><strong>Examples</strong><span>Working integration patterns for Zephyr, neuralSPOT-X, source builds, and CMake.</span></a>
 <a href="reference/benchmarks/"><strong>Benchmarks</strong><span>Per-target measurements and comparisons across toolchains and build variants.</span></a>
+
+</div>
 
 </section>

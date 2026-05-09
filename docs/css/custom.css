@@ -536,18 +536,27 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
+  margin-top: 1.4rem;
   padding-bottom: 3rem;
 }
 
 .final-links a {
   display: flex;
   flex-direction: column;
-  min-height: 150px;
+  min-height: 155px;
   padding: 1.35rem;
   border: 1px solid var(--hr-line);
   border-radius: var(--hr-radius);
   background: var(--hr-soft);
   transition: transform 0.18s ease, border-color 0.18s ease;
+}
+
+.final-section {
+  max-width: 1040px;
+}
+
+.final-section > p:not(.section-eyebrow) {
+  max-width: 760px;
 }
 
 @media (max-width: 1000px) {
@@ -556,8 +565,7 @@
   .hero-panel { justify-self: start; max-width: 620px; }
   .takeaway-grid,
   .workflow,
-  .platform-grid,
-  .final-links { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .platform-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 680px) {
