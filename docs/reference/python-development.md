@@ -6,7 +6,7 @@
 
 <!--te-->
 
-Writing and using Python scripts from the TFLM repository is currently in the
+Writing and using Python scripts from the LiteRT for Micro repository is currently in the
 prototyping stage. As such, the instructions below are somewhat sparse and
 subject to change.
 
@@ -32,7 +32,7 @@ bazel-bin/tensorflow/lite/tools/visualize tensorflow/lite/micro/models/person_de
 
 # Manual Setup Illustration
 
-For advanced users that would like to use the Python code in the TFLM repository
+For advanced users that would like to use the Python code in the LiteRT for Micro repository
 independent of bazel, here is one approach.
 
 Please note that this setup is unsupported and will need users to debug various

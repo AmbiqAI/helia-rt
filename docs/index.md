@@ -14,7 +14,7 @@ hide:
 
 # Proven LiteRT workflows. Turbocharged on Ambiq silicon.
 
-heliaRT is Ambiq's optimized TFLM runtime: the same `.tflite` models and MicroInterpreter API, backed by HELIA kernels tuned for Cortex-M and Apollo SPOT silicon.
+heliaRT is Ambiq's optimized LiteRT runtime: the same `.tflite` models and MicroInterpreter API, backed by HELIA kernels tuned for Cortex-M and Apollo SPOT silicon.
 
 <div class="hero-actions" markdown>
 [Get started](getting-started/index.md){ .md-button .md-button--primary }
@@ -35,7 +35,7 @@ heliaRT is Ambiq's optimized TFLM runtime: the same `.tflite` models and MicroIn
 </div>
 
 ```cpp
-// TFLM API, Ambiq-tuned implementation underneath
+// LiteRT API, Ambiq-tuned implementation underneath
 tflite::MicroMutableOpResolver<5> resolver;
 resolver.AddConv2D();
 resolver.AddFullyConnected();
@@ -67,7 +67,7 @@ interpreter.Invoke();
 
 ## A silicon-adjacent runtime layer in the HELIA AI stack
 
-heliaRT sits between your TFLM application and Ambiq silicon. It keeps the upstream programming model intact while routing supported operations through HELIA kernel paths that are tuned for Apollo-class MCUs and Ambiq's SPOT® (Subthreshold Power Optimized Technology) platform.
+heliaRT sits between your LiteRT application and Ambiq silicon. It keeps the upstream programming model intact while routing supported operations through HELIA kernel paths that are tuned for Apollo-class MCUs and Ambiq's SPOT® (Subthreshold Power Optimized Technology) platform.
 
 <div class="takeaway-grid" markdown>
 
@@ -97,11 +97,11 @@ heliaRT sits between your TFLM application and Ambiq silicon. It keeps the upstr
 
 <p class="section-eyebrow">How it works</p>
 
-## Keep your TFLM surface. Swap the backend underneath.
+## Keep your LiteRT surface. Swap the backend underneath.
 
 <div class="workflow" markdown>
 
-<div class="workflow-step"><span>1</span><strong>Build or bring a quantized model</strong><p>Use the same TensorFlow Lite for Microcontrollers model workflow you already have. Int8 and int16 variants map to separate optimized kernel paths where supported.</p></div>
+<div class="workflow-step"><span>1</span><strong>Build or bring a quantized model</strong><p>Use the same LiteRT model workflow you already have. Int8 and int16 variants map to separate optimized kernel paths where supported.</p></div>
 <div class="workflow-step"><span>2</span><strong>Select HELIA at build time</strong><p>Choose Zephyr Kconfig, neuralSPOT-X deployment, source / CMake, or prebuilt static libraries. The application-facing runtime stays familiar.</p></div>
 <div class="workflow-step"><span>3</span><strong>Ship on Apollo silicon</strong><p>Reference and CMSIS-NN remain available as fallbacks, while HELIA-covered ops take the Ambiq-tuned path for better latency and coverage.</p></div>
 
@@ -227,7 +227,7 @@ CMSIS-NN covers the common convolutional core. HELIA adds optimized paths for ac
 <div class="resource-links" markdown>
 [Full Zephyr guide](getting-started/zephyr.md){ .text-link }
 [All getting started paths](getting-started/index.md){ .text-link }
-[Upgrade from upstream TFLM](guides/upgrading-from-litert.md){ .text-link }
+[Upgrade from upstream LiteRT](guides/upgrading-from-litert.md){ .text-link }
 </div>
 
 </section>

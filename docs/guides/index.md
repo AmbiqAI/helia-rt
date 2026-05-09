@@ -48,7 +48,7 @@ These guides go deeper on specific topics after you've completed a [getting-star
 
     ---
 
-    Step-by-step swap from upstream TFLM to heliaRT.
+    Step-by-step swap from upstream LiteRT to heliaRT.
 
     [:octicons-arrow-right-24: Upgrading](upgrading-from-litert.md)
 

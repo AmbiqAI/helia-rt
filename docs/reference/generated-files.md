@@ -8,9 +8,9 @@
 
 # Background
 
-TFLM is designed to run on microcontrollers and other platforms without dynamic
+LiteRT for Micro is designed to run on microcontrollers and other platforms without dynamic
 memory allocation and without filesystems. This means that data files such as
-TFLite models and test inputs must be built into the binary.
+LiteRT models and test inputs must be built into the binary.
 
 Historically, data files have been included as cc arrays generated manually
 using `xxd -i <data file> > data_file.cc`
@@ -18,7 +18,7 @@ using `xxd -i <data file> > data_file.cc`
 # Data Files in Examples
 
 In order to clean up examples, make test inputs easier to understand, and
-include TFLite models directly, TFLM has moved to generating the cc and header
+include LiteRT models directly, LiteRT for Micro has moved to generating the cc and header
 files during the build process using a python script which `make` and `bazel`
 call. To include data files in an example, generator inputs should be supplied
 to the `microlite_test` call in the example's Makefile and `generate_cc_arrays`

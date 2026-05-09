@@ -1,10 +1,10 @@
 # :material-star-four-points: Features
 
-heliaRT keeps the familiar TensorFlow Lite for Microcontrollers programming model while adding Ambiq-focused runtime and kernel optimizations.
+heliaRT keeps the familiar LiteRT programming model while adding Ambiq-focused runtime and kernel optimizations.
 
-## Familiar TFLM Workflow
+## Familiar LiteRT Workflow
 
-If you already know TFLM, the core concepts stay the same:
+If you already know LiteRT for Micro, the core concepts stay the same:
 
 - `.tflite` flatbuffer model inputs
 - `MicroInterpreter`-based execution
@@ -12,7 +12,7 @@ If you already know TFLM, the core concepts stay the same:
 - statically allocated tensor arenas
 - embedded-focused logging, profiling, and memory tradeoffs
 
-That means existing TFLM knowledge transfers directly to heliaRT, while Ambiq-specific integrations give you a faster path to efficient deployment on Apollo devices.
+That means existing LiteRT knowledge transfers directly to heliaRT, while Ambiq-specific integrations give you a faster path to efficient deployment on Apollo devices.
 
 ## What heliaRT Adds
 
@@ -27,7 +27,7 @@ That means existing TFLM knowledge transfers directly to heliaRT, while Ambiq-sp
 
 ### Runtime Compatibility
 
-heliaRT is intended for the same class of microcontroller inference workloads as TFLM:
+heliaRT is intended for the same class of microcontroller inference workloads as LiteRT for Micro:
 
 - quantized inference on memory-constrained devices
 - operator-resolver-based builds

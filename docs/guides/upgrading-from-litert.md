@@ -1,10 +1,10 @@
 # Upgrading from Upstream LiteRT
 
-heliaRT is a **drop-in replacement** for upstream LiteRT for Microcontrollers. The API surface is identical, so switching requires only changing where the library comes from.
+heliaRT is a **drop-in replacement** for upstream LiteRT for Micro, formerly TensorFlow Lite for Microcontrollers / TFLM. The API surface is identical, so switching requires only changing where the library comes from.
 
 ## What Changes
 
-| Aspect | Before (upstream TFLM) | After (heliaRT) |
+| Aspect | Before (upstream LiteRT) | After (heliaRT) |
 |---|---|---|
 | Source / archive | `tensorflow/tflite-micro` | `AmbiqAI/helia-rt` |
 | Additional backend | Reference + CMSIS-NN | Reference + CMSIS-NN + **HELIA** |
@@ -24,7 +24,7 @@ heliaRT is a **drop-in replacement** for upstream LiteRT for Microcontrollers. T
 
 === "Source module"
 
-    Replace the upstream TFLM module with heliaRT in your `west.yml`:
+    Replace the upstream LiteRT module with heliaRT in your `west.yml`:
 
     ```yaml
     # west.yml — projects:
@@ -47,7 +47,7 @@ heliaRT is a **drop-in replacement** for upstream LiteRT for Microcontrollers. T
 
 ## Step-by-Step: Makefile / Source Build
 
-1. Clone heliaRT instead of upstream TFLM:
+1. Clone heliaRT instead of upstream LiteRT:
 
     ```bash
     git clone https://github.com/AmbiqAI/helia-rt

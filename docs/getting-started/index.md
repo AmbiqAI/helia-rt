@@ -1,6 +1,6 @@
 # :material-rocket-launch: Getting Started
 
-heliaRT keeps the familiar LiteRT for Microcontrollers programming model and adds Ambiq-tuned kernels for Apollo platforms. Pick the integration path that matches your project.
+heliaRT keeps the familiar LiteRT programming model and adds Ambiq-tuned kernels for Apollo platforms. Pick the integration path that matches your project.
 
 ## Pick Your Path
 
@@ -50,7 +50,7 @@ heliaRT keeps the familiar LiteRT for Microcontrollers programming model and add
 
 ## Core Concepts
 
-If you've used TFLM before, you already know the model:
+If you've used LiteRT for Micro before, you already know the model:
 
 | Concept | Same in heliaRT? |
 |---|---|

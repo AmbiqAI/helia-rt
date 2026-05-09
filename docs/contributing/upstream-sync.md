@@ -1,6 +1,6 @@
 # Upstream Sync
 
-heliaRT is periodically replanted on upstream [tflite-micro](https://github.com/tensorflow/tflite-micro) `main`. This page explains the process and the blast-radius reduction philosophy.
+heliaRT is periodically replanted on upstream LiteRT for Micro ([`tensorflow/tflite-micro`](https://github.com/tensorflow/tflite-micro)) `main`. This page explains the process and the blast-radius reduction philosophy.
 
 ## How It Works
 

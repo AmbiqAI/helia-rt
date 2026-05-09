@@ -1,10 +1,10 @@
 # Why heliaRT
 
-heliaRT is a **drop-in replacement** for upstream LiteRT for Microcontrollers (TFLM) with Ambiq-tuned kernels. Same API, faster inference, purpose-built for Apollo silicon.
+heliaRT is a **drop-in replacement** for upstream LiteRT for Micro with Ambiq-tuned kernels. Same API, faster inference, purpose-built for Apollo silicon.
 
 ## The Problem
 
-Upstream TFLM ships two kernel backends:
+Upstream LiteRT ships two kernel backends:
 
 - **Reference** — portable C, works everywhere, not fast.
 - **CMSIS-NN** — Arm-optimized, good on Cortex-M, but only covers a subset of operators.
@@ -27,7 +27,7 @@ graph LR
 ```
 
 !!! success "Drop-in upgrade"
-    heliaRT uses the **exact same API** as upstream TFLM — `MicroInterpreter`, `Model`, `MicroMutableOpResolver`, tensor arenas, `.tflite` models. Swap the dependency, rebuild, ship. No retraining, no re-quantization, no code changes.
+    heliaRT uses the **exact same API** as upstream LiteRT for Micro — formerly TensorFlow Lite for Microcontrollers / TFLM — including `MicroInterpreter`, `Model`, `MicroMutableOpResolver`, tensor arenas, and `.tflite` models. Swap the dependency, rebuild, ship. No retraining, no re-quantization, no code changes.
 
 ## What HELIA Adds
 

@@ -1,12 +1,12 @@
 # Architecture
 
-heliaRT is a thin layer on top of upstream [tflite-micro](https://github.com/tensorflow/tflite-micro). This page explains the source layout and how HELIA kernels are wired into the build.
+heliaRT is a thin layer on top of upstream LiteRT for Micro ([`tensorflow/tflite-micro`](https://github.com/tensorflow/tflite-micro)). This page explains the source layout and how HELIA kernels are wired into the build.
 
 ## Source Layout
 
 ```
 helia-rt/
-├── tensorflow/lite/micro/          # Upstream TFLM + Ambiq additions
+├── tensorflow/lite/micro/          # Upstream LiteRT for Micro + Ambiq additions
 │   ├── kernels/                    # Reference kernels (upstream)
 │   │   ├── cmsis_nn/               # Open-source Arm CMSIS-NN overrides
 │   │   └── helia/                  # ★ Ambiq HELIA kernel overrides
@@ -77,7 +77,7 @@ endfunction()
 
 1. **Minimal diff from upstream** — Ambiq additions live in dedicated directories (`kernels/helia/`, `ci/`, `zephyr/`). Upstream files are edited only when absolutely necessary.
 
-2. **Preserve the TFLM API** — no public API changes that break upstream compatibility. `MicroInterpreter`, `OpResolver`, and the `.tflite` format are identical.
+2. **Preserve the LiteRT API** — no public API changes that break upstream compatibility. `MicroInterpreter`, `OpResolver`, and the `.tflite` format are identical.
 
 3. **Backend as extension** — HELIA kernels are additive. They don't fork CMSIS-NN; they provide an independent set of optimized implementations that coexist with CMSIS-NN and Reference.
 
@@ -93,5 +93,5 @@ endfunction()
 
 ## Next Steps
 
-- [Upstream Sync](upstream-sync.md) — how we stay current with tflite-micro
+- [Upstream Sync](upstream-sync.md) — how we stay current with LiteRT for Micro
 - [Kernel Selection](../guides/kernel-selection.md) — user-facing backend choice guide

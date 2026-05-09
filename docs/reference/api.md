@@ -1,6 +1,6 @@
 # API Surface
 
-heliaRT's public API is intentionally minimal and fully compatible with upstream TFLM. This page documents the heliaRT-specific additions.
+heliaRT's public API is intentionally minimal and fully compatible with upstream LiteRT. This page documents the heliaRT-specific additions.
 
 ## heliaRT Version Header
 
@@ -13,9 +13,9 @@ const char* version = HELIART_VERSION;  // e.g. "v1.12.2"
 
 This header provides the `HELIART_VERSION` macro, which is managed by [release-please](https://github.com/googleapis/release-please) and updated automatically on every release.
 
-## Upstream TFLM API
+## Upstream LiteRT API
 
-heliaRT does **not** modify or extend the upstream TFLM API. The following core types work identically:
+heliaRT does **not** modify or extend the upstream LiteRT for Micro API. The following core types work identically:
 
 | Type | Header | Purpose |
 |---|---|---|
@@ -25,7 +25,7 @@ heliaRT does **not** modify or extend the upstream TFLM API. The following core 
 | `tflite::MicroAllocator` | `micro_allocator.h` | Arena memory management |
 | `tflite::MicroProfiler` | `micro_profiler.h` | Per-layer profiling |
 
-For detailed API documentation, refer to the [upstream TFLM API docs](https://github.com/tensorflow/tflite-micro/tree/main/tensorflow/lite/micro).
+For detailed API documentation, refer to the [upstream LiteRT for Micro API docs](https://github.com/tensorflow/tflite-micro/tree/main/tensorflow/lite/micro).
 
 ## Build-Time Configuration
 

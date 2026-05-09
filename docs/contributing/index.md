@@ -16,7 +16,7 @@ Thank you for your interest in contributing to heliaRT. This section covers the 
 
     ---
 
-    How the tflite-micro replant works and blast-radius philosophy.
+    How the LiteRT for Micro replant works and blast-radius philosophy.
 
     [:octicons-arrow-right-24: Upstream Sync](upstream-sync.md)
 
@@ -52,7 +52,7 @@ Thank you for your interest in contributing to heliaRT. This section covers the 
 
 heliaRT is released under the [Ambiq Apollo SDK License](https://github.com/AmbiqAI/helia-rt/blob/main/LICENSE). By contributing, you agree your changes are licensed under the same terms.
 
-A [Google CLA](https://cla.developers.google.com/) is required for all contributions (inherited from upstream TFLM).
+A [Google CLA](https://cla.developers.google.com/) is required for all contributions (inherited from upstream LiteRT for Micro).
 
 ## Code of Conduct
 
