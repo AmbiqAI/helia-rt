@@ -52,9 +52,7 @@ matches the release build matrix.
 
 === "Source Module + CMSIS-NN"
 
-    <div class="zephyr-tab-panel" markdown>
-
-    <span class="zephyr-tab-kicker">Open optimized backend</span>
+    **Open optimized backend.**
 
     Use this path when you want source visibility and the public CMSIS-NN backend.
     It is a good default for teams that want a familiar Zephyr source module with
@@ -74,13 +72,9 @@ matches the release build matrix.
     - `CONFIG_HELIA_RT=y`
     - `CONFIG_HELIA_RT_BACKEND_CMSIS_NN=y`
 
-    </div>
-
 === "Source Module + HELIA"
 
-    <div class="zephyr-tab-panel zephyr-tab-panel--accent" markdown>
-
-    <span class="zephyr-tab-kicker">Ambiq accelerated source path</span>
+    **Ambiq accelerated source path.**
 
     Use this path when you want source-level integration and Ambiq HELIA kernel
     acceleration. It adds the `ns-cmsis-nn` module beside heliaRT so supported
@@ -100,13 +94,9 @@ matches the release build matrix.
     - `CONFIG_NS_CMSIS_NN=y`
     - `CONFIG_HELIA_RT_BACKEND_HELIA=y`
 
-    </div>
-
 === "Prebuilt Release Module"
 
-    <div class="zephyr-tab-panel" markdown>
-
-    <span class="zephyr-tab-kicker">Release artifact path</span>
+    **Release artifact path.**
 
     Use this path when you want to consume a published heliaRT release instead of
     building the runtime from source. The module selects the matching archive for
@@ -124,8 +114,6 @@ matches the release build matrix.
     - no separate `ns-cmsis-nn` module
     - `CONFIG_HELIA_RT=y`
     - `CONFIG_FPU=y` for Cortex-M55 builds
-
-    </div>
 
 ## Module Discovery
 

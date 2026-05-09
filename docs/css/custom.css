@@ -536,11 +536,35 @@
 .coverage-foot strong { color: var(--hr-ink); font-size: 1.2rem; }
 
 .md-typeset .tabbed-set {
-  max-width: 860px;
+  width: 100%;
+  max-width: none;
+  margin: 1.1rem 0 2rem;
   border: 1px solid var(--hr-line);
   border-radius: var(--hr-radius);
   overflow: hidden;
   box-shadow: var(--hr-shadow);
+}
+
+.md-typeset .tabbed-labels {
+  background: #f8fafc;
+}
+
+.md-typeset .tabbed-labels > label {
+  min-height: 3rem;
+  padding-inline: 1rem;
+  font-weight: 780;
+}
+
+.md-typeset .tabbed-block {
+  padding: 1.25rem 1.35rem 1.35rem;
+}
+
+.md-typeset .tabbed-block > :first-child {
+  margin-top: 0;
+}
+
+.md-typeset .tabbed-block > :last-child {
+  margin-bottom: 0;
 }
 
 .resource-links {
@@ -871,61 +895,6 @@
   line-height: 1.5;
 }
 
-.md-typeset .zephyr-page .tabbed-set {
-  max-width: 100%;
-  margin: 1.1rem 0 2.5rem;
-}
-
-.md-typeset .zephyr-page .tabbed-labels {
-  background: #f8fafc;
-}
-
-.md-typeset .zephyr-page .tabbed-labels > label {
-  min-height: 3rem;
-  padding-inline: 1rem;
-  font-weight: 780;
-}
-
-.md-typeset .zephyr-page .tabbed-block {
-  padding: 1.35rem 1.45rem 1.5rem;
-}
-
-.md-typeset .zephyr-page .tabbed-block > :first-child,
-.md-typeset .zephyr-tab-panel > :first-child {
-  margin-top: 0;
-}
-
-.zephyr-tab-panel {
-  padding: 1rem;
-  border: 1px solid var(--hr-line);
-  border-radius: 12px;
-  background: #fbfcfe;
-}
-
-.zephyr-tab-panel--accent {
-  border-color: rgba(0, 193, 179, 0.45);
-  background: linear-gradient(180deg, rgba(0, 193, 179, 0.08), rgba(255,255,255,0)), #fbfcfe;
-}
-
-.zephyr-tab-kicker {
-  display: inline-flex;
-  align-items: center;
-  min-height: 1.7rem;
-  margin: 0 0 0.75rem;
-  padding: 0 0.65rem;
-  border-radius: 999px;
-  background: rgba(29, 153, 255, 0.10);
-  color: var(--hr-accent-2);
-  font-size: 0.68rem;
-  font-weight: 850;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.zephyr-tab-panel ul {
-  margin-bottom: 0.85rem;
-}
-
 @media (max-width: 1000px) {
   .landing-hero,
   .section-block--split { grid-template-columns: 1fr; }
@@ -957,7 +926,7 @@
   .zephyr-path-grid { grid-template-columns: 1fr; }
   .metric-grid { grid-template-columns: 1fr 1fr; }
   .section-block { margin-bottom: 3.2rem; }
-  .md-typeset .zephyr-page .tabbed-block { padding: 1rem; }
+  .md-typeset .tabbed-block { padding: 1rem; }
 }
 
 .termynal-comment {
