@@ -20,7 +20,7 @@ limitations under the License.
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
 #include "tensorflow/lite/micro/test_helpers.h"
-#include "tensorflow/lite/micro/testing/micro_test.h"
+#include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
 namespace tflite {
 namespace testing {
@@ -42,22 +42,22 @@ void ValidateStridedSliceGoldens(TfLiteTensor* tensors, int tensors_size,
   micro::KernelRunner runner(registration, tensors, tensors_size, inputs_array,
                              outputs_array, reinterpret_cast<void*>(params));
   if (expect_prepare_err) {
-    TF_LITE_MICRO_EXPECT_EQ(kTfLiteError, runner.InitAndPrepare());
+    EXPECT_EQ(kTfLiteError, runner.InitAndPrepare());
     return;
   } else {
-    TF_LITE_MICRO_EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+    EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
   }
 
   for (int i = 0; i < num_invoke; i++) {
-    TF_LITE_MICRO_EXPECT_EQ(kTfLiteOk, runner.Invoke());
+    EXPECT_EQ(kTfLiteOk, runner.Invoke());
   }
 
   if (no_golden_data == false) {
     for (int i = 0; i < output_len; ++i) {
-      TF_LITE_MICRO_EXPECT_NEAR(golden[i], output[i], 1e-5f);
+      EXPECT_NEAR(golden[i], output[i], 1e-5f);
     }
   }
-  TF_LITE_MICRO_EXPECT(runner.ValidateTempBufferDeallocated());
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
 }
 
 void TestStridedSliceFloat(int* input_shape, int* begin_shape, int* end_shape,
@@ -84,7 +84,6 @@ void TestStridedSliceFloat(int* input_shape, int* begin_shape, int* end_shape,
       CreateTensor(strides_data, strides_dims),
       CreateTensor(output_data, output_dims),
   };
-
   // begin must be a const tensor
   tensors[kStridedSliceBeginTensor].allocation_type = kTfLiteMmapRo;
   // end must be a const tensor
@@ -125,7 +124,6 @@ void TestStridedSliceQuantized(int* input_shape, int* begin_shape,
       CreateTensor(strides_data, strides_dims),
       CreateQuantizedTensor(output_data, output_dims, 1.0, zero_point),
   };
-
   // begin must be a const tensor
   tensors[kStridedSliceBeginTensor].allocation_type = kTfLiteMmapRo;
   // end must be a const tensor
@@ -143,19 +141,17 @@ void TestStridedSliceQuantized(int* input_shape, int* begin_shape,
 }  // namespace testing
 }  // namespace tflite
 
-TF_LITE_MICRO_TESTS_BEGIN
-
-TF_LITE_MICRO_TEST(UnsupportedInputSize) {
+TEST(StridedSliceTest, UnsupportedInputSize) {
   int input_shape[] = {5, 2, 2, 2, 2, 2};
   int begin_shape[] = {1, 5};
   int end_shape[] = {1, 5};
   int strides_shape[] = {1, 5};
   int output_shape[] = {0};
-  float input_data[] = {};
-  int32_t begin_data[] = {};
-  int32_t end_data[] = {};
-  int32_t strides_data[] = {};
-  float golden[] = {};
+  float input_data[] = {0.0f};
+  int32_t begin_data[] = {0};
+  int32_t end_data[] = {0};
+  int32_t strides_data[] = {0};
+  float golden[] = {0.0f};
   float output_data[4];
 
   TfLiteStridedSliceParams builtin_data = {};
@@ -166,7 +162,7 @@ TF_LITE_MICRO_TEST(UnsupportedInputSize) {
       golden, true);
 }
 
-TF_LITE_MICRO_TEST(In1D) {
+TEST(StridedSliceTest, In1D) {
   int input_shape[] = {1, 4};
   int begin_shape[] = {1, 1};
   int end_shape[] = {1, 1};
@@ -187,7 +183,7 @@ TF_LITE_MICRO_TEST(In1D) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In1D_EmptyOutput) {
+TEST(StridedSliceTest, In1D_EmptyOutput) {
   int input_shape[] = {1, 4};
   int begin_shape[] = {1, 1};
   int end_shape[] = {1, 1};
@@ -197,7 +193,7 @@ TF_LITE_MICRO_TEST(In1D_EmptyOutput) {
   int32_t begin_data[] = {10};
   int32_t end_data[] = {3};
   int32_t strides_data[] = {1};
-  float golden[] = {};
+  float golden[] = {0.0f};
   float output_data[4];
 
   TfLiteStridedSliceParams builtin_data = {};
@@ -208,7 +204,7 @@ TF_LITE_MICRO_TEST(In1D_EmptyOutput) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In1D_NegativeBegin) {
+TEST(StridedSliceTest, In1D_NegativeBegin) {
   int input_shape[] = {1, 4};
   int begin_shape[] = {1, 1};
   int end_shape[] = {1, 1};
@@ -229,7 +225,7 @@ TF_LITE_MICRO_TEST(In1D_NegativeBegin) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In1D_OutOfRangeBegin) {
+TEST(StridedSliceTest, In1D_OutOfRangeBegin) {
   int input_shape[] = {1, 4};
   int begin_shape[] = {1, 1};
   int end_shape[] = {1, 1};
@@ -250,7 +246,7 @@ TF_LITE_MICRO_TEST(In1D_OutOfRangeBegin) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In1D_NegativeEnd) {
+TEST(StridedSliceTest, In1D_NegativeEnd) {
   int input_shape[] = {1, 4};
   int begin_shape[] = {1, 1};
   int end_shape[] = {1, 1};
@@ -271,7 +267,7 @@ TF_LITE_MICRO_TEST(In1D_NegativeEnd) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In1D_OutOfRangeEnd) {
+TEST(StridedSliceTest, In1D_OutOfRangeEnd) {
   int input_shape[] = {1, 4};
   int begin_shape[] = {1, 1};
   int end_shape[] = {1, 1};
@@ -292,7 +288,7 @@ TF_LITE_MICRO_TEST(In1D_OutOfRangeEnd) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In1D_BeginMask) {
+TEST(StridedSliceTest, In1D_BeginMask) {
   int input_shape[] = {1, 4};
   int begin_shape[] = {1, 1};
   int end_shape[] = {1, 1};
@@ -313,7 +309,7 @@ TF_LITE_MICRO_TEST(In1D_BeginMask) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In1D_NegativeBeginNegativeStride) {
+TEST(StridedSliceTest, In1D_NegativeBeginNegativeStride) {
   int input_shape[] = {1, 4};
   int begin_shape[] = {1, 1};
   int end_shape[] = {1, 1};
@@ -334,7 +330,7 @@ TF_LITE_MICRO_TEST(In1D_NegativeBeginNegativeStride) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In1D_OutOfRangeBeginNegativeStride) {
+TEST(StridedSliceTest, In1D_OutOfRangeBeginNegativeStride) {
   int input_shape[] = {1, 4};
   int begin_shape[] = {1, 1};
   int end_shape[] = {1, 1};
@@ -355,7 +351,7 @@ TF_LITE_MICRO_TEST(In1D_OutOfRangeBeginNegativeStride) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In1D_NegativeEndNegativeStride) {
+TEST(StridedSliceTest, In1D_NegativeEndNegativeStride) {
   int input_shape[] = {1, 4};
   int begin_shape[] = {1, 1};
   int end_shape[] = {1, 1};
@@ -376,7 +372,7 @@ TF_LITE_MICRO_TEST(In1D_NegativeEndNegativeStride) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In1D_OutOfRangeEndNegativeStride) {
+TEST(StridedSliceTest, In1D_OutOfRangeEndNegativeStride) {
   int input_shape[] = {1, 4};
   int begin_shape[] = {1, 1};
   int end_shape[] = {1, 1};
@@ -397,7 +393,7 @@ TF_LITE_MICRO_TEST(In1D_OutOfRangeEndNegativeStride) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In1D_EndMask) {
+TEST(StridedSliceTest, In1D_EndMask) {
   int input_shape[] = {1, 4};
   int begin_shape[] = {1, 1};
   int end_shape[] = {1, 1};
@@ -418,7 +414,7 @@ TF_LITE_MICRO_TEST(In1D_EndMask) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In1D_NegStride) {
+TEST(StridedSliceTest, In1D_NegStride) {
   int input_shape[] = {1, 3};
   int begin_shape[] = {1, 1};
   int end_shape[] = {1, 1};
@@ -439,7 +435,7 @@ TF_LITE_MICRO_TEST(In1D_NegStride) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In1D_EvenLenStride2) {
+TEST(StridedSliceTest, In1D_EvenLenStride2) {
   int input_shape[] = {1, 2};
   int begin_shape[] = {1, 1};
   int end_shape[] = {1, 1};
@@ -460,7 +456,7 @@ TF_LITE_MICRO_TEST(In1D_EvenLenStride2) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In1D_OddLenStride2) {
+TEST(StridedSliceTest, In1D_OddLenStride2) {
   int input_shape[] = {1, 3};
   int begin_shape[] = {1, 1};
   int end_shape[] = {1, 1};
@@ -481,7 +477,7 @@ TF_LITE_MICRO_TEST(In1D_OddLenStride2) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In2D_Identity) {
+TEST(StridedSliceTest, In2D_Identity) {
   int input_shape[] = {2, 2, 3};
   int begin_shape[] = {1, 2};
   int end_shape[] = {1, 2};
@@ -502,7 +498,7 @@ TF_LITE_MICRO_TEST(In2D_Identity) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In2D) {
+TEST(StridedSliceTest, In2D) {
   int input_shape[] = {2, 2, 3};
   int begin_shape[] = {1, 2};
   int end_shape[] = {1, 2};
@@ -523,7 +519,7 @@ TF_LITE_MICRO_TEST(In2D) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In2D_Stride2) {
+TEST(StridedSliceTest, In2D_Stride2) {
   int input_shape[] = {2, 2, 3};
   int begin_shape[] = {1, 2};
   int end_shape[] = {1, 2};
@@ -544,7 +540,7 @@ TF_LITE_MICRO_TEST(In2D_Stride2) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In2D_NegStride) {
+TEST(StridedSliceTest, In2D_NegStride) {
   int input_shape[] = {2, 2, 3};
   int begin_shape[] = {1, 2};
   int end_shape[] = {1, 2};
@@ -565,7 +561,7 @@ TF_LITE_MICRO_TEST(In2D_NegStride) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In2D_BeginMask) {
+TEST(StridedSliceTest, In2D_BeginMask) {
   int input_shape[] = {2, 2, 3};
   int begin_shape[] = {1, 2};
   int end_shape[] = {1, 2};
@@ -586,7 +582,7 @@ TF_LITE_MICRO_TEST(In2D_BeginMask) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In2D_EndMask) {
+TEST(StridedSliceTest, In2D_EndMask) {
   int input_shape[] = {2, 2, 3};
   int begin_shape[] = {1, 2};
   int end_shape[] = {1, 2};
@@ -607,7 +603,7 @@ TF_LITE_MICRO_TEST(In2D_EndMask) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In2D_NegStrideBeginMask) {
+TEST(StridedSliceTest, In2D_NegStrideBeginMask) {
   int input_shape[] = {2, 2, 3};
   int begin_shape[] = {1, 2};
   int end_shape[] = {1, 2};
@@ -628,7 +624,7 @@ TF_LITE_MICRO_TEST(In2D_NegStrideBeginMask) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In2D_NegStrideEndMask) {
+TEST(StridedSliceTest, In2D_NegStrideEndMask) {
   int input_shape[] = {2, 2, 3};
   int begin_shape[] = {1, 2};
   int end_shape[] = {1, 2};
@@ -649,7 +645,7 @@ TF_LITE_MICRO_TEST(In2D_NegStrideEndMask) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In3D_Identity) {
+TEST(StridedSliceTest, In3D_Identity) {
   int input_shape[] = {3, 2, 3, 2};
   int begin_shape[] = {1, 3};
   int end_shape[] = {1, 3};
@@ -670,7 +666,7 @@ TF_LITE_MICRO_TEST(In3D_Identity) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In3D_NegStride) {
+TEST(StridedSliceTest, In3D_NegStride) {
   int input_shape[] = {3, 2, 3, 2};
   int begin_shape[] = {1, 3};
   int end_shape[] = {1, 3};
@@ -691,7 +687,7 @@ TF_LITE_MICRO_TEST(In3D_NegStride) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In3D_Strided2) {
+TEST(StridedSliceTest, In3D_Strided2) {
   int input_shape[] = {3, 2, 3, 2};
   int begin_shape[] = {1, 3};
   int end_shape[] = {1, 3};
@@ -712,7 +708,7 @@ TF_LITE_MICRO_TEST(In3D_Strided2) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In1D_ShrinkAxisMask1) {
+TEST(StridedSliceTest, In1D_ShrinkAxisMask1) {
   int input_shape[] = {3, 2, 3, 2};
   int begin_shape[] = {1, 3};
   int end_shape[] = {1, 3};
@@ -733,7 +729,7 @@ TF_LITE_MICRO_TEST(In1D_ShrinkAxisMask1) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In1D_ShrinkAxisMask1_NegativeSlice) {
+TEST(StridedSliceTest, In1D_ShrinkAxisMask1_NegativeSlice) {
   int input_shape[] = {1, 4};
   int begin_shape[] = {1, 1};
   int end_shape[] = {1, 1};
@@ -754,7 +750,7 @@ TF_LITE_MICRO_TEST(In1D_ShrinkAxisMask1_NegativeSlice) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In2D_ShrinkAxis3_NegativeSlice) {
+TEST(StridedSliceTest, In2D_ShrinkAxis3_NegativeSlice) {
   int input_shape[] = {2, 4, 1};
   int begin_shape[] = {1, 2};
   int end_shape[] = {1, 2};
@@ -775,7 +771,7 @@ TF_LITE_MICRO_TEST(In2D_ShrinkAxis3_NegativeSlice) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In2D_ShrinkAxis2_BeginEndAxis1_NegativeSlice) {
+TEST(StridedSliceTest, In2D_ShrinkAxis2_BeginEndAxis1_NegativeSlice) {
   int input_shape[] = {2, 4, 1};
   int begin_shape[] = {1, 2};
   int end_shape[] = {1, 2};
@@ -796,7 +792,7 @@ TF_LITE_MICRO_TEST(In2D_ShrinkAxis2_BeginEndAxis1_NegativeSlice) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In1D_BeginMaskShrinkAxisMask1) {
+TEST(StridedSliceTest, In1D_BeginMaskShrinkAxisMask1) {
   int input_shape[] = {1, 4};
   int begin_shape[] = {1, 1};
   int end_shape[] = {1, 1};
@@ -817,7 +813,7 @@ TF_LITE_MICRO_TEST(In1D_BeginMaskShrinkAxisMask1) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In2D_ShrinkAxisMask1) {
+TEST(StridedSliceTest, In2D_ShrinkAxisMask1) {
   int input_shape[] = {2, 2, 3};
   int begin_shape[] = {1, 2};
   int end_shape[] = {1, 2};
@@ -838,7 +834,7 @@ TF_LITE_MICRO_TEST(In2D_ShrinkAxisMask1) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In2D_ShrinkAxisMask2) {
+TEST(StridedSliceTest, In2D_ShrinkAxisMask2) {
   int input_shape[] = {2, 2, 3};
   int begin_shape[] = {1, 2};
   int end_shape[] = {1, 2};
@@ -859,7 +855,7 @@ TF_LITE_MICRO_TEST(In2D_ShrinkAxisMask2) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In2D_ShrinkAxisMask3) {
+TEST(StridedSliceTest, In2D_ShrinkAxisMask3) {
   int input_shape[] = {2, 2, 3};
   int begin_shape[] = {1, 2};
   int end_shape[] = {1, 2};
@@ -880,7 +876,7 @@ TF_LITE_MICRO_TEST(In2D_ShrinkAxisMask3) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In3D_IdentityShrinkAxis1) {
+TEST(StridedSliceTest, In3D_IdentityShrinkAxis1) {
   int input_shape[] = {3, 2, 3, 2};
   int begin_shape[] = {1, 3};
   int end_shape[] = {1, 3};
@@ -901,7 +897,7 @@ TF_LITE_MICRO_TEST(In3D_IdentityShrinkAxis1) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In3D_IdentityShrinkAxis2) {
+TEST(StridedSliceTest, In3D_IdentityShrinkAxis2) {
   int input_shape[] = {3, 2, 3, 2};
   int begin_shape[] = {1, 3};
   int end_shape[] = {1, 3};
@@ -922,7 +918,7 @@ TF_LITE_MICRO_TEST(In3D_IdentityShrinkAxis2) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In3D_IdentityShrinkAxis3) {
+TEST(StridedSliceTest, In3D_IdentityShrinkAxis3) {
   int input_shape[] = {3, 2, 3, 2};
   int begin_shape[] = {1, 3};
   int end_shape[] = {1, 3};
@@ -943,7 +939,7 @@ TF_LITE_MICRO_TEST(In3D_IdentityShrinkAxis3) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In3D_IdentityShrinkAxis4) {
+TEST(StridedSliceTest, In3D_IdentityShrinkAxis4) {
   int input_shape[] = {3, 2, 3, 2};
   int begin_shape[] = {1, 3};
   int end_shape[] = {1, 3};
@@ -964,7 +960,7 @@ TF_LITE_MICRO_TEST(In3D_IdentityShrinkAxis4) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In3D_IdentityShrinkAxis5) {
+TEST(StridedSliceTest, In3D_IdentityShrinkAxis5) {
   int input_shape[] = {3, 2, 3, 2};
   int begin_shape[] = {1, 3};
   int end_shape[] = {1, 3};
@@ -985,7 +981,7 @@ TF_LITE_MICRO_TEST(In3D_IdentityShrinkAxis5) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In3D_IdentityShrinkAxis6) {
+TEST(StridedSliceTest, In3D_IdentityShrinkAxis6) {
   int input_shape[] = {3, 2, 3, 2};
   int begin_shape[] = {1, 3};
   int end_shape[] = {1, 3};
@@ -1006,7 +1002,7 @@ TF_LITE_MICRO_TEST(In3D_IdentityShrinkAxis6) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In3D_IdentityShrinkAxis7) {
+TEST(StridedSliceTest, In3D_IdentityShrinkAxis7) {
   int input_shape[] = {3, 2, 3, 2};
   int begin_shape[] = {1, 3};
   int end_shape[] = {1, 3};
@@ -1028,7 +1024,7 @@ TF_LITE_MICRO_TEST(In3D_IdentityShrinkAxis7) {
 }
 
 // This tests catches a very subtle bug that was fixed by cl/188403234.
-TF_LITE_MICRO_TEST(RunTwice) {
+TEST(StridedSliceTest, RunTwice) {
   int input_shape[] = {2, 2, 3};
   int begin_shape[] = {1, 2};
   int end_shape[] = {1, 2};
@@ -1049,7 +1045,7 @@ TF_LITE_MICRO_TEST(RunTwice) {
       golden, false, 2);
 }
 
-TF_LITE_MICRO_TEST(In3D_IdentityShrinkAxis1int8) {
+TEST(StridedSliceTest, In3D_IdentityShrinkAxis1int8) {
   int input_shape[] = {3, 2, 3, 2};
   int begin_shape[] = {1, 3};
   int end_shape[] = {1, 3};
@@ -1070,7 +1066,7 @@ TF_LITE_MICRO_TEST(In3D_IdentityShrinkAxis1int8) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In3D_IdentityShrinkAxis1int16) {
+TEST(StridedSliceTest, In3D_IdentityShrinkAxis1int16) {
   int input_shape[] = {3, 2, 3, 2};
   int begin_shape[] = {1, 3};
   int end_shape[] = {1, 3};
@@ -1091,7 +1087,7 @@ TF_LITE_MICRO_TEST(In3D_IdentityShrinkAxis1int16) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In3D_IdentityShrinkAxis1int32) {
+TEST(StridedSliceTest, In3D_IdentityShrinkAxis1int32) {
   int input_shape[] = {3, 2, 3, 2};
   int begin_shape[] = {1, 3};
   int end_shape[] = {1, 3};
@@ -1112,7 +1108,7 @@ TF_LITE_MICRO_TEST(In3D_IdentityShrinkAxis1int32) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In3D_Strided2int32) {
+TEST(StridedSliceTest, In3D_Strided2int32) {
   int input_shape[] = {3, 2, 3, 2};
   int begin_shape[] = {1, 3};
   int end_shape[] = {1, 3};
@@ -1133,7 +1129,7 @@ TF_LITE_MICRO_TEST(In3D_Strided2int32) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In3D_Strided2bool) {
+TEST(StridedSliceTest, In3D_Strided2bool) {
   int input_shape[] = {3, 2, 3, 2};
   int begin_shape[] = {1, 3};
   int end_shape[] = {1, 3};
@@ -1155,7 +1151,7 @@ TF_LITE_MICRO_TEST(In3D_Strided2bool) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(MinusThreeMinusFourMinusOne) {
+TEST(StridedSliceTest, MinusThreeMinusFourMinusOne) {
   int input_shape[] = {1, 4};
   int begin_shape[] = {1, 1};
   int end_shape[] = {1, 1};
@@ -1176,7 +1172,7 @@ TF_LITE_MICRO_TEST(MinusThreeMinusFourMinusOne) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(MinusFourMinusThreeOne) {
+TEST(StridedSliceTest, MinusFourMinusThreeOne) {
   int input_shape[] = {1, 4};
   int begin_shape[] = {1, 1};
   int end_shape[] = {1, 1};
@@ -1197,7 +1193,7 @@ TF_LITE_MICRO_TEST(MinusFourMinusThreeOne) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(In3D_BackwardSmallBeginEndMask) {
+TEST(StridedSliceTest, In3D_BackwardSmallBeginEndMask) {
   int input_shape[] = {1, 1, 1, 2};
   int begin_shape[] = {1, 1};
   int end_shape[] = {1, 1};
@@ -1218,7 +1214,7 @@ TF_LITE_MICRO_TEST(In3D_BackwardSmallBeginEndMask) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(OneOneOne) {
+TEST(StridedSliceTest, OneOneOne) {
   int input_shape[] = {1, 1};
   int begin_shape[] = {1, 1};
   int end_shape[] = {1, 1};
@@ -1239,13 +1235,13 @@ TF_LITE_MICRO_TEST(OneOneOne) {
       golden, false);
 }
 
-TF_LITE_MICRO_TEST(StrideOutOfBounds) {
+TEST(StridedSliceTest, StrideOutOfBounds) {
   int input_shape[] = {1, 1};
   int begin_shape[] = {1, 1};
   int end_shape[] = {1, 1};
   int strides_shape[] = {1, 1};
   int output_shape[] = {0};
-  float input_data[] = {};
+  float input_data[] = {0.0f};
   int32_t begin_data[] = {1};
   int32_t end_data[] = {4};
   int32_t strides_data[] = {7};
@@ -1260,17 +1256,17 @@ TF_LITE_MICRO_TEST(StrideOutOfBounds) {
       golden, false, 1, true);
 }
 
-TF_LITE_MICRO_TEST(OutOfBounds) {
+TEST(StridedSliceTest, OutOfBounds) {
   int input_shape[] = {1, 1};
   int begin_shape[] = {1, 1};
   int end_shape[] = {1, 1};
   int strides_shape[] = {1, 1};
   int output_shape[] = {0};
-  float input_data[] = {};
+  float input_data[] = {0.0f};
   int32_t begin_data[] = {1};
   int32_t end_data[] = {2};
   int32_t strides_data[] = {1};
-  float golden[0];
+  float golden[] = {0.0f};
   float output_data[16];
 
   TfLiteStridedSliceParams builtin_data = {0, 0, 0, 0, 1, false};
@@ -1281,4 +1277,4 @@ TF_LITE_MICRO_TEST(OutOfBounds) {
       golden, false, 1, true);
 }
 
-TF_LITE_MICRO_TESTS_END
+TF_LITE_MICRO_TESTS_MAIN

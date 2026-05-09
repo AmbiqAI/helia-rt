@@ -191,9 +191,8 @@ A good example is [PR #45311][].
     This bulk-delete action is in its own commit for reasons similar to
     those given in the step above: to produce a more readable, reviewable diff in this
     step and in the next. Because the files are not yet added to the build, they
-    need not (and obviously won't) compiler or function. What to delete now as
-    opposed to deleting in the next commit is somewhat subjective, but make
-    deletes in order to:
+    need not (and obviously won't) compile or function. What to delete now as
+    opposed to deleting in the next commit is somewhat subjective, but make    deletes in order to:
 
     -   Flatten the namespace down to `tflite`.
     -   Stop resizing output tensors.
@@ -389,7 +388,7 @@ For more information see: [Memory Allocation Overview](online_memory_allocation_
 ## Can I change the shape of tensors in my operator code?
 Yes.  The new shape must be exactly equal to the storage space indicated by the
 old shape.
-Because tensor shape values may live in non-volatile memory that is not directly
+Because tensor shape values may live in non-volatile memory that is not directly 
 writable (ex. Flash, ROM), a special method must be called before modification
 is attempted.  The `tflite::micro::CreateWritableTensorDimsWithCopy` method will
 move the tensor shape values to guaranteed persistent writable memory.

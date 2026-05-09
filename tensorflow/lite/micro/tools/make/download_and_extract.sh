@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Copyright 2024 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,6 +23,8 @@
 # 4 - Optional patching action name.
 
 set -e
+
+source "$(dirname "${BASH_SOURCE[0]}")/bash_helpers.sh"
 
 # Patches the Ambiq Micro SDK to work around build issues.
 patch_am_sdk() {
@@ -88,10 +90,15 @@ download_and_extract() {
   local tempdir2=$(mktemp -d)
   local tempfile=${tempdir}/temp_file
   local curl_retries=5
+  local seed="${url} ${expected_md5}"
 
-  # Destionation already downloaded.
+  # Check for an existing download; verify its seed stamp.
   if [ -d ${dir} ]; then
+    if check_seed "${dir}" "${seed}"; then
       exit 0
+    fi
+    echo "Stale download in ${dir} (seed mismatch), re-downloading." >&2
+    rm -rf "${dir}"
   fi
 
   command -v curl >/dev/null 2>&1 || {
@@ -162,8 +169,20 @@ download_and_extract() {
   # Delete any potential BUILD files, which would interfere with Bazel builds.
   find "${dir}" -type f -name '*BUILD' -delete
 
+  # Record the seed so future runs can detect version mismatches.
+  write_seed "${dir}" "${seed}"
+
   if [[ ${action} == "patch_am_sdk" ]]; then
     patch_am_sdk ${dir}
+  elif [[ ${action} == "patch_from_url" ]]; then
+    local patch_url=${action_param1}
+    local patch_file=$(mktemp)
+    curl -LsS --fail --retry 5 "${patch_url}" > ${patch_file}
+    patch -p1 -d ${dir} < ${patch_file}
+    rm -f ${patch_file}
+  elif [[ ${action} == "patch_file" ]]; then
+    local patch_file=${action_param1}
+    patch -p1 -d ${dir} < ${patch_file}
   elif [[ ${action} == "patch_cifar10_dataset" ]]; then
     patch_cifar10_dataset ${dir}
   elif [[ ${action} == "build_embarc_mli" ]]; then

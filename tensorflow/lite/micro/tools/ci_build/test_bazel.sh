@@ -14,13 +14,14 @@
 # limitations under the License.
 # ==============================================================================
 
+set -ex
 set -x
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR=${SCRIPT_DIR}/../../../../..
-
 cd "${ROOT_DIR}"
 
-bazel test //... \
-  --config=ci
-# We are using a bazel build followed by bazel test to make sure that the CI
+BAZEL_CONFIG=${1:-ci}
+TARGETS=${2:-//...}
+
+bazel test --config=${BAZEL_CONFIG} -- ${TARGETS}

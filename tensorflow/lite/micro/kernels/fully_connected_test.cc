@@ -19,9 +19,10 @@ limitations under the License.
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
+#include "tensorflow/lite/micro/micro_arena_constants.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 #include "tensorflow/lite/micro/test_helpers.h"
-#include "tensorflow/lite/micro/testing/micro_test.h"
+#include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
 namespace tflite {
 namespace testing {
@@ -42,17 +43,6 @@ const float simple_weights_data[] = {
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10,  // u = 2
 };
 
-// TODO(b/258710417): INT4 isn't currently supported on Hexagon.
-#if !defined(HEXAGON)
-const float simple_int4_weights_data[] = {
-    -2, -1, 0, 1, 2, 3, 4, 5, 6, 7,  // u = 0
-    -2, -1, 0, 1, 2, 3, 4, 5, 6, 7,  // u = 1
-    -2, -1, 0, 1, 2, 3, 4, 5, 6, 7,  // u = 2
-};
-const float simple_golden_null_bias_int4_weights[] = {
-    -28, -28, -28, 0, 0, 0,
-};
-#endif
 int simple_bias_dims[] = {1, 3};
 const float simple_bias_data[] = {1, 2, 3};
 
@@ -64,6 +54,36 @@ constexpr size_t simple_bias_size =
 #endif  // (defined(USE_TFLM_COMPRESSION) || (!defined(XTENSA) &&
         // !defined(HEXAGON)))
 
+#ifdef USE_TFLM_COMPRESSION
+
+// compressed filter data for kBinQuant scheme
+// Align the tensor data the same as a Buffer in the schema
+alignas(tflite::MicroArenaBufferAlignment()) constexpr uint8_t
+    kBinQuantWeightData[] = {0x01, 0x23, 0x45, 0x67, 0x89, 0x01, 0x23, 0x45,
+                             0x67, 0x89, 0x01, 0x23, 0x45, 0x67, 0x89};
+constexpr float kBinQuantWeightValueTable[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+constexpr size_t kBinQuantWeightValueTableElements =
+    std::extent<decltype(tflite::testing::kBinQuantWeightValueTable)>::value;
+constexpr int kBinQuantWeightBitWidth = 4;
+// compressed bias data for kBinQuant scheme
+// Align the tensor data the same as a Buffer in the schema
+alignas(tflite::MicroArenaBufferAlignment()) constexpr uint8_t
+    kBinQuantBiasData[] = {0x18};
+constexpr int kBinQuantBiasBitWidth = 2;
+
+#endif  // USE_TFLM_COMPRESSION
+
+// TODO(b/258710417): INT4 isn't currently supported on Hexagon.
+#if !defined(HEXAGON)
+const float simple_int4_weights_data[] = {
+    -2, -1, 0, 1, 2, 3, 4, 5, 6, 7,  // u = 0
+    -2, -1, 0, 1, 2, 3, 4, 5, 6, 7,  // u = 1
+    -2, -1, 0, 1, 2, 3, 4, 5, 6, 7,  // u = 2
+};
+const float simple_golden_null_bias_int4_weights[] = {
+    -28, -28, -28, 0, 0, 0,
+};
+#endif
 const float simple_golden[] = {
     24, 25, 26, 58, 59, 60,
 };
@@ -250,11 +270,19 @@ const float representative_64x16_golden[] = {
 const int representative_64x16_output_size = 16;
 int representative_64x16_output_dims[] = {2, 1, 16};
 
-template <typename T>
-TfLiteStatus ValidateFullyConnectedGoldens(
+constexpr int kMaxTensors = 4;
+
+template <typename T, typename TW = void, typename TB = void>
+void ValidateFullyConnectedGoldens(
     TfLiteTensor* tensors, const int tensors_size, bool null_bias,
     const TfLiteFusedActivation activation, const float tolerance,
-    const int output_len, const T* golden, T* output_data) {
+    const int output_len, const T* golden, T* output_data
+#ifdef USE_TFLM_COMPRESSION
+    ,
+    const TestCompressionInfo<TW>* weight_comp_info = nullptr,
+    const TestCompressionInfo<TB>* bias_comp_info = nullptr
+#endif  // USE_TFLM_COMPRESSION
+) {
   TfLiteFullyConnectedParams builtin_data = {
       activation, kTfLiteFullyConnectedWeightsFormatDefault, false, false,
       kTfLiteNoType};
@@ -281,32 +309,59 @@ TfLiteStatus ValidateFullyConnectedGoldens(
   TfLiteIntArray* inputs_array = IntArrayFromInts(inputs_array_data);
   TfLiteIntArray* outputs_array = IntArrayFromInts(outputs_array_data);
 
+  tensors[1].allocation_type = kTfLiteMmapRo;
+  if (!null_bias) {
+    tensors[2].allocation_type = kTfLiteMmapRo;
+  }
+
+#ifdef USE_TFLM_COMPRESSION
+
+  TestCompressedList<kMaxTensors> tcl;
+
+  if (weight_comp_info != nullptr) {
+    ASSERT_EQ(
+        tcl.AddInput(*weight_comp_info, tensors[kFullyConnectedWeightsTensor],
+                     kFullyConnectedWeightsTensor),
+        kTfLiteOk);
+  }
+  if (bias_comp_info != nullptr) {
+    ASSERT_EQ(tcl.AddInput(*bias_comp_info, tensors[kFullyConnectedBiasTensor],
+                           kFullyConnectedBiasTensor),
+              kTfLiteOk);
+  }
+  const CompressedTensorList* comp_list_p = tcl.GetCompressedTensorList();
+
+#endif  // USE_TFLM_COMPRESSION
+
   const TFLMRegistration registration = Register_FULLY_CONNECTED();
   micro::KernelRunner runner(registration, tensors, tensors_size, inputs_array,
                              outputs_array,
-                             reinterpret_cast<void*>(&builtin_data));
+                             reinterpret_cast<void*>(&builtin_data), nullptr
+#ifdef USE_TFLM_COMPRESSION
+                             ,
+                             comp_list_p
+#endif  // USE_TFLM_COMPRESSION
+  );
 
-  TfLiteStatus status = runner.InitAndPrepare();
-  if (status != kTfLiteOk) {
-    return status;
-  }
-
-  status = runner.Invoke();
-  if (status != kTfLiteOk) {
-    return status;
-  }
+  ASSERT_EQ(runner.InitAndPrepare(), kTfLiteOk);
+  ASSERT_EQ(runner.Invoke(), kTfLiteOk);
 
   for (int i = 0; i < output_len; ++i) {
-    TF_LITE_MICRO_EXPECT_NEAR(golden[i], output_data[i], tolerance);
+    EXPECT_NEAR(golden[i], output_data[i], tolerance);
   }
-  return kTfLiteOk;
 }
 
-TfLiteStatus TestFullyConnectedFloat(
+void TestFullyConnectedFloat(
     int* input_dims_data, const float* input_data, int* weights_dims_data,
     const float* weights_data, int* bias_dims_data, const float* bias_data,
     const float* golden, int* output_dims_data,
-    TfLiteFusedActivation activation, float* output_data) {
+    TfLiteFusedActivation activation, float* output_data
+#ifdef USE_TFLM_COMPRESSION
+    ,
+    const TestCompressionInfo<const float>* weight_comp_info = nullptr,
+    const TestCompressionInfo<const float>* bias_comp_info = nullptr
+#endif  // USE_TFLM_COMPRESSION
+) {
   TfLiteIntArray* input_dims = IntArrayFromInts(input_dims_data);
   TfLiteIntArray* weights_dims = IntArrayFromInts(weights_dims_data);
   TfLiteIntArray* bias_dims = IntArrayFromInts(bias_dims_data);
@@ -314,29 +369,32 @@ TfLiteStatus TestFullyConnectedFloat(
   const int output_dims_count = ElementCount(*output_dims);
   bool null_bias = bias_data == nullptr ? true : false;
 
-  constexpr int array_size = 4;  // Avoid variable length array warning.
-  const int inputs_size = bias_data == nullptr ? 2 : 3;
+  const int inputs_size = null_bias ? 2 : 3;
   constexpr int outputs_size = 1;
   const int tensors_size = inputs_size + outputs_size;
-  TfLiteTensor tensors[array_size];
+  TfLiteTensor tensors[kMaxTensors];
 
   tensors[0] = CreateTensor(input_data, input_dims);
   tensors[1] = CreateTensor(weights_data, weights_dims);
 
-  if (bias_data == nullptr) {
+  if (null_bias) {
     tensors[2] = CreateTensor(output_data, output_dims);
   } else {
     tensors[2] = CreateTensor(bias_data, bias_dims);
     tensors[3] = CreateTensor(output_data, output_dims);
   }
 
-  return ValidateFullyConnectedGoldens(tensors, tensors_size, null_bias,
-                                       activation, 1e-4f, output_dims_count,
-                                       golden, output_data);
+  ValidateFullyConnectedGoldens(tensors, tensors_size, null_bias, activation,
+                                1e-4f, output_dims_count, golden, output_data
+#ifdef USE_TFLM_COMPRESSION
+                                ,
+                                weight_comp_info, bias_comp_info
+#endif  // USE_TFLM_COMPRESSION
+  );
 }
 
 template <typename dataT, typename weightT, typename biasT>
-TfLiteStatus TestFullyConnectedQuantized(
+void TestFullyConnectedQuantized(
     int* input_dims_data, const float* input_data, dataT* input_quantized,
     const float input_scale, const int input_zero_point, int* weights_dims_data,
     const float* weights_data, weightT* weights_quantized,
@@ -354,7 +412,7 @@ TfLiteStatus TestFullyConnectedQuantized(
   bool null_bias = bias_data == nullptr ? true : false;
 
   constexpr int array_size = 4;  // Avoid variable length array warning.
-  const int inputs_size = bias_data == nullptr ? 2 : 3;
+  const int inputs_size = null_bias ? 2 : 3;
   constexpr int outputs_size = 1;
   const int tensors_size = inputs_size + outputs_size;
   TfLiteTensor tensors[array_size];
@@ -364,7 +422,7 @@ TfLiteStatus TestFullyConnectedQuantized(
   tensors[1] = CreateQuantizedTensor(
       weights_data, weights_quantized, weights_dims, weights_scale,
       weights_zero_point, false, weights_packed_type);
-  if (bias_data == nullptr) {
+  if (null_bias) {
     tensors[2] = CreateQuantizedTensor(output_data, output_dims, output_scale,
                                        output_zero_point);
   } else {
@@ -377,13 +435,78 @@ TfLiteStatus TestFullyConnectedQuantized(
   Quantize(golden, golden_quantized, output_dims_count, output_scale,
            output_zero_point);
 
-  return ValidateFullyConnectedGoldens(tensors, tensors_size, null_bias,
-                                       activation, 0.0f, output_dims_count,
-                                       golden_quantized, output_data);
+  ValidateFullyConnectedGoldens(tensors, tensors_size, null_bias, activation,
+                                0.0f, output_dims_count, golden_quantized,
+                                output_data);
 }
 
+#ifdef USE_TFLM_COMPRESSION
+
+template <typename TIO, typename TW, typename TB>
+void TestFullyConnectedQuantizedCompressed(
+    int* input_dims_data, const float* input_data, TIO* input_quantized,
+    float input_scale, int input_zero_point, int* output_dims_data,
+    const float* expected_output_data, TIO* expected_output_quantized,
+    TIO* output_quantized, float output_scale, int output_zero_point,
+    const TfLiteFusedActivation activation,
+    const TestCompressionQuantizedInfo<TW>* weight_comp_info,
+    const TestCompressionQuantizedInfo<TB>* bias_comp_info) {
+  TfLiteIntArray* input_dims = IntArrayFromInts(input_dims_data);
+  TfLiteIntArray* weight_dims = IntArrayFromInts(weight_comp_info->dims_data);
+  TfLiteIntArray* bias_dims = IntArrayFromInts(bias_comp_info->dims_data);
+  TfLiteIntArray* output_dims = IntArrayFromInts(output_dims_data);
+
+  TfLiteFloatArray* weight_scales =
+      FloatArrayFromFloats(weight_comp_info->scales);
+  TfLiteIntArray* weight_zero_points =
+      IntArrayFromInts(weight_comp_info->zero_points);
+
+  TfLiteTensor weight_tensor = CreateQuantizedTensor(
+      weight_comp_info->compressed, weight_dims, weight_scales->data[0],
+      weight_zero_points->data[0], false, kTfLiteInt8);
+  SymmetricQuantize(weight_comp_info->data, weight_comp_info->value_table,
+                    weight_comp_info->value_table_stride,
+                    weight_scales->data[0]);
+
+  TfLiteTensor bias_tensor = {};
+  if (bias_comp_info != nullptr) {
+    bias_tensor = CreateQuantizedTensor(bias_comp_info->compressed, bias_dims,
+                                        input_scale * weight_scales->data[0], 0,
+                                        false, typeToTfLiteType<TB>());
+    SymmetricQuantize(bias_comp_info->data, bias_comp_info->value_table,
+                      bias_comp_info->value_table_stride,
+                      bias_tensor.params.scale);
+  }
+
+  TfLiteTensor output_tensor = CreateQuantizedTensor(
+      output_quantized, output_dims, output_scale, output_zero_point);
+
+  const int tensors_size =
+      (bias_comp_info == nullptr) ? kMaxTensors - 1 : kMaxTensors;
+  TfLiteTensor tensors[kMaxTensors] = {};
+  tensors[0] = CreateQuantizedTensor(input_data, input_quantized, input_dims,
+                                     input_scale, input_zero_point);
+  tensors[1] = weight_tensor;
+  if (bias_comp_info == nullptr) {
+    tensors[2] = output_tensor;
+  } else {
+    tensors[2] = bias_tensor;
+    tensors[3] = output_tensor;
+  }
+
+  const int output_dims_count = ElementCount(*output_dims);
+  Quantize(expected_output_data, expected_output_quantized, output_dims_count,
+           output_scale, output_zero_point);
+  ValidateFullyConnectedGoldens(
+      tensors, tensors_size, bias_comp_info == nullptr, activation, 0.0f,
+      output_dims_count, expected_output_quantized, output_quantized,
+      weight_comp_info, bias_comp_info);
+}
+
+#endif  // USE_TFLM_COMPRESSION
+
 template <typename dataT, typename weightT, typename biasT>
-TfLiteStatus TestFullyConnectedQuantizedPerChannel(
+void TestFullyConnectedQuantizedPerChannel(
     int* input_dims_data, const float* input_data, dataT* input_quantized,
     const float input_scale, const int input_zero_point, int* weights_dims_data,
     const float* weights_data, weightT* weights_quantized,
@@ -429,45 +552,67 @@ TfLiteStatus TestFullyConnectedQuantizedPerChannel(
 
   Quantize(golden, golden_quantized, output_dims_count, output_scale,
            output_zero_point);
-  return ValidateFullyConnectedGoldens(
-      tensors, tensors_size, null_bias, activation, 1.0f /* tolerance */,
-      output_dims_count, golden_quantized, output_data);
+  ValidateFullyConnectedGoldens(tensors, tensors_size, null_bias, activation,
+                                1.0f /* tolerance */, output_dims_count,
+                                golden_quantized, output_data);
 }
 
 }  // namespace
 }  // namespace testing
 }  // namespace tflite
 
-TF_LITE_MICRO_TESTS_BEGIN
-
-TF_LITE_MICRO_TEST(SimpleTest) {
+TEST(FullyConnectedTest, SimpleTest) {
   float output_data[tflite::testing::simple_output_size];
-  TF_LITE_MICRO_EXPECT_EQ(
-      tflite::testing::TestFullyConnectedFloat(
-          tflite::testing::simple_input_dims,
-          tflite::testing::simple_input_data,
-          tflite::testing::simple_weights_dims,
-          tflite::testing::simple_weights_data,
-          tflite::testing::simple_bias_dims, tflite::testing::simple_bias_data,
-          tflite::testing::simple_golden, tflite::testing::simple_output_dims,
-          kTfLiteActNone, output_data),
-      kTfLiteOk);
+  tflite::testing::TestFullyConnectedFloat(
+      tflite::testing::simple_input_dims, tflite::testing::simple_input_data,
+      tflite::testing::simple_weights_dims,
+      tflite::testing::simple_weights_data, tflite::testing::simple_bias_dims,
+      tflite::testing::simple_bias_data, tflite::testing::simple_golden,
+      tflite::testing::simple_output_dims, kTfLiteActNone, output_data);
 }
 
-TF_LITE_MICRO_TEST(SimpleTestNullBias) {
+#ifdef USE_TFLM_COMPRESSION
+
+TEST(FullyConnectedTest, SimpleTestCompressed) {
   float output_data[tflite::testing::simple_output_size];
-  TF_LITE_MICRO_EXPECT_EQ(
-      tflite::testing::TestFullyConnectedFloat(
-          tflite::testing::simple_input_dims,
-          tflite::testing::simple_input_data,
-          tflite::testing::simple_weights_dims,
-          tflite::testing::simple_weights_data, nullptr, nullptr,
-          tflite::testing::simple_golden_null_bias,
-          tflite::testing::simple_output_dims, kTfLiteActNone, output_data),
-      kTfLiteOk);
+
+  tflite::testing::TestCompressionInfo<const float> weight_comp_info = {};
+  tflite::testing::TestCompressionInfo<const float> bias_comp_info = {};
+
+  weight_comp_info.scheme = tflite::CompressionScheme::kBinQuant;
+  weight_comp_info.value_table = tflite::testing::kBinQuantWeightValueTable;
+  weight_comp_info.value_table_stride =
+      tflite::testing::kBinQuantWeightValueTableElements;
+  weight_comp_info.bit_width = tflite::testing::kBinQuantWeightBitWidth;
+
+  bias_comp_info.scheme = tflite::CompressionScheme::kBinQuant;
+  bias_comp_info.value_table = tflite::testing::simple_bias_data;
+  bias_comp_info.value_table_stride = tflite::testing::simple_bias_size;
+  bias_comp_info.bit_width = tflite::testing::kBinQuantBiasBitWidth;
+
+  tflite::testing::TestFullyConnectedFloat(
+      tflite::testing::simple_input_dims, tflite::testing::simple_input_data,
+      tflite::testing::simple_weights_dims,
+      reinterpret_cast<const float*>(tflite::testing::kBinQuantWeightData),
+      tflite::testing::simple_bias_dims,
+      reinterpret_cast<const float*>(tflite::testing::kBinQuantBiasData),
+      tflite::testing::simple_golden, tflite::testing::simple_output_dims,
+      kTfLiteActNone, output_data, &weight_comp_info, &bias_comp_info);
 }
 
-TF_LITE_MICRO_TEST(SimpleTestQuantizedInt8) {
+#endif  // USE_TFLM_COMPRESSION
+
+TEST(FullyConnectedTest, SimpleTestNullBias) {
+  float output_data[tflite::testing::simple_output_size];
+  tflite::testing::TestFullyConnectedFloat(
+      tflite::testing::simple_input_dims, tflite::testing::simple_input_data,
+      tflite::testing::simple_weights_dims,
+      tflite::testing::simple_weights_data, nullptr, nullptr,
+      tflite::testing::simple_golden_null_bias,
+      tflite::testing::simple_output_dims, kTfLiteActNone, output_data);
+}
+
+TEST(FullyConnectedTest, SimpleTestQuantizedInt8) {
   const float input_scale = 1.0f;
   const int input_zero_point = -1;
   const float weights_scale = 1.0f;
@@ -481,25 +626,72 @@ TF_LITE_MICRO_TEST(SimpleTestQuantizedInt8) {
   int8_t golden_quantized[tflite::testing::simple_output_size];
   int8_t output_data[tflite::testing::simple_output_size];
 
-  TF_LITE_MICRO_EXPECT_EQ(
-      tflite::testing::TestFullyConnectedQuantized(
-          tflite::testing::simple_input_dims,
-          tflite::testing::simple_input_data, input_quantized, input_scale,
-          input_zero_point, tflite::testing::simple_weights_dims,
-          tflite::testing::simple_weights_data, weights_quantized,
-          weights_scale, weights_zero_point, tflite::testing::simple_bias_dims,
-          tflite::testing::simple_bias_data, bias_quantized,
-          tflite::testing::simple_golden, golden_quantized,
-          tflite::testing::simple_output_dims, output_scale, output_zero_point,
-          kTfLiteActNone, output_data),
-      kTfLiteOk);
+  tflite::testing::TestFullyConnectedQuantized(
+      tflite::testing::simple_input_dims, tflite::testing::simple_input_data,
+      input_quantized, input_scale, input_zero_point,
+      tflite::testing::simple_weights_dims,
+      tflite::testing::simple_weights_data, weights_quantized, weights_scale,
+      weights_zero_point, tflite::testing::simple_bias_dims,
+      tflite::testing::simple_bias_data, bias_quantized,
+      tflite::testing::simple_golden, golden_quantized,
+      tflite::testing::simple_output_dims, output_scale, output_zero_point,
+      kTfLiteActNone, output_data);
 }
+
+#ifdef USE_TFLM_COMPRESSION
+
+TEST(FullyConnectedTest, SimpleTestQuantizedInt8Compressed) {
+  const float input_scale = 1.0f;
+  const int input_zero_point = -1;
+  constexpr float weights_scale[] = {1, 1.0f};
+  constexpr int weights_zero_point[] = {1, 0};
+  const float output_scale = 0.5f;
+  const int output_zero_point = -1;
+
+  int8_t input_quantized[tflite::testing::simple_input_size];
+  int8_t weights_quantized[tflite::testing::kBinQuantWeightValueTableElements];
+  int32_t bias_quantized[tflite::testing::simple_output_size];
+  int8_t golden_quantized[tflite::testing::simple_output_size];
+  int8_t output_data[tflite::testing::simple_output_size];
+
+  tflite::testing::TestCompressionQuantizedInfo<int8_t> weight_comp_info = {};
+  tflite::testing::TestCompressionQuantizedInfo<int32_t> bias_comp_info = {};
+
+  weight_comp_info.scheme = tflite::CompressionScheme::kBinQuant;
+  weight_comp_info.value_table = weights_quantized;
+  weight_comp_info.value_table_stride =
+      tflite::testing::kBinQuantWeightValueTableElements;
+  weight_comp_info.bit_width = tflite::testing::kBinQuantWeightBitWidth;
+  weight_comp_info.compressed = tflite::testing::kBinQuantWeightData;
+  weight_comp_info.data = tflite::testing::kBinQuantWeightValueTable;
+  weight_comp_info.dims_data = tflite::testing::simple_weights_dims;
+  weight_comp_info.scales = weights_scale;
+  weight_comp_info.zero_points = weights_zero_point;
+
+  bias_comp_info.scheme = tflite::CompressionScheme::kBinQuant;
+  bias_comp_info.value_table = bias_quantized;
+  bias_comp_info.value_table_stride = tflite::testing::simple_bias_size;
+  bias_comp_info.bit_width = tflite::testing::kBinQuantBiasBitWidth;
+  bias_comp_info.compressed = tflite::testing::kBinQuantBiasData;
+  bias_comp_info.data = tflite::testing::simple_bias_data;
+  bias_comp_info.dims_data = tflite::testing::simple_bias_dims;
+  // bias scales and bias zero_points are not used
+
+  tflite::testing::TestFullyConnectedQuantizedCompressed(
+      tflite::testing::simple_input_dims, tflite::testing::simple_input_data,
+      input_quantized, input_scale, input_zero_point,
+      tflite::testing::simple_output_dims, tflite::testing::simple_golden,
+      golden_quantized, output_data, output_scale, output_zero_point,
+      kTfLiteActNone, &weight_comp_info, &bias_comp_info);
+}
+
+#endif  // USE_TFLM_COMPRESSION
 
 #if !defined(HEXAGON)
 
 #if !defined(XTENSA)
 
-TF_LITE_MICRO_TEST(SimpleTestQuantizedPerChannelInt8) {
+TEST(FullyConnectedTest, SimpleTestQuantizedPerChannelInt8) {
   const float input_scale = 0.5f;
   const int input_zero_point = -1;
   const float output_scale = 1.0f;
@@ -515,22 +707,20 @@ TF_LITE_MICRO_TEST(SimpleTestQuantizedPerChannelInt8) {
   int8_t golden_quantized[tflite::testing::simple_output_size];
   int8_t output_data[tflite::testing::simple_output_size];
 
-  TF_LITE_MICRO_EXPECT_EQ(
-      tflite::testing::TestFullyConnectedQuantizedPerChannel(
-          tflite::testing::simple_input_dims,
-          tflite::testing::simple_input_data, input_quantized, input_scale,
-          input_zero_point, tflite::testing::simple_weights_dims,
-          tflite::testing::simple_weights_data, weights_quantized,
-          weights_scales, weights_zero_points,
-          tflite::testing::simple_bias_dims, tflite::testing::simple_bias_data,
-          bias_quantized, tflite::testing::simple_golden, golden_quantized,
-          tflite::testing::simple_output_dims, output_scale, output_zero_point,
-          kTfLiteActNone, output_data),
-      kTfLiteOk);
+  tflite::testing::TestFullyConnectedQuantizedPerChannel(
+      tflite::testing::simple_input_dims, tflite::testing::simple_input_data,
+      input_quantized, input_scale, input_zero_point,
+      tflite::testing::simple_weights_dims,
+      tflite::testing::simple_weights_data, weights_quantized, weights_scales,
+      weights_zero_points, tflite::testing::simple_bias_dims,
+      tflite::testing::simple_bias_data, bias_quantized,
+      tflite::testing::simple_golden, golden_quantized,
+      tflite::testing::simple_output_dims, output_scale, output_zero_point,
+      kTfLiteActNone, output_data);
 }
 #endif  // #if !defined(XTENSA)
 
-TF_LITE_MICRO_TEST(SimpleTestQuantizedInt16) {
+TEST(FullyConnectedTest, SimpleTestQuantizedInt16) {
   const float input_scale = 128.0 / 65536;
   const int input_zero_point = 0;
   const float weights_scale = 1.0f;
@@ -538,29 +728,76 @@ TF_LITE_MICRO_TEST(SimpleTestQuantizedInt16) {
   const float output_scale = 128.0 / 65536;
   const int output_zero_point = 0;
 
-  const float simple_golden[] = {24, 25, 26, 58, 59, 60};
   int16_t input_quantized[tflite::testing::simple_input_size];
   int8_t weights_quantized[tflite::testing::simple_weights_size];
   int64_t bias_quantized[tflite::testing::simple_output_size];
   int16_t golden_quantized[tflite::testing::simple_output_size];
   int16_t output_data[tflite::testing::simple_output_size];
 
-  TF_LITE_MICRO_EXPECT_EQ(
-      tflite::testing::TestFullyConnectedQuantized(
-          tflite::testing::simple_input_dims,
-          tflite::testing::simple_input_data, input_quantized, input_scale,
-          input_zero_point, tflite::testing::simple_weights_dims,
-          tflite::testing::simple_weights_data, weights_quantized,
-          weights_scale, weights_zero_point, tflite::testing::simple_bias_dims,
-          tflite::testing::simple_bias_data, bias_quantized, simple_golden,
-          golden_quantized, tflite::testing::simple_output_dims, output_scale,
-          output_zero_point, kTfLiteActNone, output_data),
-      kTfLiteOk);
+  tflite::testing::TestFullyConnectedQuantized(
+      tflite::testing::simple_input_dims, tflite::testing::simple_input_data,
+      input_quantized, input_scale, input_zero_point,
+      tflite::testing::simple_weights_dims,
+      tflite::testing::simple_weights_data, weights_quantized, weights_scale,
+      weights_zero_point, tflite::testing::simple_bias_dims,
+      tflite::testing::simple_bias_data, bias_quantized,
+      tflite::testing::simple_golden, golden_quantized,
+      tflite::testing::simple_output_dims, output_scale, output_zero_point,
+      kTfLiteActNone, output_data);
 }
+
+#ifdef USE_TFLM_COMPRESSION
+
+TEST(FullyConnectedTest, SimpleTestQuantizedInt16Compressed) {
+  const float input_scale = 128.0 / 65536;
+  const int input_zero_point = 0;
+  constexpr float weights_scale[] = {1, 1.0f};
+  constexpr int weights_zero_point[] = {1, 0};
+  const float output_scale = 128.0 / 65536;
+  const int output_zero_point = 0;
+
+  int16_t input_quantized[tflite::testing::simple_input_size];
+  int8_t weights_quantized[tflite::testing::kBinQuantWeightValueTableElements];
+  int64_t bias_quantized[tflite::testing::simple_output_size];
+  int16_t golden_quantized[tflite::testing::simple_output_size];
+  int16_t output_data[tflite::testing::simple_output_size];
+
+  tflite::testing::TestCompressionQuantizedInfo<int8_t> weight_comp_info = {};
+  tflite::testing::TestCompressionQuantizedInfo<int64_t> bias_comp_info = {};
+
+  weight_comp_info.scheme = tflite::CompressionScheme::kBinQuant;
+  weight_comp_info.value_table = weights_quantized;
+  weight_comp_info.value_table_stride =
+      tflite::testing::kBinQuantWeightValueTableElements;
+  weight_comp_info.bit_width = tflite::testing::kBinQuantWeightBitWidth;
+  weight_comp_info.compressed = tflite::testing::kBinQuantWeightData;
+  weight_comp_info.data = tflite::testing::kBinQuantWeightValueTable;
+  weight_comp_info.dims_data = tflite::testing::simple_weights_dims;
+  weight_comp_info.scales = weights_scale;
+  weight_comp_info.zero_points = weights_zero_point;
+
+  bias_comp_info.scheme = tflite::CompressionScheme::kBinQuant;
+  bias_comp_info.value_table = bias_quantized;
+  bias_comp_info.value_table_stride = tflite::testing::simple_bias_size;
+  bias_comp_info.bit_width = tflite::testing::kBinQuantBiasBitWidth;
+  bias_comp_info.compressed = tflite::testing::kBinQuantBiasData;
+  bias_comp_info.data = tflite::testing::simple_bias_data;
+  bias_comp_info.dims_data = tflite::testing::simple_bias_dims;
+  // bias scales and bias zero_points are not used
+
+  tflite::testing::TestFullyConnectedQuantizedCompressed(
+      tflite::testing::simple_input_dims, tflite::testing::simple_input_data,
+      input_quantized, input_scale, input_zero_point,
+      tflite::testing::simple_output_dims, tflite::testing::simple_golden,
+      golden_quantized, output_data, output_scale, output_zero_point,
+      kTfLiteActNone, &weight_comp_info, &bias_comp_info);
+}
+
+#endif  // USE_TFLM_COMPRESSION
 
 #if !defined(XTENSA) && !defined(CMSIS_NN)
 
-TF_LITE_MICRO_TEST(SimpleTestPerChannelQuantizedInt16) {
+TEST(FullyConnectedTest, SimpleTestPerChannelQuantizedInt16) {
   const float input_scale = 128.0 / 65536;
   const int input_zero_point = 0;
   const float output_scale = 128.0 / 65536;
@@ -576,25 +813,23 @@ TF_LITE_MICRO_TEST(SimpleTestPerChannelQuantizedInt16) {
   int16_t golden_quantized[tflite::testing::simple_output_size];
   int16_t output_data[tflite::testing::simple_output_size];
 
-  TF_LITE_MICRO_EXPECT_EQ(
-      tflite::testing::TestFullyConnectedQuantizedPerChannel(
-          tflite::testing::simple_input_dims,
-          tflite::testing::simple_input_data, input_quantized, input_scale,
-          input_zero_point, tflite::testing::simple_weights_dims,
-          tflite::testing::simple_weights_data, weights_quantized,
-          weights_scales, weights_zero_points,
-          tflite::testing::simple_bias_dims, tflite::testing::simple_bias_data,
-          bias_quantized, tflite::testing::simple_golden, golden_quantized,
-          tflite::testing::simple_output_dims, output_scale, output_zero_point,
-          kTfLiteActNone, output_data),
-      kTfLiteOk);
+  tflite::testing::TestFullyConnectedQuantizedPerChannel(
+      tflite::testing::simple_input_dims, tflite::testing::simple_input_data,
+      input_quantized, input_scale, input_zero_point,
+      tflite::testing::simple_weights_dims,
+      tflite::testing::simple_weights_data, weights_quantized, weights_scales,
+      weights_zero_points, tflite::testing::simple_bias_dims,
+      tflite::testing::simple_bias_data, bias_quantized,
+      tflite::testing::simple_golden, golden_quantized,
+      tflite::testing::simple_output_dims, output_scale, output_zero_point,
+      kTfLiteActNone, output_data);
 }
 
 #endif  // !defined(XTENSA) && !defined(CMSIS_NN)
 
-#endif  // #if !defined(HEXAGON)
+#endif  // !defined(HEXAGON)
 
-TF_LITE_MICRO_TEST(SimpleTest4DInputQuantizedInt8) {
+TEST(FullyConnectedTest, SimpleTest4DInputQuantizedInt8) {
   const float input_scale = 1.0f;
   const int input_zero_point = -1;
   const float weights_scale = 1.0f;
@@ -611,20 +846,18 @@ TF_LITE_MICRO_TEST(SimpleTest4DInputQuantizedInt8) {
   int8_t golden_quantized[tflite::testing::simple_output_size];
   int8_t output_data[tflite::testing::simple_output_size];
 
-  TF_LITE_MICRO_EXPECT_EQ(
-      tflite::testing::TestFullyConnectedQuantized(
-          input_dims_4d, tflite::testing::simple_input_data, input_quantized,
-          input_scale, input_zero_point, tflite::testing::simple_weights_dims,
-          tflite::testing::simple_weights_data, weights_quantized,
-          weights_scale, weights_zero_point, tflite::testing::simple_bias_dims,
-          tflite::testing::simple_bias_data, bias_quantized,
-          tflite::testing::simple_golden, golden_quantized,
-          tflite::testing::simple_output_dims, output_scale, output_zero_point,
-          kTfLiteActNone, output_data),
-      kTfLiteOk);
+  tflite::testing::TestFullyConnectedQuantized(
+      input_dims_4d, tflite::testing::simple_input_data, input_quantized,
+      input_scale, input_zero_point, tflite::testing::simple_weights_dims,
+      tflite::testing::simple_weights_data, weights_quantized, weights_scale,
+      weights_zero_point, tflite::testing::simple_bias_dims,
+      tflite::testing::simple_bias_data, bias_quantized,
+      tflite::testing::simple_golden, golden_quantized,
+      tflite::testing::simple_output_dims, output_scale, output_zero_point,
+      kTfLiteActNone, output_data);
 }
 
-TF_LITE_MICRO_TEST(SimpleTestQuantizedInt8Relu) {
+TEST(FullyConnectedTest, SimpleTestQuantizedInt8Relu) {
   const float input_scale = 1.0f;
   const int input_zero_point = -1;
   const float weights_scale = 1.0f;
@@ -639,54 +872,46 @@ TF_LITE_MICRO_TEST(SimpleTestQuantizedInt8Relu) {
   int8_t golden_quantized[tflite::testing::relu_output_size];
   int8_t output_data[tflite::testing::relu_output_size];
 
-  TF_LITE_MICRO_EXPECT_EQ(
-      tflite::testing::TestFullyConnectedQuantized(
-          tflite::testing::relu_input_dims, tflite::testing::relu_input_data,
-          input_quantized, input_scale, input_zero_point,
-          tflite::testing::relu_weights_dims,
-          tflite::testing::relu_weights_data, weights_quantized, weights_scale,
-          weights_zero_point, tflite::testing::relu_bias_dims,
-          tflite::testing::relu_bias_data, bias_quantized,
-          tflite::testing::relu_golden, golden_quantized,
-          tflite::testing::relu_output_dims, output_scale, output_zero_point,
-          kTfLiteActRelu, output_data),
-      kTfLiteOk);
+  tflite::testing::TestFullyConnectedQuantized(
+      tflite::testing::relu_input_dims, tflite::testing::relu_input_data,
+      input_quantized, input_scale, input_zero_point,
+      tflite::testing::relu_weights_dims, tflite::testing::relu_weights_data,
+      weights_quantized, weights_scale, weights_zero_point,
+      tflite::testing::relu_bias_dims, tflite::testing::relu_bias_data,
+      bias_quantized, tflite::testing::relu_golden, golden_quantized,
+      tflite::testing::relu_output_dims, output_scale, output_zero_point,
+      kTfLiteActRelu, output_data);
 }
 
-TF_LITE_MICRO_TEST(SimpleTest4DInput) {
+TEST(FullyConnectedTest, SimpleTest4DInput) {
   int input_dims_4d[] = {4, 1, 1, 2, 10};
 
   float output_data[tflite::testing::simple_output_size];
 
-  TF_LITE_MICRO_EXPECT_EQ(
-      tflite::testing::TestFullyConnectedFloat(
-          input_dims_4d, tflite::testing::simple_input_data,
-          tflite::testing::simple_weights_dims,
-          tflite::testing::simple_weights_data,
-          tflite::testing::simple_bias_dims, tflite::testing::simple_bias_data,
-          tflite::testing::simple_golden, tflite::testing::simple_output_dims,
-          kTfLiteActNone, output_data),
-      kTfLiteOk);
+  tflite::testing::TestFullyConnectedFloat(
+      input_dims_4d, tflite::testing::simple_input_data,
+      tflite::testing::simple_weights_dims,
+      tflite::testing::simple_weights_data, tflite::testing::simple_bias_dims,
+      tflite::testing::simple_bias_data, tflite::testing::simple_golden,
+      tflite::testing::simple_output_dims, kTfLiteActNone, output_data);
 }
 
-TF_LITE_MICRO_TEST(Representative1x64Input1x16Output) {
+TEST(FullyConnectedTest, Representative1x64Input1x16Output) {
   float output_data[tflite::testing::representative_64x16_output_size];
 
-  TF_LITE_MICRO_EXPECT_EQ(
-      tflite::testing::TestFullyConnectedFloat(
-          tflite::testing::representative_64x16_input_dims,
-          tflite::testing::representative_64x16_input_data,
-          tflite::testing::representative_64x16_weights_dims,
-          tflite::testing::representative_64x16_weights_data,
-          tflite::testing::representative_64x16_bias_dims,
-          tflite::testing::representative_64x16_bias_data,
-          tflite::testing::representative_64x16_golden,
-          tflite::testing::representative_64x16_output_dims, kTfLiteActNone,
-          output_data),
-      kTfLiteOk);
+  tflite::testing::TestFullyConnectedFloat(
+      tflite::testing::representative_64x16_input_dims,
+      tflite::testing::representative_64x16_input_data,
+      tflite::testing::representative_64x16_weights_dims,
+      tflite::testing::representative_64x16_weights_data,
+      tflite::testing::representative_64x16_bias_dims,
+      tflite::testing::representative_64x16_bias_data,
+      tflite::testing::representative_64x16_golden,
+      tflite::testing::representative_64x16_output_dims, kTfLiteActNone,
+      output_data);
 }
 
-TF_LITE_MICRO_TEST(Representative1x64Input1x16OutputQuantizedInt8) {
+TEST(FullyConnectedTest, Representative1x64Input1x16OutputQuantizedInt8) {
   const float input_scale = 0.051445;
   const int input_zero_point = -128;
   const float weights_scale = 0.005660;
@@ -701,23 +926,21 @@ TF_LITE_MICRO_TEST(Representative1x64Input1x16OutputQuantizedInt8) {
   int8_t golden_quantized[tflite::testing::representative_64x16_output_size];
   int8_t output_data[tflite::testing::representative_64x16_output_size];
 
-  TF_LITE_MICRO_EXPECT_EQ(
-      tflite::testing::TestFullyConnectedQuantized(
-          tflite::testing::representative_64x16_input_dims,
-          tflite::testing::representative_64x16_input_data, input_quantized,
-          input_scale, input_zero_point,
-          tflite::testing::representative_64x16_weights_dims,
-          tflite::testing::representative_64x16_weights_data, weights_quantized,
-          weights_scale, weights_zero_point,
-          tflite::testing::representative_64x16_bias_dims,
-          tflite::testing::representative_64x16_bias_data, bias_quantized,
-          tflite::testing::representative_64x16_golden, golden_quantized,
-          tflite::testing::representative_64x16_output_dims, output_scale,
-          output_zero_point, kTfLiteActNone, output_data),
-      kTfLiteOk);
+  tflite::testing::TestFullyConnectedQuantized(
+      tflite::testing::representative_64x16_input_dims,
+      tflite::testing::representative_64x16_input_data, input_quantized,
+      input_scale, input_zero_point,
+      tflite::testing::representative_64x16_weights_dims,
+      tflite::testing::representative_64x16_weights_data, weights_quantized,
+      weights_scale, weights_zero_point,
+      tflite::testing::representative_64x16_bias_dims,
+      tflite::testing::representative_64x16_bias_data, bias_quantized,
+      tflite::testing::representative_64x16_golden, golden_quantized,
+      tflite::testing::representative_64x16_output_dims, output_scale,
+      output_zero_point, kTfLiteActNone, output_data);
 }
 
-TF_LITE_MICRO_TEST(SimpleTestQuantizedInt8NullBias) {
+TEST(FullyConnectedTest, SimpleTestQuantizedInt8NullBias) {
   const float input_scale = 1.0f;
   const int input_zero_point = -1;
   const float weights_scale = 1.0f;
@@ -730,18 +953,15 @@ TF_LITE_MICRO_TEST(SimpleTestQuantizedInt8NullBias) {
   int8_t golden_quantized[tflite::testing::simple_output_size];
   int8_t output_data[tflite::testing::simple_output_size];
 
-  TF_LITE_MICRO_EXPECT_EQ(
-      tflite::testing::TestFullyConnectedQuantized(
-          tflite::testing::simple_input_dims,
-          tflite::testing::simple_input_data, input_quantized, input_scale,
-          input_zero_point, tflite::testing::simple_weights_dims,
-          tflite::testing::simple_weights_data, weights_quantized,
-          weights_scale, weights_zero_point, nullptr, nullptr,
-          static_cast<int32_t*>(nullptr),
-          tflite::testing::simple_golden_null_bias, golden_quantized,
-          tflite::testing::simple_output_dims, output_scale, output_zero_point,
-          kTfLiteActNone, output_data),
-      kTfLiteOk);
+  tflite::testing::TestFullyConnectedQuantized(
+      tflite::testing::simple_input_dims, tflite::testing::simple_input_data,
+      input_quantized, input_scale, input_zero_point,
+      tflite::testing::simple_weights_dims,
+      tflite::testing::simple_weights_data, weights_quantized, weights_scale,
+      weights_zero_point, nullptr, nullptr, static_cast<int32_t*>(nullptr),
+      tflite::testing::simple_golden_null_bias, golden_quantized,
+      tflite::testing::simple_output_dims, output_scale, output_zero_point,
+      kTfLiteActNone, output_data);
 }
 
 // TODO(b/258710417): INT4 isn't currently supported on Hexagon.
@@ -750,7 +970,7 @@ TF_LITE_MICRO_TEST(SimpleTestQuantizedInt8NullBias) {
 // simple_golden_null_bias_int4_weights was obtained by running
 // TestFullyConnectedQuantized() with int8 quantization, and ensuring that int4
 // quantization yields the same outputs.
-TF_LITE_MICRO_TEST(SimpleTestQuantizedInt4Weights) {
+TEST(FullyConnectedTest, SimpleTestQuantizedInt4Weights) {
   const float input_scale = 1.0f;
   const int input_zero_point = -1;
   const float weights_scale = 1.0f;
@@ -763,19 +983,17 @@ TF_LITE_MICRO_TEST(SimpleTestQuantizedInt4Weights) {
   int8_t golden_quantized[tflite::testing::simple_output_size];
   int8_t output_data[tflite::testing::simple_output_size];
 
-  TF_LITE_MICRO_EXPECT_EQ(
-      tflite::testing::TestFullyConnectedQuantized(
-          tflite::testing::simple_input_dims,
-          tflite::testing::simple_input_data, input_quantized, input_scale,
-          input_zero_point, tflite::testing::simple_weights_dims,
-          tflite::testing::simple_int4_weights_data, weights_quantized,
-          weights_scale, weights_zero_point, nullptr, nullptr,
-          static_cast<int32_t*>(nullptr),
-          tflite::testing::simple_golden_null_bias_int4_weights,
-          golden_quantized, tflite::testing::simple_output_dims, output_scale,
-          output_zero_point, kTfLiteActNone, output_data, kTfLiteInt4),
-      kTfLiteOk);
+  tflite::testing::TestFullyConnectedQuantized(
+      tflite::testing::simple_input_dims, tflite::testing::simple_input_data,
+      input_quantized, input_scale, input_zero_point,
+      tflite::testing::simple_weights_dims,
+      tflite::testing::simple_int4_weights_data, weights_quantized,
+      weights_scale, weights_zero_point, nullptr, nullptr,
+      static_cast<int32_t*>(nullptr),
+      tflite::testing::simple_golden_null_bias_int4_weights, golden_quantized,
+      tflite::testing::simple_output_dims, output_scale, output_zero_point,
+      kTfLiteActNone, output_data, kTfLiteInt4);
 }
-#endif
+#endif  // !defined(HEXAGON)
 
-TF_LITE_MICRO_TESTS_END
+TF_LITE_MICRO_TESTS_MAIN

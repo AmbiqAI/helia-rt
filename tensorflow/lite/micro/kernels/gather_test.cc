@@ -17,7 +17,7 @@ limitations under the License.
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
 #include "tensorflow/lite/micro/test_helpers.h"
-#include "tensorflow/lite/micro/testing/micro_test.h"
+#include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
 namespace tflite {
 namespace testing {
@@ -50,8 +50,8 @@ void TestGather(int* input_dims, const InType* input_data, int* positions_dims,
   const TFLMRegistration registration = Register_GATHER();
   micro::KernelRunner runner(registration, tensors, tensors_size, inputs_array,
                              outputs_array, &params);
-  TF_LITE_MICRO_EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
-  TF_LITE_MICRO_EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
 
   // The output tensor's data and shape have been updated by the kernel.
   TfLiteTensor* actual_output_tensor = &tensors[2];
@@ -59,13 +59,12 @@ void TestGather(int* input_dims, const InType* input_data, int* positions_dims,
   const int actual_output_dims_size = actual_output_dims->size;
   const int output_size = ElementCount(*actual_output_dims);
   for (int i = 0; i < output_size; ++i) {
-    TF_LITE_MICRO_EXPECT_EQ(expected_output_data[i], output_data[i]);
+    EXPECT_EQ(expected_output_data[i], output_data[i]);
   }
 
   // Compare output tensor's shape if expected_output_dims[] is provided.
   for (int i = 0; i < actual_output_dims_size; ++i) {
-    TF_LITE_MICRO_EXPECT_EQ(expected_output_dims[i],
-                            actual_output_dims->data[i]);
+    EXPECT_EQ(expected_output_dims[i], actual_output_dims->data[i]);
   }
 }
 
@@ -73,10 +72,8 @@ void TestGather(int* input_dims, const InType* input_data, int* positions_dims,
 }  // namespace testing
 }  // namespace tflite
 
-TF_LITE_MICRO_TESTS_BEGIN
-
 // For all test functions below, dims[0] is the dimension count.
-TF_LITE_MICRO_TEST(GatherOp_Shuffle) {
+TEST(GatherTest, GatherOp_Shuffle) {
   // For input_dims[], positions_dims[], or output_dims[], element 0 is the
   // number of dimensions in that array, not the actual dimension data.
   int input_dims[] = {2, 2, 2};
@@ -95,7 +92,7 @@ TF_LITE_MICRO_TEST(GatherOp_Shuffle) {
       output_data, golden_dims, golden_data);
 }
 
-TF_LITE_MICRO_TEST(GatherOp_Test0DIndex) {
+TEST(GatherTest, GatherOp_Test0DIndex) {
   // For input_dims[], positions_dims[], or output_dims[], element 0 is the
   // number of dimensions in that array, not the actual dimension data.
   int input_dims[] = {2, 2, 2};
@@ -114,7 +111,7 @@ TF_LITE_MICRO_TEST(GatherOp_Test0DIndex) {
       output_data, golden_dims, golden_data);
 }
 
-TF_LITE_MICRO_TEST(GatherOp_Test0DIndexWith0DResult) {
+TEST(GatherTest, GatherOp_Test0DIndexWith0DResult) {
   // 0D tensor is special case in current TFLite. Test it once to make sure
   // existing workarounds are fine with it.
   // For input_dims[], positions_dims[], or output_dims[], element 0 is the
@@ -135,7 +132,7 @@ TF_LITE_MICRO_TEST(GatherOp_Test0DIndexWith0DResult) {
       output_data, golden_dims, golden_data);
 }
 
-TF_LITE_MICRO_TEST(GatherOp_Test1DInput1DIndex) {
+TEST(GatherTest, GatherOp_Test1DInput1DIndex) {
   // For input_dims[], positions_dims[], or output_dims[], element 0 is the
   // number of dimensions in that array, not the actual dimension data.
   int input_dims[] = {1, 3};
@@ -154,7 +151,7 @@ TF_LITE_MICRO_TEST(GatherOp_Test1DInput1DIndex) {
       output_data, golden_dims, golden_data);
 }
 
-TF_LITE_MICRO_TEST(GatherOp_Test2DIndexWith2DResult) {
+TEST(GatherTest, GatherOp_Test2DIndexWith2DResult) {
   // For input_dims[], positions_dims[], or output_dims[], element 0 is the
   // number of dimensions in that array, not the actual dimension data.
   int input_dims[] = {1, 3};
@@ -173,7 +170,7 @@ TF_LITE_MICRO_TEST(GatherOp_Test2DIndexWith2DResult) {
       output_data, golden_dims, golden_data);
 }
 
-TF_LITE_MICRO_TEST(GatherOp_Duplicate) {
+TEST(GatherTest, GatherOp_Duplicate) {
   // For input_dims[], positions_dims[], or output_dims[], element 0 is the
   // number of dimensions in that array, not the actual dimension data.
   int input_dims[] = {3, 1, 2, 2};
@@ -192,7 +189,7 @@ TF_LITE_MICRO_TEST(GatherOp_Duplicate) {
       output_data, golden_dims, golden_data);
 }
 
-TF_LITE_MICRO_TEST(GatherOp_Slice) {
+TEST(GatherTest, GatherOp_Slice) {
   // For input_dims[], positions_dims[], or output_dims[], element 0 is the
   // number of dimensions in that array, not the actual dimension data.
   int input_dims[] = {2, 4, 1};
@@ -211,7 +208,7 @@ TF_LITE_MICRO_TEST(GatherOp_Slice) {
       output_data, golden_dims, golden_data);
 }
 
-TF_LITE_MICRO_TEST(GatherOp_Axis1) {
+TEST(GatherTest, GatherOp_Axis1) {
   // For input_dims[], positions_dims[], or output_dims[], element 0 is the
   // number of dimensions in that array, not the actual dimension data.
   const int axis = 1;
@@ -231,7 +228,7 @@ TF_LITE_MICRO_TEST(GatherOp_Axis1) {
       output_data, golden_dims, golden_data, axis);
 }
 
-TF_LITE_MICRO_TEST(GatherOp_Axis1_0DIndex) {
+TEST(GatherTest, GatherOp_Axis1_0DIndex) {
   // For input_dims[], positions_dims[], or output_dims[], element 0 is the
   // number of dimensions in that array, not the actual dimension data.
   const int axis = 1;
@@ -251,7 +248,7 @@ TF_LITE_MICRO_TEST(GatherOp_Axis1_0DIndex) {
       output_data, golden_dims, golden_data, axis);
 }
 
-TF_LITE_MICRO_TEST(GatherOp_Axis1Slice) {
+TEST(GatherTest, GatherOp_Axis1Slice) {
   // For input_dims[], positions_dims[], or output_dims[], element 0 is the
   // number of dimensions in that array, not the actual dimension data.
   const int axis = 1;
@@ -271,7 +268,7 @@ TF_LITE_MICRO_TEST(GatherOp_Axis1Slice) {
       output_data, golden_dims, golden_data, axis);
 }
 
-TF_LITE_MICRO_TEST(GatherOp_LastAxis) {
+TEST(GatherTest, GatherOp_LastAxis) {
   // For input_dims[], positions_dims[], or output_dims[], element 0 is the
   // number of dimensions in that array, not the actual dimension data.
   const int axis = -1;
@@ -291,7 +288,7 @@ TF_LITE_MICRO_TEST(GatherOp_LastAxis) {
       output_data, golden_dims, golden_data, axis);
 }
 
-TF_LITE_MICRO_TEST(GatherOp_LastAxis0DIndex) {
+TEST(GatherTest, GatherOp_LastAxis0DIndex) {
   // For input_dims[], positions_dims[], or output_dims[], element 0 is the
   // number of dimensions in that array, not the actual dimension data.
   const int axis = -1;
@@ -311,7 +308,7 @@ TF_LITE_MICRO_TEST(GatherOp_LastAxis0DIndex) {
       output_data, golden_dims, golden_data, axis);
 }
 
-TF_LITE_MICRO_TEST(GatherOp_Float32Int32) {
+TEST(GatherTest, GatherOp_Float32Int32) {
   // For input_dims[], positions_dims[], or output_dims[], element 0 is the
   // number of dimensions in that array, not the actual dimension data.
   int input_dims[] = {2, 2, 2};
@@ -330,7 +327,7 @@ TF_LITE_MICRO_TEST(GatherOp_Float32Int32) {
       output_data, golden_dims, golden_data);
 }
 
-TF_LITE_MICRO_TEST(GatherOp_Int8Int32) {
+TEST(GatherTest, GatherOp_Int8Int32) {
   // For input_dims[], positions_dims[], or output_dims[], element 0 is the
   // number of dimensions in that array, not the actual dimension data.
   int input_dims[] = {2, 2, 2};
@@ -349,84 +346,7 @@ TF_LITE_MICRO_TEST(GatherOp_Int8Int32) {
       output_data, golden_dims, golden_data);
 }
 
-TF_LITE_MICRO_TEST(GatherOp_Int16Int32) {
-  // For input_dims[], positions_dims[], or output_dims[], element 0 is the
-  // number of dimensions in that array, not the actual dimension data.
-  int input_dims[] = {2, 2, 2};
-  int positions_dims[] = {1, 2};
-  const int32_t positions_data[] = {1, 0};
-  const int16_t input_data[] = {-13, -120, 14, 15};
-  const int16_t golden_data[] = {14, 15, -13, -120};
-  int16_t output_data[4];
-
-  // The kernel under test will fill output_dims[1] onward, to be compared
-  // against golden_dims[0] onward.
-  const int golden_dims[] = {2, 2};
-  int output_dims[] = {2, 0, 0};
-  tflite::testing::TestGather<int16_t, int32_t>(
-      input_dims, input_data, positions_dims, positions_data, output_dims,
-      output_data, golden_dims, golden_data);
-}
-
-TF_LITE_MICRO_TEST(GatherOp_BatchDims1_Int16) {
-  // For input_dims[], positions_dims[], or output_dims[], element 0 is the
-  // number of dimensions in that array, not the actual dimension data.
-  const int axis = 2;
-  const int batch_dims = 1;
-  int input_dims[] = {4, 2, 2, 3, 5};
-  int positions_dims[] = {3, 2, 2, 2};
-  const int32_t positions_data[] = {1, 0, 0, 1, 1, 0, 0, 1};
-  const int16_t input_data[] = {0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11,
-                                12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
-                                24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
-                                36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
-                                48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59};
-  const int16_t golden_data[] = {
-      5,  6,  7,  8,  9,  0,  1,  2,  3,  4,  0,  1,  2,  3,  4,  5,
-      6,  7,  8,  9,  20, 21, 22, 23, 24, 15, 16, 17, 18, 19, 15, 16,
-      17, 18, 19, 20, 21, 22, 23, 24, 35, 36, 37, 38, 39, 30, 31, 32,
-      33, 34, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 50, 51, 52, 53,
-      54, 45, 46, 47, 48, 49, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54};
-  int16_t output_data[80];
-
-  // The kernel under test will fill output_dims[1] onward, to be compared
-  // against golden_dims[0] onward.
-  const int golden_dims[] = {2, 2, 2, 2, 5};
-  int output_dims[] = {5, 0, 0, 0, 0, 0};
-  tflite::testing::TestGather<int16_t, int32_t>(
-      input_dims, input_data, positions_dims, positions_data, output_dims,
-      output_data, golden_dims, golden_data, axis, batch_dims);
-}
-
-TF_LITE_MICRO_TEST(GatherOp_BatchDims2_Int16) {
-  // For input_dims[], positions_dims[], or output_dims[], element 0 is the
-  // number of dimensions in that array, not the actual dimension data.
-  const int axis = 2;
-  const int batch_dims = 2;
-  int input_dims[] = {4, 2, 2, 3, 5};
-  int positions_dims[] = {3, 2, 2, 2};
-  const int32_t positions_data[] = {1, 0, 0, 1, 1, 0, 0, 1};
-  const int16_t input_data[] = {0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11,
-                                12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
-                                24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
-                                36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
-                                48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59};
-  const int16_t golden_data[] = {5,  6,  7,  8,  9,  0,  1,  2,  3,  4,
-                                 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
-                                 35, 36, 37, 38, 39, 30, 31, 32, 33, 34,
-                                 45, 46, 47, 48, 49, 50, 51, 52, 53, 54};
-  int16_t output_data[40];
-
-  // The kernel under test will fill output_dims[1] onward, to be compared
-  // against golden_dims[0] onward.
-  const int golden_dims[] = {2, 2, 2, 5};
-  int output_dims[] = {4, 0, 0, 0, 0};
-  tflite::testing::TestGather<int16_t, int32_t>(
-      input_dims, input_data, positions_dims, positions_data, output_dims,
-      output_data, golden_dims, golden_data, axis, batch_dims);
-}
-
-TF_LITE_MICRO_TEST(GatherOp_BatchDims2) {
+TEST(GatherTest, GatherOp_BatchDims2) {
   // For input_dims[], positions_dims[], or output_dims[], element 0 is the
   // number of dimensions in that array, not the actual dimension data.
   const int axis = 2;
@@ -454,7 +374,7 @@ TF_LITE_MICRO_TEST(GatherOp_BatchDims2) {
       output_data, golden_dims, golden_data, axis, batch_dims);
 }
 
-TF_LITE_MICRO_TEST(GatherOp_BatchDims1) {
+TEST(GatherTest, GatherOp_BatchDims1) {
   // For input_dims[], positions_dims[], or output_dims[], element 0 is the
   // number of dimensions in that array, not the actual dimension data.
   const int axis = 2;
@@ -484,7 +404,7 @@ TF_LITE_MICRO_TEST(GatherOp_BatchDims1) {
       output_data, golden_dims, golden_data, axis, batch_dims);
 }
 
-TF_LITE_MICRO_TEST(GatherOp_NegativeBatchDims) {
+TEST(GatherTest, GatherOp_NegativeBatchDims) {
   // For input_dims[], positions_dims[], or output_dims[], element 0 is the
   // number of dimensions in that array, not the actual dimension data.
   const int axis = 2;
@@ -514,7 +434,7 @@ TF_LITE_MICRO_TEST(GatherOp_NegativeBatchDims) {
       output_data, golden_dims, golden_data, axis, batch_dims);
 }
 
-TF_LITE_MICRO_TEST(GatherOp_BatchDimsEqualIndexDims) {
+TEST(GatherTest, GatherOp_BatchDimsEqualIndexDims) {
   // For input_dims[], positions_dims[], or output_dims[], element 0 is the
   // number of dimensions in that array, not the actual dimension data.
   const int axis = 3;
@@ -538,68 +458,4 @@ TF_LITE_MICRO_TEST(GatherOp_BatchDimsEqualIndexDims) {
       output_data, golden_dims, golden_data, axis, batch_dims);
 }
 
-
-TF_LITE_MICRO_TEST(GatherOp_NegativeAxis_Int16) {
-  const int axis = -1;
-  const int batch_dims = 0;
-
-
-  int input_dims[] = {3, 2, 2, 3};
-  const int16_t input_data[] = {
-      10, 11, 12,
-      13, 14, 15,
-      20, 21, 22,
-      23, 24, 25};
-
-  int positions_dims[] = {1, 2};
-  const int32_t positions_data[] = {2, 0};
-  const int golden_dims[] = {2, 2, 2};
-
-  const int16_t golden_data[] = {
-      12, 10, 15, 13,
-      22, 20, 25, 23
-  };
-
-  int16_t output_data[8];
-  int output_dims[] = {4, 0, 0, 0, 0};
-  tflite::testing::TestGather<int16_t, int32_t>(
-      input_dims, input_data,
-      positions_dims, positions_data,
-      output_dims, output_data,
-      golden_dims, golden_data,
-      axis, batch_dims);
-}
-
-TF_LITE_MICRO_TEST(GatherOp_OutOfOrderRepeatedCoords_Int16) {
-  const int axis = 1;
-  const int batch_dims = 0;
-
-  int input_dims[] = {2, 2, 3};
-  const int16_t input_data[] = {
-    10, 11, 12,
-    20, 21, 22
-  };
-
-  int positions_dims[] = {1, 3};
-  const int32_t positions_data[] = {1, 1, 0};
-
-  const int golden_dims[] = {2, 3};
-
-  const int16_t golden_data[] = {
-    11, 11, 10,
-    21, 21, 20
-  };
-
-  int16_t output_data[6];
-  int output_dims[] = {3, 0, 0, 0};
-
-  tflite::testing::TestGather<int16_t, int32_t>(
-      input_dims, input_data,
-      positions_dims, positions_data,
-      output_dims, output_data,
-      golden_dims, golden_data,
-      axis, batch_dims);
-}
-
-
-TF_LITE_MICRO_TESTS_END
+TF_LITE_MICRO_TESTS_MAIN

@@ -50,6 +50,14 @@ struct OpDataFullyConnected {
   int32_t* per_channel_output_shift;
   bool is_per_channel;
 #endif
+
+#ifdef USE_TFLM_COMPRESSION
+
+  // scratch buffers for compressed tensors
+  int weights_scratch_index;
+  int bias_scratch_index;
+
+#endif  // USE_TFLM_COMPRESSION
 };
 
 extern const int kFullyConnectedInputTensor;
@@ -77,7 +85,7 @@ TfLiteStatus CalculateOpDataFullyConnected(
 // implementation (reference or optimized) must define this function.
 TFLMRegistration Register_FULLY_CONNECTED();
 
-#if defined(CMSIS_NN) || defined(HELIA) || defined(HEXAGON) || defined(XTENSA)
+#if defined(CMSIS_NN) || defined(HEXAGON) || defined(XTENSA)
 // Returns a TFLMRegistration struct for kernel variant that only supports
 // int8.
 TFLMRegistration Register_FULLY_CONNECTED_INT8();
@@ -94,7 +102,7 @@ inline TFLMRegistration Register_FULLY_CONNECTED_INT8() {
 
 #endif
 
-#if defined(CMSIS_NN) || defined(HELIA)
+#if defined(CMSIS_NN)
 // Returns a TFLMRegistration struct for kernel variant that only supports
 // int16.
 TFLMRegistration Register_FULLY_CONNECTED_INT16();

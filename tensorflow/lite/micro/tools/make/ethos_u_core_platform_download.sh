@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Copyright 2025 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -50,7 +50,6 @@ else
     echo "OS type ${UNAME_S} not supported."
     exit 1
   fi
-
 
   git clone "https://gitlab.arm.com/artificial-intelligence/ethos-u/ethos-u-core-platform" ${DOWNLOADED_ETHOS_U_CORE_PLATFORM_PATH} >&2
   pushd ${DOWNLOADED_ETHOS_U_CORE_PLATFORM_PATH} > /dev/null

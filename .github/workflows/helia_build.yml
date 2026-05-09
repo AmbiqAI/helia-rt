@@ -59,7 +59,7 @@ jobs:
             echo "ref=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ steps.sel.outputs.ref }}
 
@@ -70,8 +70,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: tensorflow/lite/micro/tools/make/downloads
-          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc') }}
-          restore-keys: ${{ runner.os }}-third-party-downloads-
+          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc','tensorflow/lite/micro/tools/make/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/helia.inc') }}
 
       - name: Build (${{ matrix.arch }} / ${{ matrix.toolchain }})
         run: |

@@ -1,4 +1,4 @@
-/* Copyright 2022 The TensorFlow Authors. All Rights Reserved.
+/* Copyright 2024 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -82,7 +82,7 @@ class MicroProfiler : public MicroProfilerInterface {
   };
   // In practice, the number of tags will be much lower than the number of
   // events. But it is theoretically possible that each event to be unique and
-  // hence we allow total_ticks_per_tag_ to have kMaxEvents entries.
+  // hence we allow total_ticks_per_tag to have kMaxEvents entries.
   TicksPerTag total_ticks_per_tag_[kMaxEvents] = {};
 
   int FindExistingOrNextPosition(const char* tag_name);

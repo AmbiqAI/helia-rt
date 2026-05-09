@@ -51,8 +51,8 @@ $(1)_LOCAL_OBJS := $$(addprefix $$(CORE_OBJDIR), \
 $$(patsubst %.S,%.o,$$(patsubst %.cc,%.o,$$(patsubst %.c,%.o,$$($(1)_LOCAL_SRCS)))))
 $(1)_BINARY := $$(BINDIR)$(1)
 $$($(1)_BINARY): $$($(1)_LOCAL_OBJS) $$(MICROLITE_LIB_PATH)
-	@mkdir -p $$(dir $$@)
-	$$(CXX) $$(CXXFLAGS) $$(INCLUDES) \
+	$$(Q)$(MKDIR_P) $$(dir $$@)
+	$$(Q)$$(CXX) $$(CXXFLAGS) $$(INCLUDES) \
 	-o $$($(1)_BINARY) $$($(1)_LOCAL_OBJS) \
 	$$(MICROLITE_LIB_PATH) $$(LDFLAGS) $$(MICROLITE_LIBS)
 $(1): $$($(1)_BINARY)
@@ -104,8 +104,18 @@ endef
 # Unpacks an entry in a list of strings created by add_third_party_download, and
 # defines a dependency rule to download the library. The download_and_extract.sh
 # script is used to handle to downloading and unpacking.
+#
+# helia-rt: the recipe target is marked .PHONY so the script is invoked on
+# every build. download_and_extract.sh fast-exits via check_seed when the
+# directory already matches the expected URL+MD5, so this is cheap. Without
+# .PHONY, a CI cache restore that recreates the downloads/<dir> directory
+# (with stale contents from an older flatbuffers / gemmlowp / etc. version)
+# would satisfy the make target by directory existence alone, the recipe
+# would never run, and the seed check would never fire -- leading to
+# stale-cache build failures like the one fixed in PR #121.
 # 1 - Information about the library, separated by '!'s.
 define create_download_rule
+.PHONY: $(word 3, $(subst !, ,$(1)))
 $(word 3, $(subst !, ,$(1))):
 	$(DOWNLOAD_SCRIPT) $(subst !, ,$(1))
 THIRD_PARTY_TARGETS += $(word 3, $(subst !, ,$(1)))
@@ -117,3 +127,9 @@ endef
 # 2 - File pattern, e.g: *.h
 recursive_find = $(wildcard $(1)$(2)) $(foreach dir,$(wildcard $(1)*),$(call recursive_find,$(dir)/,$(2)))
 
+# Generic debug target to print any variable.
+# Usage: make print-VARIABLE
+print-%:
+	@echo '$*=$($*)'
+	@echo '  origin = $(origin $*)'
+	@echo '  flavor = $(flavor $*)'

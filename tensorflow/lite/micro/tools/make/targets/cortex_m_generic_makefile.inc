@@ -135,7 +135,6 @@ endif
 
 # Toolchain specific flags
 ifeq ($(TOOLCHAIN), armclang)
-
   TARGET_DEFAULT_TOOLCHAIN_ROOT := $(DOWNLOADS_DIR)/arm_compiler/bin/
   TARGET_TOOLCHAIN_ROOT := $(TARGET_DEFAULT_TOOLCHAIN_ROOT)
   ifeq ($(TARGET_TOOLCHAIN_ROOT), $(TARGET_DEFAULT_TOOLCHAIN_ROOT))
@@ -157,10 +156,14 @@ ifeq ($(TOOLCHAIN), armclang)
   AR_TOOL  := armar$(EXE)
   LD       := armlink$(EXE)
 
+  # helia-rt: -Wno-unused-private-field mirrors the corstone-300 armclang
+  # target so warnings stay consistent across the two paths. Keep both
+  # FLAGS_ARMC blocks in sync (see cortex_m_corstone_300_makefile.inc).
   FLAGS_ARMC = \
     --target=arm-arm-none-eabi \
     -fshort-enums \
     -gdwarf-4     \
+    -Wno-unused-private-field \
     -mcpu=$(TARGET_ARCH)
 
   CXXFLAGS += $(FLAGS_ARMC)

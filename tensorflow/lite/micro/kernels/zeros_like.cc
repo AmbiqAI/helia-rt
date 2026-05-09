@@ -64,9 +64,6 @@ TfLiteStatus ZerosLikeEval(TfLiteContext* context, TfLiteNode* node) {
     case kTfLiteInt32:
       resetZeros(tflite::micro::GetTensorData<int32_t>(output), flat_size);
       break;
-    case kTfLiteInt16:
-      resetZeros(tflite::micro::GetTensorData<int16_t>(output), flat_size);
-      break;
     case kTfLiteInt8:
       resetZeros(tflite::micro::GetTensorData<int8_t>(output), flat_size);
       break;
@@ -75,7 +72,7 @@ TfLiteStatus ZerosLikeEval(TfLiteContext* context, TfLiteNode* node) {
       break;
     default:
       MicroPrintf(
-          "ZerosLike only currently supports int64, int32, int16, int8, "
+          "ZerosLike only currently supports int64, int32, "
           "and float32, got %d.",
           input->type);
       return kTfLiteError;

@@ -84,8 +84,8 @@ class TestModelGenerator:
       bytes_per_element = BytesFromFlatbufferType(tensor.type)
       if buffer.data is not None and len(tensor.shape) > 2:
         for i in range(len(buffer.data)):
-          buffer.data[i] = buffer.data[i] * np.random.uniform(
-              low=0.5, high=1.0, size=1)
+          buffer.data[i] = buffer.data[i] * np.random.uniform(low=0.5,
+                                                              high=1.0)
 
         all_equal = True
         for i, elem in enumerate(buffer.data):
@@ -139,10 +139,6 @@ class TestModelGenerator:
 
 class PerLayerTestGenerator(generate_test_for_model.TestDataGenerator):
 
-  def __init__(self, arena_size_kb: int = 100, *args, **kwargs):
-    super().__init__(*args, **kwargs)
-    self.arena_size_kb = arena_size_kb
-
   def generate_tests(self):
     # Collect all target names into a list
     targets = []
@@ -162,15 +158,13 @@ class PerLayerTestGenerator(generate_test_for_model.TestDataGenerator):
           'targets_with_path': targets_with_path,
           'inputs': self.inputs,
           'input_dtypes': self.input_types,
-          'output_dtype': self.output_type,
-          'arena_size_kb': self.arena_size_kb
+          'output_dtype': self.output_type
       }
       file_obj.write(build_template.render(**key_values_in_template))
 
   def generate_build_file(self):
     # Collect all target names into a list
     targets = []
-
     for model_path in self.model_paths:
       target_name = model_path.split('/')[-1].split('.')[0]
       targets.append(target_name)
@@ -188,7 +182,6 @@ class PerLayerTestGenerator(generate_test_for_model.TestDataGenerator):
 
 
 def op_info_from_name(name):
-
   if 'transpose_conv' in name:
     return [[0, 2], schema_fb.BuiltinOperator.TRANSPOSE_CONV]
   elif 'depthwise_conv' in name:
@@ -205,8 +198,6 @@ def op_info_from_name(name):
     return [[0], schema_fb.BuiltinOperator.LEAKY_RELU]
   elif 'pad' in name:
     return [[0], schema_fb.BuiltinOperator.PAD]
-  elif 'fully_connected' in name:
-    return [[0], schema_fb.BuiltinOperator.FULLY_CONNECTED]
   else:
     raise RuntimeError(f'Unsupported op: {name}')
 
@@ -219,19 +210,15 @@ flags.DEFINE_string('output_dir', None, 'directory to output generated files')
 
 flags.mark_flag_as_required('input_tflite_file')
 flags.mark_flag_as_required('output_dir')
-flags.DEFINE_integer('arena_size_kb', 100, 'Size of arena in KB')
 
 
 def main(_):
   model = flatbuffer_utils.read_model(FLAGS.input_tflite_file)
-  # print working directory and output directory
-  print(f'working directory: {os.getcwd()}')
-  print(f'output directory: {FLAGS.output_dir}')
   os.makedirs(FLAGS.output_dir, exist_ok=True)
   inputs, builtin_operator = op_info_from_name(FLAGS.output_dir.split('/')[-1])
   generator = TestModelGenerator(model, FLAGS.output_dir, inputs)
   model_names = generator.generate_models(0, builtin_operator)
-  data_generator = PerLayerTestGenerator(output_dir=FLAGS.output_dir, model_paths=model_names, inputs=inputs, arena_size_kb=FLAGS.arena_size_kb)
+  data_generator = PerLayerTestGenerator(FLAGS.output_dir, model_names, inputs)
   data_generator.generate_goldens(builtin_operator)
   data_generator.generate_build_file()
   data_generator.generate_makefile()

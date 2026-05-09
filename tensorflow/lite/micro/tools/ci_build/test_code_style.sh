@@ -14,7 +14,7 @@
 # limitations under the License.
 # ==============================================================================
 
-set -e
+set -ex
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR=${SCRIPT_DIR}/../../../../..
@@ -46,6 +46,7 @@ tensorflow/lite/micro/tools/make/downloads/pigweed/pw_presubmit/py/pw_presubmit/
   -e kernels/internal/reference/reference_ops.h \
   -e python/schema_py_generated.py \
   -e python_requirements.in \
+  -e tensorflow/lite/micro/compression/metadata_saved.h \
   -e tools/make/downloads \
   -e tools/make/targets/ecm3531 \
   -e BUILD\
@@ -86,8 +87,6 @@ tensorflow/lite/micro/tools/make/downloads/pigweed/pw_presubmit/py/pw_presubmit/
   -e third_party/xtensa \
   -e ci \
   -e c/common.c \
-  -e codegen/preprocessor/preprocessor_schema_generated.h \
-  -e codegen/preprocessor/preprocessor_schema_py_generated.py \
   -e core/api/error_reporter.cc \
   -e kernels/internal/reference/integer_ops/ \
   -e kernels/internal/reference/reference_ops.h \
@@ -97,6 +96,7 @@ tensorflow/lite/micro/tools/make/downloads/pigweed/pw_presubmit/py/pw_presubmit/
   -e experimental \
   -e schema/schema_generated.h \
   -e schema/schema_utils.h \
+  -e tensorflow/lite/micro/compression/metadata_saved.h \
   -e tensorflow/lite/micro/tools/layer_by_layer_schema_generated.h \
   -e "\.inc" \
   -e "\.md" \
@@ -161,7 +161,7 @@ popd
 
 
 # Re-enable exit on error now that we are done with the temporary git repo.
-set -e
+set -ex
 
 if [[ ${CODE_FORMAT_RESULT}  != 0 || ${BUILD_FORMAT_RESULT} != 0 ]]
 then

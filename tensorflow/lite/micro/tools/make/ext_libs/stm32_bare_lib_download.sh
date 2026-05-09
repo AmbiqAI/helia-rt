@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Copyright 2019 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -45,7 +45,7 @@ else
   git clone https://github.com/google/stm32_bare_lib.git ${DOWNLOADED_STM32_BARE_LIB_PATH} >&2
   pushd ${DOWNLOADED_STM32_BARE_LIB_PATH} > /dev/null
   git checkout aaabdeb0d6098322a0874b29f6ed547a39b3929f >&2
-  git apply ../../ext_libs/stm32_bare_lib.patch
+  git apply --ignore-space-change --ignore-whitespace ../../ext_libs/stm32_bare_lib.patch
   popd > /dev/null
 fi
 

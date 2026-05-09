@@ -1,5 +1,5 @@
 # standalone BUILD file used to test project generation with bazel.
-
+#
 load("//tensorflow/lite/micro:build_def.bzl",
     "tflm_cc_library",
     "tflm_copts",
@@ -17,3 +17,4 @@ tflm_cc_library(
     "-Ithird_party/ruy",
   ]
 )
+

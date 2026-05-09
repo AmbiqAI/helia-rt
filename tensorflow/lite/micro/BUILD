@@ -28,6 +28,16 @@ tflm_cc_library(
 )
 
 tflm_cc_library(
+    name = "compression",
+    hdrs = [
+        "compression.h",
+    ],
+    deps = [
+        "//tensorflow/lite/c:common",
+    ],
+)
+
+tflm_cc_library(
     # TODO(b/187093492): Rename to micro_interpreter.
     name = "micro_framework",
     srcs = [
@@ -62,10 +72,14 @@ tflm_cc_library(
         "micro_context.h",
     ],
     deps = [
+        ":compression",
         ":micro_common",
         ":micro_graph",
         ":micro_log",
+        ":micro_profiler",
+        "//tensorflow/lite:type_to_tflitetype",
         "//tensorflow/lite/c:common",
+        "//tensorflow/lite/micro/kernels:decompress",
     ],
 )
 
@@ -171,6 +185,7 @@ tflm_cc_library(
         "micro_allocator.h",
     ],
     deps = [
+        ":compression",
         ":flatbuffer_utils",
         ":memory_helpers",
         ":micro_arena_constants",
@@ -183,6 +198,7 @@ tflm_cc_library(
         "//tensorflow/lite/micro/arena_allocator:non_persistent_arena_buffer_allocator",
         "//tensorflow/lite/micro/arena_allocator:persistent_arena_buffer_allocator",
         "//tensorflow/lite/micro/arena_allocator:simple_memory_allocator",
+        "//tensorflow/lite/micro/compression:metadata_saved",
         "//tensorflow/lite/micro/memory_planner:greedy_memory_planner",
         "//tensorflow/lite/micro/memory_planner:linear_memory_planner",
         "//tensorflow/lite/micro/memory_planner:micro_memory_planner",
@@ -236,7 +252,9 @@ tflm_cc_library(
         "test_helpers.h",
     ],
     deps = [
+        ":compression",
         ":memory_helpers",
+        ":micro_log",
         ":micro_utils",
         ":op_resolvers",
         "//tensorflow/lite:type_to_tflitetype",
@@ -278,7 +296,7 @@ tflm_cc_library(
     ],
     hdrs = [
         "debug_log.h",
-    ]
+    ],
 )
 
 tflm_cc_library(
@@ -327,7 +345,7 @@ tflm_cc_library(
     name = "micro_profiler_interface",
     hdrs = [
         "micro_profiler_interface.h",
-    ]
+    ],
 )
 
 tflm_cc_library(
@@ -384,7 +402,7 @@ tflm_cc_library(
 
 tflm_cc_library(
     name = "span",
-    hdrs = ["span.h"]
+    hdrs = ["span.h"],
 )
 
 tflm_cc_library(
@@ -402,7 +420,7 @@ tflm_cc_library(
     ],
     hdrs = [
         "system_setup.h",
-    ]
+    ],
 )
 
 tflm_cc_library(
@@ -467,6 +485,19 @@ tflm_cc_test(
         ":fake_micro_context",
         ":micro_allocator",
         ":mock_micro_graph",
+        ":test_helpers",
+        "//tensorflow/lite/micro/testing:micro_test",
+    ],
+)
+
+tflm_cc_test(
+    name = "micro_interpreter_graph_test",
+    srcs = [
+        "micro_interpreter_graph_test.cc",
+    ],
+    deps = [
+        ":micro_allocator",
+        ":micro_interpreter_graph",
         ":test_helpers",
         "//tensorflow/lite/micro/testing:micro_test",
     ],
@@ -638,6 +669,18 @@ tflm_cc_test(
     ],
     deps = [
         ":static_vector",
+        "//tensorflow/lite/micro/testing:micro_test",
+    ],
+)
+
+tflm_cc_test(
+    name = "hexdump_test",
+    size = "small",
+    srcs = [
+        "hexdump_test.cc",
+    ],
+    deps = [
+        ":hexdump",
         "//tensorflow/lite/micro/testing:micro_test",
     ],
 )

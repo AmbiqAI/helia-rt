@@ -1,3 +1,5 @@
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+
 cc_test(
     name = "cc_deps_link_test",
     size = "small",
@@ -8,6 +10,6 @@ cc_test(
         "nomsan",  # avoid, because tensorflow library fails msan
     ],
     deps = [
-        "@tensorflow_cc_deps//:cc_library",
+        "@tflm_pip_deps//tensorflow:cc_library",
     ],
 )

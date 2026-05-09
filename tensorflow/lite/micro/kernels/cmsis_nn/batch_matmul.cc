@@ -89,7 +89,7 @@ inline TfLiteStatus PopulateEvalData(
   // Compress ops where rhs shape is [..., 1, X, Y] and lhs shape is
   // [..., Q, R, S] which is equivalent to rhs: [..., X, Y] and
   // lhs: [..., Q * R, S].
-  if (rhs_dims_count > 2 && lhs_dims_count > 2) {
+  if (!params->adj_x && rhs_dims_count > 2 && lhs_dims_count > 2) {
     int rhs_one = rhs_shape->DimsData()[rhs_dims_count - 3];
     if (rhs_one == 1) {
       int32_t* lhs_dims = lhs_shape->DimsData();
@@ -223,7 +223,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   const RuntimeShape extended_rhs_shape =
       RuntimeShape::ExtendedShape(output_rank, GetTensorShape(rhs_input));
 
-  // Ensure any batch dimensions obey broacasting rules.
+  // Ensure any batch dimensions obey broadcasting rules.
   for (int i = 0; i < output_rank - 2; ++i) {
     const int lhs_dim = extended_lhs_shape.Dims(i);
     const int rhs_dim = extended_rhs_shape.Dims(i);

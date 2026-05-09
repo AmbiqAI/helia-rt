@@ -61,7 +61,7 @@ TfLiteStatus CalculateOpDataFullyConnected(
   data->is_per_channel = false;
 #endif
 
-  if (data_type == kTfLiteFloat32 || data_type == kTfLiteFloat16) {
+  if (data_type == kTfLiteFloat32) {
     return kTfLiteOk;
   }
 
@@ -96,13 +96,13 @@ TfLiteStatus CalculateOpDataFullyConnected(
     const int per_channel_quantization_size = affine_quantization->scale->size;
 
     //  Currently only Int8/Int16 are supported for per channel quantization.
-     TF_LITE_ENSURE(
-         context,
-         (input->type == kTfLiteInt8 && filter->type != kTfLiteInt4) ||
-             (input->type == kTfLiteInt16 && filter->type != kTfLiteInt4));
+    TF_LITE_ENSURE(
+        context,
+        (input->type == kTfLiteInt8 && filter->type != kTfLiteInt4) ||
+            (input->type == kTfLiteInt16 && filter->type != kTfLiteInt4));
 
-     TF_LITE_ENSURE_EQ(context, affine_quantization->scale->size,
-                       per_channel_quantization_size);
+    TF_LITE_ENSURE_EQ(context, affine_quantization->scale->size,
+                      per_channel_quantization_size);
 
     TF_LITE_ENSURE_EQ(
         context, per_channel_quantization_size,

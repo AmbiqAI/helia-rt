@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 // WARNING: Users of TensorFlow Lite should not include this file directly, but
-// should instead include "third_party/tensorflow/lite/c/common.h".
+// should instead include "tensorflow/lite/c/common.h".
 // Only the TensorFlow Lite implementation itself should include this file
 // directly.
 
@@ -47,7 +47,7 @@ limitations under the License.
 // NOLINTEND(whitespace/line_length)
 // clang-format on
 
-// IWYU pragma: private, include "third_party/tensorflow/lite/c/common.h"
+// IWYU pragma: private, include "tensorflow/lite/c/common.h"
 
 #ifndef TENSORFLOW_LITE_CORE_C_COMMON_H_
 #define TENSORFLOW_LITE_CORE_C_COMMON_H_
@@ -1352,7 +1352,15 @@ typedef enum TfLiteDelegateFlags {
   /// operator information using `Profiler::EventType::OPERATOR_INVOKE_EVENT`
   /// and the results will appear in the operator-wise Profiling section and not
   /// in the Delegate internal section.
-  kTfLiteDelegateFlagsPerOperatorProfiling = 4
+  kTfLiteDelegateFlagsPerOperatorProfiling = 4,
+
+  // This flag can be used by callers to hint that the delegate is likely to
+  // delegate the entire graph to a single delegate so certain allocations can
+  // be skipped.
+  // This is an ADVANCED feature and should only be used if the caller has
+  // prior knowledge that the delegate will fully delegate all subgraphs
+  // to a single delegate.
+  kTfLiteDelegateFlagsHintFullyDelegatedToSingleDelegate = 8,
 } TfLiteDelegateFlags;
 
 /// WARNING: This is an experimental interface that is subject to change.

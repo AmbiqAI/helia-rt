@@ -1,4 +1,4 @@
-/* Copyright 2020 The TensorFlow Authors. All Rights Reserved.
+/* Copyright 2024 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +25,14 @@ limitations under the License.
 
 #if defined(HELIA)
 #include "Include/arm_nnsupportfunctions.h"
+#define TFLM_MEMCPY(dst, src, n) \
+  arm_memcpy_s8(reinterpret_cast<int8_t*>(dst), \
+                reinterpret_cast<const int8_t*>(src), (n))
+#define TFLM_MEMSET(dst, val, n) \
+  arm_memset_s8(reinterpret_cast<int8_t*>(dst), (val), (n))
+#else
+#define TFLM_MEMCPY(dst, src, n) memcpy((dst), (src), (n))
+#define TFLM_MEMSET(dst, val, n) memset((dst), (val), (n))
 #endif
 
 namespace tflite {
@@ -80,11 +88,7 @@ TfLiteStatus MicroResourceVariables::Read(int id,
   MicroResourceVariable variable = resource_variables_[id];
   TFLITE_DCHECK(EvalTensorBytes(tensor) == variable.bytes);
   TFLITE_DCHECK(variable.resource_buffer != nullptr);
-#if defined(HELIA)
-  arm_memcpy_s8((int8_t*)tensor->data.raw, (int8_t*)variable.resource_buffer, variable.bytes);
-#else
-  memcpy(tensor->data.raw, variable.resource_buffer, variable.bytes);
-#endif
+  TFLM_MEMCPY(tensor->data.raw, variable.resource_buffer, variable.bytes);
   return kTfLiteOk;
 }
 
@@ -114,19 +118,16 @@ TfLiteStatus MicroResourceVariables::Allocate(int id, TfLiteContext* context,
       int8_t zero_point = quantization_data->zero_point[0].data[0];
       variable.default_value = zero_point;
     }
-#if defined(HELIA)
-    arm_memset_s8((int8_t *)variable.resource_buffer, variable.default_value, variable.bytes);
-#else
     // TODO(b/269669735): Explains why casting zero_point to int8 and memset.
-    memset(variable.resource_buffer, variable.default_value, variable.bytes);
-#endif
+    TFLM_MEMSET(variable.resource_buffer, variable.default_value,
+                variable.bytes);
   }
 
   return kTfLiteOk;
 }
 
-TfLiteStatus MicroResourceVariables::Assign(int id,
-                                            const TfLiteEvalTensor* tensor) {
+TfLiteStatus MicroResourceVariables::Assign(int id, size_t count_bytes,
+                                            const void* input_buffer) {
   if (id < 0 || id >= num_resource_variables_) {
     MicroPrintf("Attempting to read non-existent resource variable %d", id);
     return kTfLiteError;
@@ -140,24 +141,18 @@ TfLiteStatus MicroResourceVariables::Assign(int id,
         "with a TfLiteTensor first.");
     return kTfLiteError;
   }
-  TFLITE_DCHECK(EvalTensorBytes(tensor) == variable.bytes);
-#if defined(HELIA)
-  arm_memcpy_s8((int8_t *)variable.resource_buffer, (int8_t *)tensor->data.raw, variable.bytes);
-#else
-  memcpy(variable.resource_buffer, tensor->data.raw, variable.bytes);
-#endif
+  TFLITE_DCHECK(count_bytes == variable.bytes);
+  TFLITE_DCHECK(input_buffer != nullptr);
+  TFLM_MEMCPY(variable.resource_buffer, input_buffer, variable.bytes);
   return kTfLiteOk;
 }
 
 TfLiteStatus MicroResourceVariables::ResetAll() {
   for (int i = 0; i < num_resource_variables_; i++) {
     MicroResourceVariable variable = resource_variables_[i];
-  #if defined(HELIA)
-    arm_memset_s8((int8_t *)variable.resource_buffer, variable.default_value, variable.bytes);
-  #else
     // TODO(b/269669735): Explains why casting zero_point to int8 and memset.
-    memset(variable.resource_buffer, variable.default_value, variable.bytes);
-  #endif
+    TFLM_MEMSET(variable.resource_buffer, variable.default_value,
+                variable.bytes);
   }
   return kTfLiteOk;
 }

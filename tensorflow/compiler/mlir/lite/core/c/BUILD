@@ -1,10 +1,13 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("//tensorflow/lite:build_def.bzl", "tflite_copts")
+
 package(
     default_visibility = [
         "//visibility:public",
     ],
     licenses = ["notice"],
 )
+
 exports_files(
     srcs = [
         "builtin_op_data.h",
@@ -14,6 +17,7 @@ exports_files(
         "//tensorflow/lite:__subpackages__",
     ],
 )
+
 # LINT.IfChange(common)
 cc_library(
     name = "tflite_common",

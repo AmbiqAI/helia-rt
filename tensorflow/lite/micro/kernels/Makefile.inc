@@ -123,10 +123,15 @@ $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/ceil_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/comparisons_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/concatenation_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/cumsum_test.cc \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/decode_state_huffman_test.cc \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/decode_state_lut_test.cc \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/decode_state_prune_test.cc \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/decode_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/depth_to_space_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/depthwise_conv_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/dequantize_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/div_test.cc \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/dynamic_update_slice_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/elementwise_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/elu_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/embedding_lookup_test.cc \
@@ -180,6 +185,18 @@ $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/transpose_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/unpack_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/while_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/zeros_like_test.cc
+
+ifeq ($(ENABLE_COMPRESSION), yes)
+MICROLITE_KERNEL_SIMPLE_TEST_SRCS += $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/decompress_test.cc
+endif
+
+# Optional per-OPTIMIZED_KERNEL_DIR test extensions. Allows backends to register
+# additional kernel tests (e.g. coverage for types only their kernel supports)
+# without modifying the upstream test list. The .inc file should append paths
+# to MICROLITE_KERNEL_SIMPLE_TEST_SRCS.
+ifneq ($(OPTIMIZED_KERNEL_DIR),)
+-include $(MAKEFILE_DIR)/ext_libs/$(OPTIMIZED_KERNEL_DIR)_tests.inc
+endif
 
 # Generate simple kernel test targets in a common way
 $(foreach TEST_TARGET,$(MICROLITE_KERNEL_SIMPLE_TEST_SRCS),\

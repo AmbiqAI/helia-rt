@@ -1,4 +1,5 @@
-load("@flatbuffers//:build_defs.bzl", "flatbuffer_cc_library")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("//third_party/flatbuffers:build_defs.bzl", "flatbuffer_cc_library")
 
 package(
     default_visibility = [
@@ -29,7 +30,10 @@ flatbuffer_cc_library(
 
 cc_library(
     name = "schema_utils",
-    hdrs = ["schema_utils.h"],
+    hdrs = [
+        "schema_generated.h",
+        "schema_utils.h",
+    ],
     deps = [
         "//tensorflow/compiler/mlir/lite/schema:schema_utils",
     ],

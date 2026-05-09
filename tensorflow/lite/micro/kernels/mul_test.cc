@@ -17,7 +17,7 @@ limitations under the License.
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
 #include "tensorflow/lite/micro/test_helpers.h"
-#include "tensorflow/lite/micro/testing/micro_test.h"
+#include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
 namespace tflite {
 namespace testing {
@@ -45,9 +45,7 @@ template <typename T>
 void ValidateMulGoldens(TfLiteTensor* tensors, int tensors_size,
                         TfLiteFusedActivation activation, const T* golden,
                         int output_len, float tolerance, T* output) {
-  TfLiteMulParams builtin_data = {
-      .activation = activation,
-  };
+  TfLiteMulParams builtin_data = {activation};
 
   int inputs_array_data[] = {2, 0, 1};
   TfLiteIntArray* inputs_array = IntArrayFromInts(inputs_array_data);
@@ -59,11 +57,11 @@ void ValidateMulGoldens(TfLiteTensor* tensors, int tensors_size,
                              outputs_array,
                              reinterpret_cast<void*>(&builtin_data));
 
-  TF_LITE_MICRO_EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
-  TF_LITE_MICRO_EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
 
   for (int i = 0; i < output_len; i++) {
-    TF_LITE_MICRO_EXPECT_NEAR(golden[i], output[i], tolerance);
+    EXPECT_NEAR(golden[i], output[i], tolerance);
   }
 }
 
@@ -126,9 +124,7 @@ void TestMulQuantized(int* input1_dims_data, const float* input1_data,
 }  // namespace testing
 }  // namespace tflite
 
-TF_LITE_MICRO_TESTS_BEGIN
-
-TF_LITE_MICRO_TEST(SimpleFloatNoActivationShouldMatchGolden) {
+TEST(MulTest, SimpleFloatNoActivationShouldMatchGolden) {
   float output_data[tflite::testing::flat_size_simple];
 
   tflite::testing::TestMulFloat(
@@ -138,7 +134,7 @@ TF_LITE_MICRO_TEST(SimpleFloatNoActivationShouldMatchGolden) {
       kTfLiteActNone);
 }
 
-TF_LITE_MICRO_TEST(SimpleFloatReluShouldMatchGolden) {
+TEST(MulTest, SimpleFloatReluShouldMatchGolden) {
   float output_data[tflite::testing::flat_size_simple];
 
   tflite::testing::TestMulFloat(
@@ -148,7 +144,7 @@ TF_LITE_MICRO_TEST(SimpleFloatReluShouldMatchGolden) {
       output_data, kTfLiteActRelu);
 }
 
-TF_LITE_MICRO_TEST(SimpleInt8NoActivationShouldMatchGolden) {
+TEST(MulTest, SimpleInt8NoActivationShouldMatchGolden) {
   int8_t input1_quantized[tflite::testing::flat_size_simple];
   int8_t input2_quantized[tflite::testing::flat_size_simple];
   int8_t golden_quantized[tflite::testing::flat_size_simple];
@@ -163,7 +159,7 @@ TF_LITE_MICRO_TEST(SimpleInt8NoActivationShouldMatchGolden) {
       tflite::testing::scale_simple, 0, output_data, kTfLiteActNone);
 }
 
-TF_LITE_MICRO_TEST(SimpleInt16NoActivationShouldMatchGolden) {
+TEST(MulTest, SimpleInt16NoActivationShouldMatchGolden) {
   int16_t input1_quantized[tflite::testing::flat_size_simple];
   int16_t input2_quantized[tflite::testing::flat_size_simple];
   int16_t golden_quantized[tflite::testing::flat_size_simple];
@@ -178,7 +174,7 @@ TF_LITE_MICRO_TEST(SimpleInt16NoActivationShouldMatchGolden) {
       tflite::testing::scale_simple, 0, output_data, kTfLiteActNone);
 }
 
-TF_LITE_MICRO_TEST(BroadcastFloatNoActivationShouldMatchGolden) {
+TEST(MulTest, BroadcastFloatNoActivationShouldMatchGolden) {
   float output_data[tflite::testing::flat_size_broadcast];
 
   tflite::testing::TestMulFloat(
@@ -188,7 +184,7 @@ TF_LITE_MICRO_TEST(BroadcastFloatNoActivationShouldMatchGolden) {
       output_data, kTfLiteActNone);
 }
 
-TF_LITE_MICRO_TEST(BroadcastFloatReluShouldMatchGolden) {
+TEST(MulTest, BroadcastFloatReluShouldMatchGolden) {
   float output_data[tflite::testing::flat_size_broadcast];
 
   tflite::testing::TestMulFloat(
@@ -198,7 +194,7 @@ TF_LITE_MICRO_TEST(BroadcastFloatReluShouldMatchGolden) {
       output_data, kTfLiteActRelu);
 }
 
-TF_LITE_MICRO_TEST(BroadcastInt8NoActivationShouldMatchGolden) {
+TEST(MulTest, BroadcastInt8NoActivationShouldMatchGolden) {
   int8_t input1_quantized[tflite::testing::flat_size_broadcast];
   int8_t input2_quantized[tflite::testing::flat_size_broadcast];
   int8_t golden_quantized[tflite::testing::flat_size_broadcast];
@@ -214,7 +210,7 @@ TF_LITE_MICRO_TEST(BroadcastInt8NoActivationShouldMatchGolden) {
       kTfLiteActNone);
 }
 
-TF_LITE_MICRO_TEST(BroadcastInt16NoActivationShouldMatchGolden) {
+TEST(MulTest, BroadcastInt16NoActivationShouldMatchGolden) {
   int16_t input1_quantized[tflite::testing::flat_size_broadcast];
   int16_t input2_quantized[tflite::testing::flat_size_broadcast];
   int16_t golden_quantized[tflite::testing::flat_size_broadcast];
@@ -230,7 +226,7 @@ TF_LITE_MICRO_TEST(BroadcastInt16NoActivationShouldMatchGolden) {
       kTfLiteActNone);
 }
 
-TF_LITE_MICRO_TEST(SimpleInt32NoActivationShouldMatchGolden) {
+TEST(MulTest, SimpleInt32NoActivationShouldMatchGolden) {
   int32_t input1_quantized[tflite::testing::flat_size_simple];
   int32_t input2_quantized[tflite::testing::flat_size_simple];
   int32_t golden_quantized[tflite::testing::flat_size_simple];
@@ -249,4 +245,4 @@ TF_LITE_MICRO_TEST(SimpleInt32NoActivationShouldMatchGolden) {
       golden_quantized, 0.0001, 0, output_data, kTfLiteActNone);
 }
 
-TF_LITE_MICRO_TESTS_END
+TF_LITE_MICRO_TESTS_MAIN

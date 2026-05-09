@@ -17,7 +17,7 @@ limitations under the License.
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
 #include "tensorflow/lite/micro/test_helpers.h"
-#include "tensorflow/lite/micro/testing/micro_test.h"
+#include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
 namespace tflite {
 namespace testing {
@@ -70,20 +70,18 @@ void TestL2Normalization(int* input_dims_data, const T* input_data,
   int outputs_array_data[] = {1, 1};
   TfLiteIntArray* outputs_array = IntArrayFromInts(outputs_array_data);
 
-  TfLiteL2NormParams builtin_data = {
-      .activation = kTfLiteActNone,
-  };
+  TfLiteL2NormParams builtin_data = {kTfLiteActNone};
 
   const TFLMRegistration registration = tflite::Register_L2_NORMALIZATION();
   micro::KernelRunner runner(registration, tensors, tensors_size, inputs_array,
                              outputs_array,
                              reinterpret_cast<void*>(&builtin_data));
 
-  TF_LITE_MICRO_EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
-  TF_LITE_MICRO_EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
 
   for (int i = 0; i < output_dims_count; ++i) {
-    TF_LITE_MICRO_EXPECT_EQ(expected_output_data[i], output_data[i]);
+    EXPECT_EQ(expected_output_data[i], output_data[i]);
   }
 }
 
@@ -91,9 +89,7 @@ void TestL2Normalization(int* input_dims_data, const T* input_data,
 }  // namespace testing
 }  // namespace tflite
 
-TF_LITE_MICRO_TESTS_BEGIN
-
-TF_LITE_MICRO_TEST(SimpleFloatTest) {
+TEST(L2normTest, SimpleFloatTest) {
   int input_dims[] = {4, 1, 1, 1, 6};
   constexpr int data_length = 6;
   const float input_data[data_length] = {-1.1, 0.6, 0.7, 1.2, -0.7, 0.1};
@@ -105,7 +101,7 @@ TF_LITE_MICRO_TEST(SimpleFloatTest) {
       input_dims, input_data, expected_output_data, output_data);
 }
 
-TF_LITE_MICRO_TEST(ZerosVectorFloatTest) {
+TEST(L2normTest, ZerosVectorFloatTest) {
   int input_dims[] = {4, 1, 1, 1, 6};
   constexpr int data_length = 6;
   const float input_data[data_length] = {0, 0, 0, 0, 0, 0};
@@ -116,7 +112,7 @@ TF_LITE_MICRO_TEST(ZerosVectorFloatTest) {
       input_dims, input_data, expected_output_data, output_data);
 }
 
-TF_LITE_MICRO_TEST(SimpleFloatWithRankLessThanFourTest) {
+TEST(L2normTest, SimpleFloatWithRankLessThanFourTest) {
   int input_dims[] = {4, 1, 1, 1, 6};
   constexpr int data_length = 6;
   const float input_data[data_length] = {-1.1, 0.6, 0.7, 1.2, -0.7, 0.1};
@@ -128,7 +124,7 @@ TF_LITE_MICRO_TEST(SimpleFloatWithRankLessThanFourTest) {
       input_dims, input_data, expected_output_data, output_data);
 }
 
-TF_LITE_MICRO_TEST(MultipleBatchFloatTest) {
+TEST(L2normTest, MultipleBatchFloatTest) {
   int input_dims[] = {4, 3, 1, 1, 6};
   constexpr int data_length = 18;
   const float input_data[data_length] = {
@@ -147,7 +143,7 @@ TF_LITE_MICRO_TEST(MultipleBatchFloatTest) {
       input_dims, input_data, expected_output_data, output_data);
 }
 
-TF_LITE_MICRO_TEST(SimpleInt8Test) {
+TEST(L2normTest, SimpleInt8Test) {
   int input_dims[] = {4, 1, 1, 1, 6};
   constexpr int data_length = 6;
   const int8_t input_data[data_length] = {-71, 37, 44, 76, -46, 5};
@@ -158,7 +154,7 @@ TF_LITE_MICRO_TEST(SimpleInt8Test) {
                                                expected_output, output_data);
 }
 
-TF_LITE_MICRO_TEST(ZerosVectorInt8Test) {
+TEST(L2normTest, ZerosVectorInt8Test) {
   int input_dims[] = {4, 1, 1, 1, 6};
   constexpr int data_length = 6;
   const int8_t input_data[data_length] = {-1, -1, -1, -1, -1, -1};
@@ -169,7 +165,7 @@ TF_LITE_MICRO_TEST(ZerosVectorInt8Test) {
                                                expected_output, output_data);
 }
 
-TF_LITE_MICRO_TEST(MultipleBatchInt8Test) {
+TEST(L2normTest, MultipleBatchInt8Test) {
   int input_dims[] = {2, 3, 6};
   constexpr int data_length = 18;
   const int8_t input_data[data_length] = {
@@ -188,45 +184,4 @@ TF_LITE_MICRO_TEST(MultipleBatchInt8Test) {
                                                expected_output, output_data);
 }
 
-// TF_LITE_MICRO_TEST(SimpleInt16Test) {
-//   int input_dims[] = {4, 1, 1, 1, 6};
-//   constexpr int data_length = 6;
-//   const int16_t input_data[data_length] = {-32768, 16384, 20480, 32767, -20480, 4096};
-//   const int16_t expected_output[data_length] = {-23170, 11585, 14481, 23170, -14481, 2896};
-//   int16_t output_data[data_length];
-
-//   tflite::testing::TestL2Normalization<int16_t>(input_dims, input_data,
-//                                                 expected_output, output_data);
-// }
-
-// TF_LITE_MICRO_TEST(ZerosVectorInt16Test) {
-//   int input_dims[] = {4, 1, 1, 1, 6};
-//   constexpr int data_length = 6;
-//   const int16_t input_data[data_length] = {0, 0, 0, 0, 0, 0};
-//   const int16_t expected_output[data_length] = {0, 0, 0, 0, 0, 0};
-//   int16_t output_data[data_length];
-
-//   tflite::testing::TestL2Normalization<int16_t>(input_dims, input_data,
-//                                                 expected_output, output_data);
-// }
-
-// TF_LITE_MICRO_TEST(MultipleBatchInt16Test) {
-//   int input_dims[] = {2, 3, 6};
-//   constexpr int data_length = 18;
-//   const int16_t input_data[data_length] = {
-//       -32768, 16384, 20480, 32767, -20480, 4096,  // batch 1
-//       -32768, 16384, 20480, 32767, -20480, 4096,  // batch 2
-//       -32768, 16384, 20480, 32767, -20480, 4096,  // batch 3
-//   };
-//   const int16_t expected_output[data_length] = {
-//       -23170, 11585, 14481, 23170, -14481, 2896,  // batch 1
-//       -23170, 11585, 14481, 23170, -14481, 2896,  // batch 2
-//       -23170, 11585, 14481, 23170, -14481, 2896,  // batch 3
-//   };
-//   int16_t output_data[data_length];
-
-//   tflite::testing::TestL2Normalization<int16_t>(input_dims, input_data,
-//                                                 expected_output, output_data);
-// }
-
-TF_LITE_MICRO_TESTS_END
+TF_LITE_MICRO_TESTS_MAIN

@@ -26,6 +26,7 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/op_macros.h"
+#include "tensorflow/lite/micro/kernels/helia/logistic_helia.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/logistic.h"
 #include "tensorflow/lite/micro/micro_log.h"
@@ -35,11 +36,12 @@ namespace {
 
 void* LogisticInit(TfLiteContext* context, const char* buffer, size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
-  return context->AllocatePersistentBuffer(context, sizeof(OpDataLogistic));
+  return context->AllocatePersistentBuffer(context, sizeof(OpDataLogisticHelia));
 }
 
 
-void EvalUsingLookupTable(const OpDataLogistic* data, const TfLiteEvalTensor* input,
+void EvalUsingLookupTable(const OpDataLogisticHelia* data,
+                          const TfLiteEvalTensor* input,
                           TfLiteEvalTensor* output) {
   const int size = MatchingFlatSize(tflite::micro::GetTensorShape(input),
                                     tflite::micro::GetTensorShape(output));
@@ -58,7 +60,7 @@ TfLiteStatus LogisticEval(TfLiteContext* context, TfLiteNode* node) {
       tflite::micro::GetEvalOutput(context, node, kLogisticOutputTensor);
 
   TFLITE_DCHECK(node->user_data != nullptr);
-  OpDataLogistic* data = static_cast<OpDataLogistic*>(node->user_data);
+  OpDataLogisticHelia* data = static_cast<OpDataLogisticHelia*>(node->user_data);
 
   if (input->type == kTfLiteFloat32) {
     switch (output->type) {

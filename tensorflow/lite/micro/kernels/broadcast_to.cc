@@ -95,7 +95,6 @@ TfLiteStatus BroadcastToPrepare(TfLiteContext* context, TfLiteNode* node) {
   // the same as TFLite.
   TF_LITE_ENSURE(context, input->type != kTfLiteString);
 
-
   TF_LITE_ENSURE_MSG(context, IsConstantTensor(shape),
                      "Non-constant >shape< tensor is not supported");
 

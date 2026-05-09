@@ -1,5 +1,6 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 load("@tflm_pip_deps//:requirements.bzl", "requirement")
+load("//tensorflow/lite/micro:build_def.bzl", "INCOMPATIBLE_WITH_WINDOWS")
 
 py_binary(
     name = "train",
@@ -15,7 +16,7 @@ py_binary(
     srcs = ["evaluate.py"],
     deps = [
         "//python/tflite_micro:runtime",
-        "@absl_py//absl:app",
+        requirement("absl_py"),
         requirement("pillow"),
     ],
 )
@@ -39,6 +40,7 @@ py_test(
         "nomsan",  # Python doesn't like these symbols
         "noubsan",
     ],
+    target_compatible_with = INCOMPATIBLE_WITH_WINDOWS,
     deps = [
         ":evaluate",
         ":train",

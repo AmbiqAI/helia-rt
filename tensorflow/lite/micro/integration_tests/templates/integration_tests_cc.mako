@@ -33,9 +33,7 @@ limitations under the License.
 #include "${target_with_path}_golden_${output_dtype}_test_data.h"
 % endfor
 
-// constexpr size_t kTensorArenaSize = 1024 * 100;
-constexpr size_t kTensorArenaSize = 1024 * ${arena_size_kb};
-
+constexpr size_t kTensorArenaSize = 1024 * 100;
 uint8_t tensor_arena[kTensorArenaSize];
 bool print_log = false;
 

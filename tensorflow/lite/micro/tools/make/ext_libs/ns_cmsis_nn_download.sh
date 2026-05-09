@@ -88,20 +88,29 @@ elif [ ! -d ${DOWNLOADS_DIR} ]; then
   echo "The top-level downloads directory: ${DOWNLOADS_DIR} does not exist."
   exit 1
 elif [ -d ${DOWNLOADED_NS_CMSIS_NN_PATH} ]; then
-  # Check that the existing clone is at the right commit
-  pushd ${DOWNLOADED_NS_CMSIS_NN_PATH} > /dev/null
-  CURRENT_COMMIT=$(git rev-parse HEAD)
-  popd > /dev/null
-
-  if [ "${CURRENT_COMMIT}" = "${GIT_COMMIT}" ]; then
-    echo >&2 "ns-cmsis-nn is already at ${GIT_COMMIT}, skipping download."
-  else
-    echo >&2 "ns-cmsis-nn is at ${CURRENT_COMMIT} but expected ${GIT_COMMIT}, redownloading."
+  if [[ "${TFLM_FORCE_REDOWNLOAD:-0}" == "1" ]]; then
+    echo >&2 "TFLM_FORCE_REDOWNLOAD set, re-downloading ns-cmsis-nn."
     rm -rf ${DOWNLOADED_NS_CMSIS_NN_PATH}
     clone_ns_cmsis_nn ${DOWNLOADED_NS_CMSIS_NN_PATH}
     pushd ${DOWNLOADED_NS_CMSIS_NN_PATH} > /dev/null
     git checkout ${GIT_COMMIT} >&2
     popd > /dev/null
+  else
+    # Check that the existing clone is at the right commit
+    pushd ${DOWNLOADED_NS_CMSIS_NN_PATH} > /dev/null
+    CURRENT_COMMIT=$(git rev-parse HEAD)
+    popd > /dev/null
+
+    if [ "${CURRENT_COMMIT}" = "${GIT_COMMIT}" ]; then
+      echo >&2 "ns-cmsis-nn is already at ${GIT_COMMIT}, skipping download."
+    else
+      echo >&2 "ns-cmsis-nn is at ${CURRENT_COMMIT} but expected ${GIT_COMMIT}, redownloading."
+      rm -rf ${DOWNLOADED_NS_CMSIS_NN_PATH}
+      clone_ns_cmsis_nn ${DOWNLOADED_NS_CMSIS_NN_PATH}
+      pushd ${DOWNLOADED_NS_CMSIS_NN_PATH} > /dev/null
+      git checkout ${GIT_COMMIT} >&2
+      popd > /dev/null
+    fi
   fi
 
 else

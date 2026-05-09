@@ -45,9 +45,9 @@ py_binary(
         "lstm_test_data_generator.py",
         "lstm_test_data_utils.py",
     ],
-    srcs_version = "PY3",
     deps = [
-        "@absl_py//absl:app",
+        "//:tflite_micro_shim",
+        requirement("absl_py"),
         requirement("numpy"),
         requirement("tensorflow"),
     ],
@@ -57,7 +57,6 @@ py_test(
     name = "lstm_test_data_generator_test",
     srcs = ["lstm_test_data_generator_test.py"],
     main = "lstm_test_data_generator_test.py",
-    python_version = "PY3",
     tags = [
         "noasan",
         "nomsan",  # Python doesn't like these symbols

@@ -67,7 +67,7 @@ void MicroProfiler::LogCsv() const {
 #if !defined(TF_LITE_STRIP_ERROR_STRINGS)
   MicroPrintf("\"Event\",\"Tag\",\"Ticks\"");
   for (int i = 0; i < num_events_; ++i) {
-#if defined(HEXAGON) || defined(CMSIS_NN) || defined(HELIA)
+#if defined(HEXAGON) || defined(CMSIS_NN)
     int ticks = end_ticks_[i] - start_ticks_[i];
     MicroPrintf("%d,%s,%d", i, tags_[i], ticks);
 #else
@@ -105,7 +105,7 @@ void MicroProfiler::LogTicksPerTagCsv() {
 #endif
 }
 
-// This method finds a particular array element in the total_ticks_per_tag_ array
+// This method finds a particular array element in the total_ticks_per_tag array
 // with the matching tag_name passed in the method. If it can find a
 // matching array element that has the same tag_name, then it will return the
 // position of the matching element. But if it unable to find a matching element
@@ -125,6 +125,7 @@ int MicroProfiler::FindExistingOrNextPosition(const char* tag_name) {
 
 void MicroProfiler::ClearEvents() {
   std::fill_n(std::begin(total_ticks_per_tag_), num_events_, TicksPerTag{});
+
   num_events_ = 0;
 }
 

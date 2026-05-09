@@ -1,7 +1,9 @@
+load("@pybind11_bazel//:build_defs.bzl", "pybind_extension")
+
 # Signal python utilities.
 load("@rules_python//python:defs.bzl", "py_library", "py_test")
 load("@tflm_pip_deps//:requirements.bzl", "requirement")
-load("@pybind11_bazel//:build_defs.bzl", "pybind_extension")
+load("//tensorflow/lite/micro:build_def.bzl", "INCOMPATIBLE_WITH_WINDOWS")
 
 package(
     default_visibility = [
@@ -16,12 +18,14 @@ py_test(
     data = [
         ":freq_to_mel_wrapper.so",
     ],
-    python_version = "PY3",
-    srcs_version = "PY3",
     tags = [
         "noasan",
         "nomsan",
         "noubsan",
+    ],
+    target_compatible_with = INCOMPATIBLE_WITH_WINDOWS,
+    deps = [
+        "//:tflite_micro_shim",
     ],
 )
 
@@ -30,6 +34,10 @@ py_library(
     data = [
         ":freq_to_mel_wrapper.so",
     ],
+    target_compatible_with = INCOMPATIBLE_WITH_WINDOWS,
+    deps = [
+        "//:tflite_micro_shim",
+    ],
 )
 
 pybind_extension(
@@ -37,11 +45,13 @@ pybind_extension(
     srcs = [
         "freq_to_mel_wrapper.cc",
     ],
+    target_compatible_with = INCOMPATIBLE_WITH_WINDOWS,
 )
 
 py_library(
     name = "util",
     srcs = ["util.py"],
+    target_compatible_with = INCOMPATIBLE_WITH_WINDOWS,
     visibility = ["//visibility:public"],
     deps = [
         requirement("tensorflow"),
@@ -54,12 +64,17 @@ pybind_extension(
     srcs = [
         "wide_dynamic_func_lut_wrapper.cc",
     ],
+    target_compatible_with = INCOMPATIBLE_WITH_WINDOWS,
 )
 
 py_library(
     name = "wide_dynamic_func_lut",
     data = [
         ":wide_dynamic_func_lut_wrapper.so",
+    ],
+    target_compatible_with = INCOMPATIBLE_WITH_WINDOWS,
+    deps = [
+        "//:tflite_micro_shim",
     ],
 )
 
@@ -69,12 +84,14 @@ py_test(
     data = [
         ":wide_dynamic_func_lut_wrapper.so",
     ],
-    python_version = "PY3",
-    srcs_version = "PY3",
     tags = [
         "noasan",
         "nomsan",
         "noubsan",
     ],
+    target_compatible_with = INCOMPATIBLE_WITH_WINDOWS,
     visibility = ["//visibility:public"],
+    deps = [
+        "//:tflite_micro_shim",
+    ],
 )

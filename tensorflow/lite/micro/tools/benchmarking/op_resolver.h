@@ -23,7 +23,7 @@ limitations under the License.
 
 namespace tflite {
 
-using TflmOpResolver = MicroMutableOpResolver<115>;
+using TflmOpResolver = MicroMutableOpResolver<117>;
 
 inline TfLiteStatus CreateOpResolver(TflmOpResolver& op_resolver) {
   TF_LITE_ENSURE_STATUS(op_resolver.AddAbs());
@@ -45,12 +45,14 @@ inline TfLiteStatus CreateOpResolver(TflmOpResolver& op_resolver) {
   TF_LITE_ENSURE_STATUS(op_resolver.AddConv2D());
   TF_LITE_ENSURE_STATUS(op_resolver.AddCos());
   TF_LITE_ENSURE_STATUS(op_resolver.AddCumSum());
+  TF_LITE_ENSURE_STATUS(op_resolver.AddDecode());
   TF_LITE_ENSURE_STATUS(op_resolver.AddDelay());
   TF_LITE_ENSURE_STATUS(op_resolver.AddDepthToSpace());
   TF_LITE_ENSURE_STATUS(op_resolver.AddDepthwiseConv2D());
   TF_LITE_ENSURE_STATUS(op_resolver.AddDequantize());
   TF_LITE_ENSURE_STATUS(op_resolver.AddDetectionPostprocess());
   TF_LITE_ENSURE_STATUS(op_resolver.AddDiv());
+  TF_LITE_ENSURE_STATUS(op_resolver.AddDynamicUpdateSlice());
   TF_LITE_ENSURE_STATUS(op_resolver.AddElu());
   TF_LITE_ENSURE_STATUS(op_resolver.AddEmbeddingLookup());
   TF_LITE_ENSURE_STATUS(op_resolver.AddEnergy());
@@ -103,6 +105,7 @@ inline TfLiteStatus CreateOpResolver(TflmOpResolver& op_resolver) {
   TF_LITE_ENSURE_STATUS(op_resolver.AddPrelu());
   TF_LITE_ENSURE_STATUS(op_resolver.AddQuantize());
   TF_LITE_ENSURE_STATUS(op_resolver.AddReadVariable());
+  TF_LITE_ENSURE_STATUS(op_resolver.AddReduceAll());
   TF_LITE_ENSURE_STATUS(op_resolver.AddReduceMax());
   TF_LITE_ENSURE_STATUS(op_resolver.AddReduceMin());
   TF_LITE_ENSURE_STATUS(op_resolver.AddRelu());

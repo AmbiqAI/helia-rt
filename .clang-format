@@ -1,9 +1,4 @@
 # Run manually to reformat a file:
 # clang-format -i --style=file <file>
-BasedOnStyle: LLVM
-IndentWidth: 2
-AlignAfterOpenBracket: AlwaysBreak
+BasedOnStyle: Google
 DerivePointerAlignment: false
-BreakBeforeBraces: Allman
-ColumnLimit: 120
-SortIncludes: false

@@ -5,7 +5,7 @@ load("@tflm_pip_deps//:requirements.bzl", "requirement")
 load(
     "//tensorflow/lite/micro:build_def.bzl",
     "tflm_cc_library",
-    "tflm_cc_test"
+    "tflm_cc_test",
 )
 
 package(
@@ -48,9 +48,7 @@ py_binary(
     srcs = ["evaluate.py"],
     data = ["//tensorflow/lite/micro/examples/hello_world/models:hello_world_float.tflite"],
     deps = [
-        "@absl_py//absl:app",
-        "@absl_py//absl/flags",
-        "@absl_py//absl/logging",
+        requirement("absl_py"),
         requirement("numpy"),
         requirement("tensorflow"),
         "//python/tflite_micro:runtime",

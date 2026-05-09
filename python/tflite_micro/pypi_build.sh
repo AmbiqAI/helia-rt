@@ -26,12 +26,14 @@ container. Uses bazel, but does not pollute the WORKSPACE's default cache.
 <python-tag> must be one of the supported interpreters:
    cp310
    cp311
+   cp312
+   cp313
 
 <output-directory> defaults to $OUT_DIR_DEFAULT.
 "
 
 case "$1" in
-    cp310|cp311)
+    cp310|cp311|cp312|cp313)
         PY_TAG=$1
         OUTDIR=$(realpath ${2:-$OUT_DIR_DEFAULT})
         mkdir -p $OUTDIR
@@ -61,6 +63,7 @@ IMAGE_ID=$(cat $IMAGE_ID_FILE)
 
 # Build the Python package within an ephemeral container.
 docker run \
+    --init \
     --rm \
     --interactive \
     --mount type=bind,source=$SRCDIR,destination=$SRCDIR \
@@ -89,7 +92,7 @@ docker run \
     export XDG_CACHE_HOME=$OUTDIR/cache
 
     # Relocate the bazel root to keep the cache used for each Python toolchain
-    # separate. Drop root privledges and run as the invoking user.
+    # separate. Drop root privileges and run as the invoking user.
     call_bazel() {
         setpriv --reuid=$(id -u) --regid=$(id -g) --clear-groups \
             bazel \
@@ -101,13 +104,15 @@ docker run \
     }
 
     # Build the wheel via bazel, using the Python compatibility tag matching the
-    # build environment.
+    # build environment. Enable compression support for the official package.
     call_bazel build //python/tflite_micro:whl.dist \
-        --//python/tflite_micro:compatibility_tag=\$PY_COMPATIBILITY
+        --//python/tflite_micro:compatibility_tag=\$PY_COMPATIBILITY \
+        --//:with_compression=true
 
     # Test, in the container environment.
     call_bazel test //python/tflite_micro:whl_test \
-            --//python/tflite_micro:compatibility_tag=\$PY_COMPATIBILITY
+            --//python/tflite_micro:compatibility_tag=\$PY_COMPATIBILITY \
+            --//:with_compression=true
 EOF
 
 # Make the output directory tree writable so it can be removed easily by the

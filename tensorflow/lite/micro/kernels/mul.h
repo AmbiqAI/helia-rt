@@ -63,7 +63,7 @@ void EvalMulFloatReference(TfLiteContext* context, TfLiteNode* node,
 // Generic must define registration function.
 TFLMRegistration Register_MUL();
 
-#if defined(CMSIS_NN) || defined(HELIA)
+#if defined(CMSIS_NN)
 TFLMRegistration Register_MUL_INT8();
 #else
 // Fallback registration

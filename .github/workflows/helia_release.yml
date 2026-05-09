@@ -61,7 +61,7 @@ jobs:
 
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ inputs.ref }}
 
@@ -72,8 +72,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: tensorflow/lite/micro/tools/make/downloads
-          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc') }}
-          restore-keys: ${{ runner.os }}-third-party-downloads-
+          key: ${{ runner.os }}-third-party-downloads-${{ inputs.ref || github.sha }}-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc','tensorflow/lite/micro/tools/make/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/helia.inc') }}
 
       - name: Validate armclang license
         if: ${{ matrix.toolchain == 'armclang' }}
@@ -110,7 +109,7 @@ jobs:
         shell: bash
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ inputs.ref }}
 
@@ -119,7 +118,8 @@ jobs:
         run: |
           tensorflow/lite/micro/tools/ci_build/resolve_release_meta.sh \
             --ref '${{ inputs.ref }}' \
-            --tag '${{ inputs.tag }}'
+            --tag '${{ inputs.tag }}' \
+            --sanitize-tag
           echo "sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
 
       - name: Download all build combos

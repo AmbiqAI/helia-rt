@@ -21,7 +21,6 @@
 
 #include "tensorflow/lite/micro/micro_log.h"
 
-
 namespace {
 
 tflite::Span<char> output(const tflite::Span<char>& buf, const char* format,

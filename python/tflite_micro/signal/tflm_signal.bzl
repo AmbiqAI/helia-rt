@@ -1,5 +1,7 @@
 """Build rule for wrapping a custom TF OP from .cc to python."""
 
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_python//python:defs.bzl", "py_library")
 
 # TODO(b/286890280): refactor to be more generic build target for any custom OP
@@ -33,34 +35,44 @@ def py_tflm_signal_library(
     if srcs:
         binary_path_end_pos = srcs[0].rfind("/")
         binary_path = srcs[0][0:binary_path_end_pos]
-    binary_name = binary_path + "/_" + cc_op_kernels[0][1:] + ".so"
+
+    binary_name = binary_path + "/_" + (cc_op_kernels[0][1:] if not cc_op_defs else name) + ".so"
+    target_compatible_with = select({
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    })
+
     if cc_op_defs:
-        binary_name = "ops/_" + name + ".so"
         library_name = name + "_cc"
-        native.cc_library(
+        cc_library(
             name = library_name,
             copts = select({
                 "//conditions:default": ["-pthread"],
             }),
             alwayslink = 1,
+            target_compatible_with = target_compatible_with,
             deps =
                 cc_op_defs +
                 cc_op_kernels +
-                ["@tensorflow_cc_deps//:cc_library"] +
-                select({"//conditions:default": []}),
+                select({
+                    "@platforms//os:windows": [],
+                    "//conditions:default": ["@tflm_pip_deps//tensorflow:cc_library"],
+                }),
         )
-
-        native.cc_binary(
+        cc_binary(
             name = binary_name,
             copts = select({
                 "//conditions:default": ["-pthread"],
             }),
             linkshared = 1,
             linkopts = [],
+            target_compatible_with = target_compatible_with,
             deps = [
                 ":" + library_name,
-                "@tensorflow_cc_deps//:cc_library",
-            ] + select({"//conditions:default": []}),
+            ] + select({
+                "@platforms//os:windows": [],
+                "//conditions:default": ["@tflm_pip_deps//tensorflow:cc_library"],
+            }),
         )
 
     py_library(
@@ -68,6 +80,7 @@ def py_tflm_signal_library(
         srcs = srcs,
         srcs_version = "PY2AND3",
         visibility = visibility,
+        target_compatible_with = target_compatible_with,
         data = [":" + binary_name],
         deps = deps,
     )
@@ -80,7 +93,7 @@ def tflm_signal_kernel_library(
         deps = [],
         copts = [],
         alwayslink = 1):
-    native.cc_library(
+    cc_library(
         name = name,
         srcs = srcs,
         hdrs = hdrs,

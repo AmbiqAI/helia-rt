@@ -329,9 +329,24 @@ TfLiteEvalTensor* MicroInterpreter::GetTensor(int tensor_index,
   return &graph_.GetAllocations()[subgraph_index].tensors[tensor_index];
 }
 
+TfLiteStatus MicroInterpreter::ResetVariableTensor(int tensor_index,
+                                                   int subgraph_index) {
+  return graph_.ResetVariableTensor(tensor_index, subgraph_index);
+}
+
 TfLiteStatus MicroInterpreter::SetMicroExternalContext(
     void* external_context_payload) {
   return micro_context_.set_external_context(external_context_payload);
+}
+
+TfLiteStatus MicroInterpreter::SetAlternateProfiler(
+    MicroProfilerInterface* alt_profiler) {
+  return micro_context_.SetAlternateProfiler(alt_profiler);
+}
+
+TfLiteStatus MicroInterpreter::SetDecompressionMemory(
+    const MicroContext::AlternateMemoryRegion* regions, size_t count) {
+  return micro_context_.SetDecompressionMemory(regions, count);
 }
 
 }  // namespace tflite

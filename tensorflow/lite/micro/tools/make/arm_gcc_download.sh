@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Copyright 2023 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -63,26 +63,26 @@ else
     # host architechture
     UNAME_M=`uname -m`
     if [ "${UNAME_M}" == "x86_64" ]; then
-      GCC_URL="https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi.tar.xz"
-      EXPECTED_MD5="fcdcd7c8d5b22d2d0cc6bf3721686e69"
+      GCC_URL="https://developer.arm.com/-/media/Files/downloads/gnu/14.3.rel1/binrel/arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi.tar.xz"
+      EXPECTED_MD5="17272b6c72d476c82b692a06ada0636c"
     elif [ "${UNAME_M}" == "aarch64" ]; then
-      GCC_URL="https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-aarch64-arm-none-eabi.tar.xz"
-      EXPECTED_MD5="342d6d9dc75e6d4c05a748f2cecc96a6"
+      GCC_URL="https://developer.arm.com/-/media/Files/downloads/gnu/14.3.rel1/binrel/arm-gnu-toolchain-14.3.rel1-aarch64-arm-none-eabi.tar.xz"
+      EXPECTED_MD5="5b44bdd1d983247ec153fe548b4ff8ed"
     fi
 
   elif [ "${HOST_OS}" == "osx" ]; then
     # host architechture
     UNAME_M=`uname -m`
     if [ "${UNAME_M}" == "arm64" ]; then
-      GCC_URL="https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-darwin-arm64-arm-none-eabi.tar.xz"
-      EXPECTED_MD5="40d1c9208aed7fab08b0f27e5383dcef"
+      GCC_URL="https://developer.arm.com/-/media/Files/downloads/gnu/14.3.rel1/binrel/arm-gnu-toolchain-14.3.rel1-darwin-arm64-arm-none-eabi.tar.xz"
+      EXPECTED_MD5="1c4a092430c167d08de4b55c6840e46b"
     else
-      GCC_URL="https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-darwin-x86_64-arm-none-eabi.tar.xz"
-      EXPECTED_MD5="d5fb1ae60e4d67eb2986837dbcd6a066"
+      echo "OSX arch:${UNAME_M} not supported."
+      exit 1
     fi
   elif [ "${HOST_OS}" == "windows" ]; then
-    GCC_URL="https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-mingw-w64-i686-arm-none-eabi.zip"
-    EXPECTED_MD5="42ab20ec8d5c52cbcb07e3fb27791ecd"
+    GCC_URL="https://developer.arm.com/-/media/Files/downloads/gnu/14.3.rel1/binrel/arm-gnu-toolchain-14.3.rel1-mingw-w64-i686-arm-none-eabi.zip"
+    EXPECTED_MD5="a3fafaa5fcfe34e9bd30df616316813e"
   else
     echo "OS type ${HOST_OS} not supported."
     exit 1

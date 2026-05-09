@@ -130,7 +130,7 @@ code is suitably shared between the reference and optimized kernels. There is
 currently no fixed recipe for this refactor and we will evaluate on a
 case-by-case basis during the PR review.
 
-For example, to add an optimized implementation for `fully_conntected` for the
+For example, to add an optimized implementation for `fully_connected` for the
 Xtensa Fusion F1 the steps were: 
 * [PR 1](https://github.com/tensorflow/tensorflow/pull/45464): refactor for
 reference fallbacks and a baseline latency. 
@@ -171,9 +171,9 @@ support:
         OPTIMIZED_KERNEL_DIR=<optimize_dir> microlite`
     *   Optionally build for size or speed. Translated to a valid make command it will be any of these two:
         `make -f tensorflow/lite/micro/tools/make/Makefile TARGET=<target>
-        OPTIMIZED_KERNEL_DIR=<optimize_dir> GLOBAL_KERNEL_OPTIMIZE=SIZE microlite`
+        OPTIMIZED_KERNEL_DIR=<optimize_dir> OPTIMIZE_KERNELS_FOR=KERNELS_OPTIMIZED_FOR_SIZE microlite`
         `make -f tensorflow/lite/micro/tools/make/Makefile TARGET=<target>
-        OPTIMIZED_KERNEL_DIR=<optimize_dir> GLOBAL_KERNEL_OPTIMIZE=SPEED microlite`
+        OPTIMIZED_KERNEL_DIR=<optimize_dir> OPTIMIZE_KERNELS_FOR=KERNELS_OPTIMIZED_FOR_SPEED microlite`
         Check relevant README for given optimization library if this is applicable.
     *   Use the static library and any TFLM headers as part of the overall
         application (with its own build system).

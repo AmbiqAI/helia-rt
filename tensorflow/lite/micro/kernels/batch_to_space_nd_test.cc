@@ -19,7 +19,7 @@ limitations under the License.
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
 #include "tensorflow/lite/micro/test_helpers.h"
-#include "tensorflow/lite/micro/testing/micro_test.h"
+#include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
 namespace tflite {
 namespace testing {
@@ -55,7 +55,7 @@ TfLiteStatus ValidateBatchToSpaceNdGoldens(TfLiteTensor* tensors,
 
   for (int i = 0; i < output_size; ++i) {
     // TODO(b/158102673): workaround for not having fatal test assertions.
-    TF_LITE_MICRO_EXPECT_EQ(golden[i], output[i]);
+    EXPECT_EQ(golden[i], output[i]);
     if (golden[i] != output[i]) {
       return kTfLiteError;
     }
@@ -123,11 +123,9 @@ TfLiteStatus TestBatchToSpaceNdQuantized(
 }  // namespace testing
 }  // namespace tflite
 
-TF_LITE_MICRO_TESTS_BEGIN
-
-TF_LITE_MICRO_TEST(BatchToSpaceBasicFloat) {
+TEST(BatchToSpaceNdTest, BatchToSpaceBasicFloat) {
   float output[tflite::testing::kBasicInputOutputSize];
-  TF_LITE_MICRO_EXPECT_EQ(
+  EXPECT_EQ(
       kTfLiteOk,
       tflite::testing::TestBatchToSpaceNdFloat(
           tflite::testing::basic_input_dims, tflite::testing::basic_input,
@@ -137,11 +135,11 @@ TF_LITE_MICRO_TEST(BatchToSpaceBasicFloat) {
           tflite::testing::basic_golden, output));
 }
 
-TF_LITE_MICRO_TEST(BatchToSpaceBasicInt8) {
+TEST(BatchToSpaceNdTest, BatchToSpaceBasicInt8) {
   int8_t output[tflite::testing::kBasicInputOutputSize];
   int8_t input_quantized[tflite::testing::kBasicInputOutputSize];
   int8_t golden_quantized[tflite::testing::kBasicInputOutputSize];
-  TF_LITE_MICRO_EXPECT_EQ(
+  EXPECT_EQ(
       kTfLiteOk,
       tflite::testing::TestBatchToSpaceNdQuantized(
           tflite::testing::basic_input_dims, tflite::testing::basic_input,
@@ -151,112 +149,4 @@ TF_LITE_MICRO_TEST(BatchToSpaceBasicInt8) {
           tflite::testing::basic_golden, golden_quantized, 1.0f, 0, output));
 }
 
-TF_LITE_MICRO_TEST(BatchToSpaceBasicInt16) {
-  int16_t output[tflite::testing::kBasicInputOutputSize];
-  int16_t input_quantized[tflite::testing::kBasicInputOutputSize];
-  int16_t golden_quantized[tflite::testing::kBasicInputOutputSize];
-  TF_LITE_MICRO_EXPECT_EQ(
-      kTfLiteOk,
-      tflite::testing::TestBatchToSpaceNdQuantized(
-          tflite::testing::basic_input_dims, tflite::testing::basic_input,
-          input_quantized, 1.0f, 0, tflite::testing::basic_block_shape_dims,
-          tflite::testing::basic_block_shape, tflite::testing::basic_crops_dims,
-          tflite::testing::basic_crops, tflite::testing::basic_output_dims,
-          tflite::testing::basic_golden, golden_quantized, 1.0f, 0, output));
-}
-
-TF_LITE_MICRO_TEST(BatchToSpaceIdentityInt16) {
-  constexpr int kInputOutputSize = 4;
-  int16_t output[kInputOutputSize];
-  int16_t input_quantized[kInputOutputSize];
-  int16_t golden_quantized[kInputOutputSize];
-
-  float input_data[kInputOutputSize] = {100, 200, 300, 400};
-  float golden_data[kInputOutputSize] = {100, 200, 300, 400};
-
-  int input_dims[] = {4, 1, 2, 2, 1};
-
-  // block_shape = [1, 1]
-  int block_shape_dims[] = {1, 2};
-  int32_t block_shape_data[] = {1, 1};
-
-  int crops_dims[] = {1, 4};
-  int32_t crops_data[] = {0, 0, 0, 0};
-
-  int output_dims[] = {4, 1, 2, 2, 1};
-
-  TF_LITE_MICRO_EXPECT_EQ(
-      kTfLiteOk,
-      tflite::testing::TestBatchToSpaceNdQuantized<int16_t>(
-          input_dims, input_data, input_quantized, 1.0f,
-          0, block_shape_dims, block_shape_data,
-          crops_dims, crops_data, output_dims, golden_data, golden_quantized,
-          1.0f, 0, output));
-}
-
-
-TF_LITE_MICRO_TEST(BatchToSpaceNonSquareBlockInt16) {
-  constexpr int kInputOutputSize = 12;
-  int16_t output[kInputOutputSize];
-  int16_t input_quantized[kInputOutputSize];
-  int16_t golden_quantized[kInputOutputSize];
-
-  float input_data[kInputOutputSize] = {
-      10, 20, 30, 40, 50, 60,
-      70, 80, 90, 100, 110, 120};
-
-  int block_shape_dims[] = {1, 2};
-  int32_t block_shape_data[] = {2, 3};
-
-  int crops_dims[] = {1, 4};
-  int32_t crops_data[] = {0, 0, 0, 0};
-
-  int input_dims[] = {4, 6, 1, 2, 1};
-  int output_dims[] = {4, 1, 2, 6, 1};
-
-  float golden_data[kInputOutputSize] = {
-      10, 30, 50, 20, 40, 60,
-      70, 90, 110, 80, 100, 120};
-
-  TF_LITE_MICRO_EXPECT_EQ(
-      kTfLiteOk,
-      tflite::testing::TestBatchToSpaceNdQuantized<int16_t>(
-          input_dims, input_data, input_quantized,1.0f,
-          0, block_shape_dims, block_shape_data,
-          crops_dims, crops_data, output_dims, golden_data, golden_quantized,
-          1.0f, 0, output));
-}
-
-TF_LITE_MICRO_TEST(BatchToSpaceCropsInt16) {
-  constexpr int kInputOutputSize = 16;
-  int16_t output[kInputOutputSize];
-  int16_t input_quantized[kInputOutputSize];
-  int16_t golden_quantized[kInputOutputSize];
-
-  float input_data[kInputOutputSize] = {
-      1, 2, 3, 4, 5, 6, 7, 8,
-      9, 10, 11, 12, 13, 14, 15, 16};
-
-  int block_shape_dims[] = {1, 2};
-  int32_t block_shape_data[] = {2, 2};
-
-  int crops_dims[] = {1, 4};
-  int32_t crops_data[] = {0, 1, 0, 1};
-
-  int input_dims[] = {4, 4, 2, 2, 1};
-  int output_dims[] = {4, 1, 3, 3, 1};
-
-  float golden_data[9] = {1, 5, 2, 9, 13, 10, 3, 7, 4};
-
-  TF_LITE_MICRO_EXPECT_EQ(
-      kTfLiteOk,
-      tflite::testing::TestBatchToSpaceNdQuantized<int16_t>(
-          input_dims, input_data, input_quantized, 1.0f,
-          0, block_shape_dims, block_shape_data,
-          crops_dims, crops_data, output_dims, golden_data, golden_quantized,
-          1.0f, 0, output));
-}
-
-
-
-TF_LITE_MICRO_TESTS_END
+TF_LITE_MICRO_TESTS_MAIN

@@ -1,8 +1,13 @@
-load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
-load("@flatbuffers//:build_defs.bzl", "flatbuffer_cc_library", "flatbuffer_py_library")
-load("@tflm_pip_deps//:requirements.bzl", "requirement")
 load("@pybind11_bazel//:build_defs.bzl", "pybind_extension")
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
+load("@tflm_pip_deps//:requirements.bzl", "requirement")
 load("//tensorflow:extra_rules.bzl", "tflm_application_friends")
+load(
+    "//tensorflow/lite/micro:build_def.bzl",
+    "INCOMPATIBLE_WITH_WINDOWS",
+)
+load("//third_party/flatbuffers:build_defs.bzl", "flatbuffer_cc_library", "flatbuffer_py_library")
 
 package(
     default_visibility = ["//:__subpackages__"],
@@ -33,6 +38,7 @@ py_library(
     srcs = ["generate_test_for_model.py"],
     visibility = ["//:__subpackages__"],
     deps = [
+        "//:tflite_micro_shim",
         "//tensorflow/lite/python:schema_py",
     ],
 )
@@ -53,9 +59,10 @@ py_binary(
         "requantize_flatbuffer_utils.py",
     ],
     deps = [
+        "//:tflite_micro_shim",
         "//tensorflow/lite/python:schema_py",
         "//tensorflow/lite/tools:flatbuffer_utils",
-        "@absl_py//absl:app",
+        requirement("absl_py"),
     ],
 )
 
@@ -68,6 +75,7 @@ py_test(
         "nomsan",  # Python doesn't like these symbols
         "noubsan",
     ],
+    target_compatible_with = INCOMPATIBLE_WITH_WINDOWS,
     deps = [
         ":requantize_flatbuffer",
         requirement("numpy"),
@@ -81,6 +89,7 @@ pybind_extension(
     srcs = [
         "tflite_flatbuffer_align_wrapper.cc",
     ],
+    target_compatible_with = INCOMPATIBLE_WITH_WINDOWS,
     deps = [
         "//tensorflow/lite/schema:schema_fbs",
         "@flatbuffers",
@@ -95,8 +104,9 @@ py_binary(
     data = [
         ":tflite_flatbuffer_align_wrapper.so",
     ],
+    target_compatible_with = INCOMPATIBLE_WITH_WINDOWS,
     deps = [
-        "@absl_py//absl:app",
+        requirement("absl_py"),
     ],
 )
 
@@ -106,11 +116,13 @@ py_library(
     data = [
         ":tflite_flatbuffer_align_wrapper.so",
     ],
+    target_compatible_with = INCOMPATIBLE_WITH_WINDOWS,
     visibility = [
         ":application_friends",
         ":tflm_tools",
     ],
     deps = [
+        "//:tflite_micro_shim",
         "//tensorflow/lite/python:schema_py",
         "//tensorflow/lite/python:schema_util",
     ],
@@ -122,6 +134,7 @@ py_library(
     data = [
         ":tflite_flatbuffer_align",
     ],
+    target_compatible_with = INCOMPATIBLE_WITH_WINDOWS,
     visibility = [
         ":application_friends",
         ":tflm_tools",
@@ -129,7 +142,7 @@ py_library(
     ],
     deps = [
         ":model_transforms_utils",
-        "@absl_py//absl/logging",
+        requirement("absl_py"),
         requirement("numpy"),
         requirement("tensorflow"),
         "//python/tflite_micro:runtime",
@@ -140,6 +153,7 @@ py_library(
 cc_binary(
     name = "layer_by_layer_output_tool",
     srcs = ["layer_by_layer.cc"],
+    target_compatible_with = INCOMPATIBLE_WITH_WINDOWS,
     deps = [
         ":layer_by_layer_schema",
         "//tensorflow/lite/c:c_api_types",
@@ -162,11 +176,10 @@ cc_binary(
 py_binary(
     name = "tflm_model_transforms",
     srcs = ["tflm_model_transforms.py"],
+    target_compatible_with = INCOMPATIBLE_WITH_WINDOWS,
     deps = [
         ":tflm_model_transforms_lib",
-        "@absl_py//absl:app",
-        "@absl_py//absl/flags",
-        "@absl_py//absl/logging",
+        requirement("absl_py"),
     ],
 )
 
@@ -182,9 +195,11 @@ py_test(
         "nomsan",
         "noubsan",
     ],
+    target_compatible_with = INCOMPATIBLE_WITH_WINDOWS,
     deps = [
         ":tflm_model_transforms_lib",
-        "@absl_py//absl/testing:parameterized",
+        "//:tflite_micro_shim",
+        requirement("absl_py"),
         requirement("tensorflow"),
         "//tensorflow/lite/micro/examples/recipes:resource_variables_lib",
     ],
@@ -193,11 +208,11 @@ py_test(
 py_binary(
     name = "layer_by_layer_debugger",
     srcs = ["layer_by_layer_debugger.py"],
+    target_compatible_with = INCOMPATIBLE_WITH_WINDOWS,
     deps = [
         ":layer_by_layer_schema_py",
         ":model_transforms_utils",
-        "@absl_py//absl:app",
-        "@absl_py//absl/flags",
+        requirement("absl_py"),
         requirement("tensorflow"),
         "//python/tflite_micro:runtime",
         "//tensorflow/lite/tools:flatbuffer_utils",

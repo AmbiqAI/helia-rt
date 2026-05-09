@@ -39,7 +39,6 @@ struct OpData {
   int32_t input_range_radius;
   int32_t input_multiplier;
   int input_left_shift;
-  int8_t table[256];
 };
 
 void* TanhInit(TfLiteContext* context, const char* buffer, size_t length) {
@@ -72,7 +71,6 @@ TfLiteStatus CalculateArithmeticOpData(TfLiteContext* context, TfLiteNode* node,
 
     data->input_range_radius =
         CalculateInputRadius(kInputIntegerBits, data->input_left_shift, 31);
-
   }
 
   if (input->type == kTfLiteInt16) {
@@ -177,11 +175,11 @@ TfLiteStatus TanhEval(TfLiteContext* context, TfLiteNode* node) {
     } break;
     case kTfLiteInt8: {
       reference_integer_ops::Tanh(
-         data.input_zero_point, data.input_range_radius, data.input_multiplier,
-         data.input_left_shift, tflite::micro::GetTensorShape(input),
-         tflite::micro::GetTensorData<int8_t>(input),
-         tflite::micro::GetTensorShape(output),
-         tflite::micro::GetTensorData<int8_t>(output));
+          data.input_zero_point, data.input_range_radius, data.input_multiplier,
+          data.input_left_shift, tflite::micro::GetTensorShape(input),
+          tflite::micro::GetTensorData<int8_t>(input),
+          tflite::micro::GetTensorShape(output),
+          tflite::micro::GetTensorData<int8_t>(output));
       return kTfLiteOk;
     } break;
     default:

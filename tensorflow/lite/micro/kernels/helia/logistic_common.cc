@@ -22,6 +22,7 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/op_macros.h"
+#include "tensorflow/lite/micro/kernels/helia/logistic_helia.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/logistic.h"
 
@@ -31,7 +32,7 @@ const int kLogisticOutputTensor = 0;
 
 void PopulateLookupTable(int32_t input_zero_point, int32_t input_range_radius,
                  int32_t input_multiplier, int32_t input_shift,
-                 OpDataLogistic* data) {
+                 OpDataLogisticHelia* data) {
 
   static constexpr int32_t kInputIntegerBits = 4;
   static constexpr int32_t kOutputIntegerBits = 8;
@@ -69,6 +70,11 @@ void PopulateLookupTable(int32_t input_zero_point, int32_t input_range_radius,
 TfLiteStatus CalculateArithmeticOpDataLogistic(TfLiteContext* context,
                                                TfLiteNode* node,
                                                OpDataLogistic* data) {
+  // The helia kernel allocates `OpDataLogisticHelia` in `LogisticInit` and
+  // stashes the int8 lookup table after the upstream `OpDataLogistic` base.
+  // Recover the helia view here so `PopulateLookupTable()` can populate it.
+  OpDataLogisticHelia* helia_data = static_cast<OpDataLogisticHelia*>(
+      static_cast<void*>(data));
   MicroContext* micro_context = GetMicroContext(context);
 
   TfLiteTensor* input =
@@ -98,7 +104,7 @@ TfLiteStatus CalculateArithmeticOpDataLogistic(TfLiteContext* context,
 
     PopulateLookupTable(data->input_zero_point, data->input_range_radius,
                 data->input_multiplier, data->input_left_shift,
-                data);
+                helia_data);
   }
 
   if (input->type == kTfLiteInt16) {
