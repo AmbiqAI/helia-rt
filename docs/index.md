@@ -4,26 +4,61 @@ hide:
   - toc
 ---
 
-<div style="text-align: center; margin: 2em auto 1em;" markdown>
+<div class="hero" markdown>
+<div class="hero-content" markdown>
 
-![heliaRT](./assets/helia-rt-banner-light.png#only-light){ width="360" }
-![heliaRT](./assets/helia-rt-banner-dark.png#only-dark){ width="360" }
+![heliaRT](./assets/helia-rt-banner-light.png#only-light){ width="480" }
+![heliaRT](./assets/helia-rt-banner-dark.png#only-dark){ width="480" }
 
-**Drop-in replacement for LiteRT for Microcontrollers with Ambiq-tuned kernels.**
-{ style="font-size: 1.2em; max-width: 640px; margin: 0.5em auto 1.5em;" }
+# Ambiq-tuned AI inference for Cortex-M
+
+A **drop-in replacement** for LiteRT for Microcontrollers — same API, faster inference, purpose-built for Apollo silicon.
 
 [:octicons-arrow-right-24: Get Started](getting-started/index.md){ .md-button .md-button--primary }
 [:octicons-book-24: Why heliaRT](why-helia-rt.md){ .md-button }
 
 </div>
+</div>
 
----
+<div class="grid cards" markdown>
 
-- :material-swap-horizontal: **Drop-in upgrade** — same `MicroInterpreter`, `OpResolver`, and `.tflite` model format as upstream LiteRT-Micro. Swap the dependency, rebuild, ship.
-- :material-chip: **36 optimised kernels** — heliaCORE fills the gaps where upstream only offers Reference — activations, reduce, concat, reshape, and [more](reference/operator-coverage.md).
-- :material-speedometer: **SPEED & SIZE variants** — choose latency-optimised or footprint-optimised builds, shipped as prebuilt `.a` libraries and full source.
-- :material-wrench: **Three toolchains** — GCC, Arm Compiler 6, and **ATfE** (open-source, ~10–20 % faster than GCC on Cortex-M55).
-- :material-developer-board: **All Apollo silicon** — Apollo3, Apollo4, Apollo510, with Atomiq planned.
+- :material-swap-horizontal:{ .lg .middle } **Drop-in Upgrade**
+
+    ---
+
+    Same `MicroInterpreter`, `OpResolver`, and `.tflite` format. Swap the dependency, rebuild, ship — no retraining needed.
+
+- :material-chip:{ .lg .middle } **36 Optimised Kernels**
+
+    ---
+
+    heliaCORE fills gaps where upstream only has Reference — activations, reduce, concat, reshape, and [more](reference/operator-coverage.md).
+
+- :material-speedometer:{ .lg .middle } **SPEED & SIZE Variants**
+
+    ---
+
+    Latency-optimised or footprint-optimised builds, shipped as prebuilt `.a` libraries and full source.
+
+- :material-wrench:{ .lg .middle } **Three Toolchains**
+
+    ---
+
+    GCC, Arm Compiler 6, and **ATfE** — open-source LLVM, ~10–20 % faster than GCC on Cortex-M55.
+
+- :material-developer-board:{ .lg .middle } **All Apollo Silicon**
+
+    ---
+
+    Apollo3 · Apollo4 · Apollo510, with Atomiq planned. [Full matrix](reference/silicon-support.md).
+
+- :material-shield-check:{ .lg .middle } **Production Ready**
+
+    ---
+
+    18-combo CI matrix (2 archs × 3 toolchains × 3 builds). Every release tested, every artifact published.
+
+</div>
 
 ---
 
