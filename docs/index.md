@@ -10,9 +10,9 @@ hide:
 ![heliaRT](./assets/helia-rt-banner-light.png#only-light){ width="480" }
 ![heliaRT](./assets/helia-rt-banner-dark.png#only-dark){ width="480" }
 
-# Ambiq-tuned AI inference for Cortex-M
+# Ambiq-optimised AI inference for Cortex-M
 
-A **drop-in replacement** for LiteRT for Microcontrollers — same API, faster inference, purpose-built for Apollo silicon.
+**Accelerated TensorFlow Lite for Microcontrollers** runtime with Ambiq-tuned kernels — purpose-built for Apollo silicon.
 
 [:octicons-arrow-right-24: Get Started](getting-started/index.md){ .md-button .md-button--primary }
 [:octicons-book-24: Why heliaRT](why-helia-rt.md){ .md-button }
