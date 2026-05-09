@@ -53,8 +53,8 @@ theme:
   icon:
       repo: fontawesome/brands/github-alt
   font:
-    text: Roboto
-    code: Roboto Mono
+    text: Inter
+    code: JetBrains Mono
   palette:
     - media: "(prefers-color-scheme)"
       primary: cyan
