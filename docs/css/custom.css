@@ -287,6 +287,7 @@
 .takeaway-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-top: 1.8rem;
+  align-items: stretch;
 }
 
 .takeaway-card,
@@ -300,7 +301,8 @@
 .takeaway-card {
   display: flex;
   flex-direction: column;
-  min-height: 210px;
+  min-height: 270px;
+  height: 100%;
   padding: 1.45rem;
   border: 1px solid var(--hr-line);
   border-radius: var(--hr-radius);
@@ -339,12 +341,22 @@
   letter-spacing: -0.02em;
 }
 
+.takeaway-card strong {
+  min-height: 2.8rem;
+  display: flex;
+  align-items: flex-end;
+}
+
 .takeaway-card > span:last-child,
 .platform-card > span:not(.logo-mark):not(.platform-label),
 .final-links span {
   margin-top: 0.65rem;
   color: var(--hr-muted);
   line-height: 1.55;
+}
+
+.takeaway-card > span:last-child {
+  flex: 1;
 }
 
 .workflow {
