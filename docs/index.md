@@ -52,6 +52,43 @@ hide:
 
 </div>
 
+## <span class="eyebrow">00 — The HELIA AI stack</span><br/>Silicon-adjacent AI for ultra-low-power devices { .section-heading }
+
+heliaRT is the runtime layer of the broader **HELIA AI** stack — Ambiq's silicon-adjacent software portfolio for always-on, battery-powered intelligence. HELIA AI is built on top of Ambiq's patented **SPOT®** (Subthreshold Power Optimized Technology) platform, the same sub-threshold design philosophy that lets Apollo SoCs run AI workloads at a fraction of the power of conventional MCUs.
+
+The stack is co-designed top-to-bottom: model architectures, kernels, runtime, and silicon all evolve together so that each layer extracts the most from the one beneath it.
+
+<div class="stack-diagram" markdown>
+
+<div class="stack-layer stack-layer--app" markdown>
+<span class="stack-tag">Apps</span>
+<span class="stack-title">Audio · Vision · Health · Sensor fusion</span>
+<span class="stack-meta">Customer applications and reference designs</span>
+</div>
+
+<div class="stack-layer stack-layer--models" markdown>
+<span class="stack-tag">HELIA AI · Models</span>
+<span class="stack-title">Model zoo · Quantisation recipes · Deployment tools</span>
+<span class="stack-meta">neuralSPOT-X · ns_autodeploy · model templates</span>
+</div>
+
+<div class="stack-layer stack-layer--runtime" markdown>
+<span class="stack-tag">HELIA AI · Runtime <span class="stack-pill">You are here</span></span>
+<span class="stack-title">heliaRT — TFLM runtime + HELIA kernels</span>
+<span class="stack-meta">Optimised operators, vectorised paths, multi-toolchain builds</span>
+</div>
+
+<div class="stack-layer stack-layer--silicon" markdown>
+<span class="stack-tag">Silicon · SPOT®</span>
+<span class="stack-title">Apollo3 · Apollo4 · Apollo510 · Atomiq</span>
+<span class="stack-meta">Subthreshold Power Optimized Technology — sub-mW always-on AI</span>
+</div>
+
+</div>
+
+[:octicons-arrow-right-24: Learn about HELIA AI](https://ambiq.com/helia-ai/){ .external-link } ·
+[:octicons-arrow-right-24: Ambiq SPOT® platform](https://ambiq.com/technology/){ .external-link }
+
 ## <span class="eyebrow">01 — Foundation</span><br/>Why heliaRT { .section-heading }
 
 heliaRT pairs the familiar **TensorFlow Lite for Microcontrollers** programming model with a kernel backend tuned by Ambiq for Apollo silicon. Models built with the standard LiteRT tooling run unchanged — and run faster, with a larger pool of operators getting the optimised path instead of falling back to generic Reference C.
@@ -171,41 +208,47 @@ Every release ships pre-built artifacts for all three supported toolchains — p
 
 ## <span class="eyebrow">04 — Integration</span><br/>Pick your integration path { .section-heading }
 
-heliaRT meets you where you build. Drop it into a Zephyr workspace, deploy through Ambiq's neuralSPOT toolkit, link a prebuilt static library into a custom CMake project, or — coming soon — install via CMSIS-Pack.
+heliaRT meets you where you build. Three flagship platforms get first-class support — **Zephyr**, **neuralSPOT-X**, and **CMSIS-Pack** — with raw source / CMake always available as an escape hatch for custom build systems.
 
-<div class="grid cards" markdown>
+<div class="platform-row" markdown>
 
-- :material-home-automation:{ .lg .middle } **Zephyr Module**
+<div class="platform platform--featured" markdown>
+<span class="platform-tag">Zephyr RTOS</span>
+<span class="platform-icon">:material-home-automation:</span>
+<span class="platform-title">Zephyr Module</span>
+<span class="platform-desc">First-class `west` module. Toggle the HELIA backend with a single Kconfig option, source-build or use the prebuilt bundle.</span>
+<span class="platform-status"><span class="chip-dot"></span> Available now · v1.13</span>
+<a href="getting-started/zephyr/" class="platform-link">Zephyr setup →</a>
+</div>
 
-    ---
+<div class="platform platform--featured" markdown>
+<span class="platform-tag">Ambiq SDK</span>
+<span class="platform-icon">:material-rocket-launch:</span>
+<span class="platform-title">neuralSPOT-X</span>
+<span class="platform-desc">Profile, deploy, and benchmark `.tflite` models on Apollo EVBs in minutes with `ns_autodeploy`. heliaRT ships bundled.</span>
+<span class="platform-status"><span class="chip-dot"></span> Available now · v1.13</span>
+<a href="getting-started/neuralspot/" class="platform-link">neuralSPOT-X setup →</a>
+</div>
 
-    Add heliaRT as a `west` module. Switch backend with a single Kconfig option. Source-build or use the prebuilt bundle.
+<div class="platform platform--featured platform--soon" markdown>
+<span class="platform-tag">Arm ecosystem</span>
+<span class="platform-icon">:material-package-variant:</span>
+<span class="platform-title">CMSIS-Pack <span class="chip-badge">Soon</span></span>
+<span class="platform-desc">Install with CMSIS-Pack Manager, drop into Keil / IAR / Open-CMSIS-Pack toolchains. Tracking [issue #124](https://github.com/AmbiqAI/helia-rt/issues/124).</span>
+<span class="platform-status"><span class="chip-dot chip-dot--planned"></span> In progress</span>
+<a href="getting-started/cmsis-pack/" class="platform-link">Roadmap →</a>
+</div>
 
-    [:octicons-arrow-right-24: Zephyr setup](getting-started/zephyr.md)
+</div>
 
-- :material-rocket-launch:{ .lg .middle } **neuralSPOT**
+<div class="platform-row platform-row--secondary" markdown>
 
-    ---
-
-    Profile and deploy a `.tflite` model on Ambiq EVBs in minutes with `ns_autodeploy`. heliaRT is bundled.
-
-    [:octicons-arrow-right-24: neuralSPOT setup](getting-started/neuralspot.md)
-
-- :material-hammer-wrench:{ .lg .middle } **Source / CMake**
-
-    ---
-
-    Full control over target, toolchain, and build type. Link the `libtensorflow-microlite.a` into any project.
-
-    [:octicons-arrow-right-24: Source builds](getting-started/source.md)
-
-- :material-package-variant:{ .lg .middle } **CMSIS-Pack** _(soon)_
-
-    ---
-
-    Install via CMSIS-Pack Manager. Planned for an upcoming release. Track [#124](https://github.com/AmbiqAI/helia-rt/issues/124).
-
-    [:octicons-arrow-right-24: Details](getting-started/cmsis-pack.md)
+<div class="platform platform--secondary" markdown>
+<span class="platform-icon">:material-hammer-wrench:</span>
+<span class="platform-title">Source / CMake</span>
+<span class="platform-desc">Full control over target, toolchain, and build type. Link `libtensorflow-microlite.a` into any project.</span>
+<a href="getting-started/source/" class="platform-link">Source builds →</a>
+</div>
 
 </div>
 
@@ -247,15 +290,65 @@ Three files. Three commands. A model running on Apollo510.
 
 heliaRT's HELIA backend covers categories that upstream CMSIS-NN doesn't touch — most notably activations, reduce, and data-movement ops that would otherwise fall back to slow Reference C.
 
-| Category | REF | CMSIS-NN | **HELIA** |
-|---|:---:|:---:|:---:|
-| Conv / DW-Conv / Transpose-Conv | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| Fully Connected (incl. A16W16) | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| Pooling, Softmax, Pad | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| Activations (relu, tanh, logistic, …) | :white_check_mark: | — | :white_check_mark: |
-| Reduce (mean, max) | :white_check_mark: | — | :white_check_mark: |
-| Data movement (concat, reshape, split, …) | :white_check_mark: | — | :white_check_mark: |
-| Comparisons & arithmetic (sub, equal, …) | :white_check_mark: | — | :white_check_mark: |
+<div class="op-matrix" markdown>
+
+<div class="op-matrix-head">
+  <div class="op-cat">Operator category</div>
+  <div class="op-col" title="TFLM Reference">REF</div>
+  <div class="op-col" title="Arm CMSIS-NN">CMSIS-NN</div>
+  <div class="op-col op-col--helia">HELIA</div>
+</div>
+
+<div class="op-row">
+  <div class="op-cat">Conv · DW-Conv · Transpose-Conv</div>
+  <div class="op-cell op-cell--ok">✓</div>
+  <div class="op-cell op-cell--ok">✓</div>
+  <div class="op-cell op-cell--helia">✓</div>
+</div>
+<div class="op-row">
+  <div class="op-cat">Fully Connected (incl. A16W16)</div>
+  <div class="op-cell op-cell--ok">✓</div>
+  <div class="op-cell op-cell--ok">✓</div>
+  <div class="op-cell op-cell--helia">✓</div>
+</div>
+<div class="op-row">
+  <div class="op-cat">Pooling · Softmax · Pad</div>
+  <div class="op-cell op-cell--ok">✓</div>
+  <div class="op-cell op-cell--ok">✓</div>
+  <div class="op-cell op-cell--helia">✓</div>
+</div>
+<div class="op-row">
+  <div class="op-cat">Activations (relu · tanh · logistic …)</div>
+  <div class="op-cell op-cell--ok">✓</div>
+  <div class="op-cell op-cell--no">—</div>
+  <div class="op-cell op-cell--helia">✓</div>
+</div>
+<div class="op-row">
+  <div class="op-cat">Reduce (mean · max)</div>
+  <div class="op-cell op-cell--ok">✓</div>
+  <div class="op-cell op-cell--no">—</div>
+  <div class="op-cell op-cell--helia">✓</div>
+</div>
+<div class="op-row">
+  <div class="op-cat">Data movement (concat · reshape · split …)</div>
+  <div class="op-cell op-cell--ok">✓</div>
+  <div class="op-cell op-cell--no">—</div>
+  <div class="op-cell op-cell--helia">✓</div>
+</div>
+<div class="op-row">
+  <div class="op-cat">Comparisons & arithmetic (sub · equal …)</div>
+  <div class="op-cell op-cell--ok">✓</div>
+  <div class="op-cell op-cell--no">—</div>
+  <div class="op-cell op-cell--helia">✓</div>
+</div>
+
+<div class="op-matrix-foot">
+  <span><strong>36</strong> ops in HELIA</span>
+  <span><strong>14</strong> in CMSIS-NN</span>
+  <span><strong>22</strong> additional ops on the fast path</span>
+</div>
+
+</div>
 
 [:octicons-arrow-right-24: Full operator matrix](reference/operator-coverage.md)
 
