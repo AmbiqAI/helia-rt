@@ -5,3 +5,13 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # Ignore actions referenced *only* by upstream-vendored workflows
+    # that we disable at the API level (see ci/disable_upstream_workflows.sh).
+    # Bumping these would create dependabot PRs that touch upstream YAML,
+    # which we don't want -- it inflates the diff on future upstream syncs
+    # without changing any behaviour.
+    ignore:
+      - dependency-name: "actions/stale"
+      - dependency-name: "peter-evans/create-pull-request"
+      - dependency-name: "aws-actions/configure-aws-credentials"
+      - dependency-name: "ARM-software/cmsis-actions"
