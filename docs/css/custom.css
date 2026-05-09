@@ -2,13 +2,13 @@
 /* Landing page hero */
 .hero {
   text-align: center;
-  padding: 1rem 1rem 0.5rem;
+  padding: 1.5rem 1rem 0.5rem;
 }
 .hero img {
   margin-bottom: 0.25rem;
 }
 .hero h1 {
-  font-size: 1.6rem;
+  font-size: 1.7rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   margin: 0 0 0.4rem;
@@ -23,6 +23,117 @@
 .hero .md-button {
   margin: 0.25rem;
 }
+
+/* Stats strip */
+.stats-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0 1rem;
+  padding: 1.25rem 1rem;
+  background: var(--md-code-bg-color);
+  border-radius: 0.5rem;
+}
+.stats-strip .stat {
+  text-align: center;
+  padding: 0.25rem;
+}
+.stats-strip .stat-icon {
+  display: block;
+  font-size: 1.5rem;
+  margin-bottom: 0.25rem;
+  color: var(--md-accent-fg-color);
+  opacity: 0.85;
+}
+.stats-strip .stat-icon svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  fill: currentColor;
+}
+.stats-strip .stat-num {
+  display: block;
+  font-size: 2.4rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--md-default-fg-color);
+  margin: 0.1rem 0;
+}
+.stats-strip .stat-num strong {
+  font-weight: inherit;
+}
+.stats-strip .stat-label {
+  display: block;
+  font-size: 0.85rem;
+  opacity: 0.75;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Section headings */
+.section-heading {
+  margin-top: 2.5rem !important;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Two-column section (Why heliaRT) */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin: 1rem 0;
+  align-items: start;
+}
+@media (max-width: 768px) {
+  .two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Chip rows (silicon, toolchains) */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+.chip {
+  flex: 1 1 200px;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.5rem;
+  background: var(--md-default-bg-color);
+  line-height: 1.4;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.chip:hover {
+  border-color: var(--md-accent-fg-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+.chip .chip-icon {
+  font-size: 1.1rem;
+  margin-right: 0.25rem;
+  vertical-align: middle;
+}
+.chip .chip-meta {
+  display: block;
+  font-size: 0.82rem;
+  opacity: 0.7;
+  margin-top: 0.15rem;
+}
+.chip--ok .chip-icon { color: #2ea043; }
+.chip--star {
+  border-color: var(--md-accent-fg-color);
+  background: linear-gradient(0deg,
+              var(--md-default-bg-color),
+              color-mix(in srgb, var(--md-accent-fg-color) 6%, var(--md-default-bg-color)));
+}
+.chip--star .chip-icon { color: var(--md-accent-fg-color); }
+.chip--planned {
+  opacity: 0.7;
+}
+.chip--planned .chip-icon { color: #888; }
 
 .termynal-comment {
   color: #4a968f;
