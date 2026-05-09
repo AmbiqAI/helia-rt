@@ -5,19 +5,17 @@ hide:
 ---
 
 <div class="hero" markdown>
-<div class="hero-content" markdown>
 
-![heliaRT](./assets/helia-rt-banner-light.png#only-light){ width="480" }
-![heliaRT](./assets/helia-rt-banner-dark.png#only-dark){ width="480" }
+![heliaRT](./assets/helia-rt-banner-light.png#only-light){ width="400" }
+![heliaRT](./assets/helia-rt-banner-dark.png#only-dark){ width="400" }
 
 # Ambiq-optimised AI inference for Cortex-M
 
-**Accelerated TensorFlow Lite for Microcontrollers** runtime with Ambiq-tuned kernels — purpose-built for Apollo silicon.
+<p class="hero-tagline">Accelerated <strong>TensorFlow Lite for Microcontrollers</strong> runtime with Ambiq-tuned kernels — purpose-built for Apollo silicon.</p>
 
 [:octicons-arrow-right-24: Get Started](getting-started/index.md){ .md-button .md-button--primary }
 [:octicons-book-24: Why heliaRT](why-helia-rt.md){ .md-button }
 
-</div>
 </div>
 
 <div class="grid cards" markdown>

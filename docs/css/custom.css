@@ -2,17 +2,26 @@
 /* Landing page hero */
 .hero {
   text-align: center;
-  padding: 2rem 1rem 1rem;
+  padding: 1rem 1rem 0.5rem;
+}
+.hero img {
+  margin-bottom: 0.25rem;
 }
 .hero h1 {
-  font-size: 2rem;
-  margin-bottom: 0.5rem;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.4rem;
+  color: var(--md-default-fg-color);
 }
-.hero p {
-  font-size: 1.15rem;
-  max-width: 640px;
-  margin: 0 auto 1.5rem;
-  opacity: 0.85;
+.hero .hero-tagline {
+  font-size: 1.05rem;
+  max-width: 720px;
+  margin: 0 auto 1.2rem;
+  line-height: 1.5;
+}
+.hero .md-button {
+  margin: 0.25rem;
 }
 
 .termynal-comment {
