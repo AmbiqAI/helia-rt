@@ -57,7 +57,44 @@ jobs:
           path: tensorflow/lite/micro/tools/make/downloads
           key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc','tensorflow/lite/micro/tools/make/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/helia.inc') }}
 
-      - name: Testing (${{ matrix.arch }} / ${{ matrix.toolchain }})
+      # ccache massively reduces wall-clock for incremental PR pushes
+      # (~3x speedup with a warm cache). Install in-workflow for now;
+      # baking it into .devcontainer/Dockerfile is a follow-up.
+      - name: Install ccache
         run: |
+          if ! command -v ccache >/dev/null 2>&1; then
+            apt-get update && apt-get install -y --no-install-recommends ccache
+          fi
+          ccache --version | head -1
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          # Save key uses run_id so each run produces a fresh save.
+          # restore-keys does prefix-fallback so we always inherit the most
+          # recent prior cache for this toolchain+arch slot. Safe with
+          # ccache: it hashes preprocessed content + compiler mtime/size,
+          # so stale hits are not possible (unlike third-party-downloads).
+          key: ${{ runner.os }}-ccache-${{ matrix.toolchain }}-${{ matrix.arch }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-${{ matrix.toolchain }}-${{ matrix.arch }}-
+
+      - name: Testing (${{ matrix.arch }} / ${{ matrix.toolchain }})
+        env:
+          CCACHE_WRAP_DIR: ${{ runner.temp }}/ccwrap
+          CCACHE_BASEDIR: ${{ github.workspace }}
+          CCACHE_COMPRESS: "true"
+          CCACHE_COMPRESSLEVEL: "6"
+          CCACHE_MAXSIZE: "2G"
+        run: |
+          # Configure & zero stats before the build so the post-build
+          # 'ccache -s' line shows only this run.
+          ccache -o max_size=${CCACHE_MAXSIZE} || true
+          ccache -z || true
           /bin/sh -c "tensorflow/lite/micro/tools/ci_build/test_helia.sh \
           -a ${{ matrix.arch }} -t ${{ matrix.toolchain }}"
+
+      - name: Show ccache stats
+        if: always()
+        run: ccache -s || true
