@@ -95,7 +95,7 @@ jobs:
           find "${OUTDIR}" -maxdepth 3 -type f -print
 
       - name: Upload build combo
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: helia-rt-combo-${{ matrix.arch }}-${{ matrix.toolchain }}-${{ matrix.build }}
           path: out/${{ matrix.arch }}/${{ matrix.toolchain }}/${{ matrix.build }}/**
@@ -141,7 +141,7 @@ jobs:
         run: ls -1 upload/*.zip
 
       - name: Upload bundle artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: helia-rt-bundle-${{ steps.info.outputs.tag }}
           path: upload/*.zip
