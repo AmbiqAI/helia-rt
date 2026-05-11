@@ -25,3 +25,25 @@ neuralspot-*-local-*/
 neuralspot-*-local-*.zip
 tflm-vanilla.zip
 site/
+
+# Integration tests generate C arrays from checked-in .tflite/.csv inputs.
+tensorflow/lite/micro/integration_tests/nnaed/**/*_model_data.cc
+tensorflow/lite/micro/integration_tests/nnaed/**/*_model_data.h
+tensorflow/lite/micro/integration_tests/nnaed/**/*_input*_test_data.cc
+tensorflow/lite/micro/integration_tests/nnaed/**/*_input*_test_data.h
+tensorflow/lite/micro/integration_tests/nnaed/**/*_golden_*_test_data.cc
+tensorflow/lite/micro/integration_tests/nnaed/**/*_golden_*_test_data.h
+tensorflow/lite/micro/integration_tests/seanet/**/*_model_data.cc
+tensorflow/lite/micro/integration_tests/seanet/**/*_model_data.h
+tensorflow/lite/micro/integration_tests/seanet/**/*_input*_test_data.cc
+tensorflow/lite/micro/integration_tests/seanet/**/*_input*_test_data.h
+tensorflow/lite/micro/integration_tests/seanet/**/*_golden_*_test_data.cc
+tensorflow/lite/micro/integration_tests/seanet/**/*_golden_*_test_data.h
+tensorflow/lite/micro/examples/**/*_model_data.cc
+tensorflow/lite/micro/examples/**/*_model_data.h
+tensorflow/lite/micro/examples/**/*_audio_data.cc
+tensorflow/lite/micro/examples/**/*_audio_data.h
+tensorflow/lite/micro/examples/**/*_image_data.cc
+tensorflow/lite/micro/examples/**/*_image_data.h
+tensorflow/lite/micro/models/**/*_model_data.cc
+tensorflow/lite/micro/models/**/*_model_data.h
