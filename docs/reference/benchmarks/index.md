@@ -11,4 +11,4 @@ Benchmark results published here should reflect:
 - reproducible measurement methodology
 - heliaRT runtime behavior on representative models
 
-For now, use the main [Getting Started](../usage/index.md) guide to profile models on hardware with `ns_autodeploy`.
+For now, use the main [Getting Started](../../getting-started/index.md) guide to profile models on hardware with `ns_autodeploy`.

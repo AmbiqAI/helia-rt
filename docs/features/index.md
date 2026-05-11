@@ -1,10 +1,10 @@
 # :material-star-four-points: Features
 
-heliaRT keeps the familiar TensorFlow Lite for Microcontrollers programming model while adding Ambiq-focused runtime and kernel optimizations.
+heliaRT keeps the familiar LiteRT programming model while adding Ambiq-focused runtime and kernel optimizations.
 
-## Familiar TFLM Workflow
+## Familiar LiteRT Workflow
 
-If you already know TFLM, the core concepts stay the same:
+If you already know LiteRT for Micro, the core concepts stay the same:
 
 - `.tflite` flatbuffer model inputs
 - `MicroInterpreter`-based execution
@@ -12,7 +12,7 @@ If you already know TFLM, the core concepts stay the same:
 - statically allocated tensor arenas
 - embedded-focused logging, profiling, and memory tradeoffs
 
-That means existing TFLM knowledge transfers directly to heliaRT, while Ambiq-specific integrations give you a faster path to efficient deployment on Apollo devices.
+That means existing LiteRT knowledge transfers directly to heliaRT, while Ambiq-specific integrations give you a faster path to efficient deployment on Apollo devices.
 
 ## What heliaRT Adds
 
@@ -27,7 +27,7 @@ That means existing TFLM knowledge transfers directly to heliaRT, while Ambiq-sp
 
 ### Runtime Compatibility
 
-heliaRT is intended for the same class of microcontroller inference workloads as TFLM:
+heliaRT is intended for the same class of microcontroller inference workloads as LiteRT for Micro:
 
 - quantized inference on memory-constrained devices
 - operator-resolver-based builds
@@ -53,8 +53,8 @@ Users can start in the way that best matches their project stage:
 
 ## Choosing a Path
 
-Use [Zephyr setup](../usage/zephyr.md) if you are integrating heliaRT into a west workspace.
+Use [Zephyr setup](../getting-started/zephyr.md) if you are integrating heliaRT into a west workspace.
 
-Use [neuralSPOT setup](../usage/neuralspot.md) if you want the fastest path to evaluate and profile a model on Ambiq hardware.
+Use [neuralSPOT setup](../getting-started/neuralspot.md) if you want the fastest path to evaluate and profile a model on Ambiq hardware.
 
 Use [Examples](../examples/index.md) when you want working integration patterns rather than general setup guidance.

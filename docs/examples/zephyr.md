@@ -429,4 +429,4 @@ Prebuilt release module:
 - `CONFIG_FPU=y` is enabled for Cortex-M55 builds
 - no source-backend Kconfig options are enabled
 
-For the broader setup guide, including `Reference`, open `CMSIS-NN`, and prebuilt flows, see [Zephyr setup](../usage/zephyr.md).
+For the broader setup guide, including `Reference`, open `CMSIS-NN`, and prebuilt flows, see [Zephyr setup](../getting-started/zephyr.md).

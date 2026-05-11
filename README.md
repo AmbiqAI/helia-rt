@@ -1,172 +1,91 @@
 # heliaRT
 
-heliaRT is Ambiq's optimized TensorFlow Lite for Microcontrollers runtime for Apollo platforms. It is designed to help developers bring efficient inference to ultra-low-power Ambiq silicon, with tuned kernels that take advantage of Apollo CPU, DSP, and MVE capabilities where available.
+**Drop-in LiteRT for Microcontrollers with Ambiq-tuned kernels.**
 
-[![CI](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ci.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ci.yml)
-[![Unit Tests](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_helia.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_helia.yml)
+[![Tests](https://github.com/AmbiqAI/helia-rt/actions/workflows/tests_entry.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/tests_entry.yml)
+[![Release](https://img.shields.io/github/v/release/AmbiqAI/helia-rt?label=latest)](https://github.com/AmbiqAI/helia-rt/releases/latest)
+[![License](https://img.shields.io/badge/license-Ambiq%20Apollo%20SDK-blue)](LICENSE)
+[![Docs](https://img.shields.io/badge/docs-ambiqai.github.io%2Fhelia--rt-cyan)](https://ambiqai.github.io/helia-rt/)
 
+heliaRT is Ambiq's optimised TensorFlow Lite for Microcontrollers (LiteRT-Micro) runtime for Apollo platforms. It adds heliaCORE — a set of Ambiq-tuned kernel implementations — on top of the standard TFLM API so you get faster inference without changing your application code.
 
 ## Why heliaRT?
 
-heliaRT focuses on efficient inference for Ambiq edge devices. By aligning the runtime with Apollo hardware capabilities, heliaRT helps reduce integration friction while improving performance and energy efficiency on supported Ambiq targets.
+| | |
+|---|---|
+| **Drop-in** | Same `MicroInterpreter` / `Model` / `OpResolver` API. Swap the dependency, rebuild, ship. |
+| **More kernels** | heliaCORE adds optimised paths for activations, reduce, concat, reshape, and more — where upstream only offers Reference. |
+| **Open-source toolchains** | GCC, Arm Compiler 6, and **ATfE** (LLVM-Embedded for Arm, ~10–20 % faster than GCC). |
+| **Two variants** | **SPEED** (`-O2`) for latency, **SIZE** (`-Os`) for footprint. Both ship as prebuilt `.a` and source. |
 
-## License
+## Supported Silicon
 
-heliaRT is released under the [Ambiq Apollo SDK License](LICENSE). The license permits free use, modification, and redistribution **solely for execution on Ambiq-manufactured CPUs** (including the Apollo series). Use on non-Ambiq hardware is not permitted. See the full [LICENSE](LICENSE) file for details.
+| SoC | Core | DSP | MVE / Helium |
+|---|---|---|---|
+| Apollo3 / Apollo3p | Cortex-M4F | ✓ | — |
+| Apollo4 / Apollo4p | Cortex-M4F | ✓ | — |
+| Apollo510 | Cortex-M55 | ✓ | ✓ |
+| Atomiq | _(planned)_ | | |
 
-## Key Features
+## Quick Start — Zephyr
 
-- **Optimized Performance**: Utilizes MVE and DSP hardware capabilities to enhance computational efficiency and speed.
-- **Energy Efficiency**: Designed to minimize power usage, extending the battery life of edge devices.
-- **Broad Ambiq Coverage**: Supports a range of Ambiq Apollo SoCs through source and prebuilt integration paths.
+Add heliaRT to your west workspace and build:
 
-Start with the [Getting Started guide](docs/usage/index.md) to choose a neuralSPOT, Zephyr, or source-build path for heliaRT on Ambiq hardware.
+```yaml
+# west.yml — add under projects:
+- name: helia-rt
+  url: https://github.com/AmbiqAI/helia-rt
+  revision: main
+  path: modules/lib/helia-rt
+```
 
-## Getting Started
+```cfg
+# prj.conf
+CONFIG_HELIA_RT=y
+CONFIG_HELIA_RT_BACKEND_HELIA=y   # or CMSIS_NN / REFERENCE
+```
 
-The recommended getting-started paths are:
+```bash
+west build -b apollo510_evb app
+west flash
+```
 
-- profile a model with `ns_autodeploy`
-- integrate heliaRT into a Zephyr application
-- build heliaRT from source for a custom integration
+See the full [Zephyr getting-started guide](https://ambiqai.github.io/helia-rt/getting-started/zephyr/) for module variants, backend selection, and prebuilt bundles.
 
-See the full [Getting Started documentation](docs/usage/index.md) for step-by-step instructions.
+## Integration Paths
 
-The main setup guides are:
+| Path | Best for | Guide |
+|---|---|---|
+| **Zephyr module** | Product integration via `west` | [Getting Started — Zephyr](https://ambiqai.github.io/helia-rt/getting-started/zephyr/) |
+| **CMSIS-Pack** | Keil / CMSIS-Toolbox _(coming soon)_ | [#124](https://github.com/AmbiqAI/helia-rt/issues/124) |
+| **neuralSPOT** | Fast model profiling with `ns_autodeploy` | [Getting Started — neuralSPOT](https://ambiqai.github.io/helia-rt/getting-started/neuralspot/) |
+| **Source / CMake** | Full control over build and link | [Getting Started — Source](https://ambiqai.github.io/helia-rt/getting-started/source/) |
 
-- [Zephyr setup](docs/usage/zephyr.md)
-- [neuralSPOT setup](docs/usage/neuralspot.md)
-- [Source builds](docs/usage/source.md)
-- [Features overview](docs/features/index.md)
+## Kernel Backends
 
+| Backend | Description | Requires |
+|---|---|---|
+| **Reference** | Generic TFLM C kernels | Nothing extra |
+| **CMSIS-NN** | Open-source Arm CMSIS-NN | Cortex-M |
+| **HELIA** | Ambiq heliaCORE (ns-cmsis-nn) | Cortex-M + Ambiq module |
 
-## Supported SoCs
-
-heliaRT is specifically optimized to leverage the advanced features of Ambiq's ultra-low-power SoCs. Below is the list of SoCs that are fully supported:
-
-- **Apollo3**: Ideal for battery-operated mobile devices with its highly efficient power management capabilities.
-- **Apollo4**: Enhances performance with higher processing capabilities and improved memory architecture.
-- **Apollo4 Plus**: Features a Cortex-M4 core, offering a balance of power and performance for complex processing tasks.
-- **Apollo510**: Equipped with a Cortex-M55 core and MVE Helium capabilities, designed for next-level computation needs and edge AI applications.
-
-These optimizations ensure that heliaRT can provide excellent performance and energy efficiency on Ambiq's cutting-edge hardware platforms.
-
-
-## Official Build Status
-
-This table provides a summary of the build status for heliaRT across various platforms and configurations, ensuring both compatibility and optimal performance.
-
-| Build Type         | Status |
-| ------------------ | ------ |
-| **CI on Linux**    | [![CI Status](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ci.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_ci.yml) |
-| **Apollo3/4 (CM4)** | [![Apollo4 Tests](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_helia.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_helia.yml) |
-| **Apollo510 (CM55)** | [![Apollo510 Tests](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_helia.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/run_helia.yml) |
-
-Each badge links directly to the detailed results of the respective builds, allowing for quick access to the latest test outcomes and build logs.
-
-
-## Getting Help
-
-If you encounter issues or need assistance, the following resources are available:
-
-- **Primary Support**: [Submit a GitHub Issue](https://github.com/AmbiqAI/helia-rt/issues/new/choose) for direct support on heliaRT related queries.
-- **Community and Discussions**:
-  - Contact Ambiq AITG [email group](mailto:support.aitg@ambiq.com)
-- **TensorFlow Community**:
-  - Pose general questions on the [TensorFlow Discourse forum](https://discuss.tensorflow.org).
-  - Engage with the broader TensorFlow community via the [TensorFlow Lite mailing list](https://groups.google.com/a/tensorflow.org/g/tflite).
-  - Report broader TensorFlow issues on the [official TensorFlow GitHub page](https://github.com/tensorflow/tensorflow/issues/new/choose).
-  - Discuss optimization techniques on the [Model Optimization Toolkit GitHub page](https://github.com/tensorflow/model-optimization).
+The full operator coverage matrix is in the [docs](https://ambiqai.github.io/helia-rt/reference/operator-coverage/).
 
 ## Documentation
 
-Explore the main documentation entry points:
+| | |
+|---|---|
+| [Why heliaRT](https://ambiqai.github.io/helia-rt/why-helia-rt/) | The pitch — drop-in upgrade, kernel coverage, perf gains |
+| [Guides](https://ambiqai.github.io/helia-rt/guides/) | Static vs source, SPEED vs SIZE, toolchains, memory placement, troubleshooting |
+| [Examples](https://ambiqai.github.io/helia-rt/examples/) | Per-target app walkthroughs |
+| [Reference](https://ambiqai.github.io/helia-rt/reference/) | Operator matrix, silicon support, benchmarks, CI |
+| [Contributing](https://ambiqai.github.io/helia-rt/contributing/) | Architecture, upstream sync process, releases |
 
-- [Getting Started](docs/usage/index.md): Step-by-step guide to begin with heliaRT.
-- [Continuous Integration](docs/continuous_integration.md): Details on our CI processes and infrastructure.
-- [Benchmarks](docs/benchmarks/index.md): Performance-focused documentation for supported Ambiq targets.
-- [Profiling](tensorflow/lite/micro/docs/profiling.md): Techniques to profile and optimize your TFLM applications.
-- [Memory Management](tensorflow/lite/micro/docs/memory_management.md): Strategies for effective memory use in constrained environments.
-- [Logging](tensorflow/lite/micro/docs/logging.md): How to implement and utilize logging within heliaRT projects.
-- [Porting Reference Kernels from TfLite to TFLM](tensorflow/lite/micro/docs/porting_reference_ops.md): Guide on adapting TensorFlow Lite kernels for microcontrollers.
-- [Optimized Kernel Implementations](tensorflow/lite/micro/docs/optimized_kernel_implementations.md): Discusses the optimized kernels specific to various architectures.
-- [New Platform Support](tensorflow/lite/micro/docs/new_platform_support.md): Instructions for adding heliaRT support to new hardware platforms.
-- [heliaRT Python Development Guide](docs/python.md): Insights into using Python for heliaRT development.
-- [Automatically Generated Files](docs/automatically_generated_files.md): Information about the files generated during the build process.
-- [Python Interpreter Guide](python/tflite_micro/README.md): Detailed guide for using the Python interpreter with TFLM.
+## License
 
+heliaRT is released under the [Ambiq Apollo SDK License](LICENSE). Free use, modification, and redistribution **solely for execution on Ambiq-manufactured CPUs**. See [LICENSE](LICENSE) for details.
 
-## Operator Support Matrix
+## Getting Help
 
-Below is the operator support matrix for heliaRT's three kernel backends. Each operator is available in all backends at the Reference level. The **CMSIS-NN** and **HELIA** columns indicate where optimized implementations replace the generic reference kernels.
-
-The three backends correspond to Zephyr Kconfig choices:
-
-- **Reference** (`HELIA_RT_BACKEND_REFERENCE`): Generic TFLM C kernels. Works on any architecture.
-- **CMSIS-NN** (`HELIA_RT_BACKEND_CMSIS_NN`): Open-source Arm CMSIS-NN optimized kernels. Cortex-M only.
-- **HELIA** (`HELIA_RT_BACKEND_HELIA`): Ambiq-optimized kernels (heliaCORE / ns-cmsis-nn). Cortex-M only. Requires Ambiq-provided module.
-
-> **Note:** The **Reference** and **CMSIS-NN** backends are fully open and available to all users. The **HELIA** backend requires the private `ns-cmsis-nn` module, which is provided to Ambiq licensees. If you build with `OPTIMIZED_KERNEL_DIR=helia` (the default in CI scripts) without access to this module, the build will fail with a clear error message explaining available alternatives. To build without the HELIA backend, use `OPTIMIZED_KERNEL_DIR=cmsis_nn` or leave it empty for reference kernels only. Contact [support.aitg@ambiq.com](mailto:support.aitg@ambiq.com) for access to the HELIA module.
-
-Data type key: **i8** = int8 activations/weights, **i16** = int16 activations, **i4** = int4 weights, **f32** = float32.
-
-Operators without an optimized variant in a backend fall through to the Reference implementation.
-
-### Compute-Heavy Ops
-
-| Operator | Reference | CMSIS-NN | HELIA | Notes |
-| --- | --- | --- | --- | --- |
-| conv | f32, i8, i16, i4 | f32, i8, i16, i4 | f32, i8, i16, i4 | HELIA: weight repacking at Prepare |
-| depthwise_conv | f32, i8, i16, i4 | f32, i8, i16, i4 | f32, i8, i16, i4 | HELIA: weight repacking at Prepare |
-| fully_connected | f32, i8, i16, i4 | f32, i8, i16, i4 | f32, i8, **i16(w8+w16)**, i4 | HELIA uniquely supports A16W16 |
-| batch_matmul | f32, i8, i16 | f32, i8, i16 | f32, i8, i16 | |
-| transpose_conv | f32, i8, i16 | f32, i8, i16 | f32, i8, i16 | |
-| svdf | f32, i8 | f32, i8 | f32, i8 | |
-| unidirectional_sequence_lstm | f32, i8 | f32, i8 | f32, i8 | |
-
-### Pooling and Reduce
-
-| Operator | Reference | CMSIS-NN | HELIA | Notes |
-| --- | --- | --- | --- | --- |
-| avg_pool | f32, i8, i16 | f32, i8, i16 | f32, i8, i16 | |
-| max_pool | f32, i8, i16 | f32, i8, i16 | f32, i8, i16 | |
-| softmax | f32, i8, i16 | f32, i8, i16 | f32, i8, i16 | |
-| reduce (mean/max) | f32, i8 | *(Reference)* | f32, i8 | HELIA-only optimized |
-
-### Activations
-
-| Operator | Reference | CMSIS-NN | HELIA | Notes |
-| --- | --- | --- | --- | --- |
-| relu / relu6 | f32, i8, i16 | *(Reference)* | f32, i8, i16 | HELIA-only optimized |
-| logistic | f32, i8, i16 | *(Reference)* | f32, i8, i16 | HELIA-only optimized |
-| tanh | f32, i8, i16 | *(Reference)* | f32, i8, i16 | HELIA-only optimized |
-| hard_swish | f32, i8 | *(Reference)* | f32, i8, i16 | HELIA extends to i16 |
-| leaky_relu | f32, i8, i16 | *(Reference)* | f32, i8, i16 | HELIA-only optimized |
-
-### Elementwise Arithmetic
-
-| Operator | Reference | CMSIS-NN | HELIA | Notes |
-| --- | --- | --- | --- | --- |
-| add | f32, i8, i16 | f32, i8, i16 | f32, i8, i16 | |
-| mul | f32, i8, i16 | f32, i8, i16 | f32, i8, i16 | |
-| sub | f32, i8, i16 | *(Reference)* | f32, i8, i16 | HELIA-only optimized |
-| maximum / minimum | f32, i8 | f32, i8 | f32, i8 | |
-| comparisons | f32, i8 | *(Reference)* | f32, i8 | HELIA-only optimized |
-
-### Data Movement / Shape
-
-| Operator | Reference | CMSIS-NN | HELIA | Notes |
-| --- | --- | --- | --- | --- |
-| pad | f32, i8, i16 | f32, i8, i16 | f32, i8, i16 | |
-| transpose | f32, i8, i16 | f32, i8, i16 | f32, i8, i16 | |
-| concatenation | f32, i8, i16 | *(Reference)* | f32, i8, i16 | HELIA-only optimized |
-| reshape | all | *(Reference)* | all | HELIA-only optimized |
-| split / split_v | all | *(Reference)* | all | HELIA-only optimized |
-| pack | all | *(Reference)* | all | HELIA-only optimized |
-| squeeze | all | *(Reference)* | all | HELIA-only optimized |
-| strided_slice | all | *(Reference)* | all | HELIA-only optimized |
-| dequantize | i8→f32, i16→f32 | *(Reference)* | i8→f32, i16→f32 | HELIA-only optimized |
-| fill | all | *(Reference)* | all | HELIA-only optimized |
-| zeros_like | f32, i8, i16 | *(Reference)* | f32, i8, i16 | HELIA-only optimized |
-
-All operators not listed above (e.g., cast, elu, gather, slice, unpack, etc.) are available via the Reference backend on all data types they support. See the TFLM documentation for the full reference operator list.
+- [Submit an issue](https://github.com/AmbiqAI/helia-rt/issues/new/choose)
+- [Contact Ambiq AITG](mailto:support.aitg@ambiq.com)

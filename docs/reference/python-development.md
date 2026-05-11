@@ -1,23 +1,15 @@
-<!--ts-->
-   * [Using Bazel](#using-bazel)
-   * [Manual Setup Illustration](#manual-setup-illustration)
+# Python Development
 
-<!-- Added by: advaitjain, at: Fri Oct 29 11:57:14 AM PDT 2021 -->
-
-<!--te-->
-
-Writing and using Python scripts from the TFLM repository is currently in the
-prototyping stage. As such, the instructions below are somewhat sparse and
-subject to change.
+heliaRT keeps the upstream LiteRT for Micro Python utilities available for development, testing, and model inspection. Most repository Python workflows run through Bazel so dependency setup stays reproducible in CI.
 
 
 * [TensorFlow Python style guide](https://www.tensorflow.org/community/contribute/code_style#python_style)
 
 
-# Using Bazel
+## Using Bazel
 
 We use Bazel as our default build system for Python and the continuous
-integration infrastrucutre only runs the Python unit tests via Bazel.
+integration infrastructure runs Python unit tests through Bazel.
 
 When using Bazel with Python, all the environment setup is handled as part of the
 build.
@@ -30,10 +22,10 @@ bazel build tensorflow/lite/tools:visualize
 bazel-bin/tensorflow/lite/tools/visualize tensorflow/lite/micro/models/person_detect.tflite tensorflow/lite/micro/models/person_detect.tflite.html
 ```
 
-# Manual Setup Illustration
+## Manual Setup Illustration
 
-For advanced users that would like to use the Python code in the TFLM repository
-independent of bazel, here is one approach.
+For advanced users that would like to use the Python code in the LiteRT for Micro repository
+independent of Bazel, here is one approach.
 
 Please note that this setup is unsupported and will need users to debug various
 issues on their own. It is described here for illustrative purposes only.

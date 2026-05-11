@@ -1,24 +1,45 @@
 # :material-book-open-page-variant: Examples
 
-Examples are organized around practical bring-up and integration flows for heliaRT on Ambiq hardware.
+Practical bring-up and integration patterns for heliaRT on Ambiq hardware.
 
-## Example Tracks
+<div class="grid cards" markdown>
 
-- [Zephyr examples](zephyr.md): application skeletons and integration patterns for raw and prebuilt Zephyr module use.
-- [neuralSPOT examples](neuralspot.md): model evaluation and profiling flows using `ns_autodeploy`.
-- [Source integration examples](source.md): lower-level library build and embedding patterns.
+- :material-home-automation:{ .lg .middle } **Zephyr**
 
-## Common Example Themes
+    ---
 
-Examples focus on:
+    Application skeletons, `prj.conf` setup, and `west build` patterns.
 
-- Ambiq Apollo application bring-up
-- model execution with a familiar TFLM-style interpreter flow
-- operator resolver and tensor arena setup
-- integration patterns aligned with supported Ambiq workflows
+    [:octicons-arrow-right-24: Zephyr examples](zephyr.md)
+
+- :material-rocket-launch:{ .lg .middle } **neuralSPOT**
+
+    ---
+
+    Model evaluation and profiling with `ns_autodeploy`.
+
+    [:octicons-arrow-right-24: neuralSPOT examples](neuralspot.md)
+
+- :material-hammer-wrench:{ .lg .middle } **Source / Makefile**
+
+    ---
+
+    Direct `make microlite` builds and library embedding.
+
+    [:octicons-arrow-right-24: Source examples](source.md)
+
+- :material-file-code:{ .lg .middle } **CMake**
+
+    ---
+
+    Link a prebuilt heliaRT archive into a plain CMake project.
+
+    [:octicons-arrow-right-24: CMake example](cmake.md)
+
+</div>
 
 ## Recommended Starting Points
 
-- Start with [neuralSPOT setup](../usage/neuralspot.md) if you want the shortest path to profile a model.
-- Start with [Zephyr setup](../usage/zephyr.md) if you are integrating heliaRT into an application workspace.
-- Start with [source builds](../usage/source.md) if you need a custom build environment.
+1. **Evaluating a model?** → [neuralSPOT examples](neuralspot.md)
+2. **Building a Zephyr app?** → [Zephyr examples](zephyr.md)
+3. **Custom build system?** → [Source](source.md) or [CMake](cmake.md)
