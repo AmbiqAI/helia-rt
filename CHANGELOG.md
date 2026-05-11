@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.0](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.12.2...heliaRT-v1.13.0) (2026-05-11)
+
+
+### Features
+
+* **helia:** replant helia-rt on tflm/main (2.3a) ([690a2d7](https://github.com/AmbiqAI/helia-rt/commit/690a2d72517522b8d7988ff7ee9ea01c9715491f))
+
 ## [1.12.2](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.12.1...heliaRT-v1.12.2) (2026-04-30)
 
 
