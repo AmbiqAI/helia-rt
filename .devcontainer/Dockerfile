@@ -39,7 +39,7 @@ FROM python:3.10-bookworm as tflm-ci
 
 RUN apt-get update
 
-RUN apt-get install -y zip xxd sudo
+RUN apt-get install -y zip xxd sudo ccache
 
 RUN apt install -y lsb-release wget software-properties-common gnupg
 RUN wget https://apt.llvm.org/llvm.sh
