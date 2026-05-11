@@ -20,11 +20,16 @@ on:
         required: false
         default: ""
 
+# Pinned CI image. Bump this on Dockerfile changes.
+# See .github/workflows/README.md for the bump procedure.
+env:
+  CI_IMAGE: ghcr.io/ambiqai/helia-rt-ci:latest
+
 jobs:
   helia_test:
     runs-on: ubuntu-latest-md
     container:
-      image: ghcr.io/ambiqai/helia-rt-ci:latest
+      image: ${{ env.CI_IMAGE }}
 
     strategy:
       fail-fast: false

@@ -7,6 +7,11 @@ on:
         required: true
         type: string
 
+# Pinned CI image. Bump this on Dockerfile changes.
+# See .github/workflows/README.md for the bump procedure.
+env:
+  CI_IMAGE: ghcr.io/ambiqai/helia-rt-ci:latest
+
 jobs:
   bazel_tests:
     runs-on: ubuntu-latest-md
@@ -82,7 +87,7 @@ jobs:
     runs-on: ubuntu-latest-md
     name: third_party_static drift check (presubmit)
     container:
-      image: ghcr.io/ambiqai/helia-rt-ci:latest
+      image: ${{ env.CI_IMAGE }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -110,7 +115,7 @@ jobs:
   #   runs-on: ubuntu-latest-md
   #   name: Bazel ubsan (presubmit)
   #   container:
-  #     image: ghcr.io/ambiqai/helia-rt-ci:latest
+  #     image: ${{ env.CI_IMAGE }}
   #   steps:
   #     - uses: actions/checkout@v6
   #       with:
@@ -131,7 +136,7 @@ jobs:
     runs-on: ubuntu-latest-md
     name: Cortex-M Bluepill Release (presubmit)
     container:
-      image: ghcr.io/ambiqai/helia-rt-ci:latest
+      image: ${{ env.CI_IMAGE }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -145,7 +150,7 @@ jobs:
     runs-on: ubuntu-latest-md
     name: Cortex-M Bluepill No Release (presubmit)
     container:
-      image: ghcr.io/ambiqai/helia-rt-ci:latest
+      image: ${{ env.CI_IMAGE }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -159,7 +164,7 @@ jobs:
     runs-on: ubuntu-latest-md
     name: Cortex-M Bluepill Renode (presubmit)
     container:
-      image: ghcr.io/ambiqai/helia-rt-ci:latest
+      image: ${{ env.CI_IMAGE }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -173,7 +178,7 @@ jobs:
     runs-on: ubuntu-latest-md
     name: Cortex-M QEMU Unit Tests (presubmit)
     container:
-      image: ghcr.io/ambiqai/helia-rt-ci:latest
+      image: ${{ env.CI_IMAGE }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -186,7 +191,7 @@ jobs:
   #   runs-on: ubuntu-latest-md
   #   name: Code Style (presubmit)
   #   container:
-  #     image: ghcr.io/ambiqai/helia-rt-ci:latest
+  #     image: ${{ env.CI_IMAGE }}
   #   steps:
   #     - uses: actions/checkout@v6
   #       with:
@@ -199,7 +204,7 @@ jobs:
     runs-on: ubuntu-latest-md
     name: Project Generation (presubmit)
     container:
-      image: ghcr.io/ambiqai/helia-rt-ci:latest
+      image: ${{ env.CI_IMAGE }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -213,7 +218,7 @@ jobs:
     runs-on: ubuntu-latest-md
     name: Makefile x86 Release (presubmit)
     container:
-      image: ghcr.io/ambiqai/helia-rt-ci:latest
+      image: ${{ env.CI_IMAGE }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -228,7 +233,7 @@ jobs:
     runs-on: ubuntu-latest-md
     name: Makefile x86 Default (presubmit)
     container:
-      image: ghcr.io/ambiqai/helia-rt-ci:latest
+      image: ${{ env.CI_IMAGE }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -243,7 +248,7 @@ jobs:
     runs-on: ubuntu-latest-md
     name: Makefile x86 Out Of Tree (presubmit)
     container:
-      image: ghcr.io/ambiqai/helia-rt-ci:latest
+      image: ${{ env.CI_IMAGE }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -258,7 +263,7 @@ jobs:
     runs-on: ubuntu-latest-md
     name: Makefile x86 No TFLite Static Memory (presubmit)
     container:
-      image: ghcr.io/ambiqai/helia-rt-ci:latest
+      image: ${{ env.CI_IMAGE }}
     steps:
       - uses: actions/checkout@v6
         with:
