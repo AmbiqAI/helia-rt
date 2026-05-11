@@ -1,20 +1,20 @@
 # heliaRT
 
-**Drop-in LiteRT for Microcontrollers with Ambiq-tuned kernels.**
+**Drop-in LiteRT for Micro with Ambiq-tuned kernels.**
 
 [![Tests](https://github.com/AmbiqAI/helia-rt/actions/workflows/tests_entry.yml/badge.svg)](https://github.com/AmbiqAI/helia-rt/actions/workflows/tests_entry.yml)
 [![Release](https://img.shields.io/github/v/release/AmbiqAI/helia-rt?label=latest)](https://github.com/AmbiqAI/helia-rt/releases/latest)
 [![License](https://img.shields.io/badge/license-Ambiq%20Apollo%20SDK-blue)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-ambiqai.github.io%2Fhelia--rt-cyan)](https://ambiqai.github.io/helia-rt/)
 
-heliaRT is Ambiq's optimised TensorFlow Lite for Microcontrollers (LiteRT-Micro) runtime for Apollo platforms. It adds heliaCORE — a set of Ambiq-tuned kernel implementations — on top of the standard TFLM API so you get faster inference without changing your application code.
+heliaRT is Ambiq's optimized LiteRT for Micro runtime for Apollo platforms, compatible with TensorFlow Lite for Microcontrollers / TFLM. It adds heliaCORE — a set of Ambiq-tuned kernel implementations — on top of the standard LiteRT for Micro API so you get faster inference without changing your application code.
 
 ## Why heliaRT?
 
 | | |
 |---|---|
 | **Drop-in** | Same `MicroInterpreter` / `Model` / `OpResolver` API. Swap the dependency, rebuild, ship. |
-| **More kernels** | heliaCORE adds optimised paths for activations, reduce, concat, reshape, and more — where upstream only offers Reference. |
+| **More kernels** | heliaCORE adds optimized paths for activations, reduce, concat, reshape, and more — where upstream only offers Reference. |
 | **Open-source toolchains** | GCC, Arm Compiler 6, and **ATfE** (LLVM-Embedded for Arm, ~10–20 % faster than GCC). |
 | **Two variants** | **SPEED** (`-O2`) for latency, **SIZE** (`-Os`) for footprint. Both ship as prebuilt `.a` and source. |
 
@@ -84,6 +84,12 @@ The full operator coverage matrix is in the [docs](https://ambiqai.github.io/hel
 ## License
 
 heliaRT is released under the [Ambiq Apollo SDK License](LICENSE). Free use, modification, and redistribution **solely for execution on Ambiq-manufactured CPUs**. See [LICENSE](LICENSE) for details.
+
+This repository also contains code derived from or compatible with upstream TensorFlow Lite for Microcontrollers / LiteRT for Micro and other third-party projects. Those files retain their original copyright and license notices. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution and trademark notes.
+
+## Trademarks and Non-affiliation
+
+LiteRT, TensorFlow, Google, and related marks are trademarks of Google LLC. heliaRT is developed and maintained by Ambiq and is not affiliated with, endorsed by, sponsored by, or otherwise associated with Google LLC.
 
 ## Getting Help
 

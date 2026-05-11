@@ -41,6 +41,7 @@ nav:
       - Continuous Integration: reference/continuous-integration.md
       - Python Development: reference/python-development.md
       - Generated Files: reference/generated-files.md
+      - Attribution and Trademarks: reference/attribution.md
   - Contributing:
       - Overview: contributing/index.md
       - Architecture: contributing/architecture.md
@@ -49,7 +50,7 @@ nav:
 
 theme:
   name: material
-  favicon: assets/helia-rt-icon.png
+  favicon: assets/helia-rt-favicon.svg
   logo: assets/helia-rt-icon-white.png
   icon:
       repo: fontawesome/brands/github-alt

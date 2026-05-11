@@ -13,6 +13,17 @@
   --hr-dark: #080d14;
   --hr-dark-2: #101722;
   --hr-dark-3: #171f2c;
+  --hr-hero-bg: var(--hr-dark);
+  --hr-hero-sheen: rgba(255,255,255,0.04);
+  --hr-hero-ink: #ffffff;
+  --hr-hero-muted: #c4cedc;
+  --hr-hero-kicker: #b8c4d6;
+  --hr-hero-panel-bg: var(--hr-dark-2);
+  --hr-hero-panel-cell: var(--hr-dark-3);
+  --hr-hero-panel-code: #05080d;
+  --hr-hero-panel-line: var(--hr-line-dark);
+  --hr-hero-panel-muted: #a7b4c5;
+  --hr-hero-code-comment: #7d8da3;
   --hr-accent: #00c1b3;
   --hr-accent-2: #1d99ff;
   --hr-good: #21c55d;
@@ -27,6 +38,17 @@
   --hr-soft: #111821;
   --hr-line: #273140;
   --hr-shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
+  --hr-hero-bg: #f7fafc;
+  --hr-hero-sheen: rgba(0, 193, 179, 0.13);
+  --hr-hero-ink: #07111f;
+  --hr-hero-muted: #475569;
+  --hr-hero-kicker: #1d6f86;
+  --hr-hero-panel-bg: #ffffff;
+  --hr-hero-panel-cell: #f1f5f9;
+  --hr-hero-panel-code: #0b1220;
+  --hr-hero-panel-line: #d9dde5;
+  --hr-hero-panel-muted: #64748b;
+  --hr-hero-code-comment: #8ea0b8;
 }
 
 .md-main__inner:has(.landing-hero) {
@@ -56,8 +78,8 @@
   align-items: center;
   margin: 0 calc(50% - 50vw) 0;
   padding: clamp(3rem, 7vw, 5.25rem) max(1.5rem, calc((100vw - 1180px) / 2)) 3.6rem;
-  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0)), var(--hr-dark);
-  color: #fff;
+  background: linear-gradient(180deg, var(--hr-hero-sheen), rgba(255,255,255,0)), var(--hr-hero-bg);
+  color: var(--hr-hero-ink);
 }
 
 .hero-logo {
@@ -71,7 +93,7 @@
   align-items: center;
   gap: 0.55rem;
   margin: 0 0 1.1rem;
-  color: #b8c4d6;
+  color: var(--hr-hero-kicker);
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -88,7 +110,7 @@
 .landing-hero h1 {
   max-width: 820px;
   margin: 0 0 1.4rem;
-  color: #fff;
+  color: var(--hr-hero-ink);
   font-size: clamp(2.45rem, 5vw, 4.45rem);
   font-weight: 760;
   letter-spacing: -0.05em;
@@ -98,7 +120,7 @@
 .hero-copy > p:not(.hero-kicker) {
   max-width: 660px;
   margin: 0 0 2rem;
-  color: #c4cedc;
+  color: var(--hr-hero-muted);
   font-size: clamp(1.02rem, 1.45vw, 1.23rem);
   line-height: 1.62;
 }
@@ -127,9 +149,9 @@
   max-width: 440px;
   justify-self: end;
   padding: 1rem;
-  border: 1px solid var(--hr-line-dark);
+  border: 1px solid var(--hr-hero-panel-line);
   border-radius: 24px;
-  background: var(--hr-dark-2);
+  background: var(--hr-hero-panel-bg);
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.35);
 }
 
@@ -139,7 +161,7 @@
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1rem;
-  color: #dbe7f5;
+  color: var(--hr-hero-ink);
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -162,9 +184,9 @@
 
 .metric-grid div {
   padding: 1rem;
-  border: 1px solid var(--hr-line-dark);
+  border: 1px solid var(--hr-hero-panel-line);
   border-radius: 16px;
-  background: var(--hr-dark-3);
+  background: var(--hr-hero-panel-cell);
 }
 
 .metric-grid strong,
@@ -174,14 +196,14 @@
 
 .metric-grid strong {
   margin-bottom: 0.25rem;
-  color: #fff;
+  color: var(--hr-hero-ink);
   font-size: 2rem;
   line-height: 1;
   letter-spacing: -0.04em;
 }
 
 .metric-grid span {
-  color: #a7b4c5;
+  color: var(--hr-hero-panel-muted);
   font-size: 0.74rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -190,9 +212,9 @@
 .hero-panel .highlight,
 .hero-panel pre {
   margin: 0;
-  border: 1px solid var(--hr-line-dark) !important;
+  border: 1px solid var(--hr-hero-panel-line) !important;
   border-radius: 16px;
-  background: #05080d !important;
+  background: var(--hr-hero-panel-code) !important;
   color: #dbe7f5;
 }
 
@@ -210,7 +232,7 @@
 .hero-panel .highlight .c,
 .hero-panel .highlight .c1,
 .hero-panel .highlight .cm {
-  color: #7d8da3 !important;
+  color: var(--hr-hero-code-comment) !important;
 }
 
 .hero-panel .highlight .mi,
@@ -609,17 +631,24 @@
 }
 
 .md-typeset .tabbed-labels {
-  background: #f8fafc;
+  background: var(--hr-soft);
 }
 
 .md-typeset .tabbed-labels > label {
   min-height: 3rem;
   padding-inline: 1rem;
+  color: var(--hr-muted);
   font-weight: 780;
+}
+
+.md-typeset .tabbed-set > input:checked + label,
+.md-typeset .tabbed-labels > label:hover {
+  color: var(--hr-ink);
 }
 
 .md-typeset .tabbed-block {
   padding: 1.25rem 1.35rem 1.35rem;
+  background: var(--md-default-bg-color);
 }
 
 .md-typeset .tabbed-block > :first-child {

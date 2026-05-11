@@ -56,8 +56,16 @@ Detailed reference material for heliaRT internals, configuration, and infrastruc
 
     ---
 
-    Automatically generated build artefacts and how they are produced.
+    Automatically generated build artifacts and how they are produced.
 
     [:octicons-arrow-right-24: Generated Files](generated-files.md)
+
+- :material-scale-balance:{ .lg .middle } **Attribution and Trademarks**
+
+    ---
+
+    License scope, upstream attribution, and Google/LiteRT non-affiliation notes.
+
+    [:octicons-arrow-right-24: Attribution](attribution.md)
 
 </div>
