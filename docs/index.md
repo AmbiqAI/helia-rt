@@ -200,7 +200,7 @@ CMSIS-NN covers the common convolutional core. HELIA adds optimized paths for ac
 
 ## Start with the runtime path. Grow into ahead-of-time deployment.
 
-heliaRT is part of Ambiq's broader **HELIA AI platform**: silicon-adjacent tools for bringing trained models onto Apollo-class devices. Use heliaRT when your application already follows the LiteRT workflow, or heliaTorch when your team is coming from ExecuTorch.
+heliaRT is part of Ambiq's broader **HELIA AI platform**: silicon-adjacent tools for bringing trained models onto Apollo-class devices. Use heliaRT when your application already follows the LiteRT workflow and you want a familiar runtime path onto Ambiq silicon.
 
 As models and products mature, **heliaAOT** opens a deeper deployment path: Ambiq's ahead-of-time compiler for teams that want to move beyond runtime integration and generate device-oriented inference code.
 
@@ -211,7 +211,6 @@ As models and products mature, **heliaAOT** opens a deeper deployment path: Ambi
 <div class="platform-stack" markdown>
 
 <div class="stack-row stack-row--active"><span>RT</span><strong>heliaRT</strong><em>LiteRT runtime path</em></div>
-<div class="stack-row"><span>Torch</span><strong>heliaTorch</strong><em>ExecuTorch runtime path</em></div>
 <a class="stack-row stack-row--aot" href="https://ambiqai.github.io/helia-aot/" target="_blank" rel="noopener"><span>AOT</span><strong>heliaAOT</strong><em>ahead-of-time compiler</em></a>
 
 </div>
