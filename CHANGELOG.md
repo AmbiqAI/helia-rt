@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.1](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.13.0...heliaRT-v1.13.1) (2026-05-12)
+
+
+### Bug Fixes
+
+* **zephyr:** define CMSIS_NN for HELIA backend to prevent kernel redefinition ([#139](https://github.com/AmbiqAI/helia-rt/issues/139)) ([6ca8157](https://github.com/AmbiqAI/helia-rt/commit/6ca8157221c77c3c3c4fd0e83c43e757f3a5f025))
+
 ## [1.13.0](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.12.2...heliaRT-v1.13.0) (2026-05-11)
 
 
