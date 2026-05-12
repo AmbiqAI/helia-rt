@@ -42,6 +42,9 @@ if(CONFIG_HELIA_RT)
     set(HELIA_RT_OPTIMIZED_KERNEL_DIR helia)
     zephyr_library_compile_definitions(NS_CMSIS_NN)
     zephyr_library_compile_definitions(HELIA)
+    # HELIA kernels provide the same optimized registration functions as CMSIS-NN.
+    # Define CMSIS_NN so headers emit declarations (not inline fallbacks).
+    zephyr_library_compile_definitions(CMSIS_NN)
   endif()
 
   if(HELIA_RT_EXTERNAL_KERNEL_MODULE_DIR)
