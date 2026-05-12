@@ -8,7 +8,7 @@ heliaRT supports three toolchains for Cortex-M targets. All three are tested in 
 |---|---|---|---|---|
 | **GCC** (arm-none-eabi-gcc) | `gcc` | Open source | Baseline | Default, broadest availability |
 | **Arm Compiler 6** (armclang) | `armclang` | Commercial | ~5–15 % faster | Keil MDK shops |
-| **ATfE** (Arm Toolchain for Embedded) | `atfe` | **Open source** | **~10–20 % faster** | **Recommended** |
+| **ATfE** (Arm Toolchain for Embedded) | `atfe` | **Open source** | **8–24 % faster** | **Recommended** |
 
 !!! success "Recommended: ATfE"
     ATfE is LLVM-based, fully open-source, and actively maintained by Arm. It produces measurably faster code than GCC on Cortex-M55 MVE workloads — without any licensing cost.
