@@ -57,10 +57,11 @@ jobs:
           path: tensorflow/lite/micro/tools/make/downloads
           key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc','tensorflow/lite/micro/tools/make/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/helia.inc') }}
 
-      # ccache massively reduces wall-clock for incremental PR pushes
-      # (~3x speedup with a warm cache). Install in-workflow for now;
-      # baking it into .devcontainer/Dockerfile is a follow-up.
-      - name: Install ccache
+      # ccache is baked into the CI image (.devcontainer/Dockerfile), but
+      # keep an apt-get fallback so this workflow still works when running
+      # against an older :latest image (e.g. during image rollout, since the
+      # image build job is not a `needs:` dependency of this workflow).
+      - name: Ensure ccache
         run: |
           if ! command -v ccache >/dev/null 2>&1; then
             apt-get update && apt-get install -y --no-install-recommends ccache

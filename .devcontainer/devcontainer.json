@@ -27,7 +27,12 @@
             ]
         }
     },
+    "remoteEnv": {
+        "GH_TOKEN": "${localEnv:GH_TOKEN}",
+        "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}"
+    },
     "postCreateCommand": "./.devcontainer/install.sh",
+    "postStartCommand": "./.devcontainer/post-start.sh",
     "features": {
         "ghcr.io/devcontainers/features/github-cli:1": {
             "installDirectlyFromGitHubRelease": true,
