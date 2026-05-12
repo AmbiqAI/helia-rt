@@ -156,4 +156,6 @@ Continue with [Zephyr example](../examples/zephyr.md) for:
 - minimal bring-up code
 - build, flash, and log commands
 
+For controlling where the model flatbuffer and tensor arena live in memory on Apollo SoCs, see [Memory Placement](../guides/memory-placement.md).
+
 </div>
