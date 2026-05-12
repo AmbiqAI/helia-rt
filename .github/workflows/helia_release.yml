@@ -38,12 +38,26 @@ concurrency:
   group: helia-release-${{ inputs.tag || inputs.ref || github.sha }}
   cancel-in-progress: false
 
+# The CI image is resolved by the `ci-image` setup job below and consumed via
+# `needs.ci-image.outputs.image`. `container.image` does not support the `env`
+# context, so a tiny setup job is the cleanest way to keep a single pin point.
+# Bump the image tag in that one job. See .github/workflows/README.md.
+
 jobs:
+  ci-image:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+    steps:
+      - id: image
+        run: echo "image=ghcr.io/ambiqai/helia-rt-ci:latest" >> "$GITHUB_OUTPUT"
+
   build:
     name: Build heliaRT (${{ matrix.arch }} • ${{ matrix.toolchain }} • ${{ matrix.build }})
+    needs: ci-image
     runs-on: ubuntu-latest-md
     container:
-      image: ghcr.io/ambiqai/helia-rt-ci:latest
+      image: ${{ needs.ci-image.outputs.image }}
     defaults:
       run:
         shell: bash
