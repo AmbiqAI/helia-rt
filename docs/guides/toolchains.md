@@ -13,7 +13,7 @@ heliaRT supports three toolchains for Cortex-M targets. All three are tested in 
 !!! success "Recommended: ATfE"
     ATfE is LLVM-based, fully open-source, and actively maintained by Arm. It produces measurably faster code than GCC on Cortex-M55 MVE workloads — without any licensing cost.
 
-    [:octicons-link-external-16: ATfE on GitHub](https://github.com/nicowilliams/llvm-project-armfe){ target="_blank" }
+    [:octicons-link-external-16: ATfE on GitHub](https://github.com/arm/arm-toolchain){ target="_blank" }
 
 ## Installation
 

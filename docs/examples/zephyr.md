@@ -400,7 +400,7 @@ The examples below use Apollo510 EVB; substitute your board and app source path 
 
 === "ATfE (recommended)"
 
-    [ATfE](https://github.com/nicowilliams/llvm-project-armfe) (Arm Toolchain for Embedded) is LLVM-based and open-source.
+    [ATfE](https://github.com/arm/arm-toolchain) (Arm Toolchain for Embedded) is LLVM-based and open-source.
     On Cortex-M55 MVE workloads it produces **8–24 % faster** code than GCC.
 
     Point `LLVM_TOOLCHAIN_PATH` at the ATfE install root:
@@ -421,10 +421,6 @@ The examples below use Apollo510 EVB; substitute your board and app source path 
     | `-DCONFIG_LLVM_USE_LLD=y` | Use LLD instead of GNU ld |
     | `-DCONFIG_COMPILER_RT_RTLIB=y` | Link compiler-rt instead of libgcc |
 
-
-!!! tip "Prebuilt module & toolchain matching"
-    When using the **prebuilt release module**, the Zephyr module automatically selects the correct `.a` archive
-    based on the active toolchain variant (`gcc` or `atfe`). No additional configuration is needed.
 
 ## 5. Flash
 
