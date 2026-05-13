@@ -78,9 +78,23 @@ heliaRT supports three toolchains for Cortex-M targets. All three are tested in 
 === "Zephyr"
 
     Zephyr toolchain selection is handled by `ZEPHYR_TOOLCHAIN_VARIANT` and is independent of heliaRT.
+    The prebuilt module auto-selects the matching archive for `gcc`or `atfe`.
+
+    For full build commands and per-toolchain flags, see
+    [Zephyr + heliaRT → Build](../examples/zephyr.md#4-build).
+
+    Quick reference:
 
     ```bash
-    west build -b apollo510_evb -- -DZEPHYR_TOOLCHAIN_VARIANT=gnuarmemb
+    # GCC (default — no extra flags)
+    west build -b apollo510_evb -s app/helia_rt_app
+
+    # ATfE
+    west build -b apollo510_evb -s app/helia_rt_app -- \
+      -DZEPHYR_TOOLCHAIN_VARIANT=host/llvm \
+      -DLLVM_TOOLCHAIN_PATH=/path/to/ATfE \
+      -DCONFIG_LLVM_USE_LLD=y -DCONFIG_COMPILER_RT_RTLIB=y
+
     ```
 
 ## CI Matrix
