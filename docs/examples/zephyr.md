@@ -25,7 +25,7 @@ This guide assumes a workspace like:
 Known-good versions:
 
 - **Zephyr:** 4.3
-- **Zephyr SDK:** zephyr-sdk-0.17.4
+- **Zephyr SDK:** zephyr-sdk-1.0.1
 
 !!! note
 
@@ -378,16 +378,58 @@ int main() {
 
 ## 4. Build
 
-Example build for Apollo510 EVB:
+The examples below use Apollo510 EVB; substitute your board and app source path as needed.
 
-```bash
-west build -p always -b apollo510_evb -s app/helia_rt_app -d build/helia_rt_app
-```
+=== "GCC (default)"
+
+    GCC is the Zephyr default. No extra flags are required when `ZEPHYR_TOOLCHAIN_VARIANT` is unset or set to `zephyr`.
+
+    ```bash
+    west build -p always -b apollo510_evb \
+      -s app/helia_rt_app -d build/helia_rt_app_gcc
+    ```
+
+    If you installed the Arm GNU Toolchain separately (outside the Zephyr SDK), set the variant explicitly:
+
+    ```bash
+    west build -p always -b apollo510_evb \
+      -s app/helia_rt_app -d build/helia_rt_app_gcc \
+      -- -DZEPHYR_TOOLCHAIN_VARIANT=gnuarmemb \
+         -DGNUARMEMB_TOOLCHAIN_PATH=/path/to/gcc-arm-none-eabi
+    ```
+
+=== "ATfE (recommended)"
+
+    [ATfE](https://github.com/arm/arm-toolchain) (Arm Toolchain for Embedded) is LLVM-based and open-source.
+    On Cortex-M55 + Helium workloads it produces code that is **up to 25 % more efficient**[^atfe-bench] than GCC — fewer cycles *and* more inferences per Joule.
+
+    Point `LLVM_TOOLCHAIN_PATH` at the ATfE install root:
+
+    ```bash
+    west build -p always -b apollo510_evb \
+      -s app/helia_rt_app -d build/helia_rt_app_atfe \
+      -- -DZEPHYR_TOOLCHAIN_VARIANT=host/llvm \
+         -DLLVM_TOOLCHAIN_PATH=/path/to/ATfE-<version> \
+         -DCONFIG_LLVM_USE_LLD=y \
+         -DCONFIG_COMPILER_RT_RTLIB=y
+    ```
+
+    | Flag | Purpose |
+    |---|---|
+    | `-DZEPHYR_TOOLCHAIN_VARIANT=host/llvm` | Select the host LLVM toolchain variant |
+    | `-DLLVM_TOOLCHAIN_PATH=...` | Root of the ATfE installation (contains `bin/`, `lib/`, …) |
+    | `-DCONFIG_LLVM_USE_LLD=y` | Use LLD instead of GNU ld |
+    | `-DCONFIG_COMPILER_RT_RTLIB=y` | Link compiler-rt instead of libgcc |
+
+[^atfe-bench]:
+    Measured across the [MLPerf Tiny v1.1](https://mlcommons.org/benchmarks/inference-tiny/) reference suite on the Apollo510 EVB (Cortex-M55 + Helium @ 192 MHz, 10 iterations) using heliaRT v1.13.1. Latency derived from PMU cycles; energy captured with a Joulescope. Compilers: ATfE 22.1 vs `arm-none-eabi-gcc` 14.2. Headline **"up to 25 %"** refers to the inferences-per-Joule improvement on Image Classification (ResNet, +24.4 %, rounded). Every model also ran with **lower latency** under ATfE (4 %–13 % fewer cycles) and **lower energy per inference** (6 %–20 %). See [Toolchains → Why ATfE](../guides/toolchains.md#why-atfe) for the full per-model table.
 
 ## 5. Flash
 
 ```bash
-west flash -d build/helia_rt_app
+# Substitute the build directory you used in step 4
+# (e.g. build/helia_rt_app_gcc or build/helia_rt_app_atfe)
+west flash -d build/helia_rt_app_gcc
 ```
 
 ## 6. View logs

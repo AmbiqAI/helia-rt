@@ -662,8 +662,23 @@
 .resource-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: 0.5rem 1.25rem;
   margin-top: 1rem;
+}
+
+.resource-links p {
+  display: contents;
+}
+
+.resource-links a {
+  position: relative;
+}
+
+.resource-links a + a::before {
+  content: '·';
+  margin-right: 1rem;
+  color: var(--hr-muted);
+  font-weight: 700;
 }
 
 .final-links {
@@ -1261,4 +1276,177 @@ code {
 .mermaid svg {
   display: block;
   margin: 0 auto;
+}
+
+/* ============================================================
+   Performance badge — animated ATfE speedup callout
+   ============================================================ */
+
+@property --perf-count {
+  syntax: '<integer>';
+  initial-value: 0;
+  inherits: false;
+}
+
+.perf-badge {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  max-width: 30rem;
+  margin: 1.5rem 0 1rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--hr-accent) 55%, var(--hr-line));
+  border-radius: var(--hr-radius);
+  background:
+    radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--hr-accent) 14%, transparent) 0%, transparent 60%),
+    var(--hr-soft);
+  box-shadow:
+    0 0 40px -6px color-mix(in srgb, var(--hr-accent) 28%, transparent),
+    0 14px 36px rgba(11, 18, 32, 0.07);
+  position: relative;
+  text-decoration: none !important;
+  color: inherit;
+  cursor: pointer;
+  animation: perf-aura 5s ease-in-out infinite;
+  transition: transform 0.18s ease, border-color 0.18s ease;
+}
+
+.perf-badge:hover,
+.perf-badge:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--hr-accent);
+}
+
+.perf-badge:focus-visible {
+  outline: 2px solid var(--hr-accent);
+  outline-offset: 3px;
+}
+
+.perf-badge:hover .perf-badge__cta {
+  transform: translateX(3px);
+}
+
+.perf-badge::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--hr-accent) 80%, transparent),
+    transparent 50%,
+    color-mix(in srgb, var(--hr-accent-2, var(--hr-accent)) 60%, transparent));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.perf-badge__num {
+  --perf-count: 25;
+  counter-reset: perf var(--perf-count);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.perf-badge__label {
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--hr-muted);
+  margin-bottom: 0.25rem;
+}
+
+.perf-badge__value {
+  position: relative;
+  font-family: var(--md-code-font, ui-monospace, monospace);
+  font-size: clamp(2.6rem, 6.5vw, 3.4rem);
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  color: var(--hr-accent);
+  white-space: nowrap;
+}
+
+.perf-badge__value::after { content: counter(perf) '%'; }
+
+.perf-badge__value::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.18rem;
+  height: 0.28rem;
+  border-radius: 0.14rem;
+  background: var(--hr-accent);
+  opacity: 0.85;
+}
+
+.perf-badge__sr {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0);
+  white-space: nowrap; border: 0;
+}
+
+.perf-badge__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.perf-badge__copy strong {
+  color: var(--hr-ink);
+  font-size: 1.02rem;
+  font-weight: 850;
+  line-height: 1.2;
+}
+.perf-badge__copy em {
+  color: var(--hr-muted);
+  font-style: normal;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+.perf-badge__copy em code {
+  font-size: 0.76rem;
+  padding: 0.05rem 0.35rem;
+}
+
+.perf-badge__cta {
+  position: absolute;
+  right: 1rem;
+  bottom: 0.65rem;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--hr-accent-2, var(--hr-accent));
+  transition: transform 0.18s ease;
+}
+
+@keyframes perf-aura {
+  0%, 100% {
+    box-shadow:
+      0 0 36px -8px color-mix(in srgb, var(--hr-accent) 22%, transparent),
+      0 14px 36px rgba(11, 18, 32, 0.07);
+  }
+  50% {
+    box-shadow:
+      0 0 56px -4px color-mix(in srgb, var(--hr-accent) 42%, transparent),
+      0 14px 36px rgba(11, 18, 32, 0.07);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .perf-badge { animation: none; }
+}
+
+@media (max-width: 36rem) {
+  .perf-badge { max-width: 100%; }
+  .perf-badge__value { font-size: clamp(2.2rem, 12vw, 2.8rem); }
 }

@@ -8,7 +8,8 @@ hide:
 
 <div class="hero-copy" markdown>
 
-![heliaRT](./assets/helia-rt-banner-dark.png){ .hero-logo width="260" }
+![heliaRT](./assets/helia-rt-banner-dark.png#only-light){ .hero-logo width="260" }
+![heliaRT](./assets/helia-rt-banner-light.png#only-dark){ .hero-logo width="260" }
 
 <p class="hero-kicker"><span></span> HELIA AI runtime for Ambiq silicon</p>
 
@@ -151,6 +152,19 @@ heliaRT sits between your LiteRT application and Ambiq silicon. It keeps the ups
 
 Every release is built across architecture, toolchain, and build-type combinations. **ATfE** is the recommended path for Cortex-M55 + MVE workloads, with GCC and Arm Compiler 6 available for teams that already standardize there.
 
+<a href="guides/toolchains/#why-atfe" class="perf-badge" aria-label="ATfE up to 25 percent more efficient than GCC on Cortex-M55 Helium — read why ATfE">
+  <span class="perf-badge__num" aria-hidden="true">
+    <span class="perf-badge__label">up to</span>
+    <span class="perf-badge__value"></span>
+  </span>
+  <span class="perf-badge__sr">Up to 25%</span>
+  <span class="perf-badge__copy">
+    <strong>more efficient than GCC</strong>
+    <em>ATfE on Cortex-M55 + Helium.</em>
+  </span>
+  <span class="perf-badge__cta" aria-hidden="true">Why ATfE &rarr;</span>
+</a>
+
 [Read the toolchain guide](guides/toolchains.md){ .text-link }
 
 </div>
@@ -251,7 +265,9 @@ As models and products mature, **heliaAOT** opens a deeper deployment path: Ambi
 
 <div class="resource-links" markdown>
 [Full Zephyr guide](getting-started/zephyr.md){ .text-link }
+
 [All getting started paths](getting-started/index.md){ .text-link }
+
 [Upgrade from upstream LiteRT](guides/upgrading-from-litert.md){ .text-link }
 </div>
 
