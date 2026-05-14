@@ -8,7 +8,8 @@ hide:
 
 <div class="hero-copy" markdown>
 
-![heliaRT](./assets/helia-rt-banner-dark.png){ .hero-logo width="260" }
+![heliaRT](./assets/helia-rt-banner-dark.png#only-light){ .hero-logo width="260" }
+![heliaRT](./assets/helia-rt-banner-light.png#only-dark){ .hero-logo width="260" }
 
 <p class="hero-kicker"><span></span> HELIA AI runtime for Ambiq silicon</p>
 
