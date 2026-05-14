@@ -1348,7 +1348,7 @@ code {
   counter-reset: perf var(--perf-count);
   display: inline-flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   line-height: 1;
   flex-shrink: 0;
 }
