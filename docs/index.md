@@ -160,7 +160,7 @@ Every release is built across architecture, toolchain, and build-type combinatio
   <span class="perf-badge__sr">Up to 25%</span>
   <span class="perf-badge__copy">
     <strong>more efficient than GCC</strong>
-    <em>ATfE on Apollo510 (Cortex-M55 + Helium) — fewer cycles and more inferences per Joule across the MLPerf Tiny suite.</em>
+    <em>ATfE on Cortex-M55 + Helium.</em>
   </span>
   <span class="perf-badge__cta" aria-hidden="true">Why ATfE &rarr;</span>
 </a>
