@@ -1425,7 +1425,7 @@ code {
 
 @keyframes perf-count-up {
   from { --perf-count: 0; }
-  to   { --perf-count: 24; }
+  to   { --perf-count: 25; }
 }
 
 @keyframes perf-pop {

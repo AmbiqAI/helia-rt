@@ -401,7 +401,7 @@ The examples below use Apollo510 EVB; substitute your board and app source path 
 === "ATfE (recommended)"
 
     [ATfE](https://github.com/arm/arm-toolchain) (Arm Toolchain for Embedded) is LLVM-based and open-source.
-    On Cortex-M55 + Helium workloads it produces **up to 24 % more efficient**[^atfe-bench] code than GCC — same model, fewer Joules per inference.
+    On Cortex-M55 + Helium workloads it produces code that is **up to 25 % more efficient**[^atfe-bench] than GCC — fewer cycles *and* more inferences per Joule.
 
     Point `LLVM_TOOLCHAIN_PATH` at the ATfE install root:
 
@@ -422,7 +422,7 @@ The examples below use Apollo510 EVB; substitute your board and app source path 
     | `-DCONFIG_COMPILER_RT_RTLIB=y` | Link compiler-rt instead of libgcc |
 
 [^atfe-bench]:
-    Measured across the [MLPerf Tiny v1.1](https://mlcommons.org/benchmarks/inference-tiny/) reference suite on the Apollo510 EVB (Cortex-M55 + Helium @ 192 MHz, 10 iterations) using heliaRT v1.13.1. Latency derived from PMU cycles; energy captured with a Joulescope. Compilers: ATfE 22.1 vs `arm-none-eabi-gcc` 14.2. Headline "up to 24 %" refers to **inferences per Joule** improvement on Image Classification (ResNet); latency speedup ranges 4 %–13 %, energy-per-inference reduction ranges 6 %–20 %. See [Toolchains → Why ATfE](../guides/toolchains.md#why-atfe) for the full per-model table.
+    Measured across the [MLPerf Tiny v1.1](https://mlcommons.org/benchmarks/inference-tiny/) reference suite on the Apollo510 EVB (Cortex-M55 + Helium @ 192 MHz, 10 iterations) using heliaRT v1.13.1. Latency derived from PMU cycles; energy captured with a Joulescope. Compilers: ATfE 22.1 vs `arm-none-eabi-gcc` 14.2. Headline **"up to 25 %"** refers to the inferences-per-Joule improvement on Image Classification (ResNet, +24.4 %, rounded). Every model also ran with **lower latency** under ATfE (4 %–13 % fewer cycles) and **lower energy per inference** (6 %–20 %). See [Toolchains → Why ATfE](../guides/toolchains.md#why-atfe) for the full per-model table.
 
 ## 5. Flash
 

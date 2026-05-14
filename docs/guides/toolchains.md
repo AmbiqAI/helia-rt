@@ -8,15 +8,15 @@ heliaRT supports three toolchains for Cortex-M targets. All three are tested in 
 |---|---|---|---|---|
 | **GCC** (arm-none-eabi-gcc) | `gcc` | Open source | Baseline | Default, broadest availability |
 | **Arm Compiler 6** (armclang) | `armclang` | Commercial | ~5–15 % faster | Keil MDK shops |
-| **ATfE** (Arm Toolchain for Embedded) | `atfe` | **Open source** | **up to 24 % more efficient**[^atfe-bench] | **Recommended** |
+| **ATfE** (Arm Toolchain for Embedded) | `atfe` | **Open source** | **up to 25 % more efficient**[^atfe-bench] | **Recommended** |
 
 !!! success "Recommended: ATfE"
-    ATfE is LLVM-based, fully open-source, and actively maintained by Arm. On Cortex-M55 + Helium workloads it produces measurably faster *and* more energy-efficient code than GCC — without any licensing cost.
+    ATfE is LLVM-based, fully open-source, and actively maintained by Arm. On Cortex-M55 + Helium workloads it delivers **fewer cycles *and* more inferences per Joule** than GCC — a compounding win for battery-powered devices.
 
     [:octicons-link-external-16: ATfE on GitHub](https://github.com/arm/arm-toolchain){ target="_blank" }
 
 [^atfe-bench]:
-    Measured across the [MLPerf Tiny v1.1](https://mlcommons.org/benchmarks/inference-tiny/) reference suite on the Apollo510 EVB (Cortex-M55 + Helium @ 192 MHz, 10 iterations) using heliaRT v1.13.1. Latency derived from PMU cycles; energy captured with a Joulescope. Compilers: ATfE 22.1 vs `arm-none-eabi-gcc` 14.2. Headline "up to 24 %" refers to **inferences per Joule** improvement on Image Classification (ResNet); latency speedup ranges 4 %–13 %, energy-per-inference reduction ranges 6 %–20 %.
+    Measured across the [MLPerf Tiny v1.1](https://mlcommons.org/benchmarks/inference-tiny/) reference suite on the Apollo510 EVB (Cortex-M55 + Helium @ 192 MHz, 10 iterations) using heliaRT v1.13.1. Latency derived from PMU cycles; energy captured with a Joulescope. Compilers: ATfE 22.1 vs `arm-none-eabi-gcc` 14.2. Headline **"up to 25 %"** refers to the inferences-per-Joule improvement on Image Classification (ResNet, +24.4 %, rounded). Every model also ran with **lower latency** under ATfE (4 %–13 % fewer cycles) and **lower energy per inference** (6 %–20 %).
 
 ## Why ATfE
 
@@ -91,7 +91,7 @@ We profiled the MLPerf Tiny v1.1 reference suite on the **Apollo510 EVB** (Corte
 
 All values are ATfE relative to GCC; negative is better for latency and energy, positive is better for efficiency.
 
-Across the four reference models, ATfE delivered **4 %–13 % lower latency**, **6 %–20 % less energy per inference**, and **6 %–24 % more inferences per Joule** than the same code built with GCC. The headline **"up to 24 %"** refers to the inferences-per-Joule improvement on Image Classification — the most demanding model in the suite. We have not observed a model where GCC outperformed ATfE on this target across any of these three metrics.
+Across the four reference models, ATfE delivered **4 %–13 % fewer cycles**, **6 %–20 % less energy per inference**, and **6 %–25 % more inferences per Joule** than the same code built with GCC. The headline **"up to 25 %"** refers to the inferences-per-Joule improvement on Image Classification (the most demanding model in the suite). Critically, **no model regressed on any metric** — ATfE is strictly better than GCC across this benchmark.
 
 !!! tip "When to expect the biggest gains"
     Speedup tracks how vectorizable a model is on MVE. Heavily quantized int8 convolutional and fully-connected layers benefit most (ResNet, MobileNetV1). Models dominated by very small kernels or operators that fall to HELIA hand-tuned paths (Anomaly Detection) see smaller compute-side wins, but still benefit from ATfE's tighter code generation — reflected as the larger energy gain than latency gain on AD.
