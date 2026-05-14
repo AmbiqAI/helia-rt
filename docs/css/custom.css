@@ -1445,18 +1445,18 @@ code {
   50%      { opacity: 0.85; }
 }
 
-/* Fallback for browsers without @property support: show "24%" statically. */
+/* Fallback for browsers without @property support: show "25%" statically. */
 @supports not (background: paint(something)) {
   .perf-badge__num { animation: none; }
   .perf-badge__value { animation: none; }
-  .perf-badge__value::after { content: '24%'; }
+  .perf-badge__value::after { content: '25%'; }
   .perf-badge__value::before { transform: scaleX(1); animation: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .perf-badge__num { animation: none; }
   .perf-badge__value { animation: none; }
-  .perf-badge__value::after { content: '24%'; }
+  .perf-badge__value::after { content: '25%'; }
   .perf-badge__value::before { transform: scaleX(1); animation: none; }
   .perf-badge::before { animation: none; opacity: 0.5; }
 }
