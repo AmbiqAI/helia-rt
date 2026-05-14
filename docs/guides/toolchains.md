@@ -8,12 +8,15 @@ heliaRT supports three toolchains for Cortex-M targets. All three are tested in 
 |---|---|---|---|---|
 | **GCC** (arm-none-eabi-gcc) | `gcc` | Open source | Baseline | Default, broadest availability |
 | **Arm Compiler 6** (armclang) | `armclang` | Commercial | ~5–15 % faster | Keil MDK shops |
-| **ATfE** (Arm Toolchain for Embedded) | `atfe` | **Open source** | **8–24 % faster** | **Recommended** |
+| **ATfE** (Arm Toolchain for Embedded) | `atfe` | **Open source** | **up to 24 % faster**[^atfe-bench] | **Recommended** |
 
 !!! success "Recommended: ATfE"
     ATfE is LLVM-based, fully open-source, and actively maintained by Arm. It produces measurably faster code than GCC on Cortex-M55 MVE workloads — without any licensing cost.
 
     [:octicons-link-external-16: ATfE on GitHub](https://github.com/arm/arm-toolchain){ target="_blank" }
+
+[^atfe-bench]:
+    Measured across the [MLPerf Tiny v1.1](https://mlcommons.org/benchmarks/inference-tiny/) model suite on Apollo510 (Cortex-M55 + Helium) using heliaRT v1.13.1 with `heliaPROFILER`. Compilers: ATfE 22.1.0 vs arm-none-eabi-gcc 15.2.1. Per-model speedup ranges 8 %–24 %; "up to 24 %" reflects the best-case model in this matrix.
 
 ## Installation
 
@@ -37,7 +40,7 @@ heliaRT supports three toolchains for Cortex-M targets. All three are tested in 
 
 === "ATfE"
 
-    Download from the [Arm Toolchain for Embedded releases](https://github.com/nicowilliams/llvm-project-armfe/releases):
+    Download from the [Arm Toolchain for Embedded releases](https://github.com/arm/arm-toolchain/releases):
 
     ```bash
     # Example (adjust version and host OS)
@@ -78,7 +81,7 @@ heliaRT supports three toolchains for Cortex-M targets. All three are tested in 
 === "Zephyr"
 
     Zephyr toolchain selection is handled by `ZEPHYR_TOOLCHAIN_VARIANT` and is independent of heliaRT.
-    The prebuilt module auto-selects the matching archive for `gcc`or `atfe`.
+    The prebuilt module auto-selects the matching archive for `gcc` or `atfe`.
 
     For full build commands and per-toolchain flags, see
     [Zephyr + heliaRT → Build](../examples/zephyr.md#4-build).

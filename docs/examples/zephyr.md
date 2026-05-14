@@ -401,7 +401,7 @@ The examples below use Apollo510 EVB; substitute your board and app source path 
 === "ATfE (recommended)"
 
     [ATfE](https://github.com/arm/arm-toolchain) (Arm Toolchain for Embedded) is LLVM-based and open-source.
-    On Cortex-M55 MVE workloads it produces **8–24 % faster** code than GCC.
+    On Cortex-M55 MVE workloads it produces **up to 24 % faster**[^atfe-bench] code than GCC.
 
     Point `LLVM_TOOLCHAIN_PATH` at the ATfE install root:
 
@@ -421,6 +421,8 @@ The examples below use Apollo510 EVB; substitute your board and app source path 
     | `-DCONFIG_LLVM_USE_LLD=y` | Use LLD instead of GNU ld |
     | `-DCONFIG_COMPILER_RT_RTLIB=y` | Link compiler-rt instead of libgcc |
 
+[^atfe-bench]:
+    Measured across the [MLPerf Tiny v1.1](https://mlcommons.org/benchmarks/inference-tiny/) model suite on Apollo510 (Cortex-M55 + Helium) using heliaRT v1.13.1 with `heliaPROFILER`. Compilers: ATfE 22.1.0 vs arm-none-eabi-gcc 15.2.1. Per-model speedup ranges 8 %–24 %; "up to 24 %" reflects the best-case model in this matrix.
 
 ## 5. Flash
 
