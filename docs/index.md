@@ -151,7 +151,7 @@ heliaRT sits between your LiteRT application and Ambiq silicon. It keeps the ups
 
 Every release is built across architecture, toolchain, and build-type combinations. **ATfE** is the recommended path for Cortex-M55 + MVE workloads, with GCC and Arm Compiler 6 available for teams that already standardize there.
 
-<a href="guides/toolchains/" class="perf-badge" aria-label="ATfE up to 24 percent faster than GCC on Cortex-M55 MVE — read the toolchain guide">
+<a href="guides/toolchains/#why-atfe" class="perf-badge" aria-label="ATfE up to 24 percent faster than GCC on Cortex-M55 MVE — read why ATfE">
   <span class="perf-badge__num" aria-hidden="true">
     <span class="perf-badge__label">up to</span>
     <span class="perf-badge__value"></span>
@@ -161,7 +161,7 @@ Every release is built across architecture, toolchain, and build-type combinatio
     <strong>faster than GCC</strong>
     <em>ATfE on Cortex-M55 + Helium, measured on MLPerf Tiny v1.1 with <code>heliaPROFILER</code>.</em>
   </span>
-  <span class="perf-badge__cta" aria-hidden="true">Learn more &rarr;</span>
+  <span class="perf-badge__cta" aria-hidden="true">Why ATfE &rarr;</span>
 </a>
 
 [Read the toolchain guide](guides/toolchains.md){ .text-link }

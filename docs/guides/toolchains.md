@@ -18,6 +18,40 @@ heliaRT supports three toolchains for Cortex-M targets. All three are tested in 
 [^atfe-bench]:
     Measured across the [MLPerf Tiny v1.1](https://mlcommons.org/benchmarks/inference-tiny/) model suite on Apollo510 (Cortex-M55 + Helium) using heliaRT v1.13.1 with `heliaPROFILER`. Compilers: ATfE 22.1.0 vs arm-none-eabi-gcc 14.3.0. Per-model speedup ranges 8 %–24 %; "up to 24 %" reflects the best-case model in this matrix.
 
+## Why ATfE
+
+[ATfE](https://github.com/arm/arm-toolchain) (Arm Toolchain for Embedded) is Arm's LLVM-based, open-source toolchain for bare-metal embedded targets. On Cortex-M55 + Helium workloads it consistently outperforms `arm-none-eabi-gcc` for three reasons:
+
+- **MVE auto-vectorization.** LLVM's loop vectorizer targets the M-Profile Vector Extension (MVE / Helium) more aggressively than GCC at parity optimization levels, lighting up predicated vector paths on inner loops that GCC still emits as scalar.
+- **Picolib over newlib-nano.** ATfE ships [Picolibc](https://github.com/picolibc/picolibc), a modernized C library that is smaller, faster, and tuned for embedded LLVM workflows.
+- **compiler-rt builtins.** Arm-tuned soft-float and integer helpers replace `libgcc`, typically with better register usage on M-profile cores.
+
+### Measured performance
+
+We profiled the MLPerf Tiny v1.1 reference suite on the **Apollo510 EVB** (Cortex-M55 + Helium) using heliaRT v1.13.1 with `heliaPROFILER`:
+
+| Configuration | Value |
+|---|---|
+| heliaRT version | `v1.13.1` |
+| Hardware | Apollo510 EVB — Cortex-M55, Helium MVE |
+| Compilers | ATfE `22.1.0` vs `arm-none-eabi-gcc 14.3.0` |
+| Models | [MLPerf Tiny v1.1](https://mlcommons.org/benchmarks/inference-tiny/) — KWS, VWW, IC, AD |
+| Build | `release`, `-O3`, MVE enabled |
+| Measurement | `heliaPROFILER` — mean inference latency |
+
+Across the four reference models, ATfE produced **8 % – 24 % faster** inference than the same code built with GCC. The headline **"up to 24 %"** reflects the best-case model in this matrix; the lowest-impact model still showed an 8 % improvement. We have not observed a model where GCC outperformed ATfE on this target.
+
+!!! tip "When to expect the biggest gains"
+    Speedup tracks how vectorizable a model is on MVE. Heavily quantized int8 convolutional and fully-connected layers benefit most. Models dominated by elementwise activations or operators that fall to HELIA kernels (rather than compiler-emitted code) see smaller wins, because the hot path is already hand-tuned assembly underneath.
+
+### Trade-offs
+
+- **Newer toolchain.** ATfE is younger than GCC; expect occasional rough edges around uncommon link-script directives or proprietary SDK glue code.
+- **Picolibc instead of newlib.** Most projects work without changes, but if you rely on newlib-specific behavior (e.g. certain `_sbrk` patterns) you may need a small shim.
+- **No Arm Compiler 5 compatibility shims.** ATfE follows the modern LLVM toolchain conventions; legacy `armcc`-era assembly may need updates.
+
+For a full build walkthrough on Apollo510 + Zephyr, see [Zephyr + heliaRT → Build](../examples/zephyr.md#4-build).
+
 ## Installation
 
 === "GCC"
