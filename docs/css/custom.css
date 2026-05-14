@@ -1330,19 +1330,36 @@ code {
 }
 
 .perf-badge__value {
+  position: relative;
   font-family: var(--md-code-font, ui-monospace, monospace);
   font-size: clamp(2.6rem, 6.5vw, 3.4rem);
   font-weight: 900;
   line-height: 0.95;
   letter-spacing: -0.03em;
-  background: linear-gradient(135deg, var(--hr-accent), var(--hr-accent-2, var(--hr-accent)));
-  -webkit-background-clip: text;
-          background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--hr-accent);
   white-space: nowrap;
+  transform-origin: left center;
+  animation: perf-pop 1.8s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+  animation-delay: 0.2s;
 }
 
 .perf-badge__value::after { content: counter(perf) '%'; }
+
+.perf-badge__value::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.18rem;
+  height: 0.28rem;
+  border-radius: 0.14rem;
+  background: var(--hr-accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: perf-underline 1s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+  animation-delay: 1.4s;
+  opacity: 0.85;
+}
 
 .perf-badge__sr {
   position: absolute;
@@ -1380,6 +1397,18 @@ code {
   to   { --perf-count: 24; }
 }
 
+@keyframes perf-pop {
+  0%   { transform: scale(0.6); opacity: 0; }
+  60%  { transform: scale(1.12); opacity: 1; }
+  80%  { transform: scale(0.97); }
+  100% { transform: scale(1); }
+}
+
+@keyframes perf-underline {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
 @keyframes perf-glow {
   0%, 100% { opacity: 0.4; }
   50%      { opacity: 0.85; }
@@ -1388,12 +1417,16 @@ code {
 /* Fallback for browsers without @property support: show "24%" statically. */
 @supports not (background: paint(something)) {
   .perf-badge__num { animation: none; }
+  .perf-badge__value { animation: none; }
   .perf-badge__value::after { content: '24%'; }
+  .perf-badge__value::before { transform: scaleX(1); animation: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .perf-badge__num { animation: none; }
+  .perf-badge__value { animation: none; }
   .perf-badge__value::after { content: '24%'; }
+  .perf-badge__value::before { transform: scaleX(1); animation: none; }
   .perf-badge::before { animation: none; opacity: 0.5; }
 }
 
