@@ -401,7 +401,7 @@ The examples below use Apollo510 EVB; substitute your board and app source path 
 === "ATfE (recommended)"
 
     [ATfE](https://github.com/arm/arm-toolchain) (Arm Toolchain for Embedded) is LLVM-based and open-source.
-    On Cortex-M55 MVE workloads it produces **up to 24 % faster**[^atfe-bench] code than GCC.
+    On Cortex-M55 + Helium workloads it produces **up to 24 % more efficient**[^atfe-bench] code than GCC — same model, fewer Joules per inference.
 
     Point `LLVM_TOOLCHAIN_PATH` at the ATfE install root:
 
@@ -422,7 +422,7 @@ The examples below use Apollo510 EVB; substitute your board and app source path 
     | `-DCONFIG_COMPILER_RT_RTLIB=y` | Link compiler-rt instead of libgcc |
 
 [^atfe-bench]:
-    Measured across the [MLPerf Tiny v1.1](https://mlcommons.org/benchmarks/inference-tiny/) model suite on Apollo510 (Cortex-M55 + Helium) using heliaRT v1.13.1 with `heliaPROFILER`. Compilers: ATfE 22.1.0 vs arm-none-eabi-gcc 14.3.0. Per-model speedup ranges 8 %–24 %; "up to 24 %" reflects the best-case model in this matrix.
+    Measured across the [MLPerf Tiny v1.1](https://mlcommons.org/benchmarks/inference-tiny/) reference suite on the Apollo510 EVB (Cortex-M55 + Helium @ 192 MHz, 10 iterations) using heliaRT v1.13.1. Latency derived from PMU cycles; energy captured with a Joulescope. Compilers: ATfE 22.1 vs `arm-none-eabi-gcc` 14.2. Headline "up to 24 %" refers to **inferences per Joule** improvement on Image Classification (ResNet); latency speedup ranges 4 %–13 %, energy-per-inference reduction ranges 6 %–20 %. See [Toolchains → Why ATfE](../guides/toolchains.md#why-atfe) for the full per-model table.
 
 ## 5. Flash
 

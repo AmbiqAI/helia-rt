@@ -8,15 +8,15 @@ heliaRT supports three toolchains for Cortex-M targets. All three are tested in 
 |---|---|---|---|---|
 | **GCC** (arm-none-eabi-gcc) | `gcc` | Open source | Baseline | Default, broadest availability |
 | **Arm Compiler 6** (armclang) | `armclang` | Commercial | ~5–15 % faster | Keil MDK shops |
-| **ATfE** (Arm Toolchain for Embedded) | `atfe` | **Open source** | **up to 24 % faster**[^atfe-bench] | **Recommended** |
+| **ATfE** (Arm Toolchain for Embedded) | `atfe` | **Open source** | **up to 24 % more efficient**[^atfe-bench] | **Recommended** |
 
 !!! success "Recommended: ATfE"
-    ATfE is LLVM-based, fully open-source, and actively maintained by Arm. It produces measurably faster code than GCC on Cortex-M55 MVE workloads — without any licensing cost.
+    ATfE is LLVM-based, fully open-source, and actively maintained by Arm. On Cortex-M55 + Helium workloads it produces measurably faster *and* more energy-efficient code than GCC — without any licensing cost.
 
     [:octicons-link-external-16: ATfE on GitHub](https://github.com/arm/arm-toolchain){ target="_blank" }
 
 [^atfe-bench]:
-    Measured across the [MLPerf Tiny v1.1](https://mlcommons.org/benchmarks/inference-tiny/) model suite on Apollo510 (Cortex-M55 + Helium) using heliaRT v1.13.1 with `heliaPROFILER`. Compilers: ATfE 22.1.0 vs arm-none-eabi-gcc 14.3.0. Per-model speedup ranges 8 %–24 %; "up to 24 %" reflects the best-case model in this matrix.
+    Measured across the [MLPerf Tiny v1.1](https://mlcommons.org/benchmarks/inference-tiny/) reference suite on the Apollo510 EVB (Cortex-M55 + Helium @ 192 MHz, 10 iterations) using heliaRT v1.13.1. Latency derived from PMU cycles; energy captured with a Joulescope. Compilers: ATfE 22.1 vs `arm-none-eabi-gcc` 14.2. Headline "up to 24 %" refers to **inferences per Joule** improvement on Image Classification (ResNet); latency speedup ranges 4 %–13 %, energy-per-inference reduction ranges 6 %–20 %.
 
 ## Why ATfE
 
@@ -28,21 +28,71 @@ heliaRT supports three toolchains for Cortex-M targets. All three are tested in 
 
 ### Measured performance
 
-We profiled the MLPerf Tiny v1.1 reference suite on the **Apollo510 EVB** (Cortex-M55 + Helium) using heliaRT v1.13.1 with `heliaPROFILER`:
+We profiled the MLPerf Tiny v1.1 reference suite on the **Apollo510 EVB** (Cortex-M55 + Helium @ 192 MHz) using heliaRT v1.13.1 with `heliaPROFILER` for latency and a Joulescope for energy.
 
-| Configuration | Value |
+<canvas id="atfe-bench-chart" data-chart-config='{
+  "type": "bar",
+  "data": {
+    "labels": [
+      ["Keyword Spotting", "(DS-CNN)"],
+      ["Visual Wake Words", "(MobileNetV1)"],
+      ["Anomaly Detection", "(Deep Autoencoder)"],
+      ["Image Classification", "(ResNet)"]
+    ],
+    "datasets": [
+      {"label": "Latency reduction",       "data": [9.67, 12.53, 4.43, 10.49], "backgroundColor": "#00c1b3", "borderRadius": 4},
+      {"label": "Energy reduction",        "data": [5.92, 15.94, 12.05, 19.60], "backgroundColor": "#1d99ff", "borderRadius": 4},
+      {"label": "Efficiency improvement",  "data": [6.30, 18.96, 13.71, 24.38], "backgroundColor": "#7c4dff", "borderRadius": 4}
+    ]
+  },
+  "options": {
+    "indexAxis": "y",
+    "responsive": true,
+    "maintainAspectRatio": false,
+    "plugins": {
+      "legend": {"position": "top", "align": "start", "labels": {"boxWidth": 12, "boxHeight": 12, "padding": 14}},
+      "title": {"display": false},
+      "tooltip": {
+        "callbacks": {}
+      }
+    },
+    "scales": {
+      "x": {
+        "beginAtZero": true,
+        "title": {"display": true, "text": "Improvement over GCC 14.2 (%)"},
+        "grid": {"color": "rgba(0,0,0,0.06)"}
+      },
+      "y": {"grid": {"display": false}, "ticks": {"font": {"size": 12}}}
+    }
+  }
+}' style="width:100%;max-height:340px;height:340px;"></canvas>
+
+#### Configuration
+
+| Field | Value |
 |---|---|
 | heliaRT version | `v1.13.1` |
-| Hardware | Apollo510 EVB — Cortex-M55, Helium MVE |
-| Compilers | ATfE `22.1.0` vs `arm-none-eabi-gcc 14.3.0` |
-| Models | [MLPerf Tiny v1.1](https://mlcommons.org/benchmarks/inference-tiny/) — Keyword Spotting (KWS), Visual Wake Words (VWW), Image Classification (IC), Anomaly Detection (AD) |
+| Hardware | Apollo510 EVB — Cortex-M55, Helium MVE @ 192 MHz |
+| Compilers | ATfE `22.1` vs `arm-none-eabi-gcc 14.2` |
+| Models | [MLPerf Tiny v1.1](https://mlcommons.org/benchmarks/inference-tiny/) — Keyword Spotting (DS-CNN), Visual Wake Words (MobileNetV1), Anomaly Detection (Deep Autoencoder), Image Classification (ResNet) |
 | Build | `release`, `-O3`, MVE enabled |
-| Measurement | `heliaPROFILER` — mean inference latency |
+| Iterations | 10 per configuration, mean reported |
+| Latency | Derived from PMU cycle counts ÷ 192 MHz |
+| Energy | Joulescope capture, normalized per inference (latency × average power) |
 
-Across the four reference models, ATfE produced **8 % – 24 % faster** inference than the same code built with GCC. The headline **"up to 24 %"** reflects the best-case model in this matrix; the lowest-impact model still showed an 8 % improvement. We have not observed a model where GCC outperformed ATfE on this target.
+#### Per-model results
+
+| Model | Latency: GCC → ATfE | Energy/inf: GCC → ATfE | **Inferences / Joule** |
+|---|---|---|---|
+| Keyword Spotting (DS-CNN) | 10.43 → 9.42 ms (**−9.7 %**) | 65.2 → 61.3 µJ (**−5.9 %**) | **+6.3 %** |
+| Visual Wake Words (MobileNetV1) | 38.99 → 34.11 ms (**−12.5 %**) | 272.9 → 229.4 µJ (**−15.9 %**) | **+19.0 %** |
+| Anomaly Detection (Deep Autoencoder) | 0.719 → 0.687 ms (**−4.4 %**) | 4.99 → 4.39 µJ (**−12.1 %**) | **+13.7 %** |
+| Image Classification (ResNet) | 27.12 → 24.28 ms (**−10.5 %**) | 197.7 → 159.0 µJ (**−19.6 %**) | **+24.4 %** |
+
+Across the four reference models, ATfE delivered **4 %–13 % lower latency**, **6 %–20 % less energy per inference**, and **6 %–24 % more inferences per Joule** than the same code built with GCC. The headline **"up to 24 %"** refers to the inferences-per-Joule improvement on Image Classification — the most demanding model in the suite. We have not observed a model where GCC outperformed ATfE on this target across any of these three metrics.
 
 !!! tip "When to expect the biggest gains"
-    Speedup tracks how vectorizable a model is on MVE. Heavily quantized int8 convolutional and fully-connected layers benefit most. Models dominated by elementwise activations or operators that fall to HELIA kernels (rather than compiler-emitted code) see smaller wins, because the hot path is already hand-tuned assembly underneath.
+    Speedup tracks how vectorizable a model is on MVE. Heavily quantized int8 convolutional and fully-connected layers benefit most (ResNet, MobileNetV1). Models dominated by very small kernels or operators that fall to HELIA hand-tuned paths (Anomaly Detection) see smaller compute-side wins, but still benefit from ATfE's tighter code generation — reflected as the larger energy gain than latency gain on AD.
 
 ### Trade-offs
 
