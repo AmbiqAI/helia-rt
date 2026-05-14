@@ -1262,3 +1262,106 @@ code {
   display: block;
   margin: 0 auto;
 }
+
+/* ============================================================
+   Performance badge — animated ATfE speedup callout
+   ============================================================ */
+
+@property --perf-count {
+  syntax: '<integer>';
+  initial-value: 0;
+  inherits: false;
+}
+
+.perf-badge {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 1rem 1.1rem;
+  margin: 1.25rem 0 0.75rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--hr-accent) 55%, var(--hr-line));
+  border-radius: var(--hr-radius);
+  background:
+    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--hr-accent) 12%, transparent) 0%, transparent 55%),
+    var(--hr-soft);
+  box-shadow: 0 10px 30px rgba(11, 18, 32, 0.06);
+  position: relative;
+  overflow: hidden;
+}
+
+.perf-badge::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--hr-accent) 75%, transparent),
+    transparent 45%,
+    color-mix(in srgb, var(--hr-accent-2, var(--hr-accent)) 55%, transparent));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  opacity: 0.6;
+  pointer-events: none;
+  animation: perf-glow 3.6s ease-in-out infinite;
+}
+
+.perf-badge__num {
+  --perf-count: 0;
+  font-family: var(--md-code-font, ui-monospace, monospace);
+  font-size: clamp(2.4rem, 6vw, 3.1rem);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--hr-ink);
+  background: linear-gradient(135deg, var(--hr-accent), var(--hr-accent-2, var(--hr-accent)));
+  -webkit-background-clip: text;
+          background-clip: text;
+  -webkit-text-fill-color: transparent;
+  counter-reset: perf var(--perf-count);
+  animation: perf-count-up 1.8s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+  animation-delay: 0.25s;
+  white-space: nowrap;
+}
+
+.perf-badge__num::before { content: 'up to '; font-size: 0.42em; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.7; margin-right: 0.35em; vertical-align: 0.45em; -webkit-text-fill-color: var(--hr-muted); }
+.perf-badge__num::after { content: counter(perf) '%'; }
+
+.perf-badge__sr {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0);
+  white-space: nowrap; border: 0;
+}
+
+.perf-badge__copy { display: flex; flex-direction: column; gap: 0.2rem; }
+.perf-badge__copy strong { color: var(--hr-ink); font-size: 1rem; font-weight: 850; }
+.perf-badge__copy em { color: var(--hr-muted); font-style: normal; font-size: 0.84rem; line-height: 1.45; }
+.perf-badge__copy em code { font-size: 0.78rem; padding: 0.05rem 0.35rem; }
+.perf-badge__copy em a { color: var(--hr-accent-2, var(--hr-accent)); font-weight: 700; text-decoration: none; white-space: nowrap; }
+.perf-badge__copy em a:hover { text-decoration: underline; }
+
+@keyframes perf-count-up {
+  from { --perf-count: 0; }
+  to   { --perf-count: 24; }
+}
+
+@keyframes perf-glow {
+  0%, 100% { opacity: 0.45; }
+  50%      { opacity: 0.85; }
+}
+
+/* Fallback for browsers without @property support: show "24%" statically. */
+@supports not (background: paint(something)) {
+  .perf-badge__num { animation: none; }
+  .perf-badge__num::after { content: '24%'; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .perf-badge__num { animation: none; }
+  .perf-badge__num::after { content: '24%'; }
+  .perf-badge::before { animation: none; opacity: 0.5; }
+}
