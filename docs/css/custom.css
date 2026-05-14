@@ -1328,11 +1328,29 @@ code {
   animation: perf-glow 3.6s ease-in-out infinite;
 }
 
+/* Slow always-on diagonal shine sweep — eye-catching but not noisy. */
+.perf-badge::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 35%;
+  background: linear-gradient(115deg,
+    transparent 0%,
+    color-mix(in srgb, var(--hr-accent) 22%, transparent) 45%,
+    color-mix(in srgb, var(--hr-accent-2, var(--hr-accent)) 14%, transparent) 55%,
+    transparent 100%);
+  filter: blur(8px);
+  transform: translateX(-120%) skewX(-12deg);
+  animation: perf-shine 6s ease-in-out infinite;
+  animation-delay: 1.2s;
+  pointer-events: none;
+}
+
 .perf-badge__num {
-  --perf-count: 0;
+  --perf-count: 25;
   counter-reset: perf var(--perf-count);
-  animation: perf-count-up 1.8s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
-  animation-delay: 0.2s;
   display: inline-flex;
   flex-direction: column;
   align-items: flex-start;
@@ -1358,9 +1376,6 @@ code {
   letter-spacing: -0.03em;
   color: var(--hr-accent);
   white-space: nowrap;
-  transform-origin: left center;
-  animation: perf-pop 1.8s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
-  animation-delay: 0.2s;
 }
 
 .perf-badge__value::after { content: counter(perf) '%'; }
@@ -1374,10 +1389,6 @@ code {
   height: 0.28rem;
   border-radius: 0.14rem;
   background: var(--hr-accent);
-  transform: scaleX(0);
-  transform-origin: left center;
-  animation: perf-underline 1s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
-  animation-delay: 1.4s;
   opacity: 0.85;
 }
 
@@ -1423,42 +1434,22 @@ code {
   transition: transform 0.18s ease;
 }
 
-@keyframes perf-count-up {
-  from { --perf-count: 0; }
-  to   { --perf-count: 25; }
-}
-
-@keyframes perf-pop {
-  0%   { transform: scale(0.6); opacity: 0; }
-  60%  { transform: scale(1.12); opacity: 1; }
-  80%  { transform: scale(0.97); }
-  100% { transform: scale(1); }
-}
-
-@keyframes perf-underline {
-  from { transform: scaleX(0); }
-  to   { transform: scaleX(1); }
-}
-
 @keyframes perf-glow {
   0%, 100% { opacity: 0.4; }
   50%      { opacity: 0.85; }
 }
 
-/* Fallback for browsers without @property support: show "25%" statically. */
-@supports not (background: paint(something)) {
-  .perf-badge__num { animation: none; }
-  .perf-badge__value { animation: none; }
-  .perf-badge__value::after { content: '25%'; }
-  .perf-badge__value::before { transform: scaleX(1); animation: none; }
+/* Slow diagonal shine sweep — always-on, low-frequency so it's a glance-catcher
+   without being distracting. ~2s sweep, ~4s rest between passes. */
+@keyframes perf-shine {
+  0%   { transform: translateX(-120%) skewX(-12deg); }
+  35%  { transform: translateX(160%)  skewX(-12deg); }
+  100% { transform: translateX(160%)  skewX(-12deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .perf-badge__num { animation: none; }
-  .perf-badge__value { animation: none; }
-  .perf-badge__value::after { content: '25%'; }
-  .perf-badge__value::before { transform: scaleX(1); animation: none; }
   .perf-badge::before { animation: none; opacity: 0.5; }
+  .perf-badge::after  { animation: none; opacity: 0; }
 }
 
 @media (max-width: 36rem) {
