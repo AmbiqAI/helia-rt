@@ -23,7 +23,7 @@ heliaRT supports three toolchains for Cortex-M targets. All three are tested in 
 [ATfE](https://github.com/arm/arm-toolchain) (Arm Toolchain for Embedded) is Arm's LLVM-based, open-source toolchain for bare-metal embedded targets. On Cortex-M55 + Helium workloads it consistently outperforms `arm-none-eabi-gcc` for three reasons:
 
 - **MVE auto-vectorization.** LLVM's loop vectorizer targets the M-Profile Vector Extension (MVE / Helium) more aggressively than GCC at parity optimization levels, lighting up predicated vector paths on inner loops that GCC still emits as scalar.
-- **Picolib over newlib-nano.** ATfE ships [Picolibc](https://github.com/picolibc/picolibc), a modernized C library that is smaller, faster, and tuned for embedded LLVM workflows.
+- **Picolibc over newlib-nano.** ATfE ships [Picolibc](https://github.com/picolibc/picolibc), a modernized C library that is smaller, faster, and tuned for embedded LLVM workflows.
 - **compiler-rt builtins.** Arm-tuned soft-float and integer helpers replace `libgcc`, typically with better register usage on M-profile cores.
 
 ### Measured performance
@@ -35,7 +35,7 @@ We profiled the MLPerf Tiny v1.1 reference suite on the **Apollo510 EVB** (Corte
 | heliaRT version | `v1.13.1` |
 | Hardware | Apollo510 EVB — Cortex-M55, Helium MVE |
 | Compilers | ATfE `22.1.0` vs `arm-none-eabi-gcc 14.3.0` |
-| Models | [MLPerf Tiny v1.1](https://mlcommons.org/benchmarks/inference-tiny/) — KWS, VWW, IC, AD |
+| Models | [MLPerf Tiny v1.1](https://mlcommons.org/benchmarks/inference-tiny/) — Keyword Spotting (KWS), Visual Wake Words (VWW), Image Classification (IC), Anomaly Detection (AD) |
 | Build | `release`, `-O3`, MVE enabled |
 | Measurement | `heliaPROFILER` — mean inference latency |
 
@@ -131,7 +131,6 @@ For a full build walkthrough on Apollo510 + Zephyr, see [Zephyr + heliaRT → Bu
       -DZEPHYR_TOOLCHAIN_VARIANT=host/llvm \
       -DLLVM_TOOLCHAIN_PATH=/path/to/ATfE \
       -DCONFIG_LLVM_USE_LLD=y -DCONFIG_COMPILER_RT_RTLIB=y
-
     ```
 
 ## CI Matrix

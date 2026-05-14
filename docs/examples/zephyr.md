@@ -427,7 +427,9 @@ The examples below use Apollo510 EVB; substitute your board and app source path 
 ## 5. Flash
 
 ```bash
-west flash -d build/helia_rt_app
+# Substitute the build directory you used in step 4
+# (e.g. build/helia_rt_app_gcc or build/helia_rt_app_atfe)
+west flash -d build/helia_rt_app_gcc
 ```
 
 ## 6. View logs
