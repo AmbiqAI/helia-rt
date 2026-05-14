@@ -1300,20 +1300,21 @@ code {
   background:
     radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--hr-accent) 14%, transparent) 0%, transparent 60%),
     var(--hr-soft);
-  box-shadow: 0 14px 36px rgba(11, 18, 32, 0.07);
+  box-shadow:
+    0 0 40px -6px color-mix(in srgb, var(--hr-accent) 28%, transparent),
+    0 14px 36px rgba(11, 18, 32, 0.07);
   position: relative;
-  overflow: hidden;
   text-decoration: none !important;
   color: inherit;
   cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  animation: perf-aura 5s ease-in-out infinite;
+  transition: transform 0.18s ease, border-color 0.18s ease;
 }
 
 .perf-badge:hover,
 .perf-badge:focus-visible {
   transform: translateY(-2px);
   border-color: var(--hr-accent);
-  box-shadow: 0 20px 44px rgba(11, 18, 32, 0.12);
 }
 
 .perf-badge:focus-visible {
@@ -1338,28 +1339,7 @@ code {
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
           mask-composite: exclude;
-  opacity: 0.55;
-  pointer-events: none;
-  animation: perf-glow 3.6s ease-in-out infinite;
-}
-
-/* Slow always-on diagonal shine sweep — eye-catching but not noisy. */
-.perf-badge::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 35%;
-  background: linear-gradient(115deg,
-    transparent 0%,
-    color-mix(in srgb, var(--hr-accent) 22%, transparent) 45%,
-    color-mix(in srgb, var(--hr-accent-2, var(--hr-accent)) 14%, transparent) 55%,
-    transparent 100%);
-  filter: blur(8px);
-  transform: translateX(-120%) skewX(-12deg);
-  animation: perf-shine 6s ease-in-out infinite;
-  animation-delay: 1.2s;
+  opacity: 0.6;
   pointer-events: none;
 }
 
@@ -1449,22 +1429,21 @@ code {
   transition: transform 0.18s ease;
 }
 
-@keyframes perf-glow {
-  0%, 100% { opacity: 0.4; }
-  50%      { opacity: 0.85; }
-}
-
-/* Slow diagonal shine sweep — always-on, low-frequency so it's a glance-catcher
-   without being distracting. ~2s sweep, ~4s rest between passes. */
-@keyframes perf-shine {
-  0%   { transform: translateX(-120%) skewX(-12deg); }
-  35%  { transform: translateX(160%)  skewX(-12deg); }
-  100% { transform: translateX(160%)  skewX(-12deg); }
+@keyframes perf-aura {
+  0%, 100% {
+    box-shadow:
+      0 0 36px -8px color-mix(in srgb, var(--hr-accent) 22%, transparent),
+      0 14px 36px rgba(11, 18, 32, 0.07);
+  }
+  50% {
+    box-shadow:
+      0 0 56px -4px color-mix(in srgb, var(--hr-accent) 42%, transparent),
+      0 14px 36px rgba(11, 18, 32, 0.07);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .perf-badge::before { animation: none; opacity: 0.5; }
-  .perf-badge::after  { animation: none; opacity: 0; }
+  .perf-badge { animation: none; }
 }
 
 @media (max-width: 36rem) {
