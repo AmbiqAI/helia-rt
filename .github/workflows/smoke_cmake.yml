@@ -1,0 +1,117 @@
+name: cmake-ssot-smoke
+
+# Phase 1 smoke gate for the CMake source-of-truth (issue #147).
+# Validates that:
+#   1. cmake/helia_rt_sources.cmake loads in script mode for every backend.
+#   2. dump_manifest emits valid JSON with the expected schema.
+#   3. The top-level CMakeLists configures + builds helia_rt::reference on host clang.
+#   4. The upstream-sync invariant holds (no SSoT-time edits under tensorflow/, signal/,
+#      python/tflite_micro/).
+
+on:
+  pull_request:
+    paths:
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - 'tensorflow/lite/micro/**'
+      - 'signal/**'
+      - '.github/workflows/smoke_cmake.yml'
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  manifest:
+    name: dump_manifest (${{ matrix.backend }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [reference, cmsis_nn, helia]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cmake
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake
+      - name: Dump + validate JSON manifest
+        run: |
+          set -euo pipefail
+          cmake -DBACKEND=${{ matrix.backend }} -P cmake/dump_manifest.cmake \
+              > manifest.json
+          python3 -c "
+          import json, sys
+          d = json.load(open('manifest.json'))
+          assert d['schema'] == 'helia-rt-manifest-v1', d['schema']
+          assert d['backend'] == '${{ matrix.backend }}', d['backend']
+          assert len(d['include_dirs'])  >= 4
+          assert len(d['common_sources']) >= 30
+          assert len(d['kernel_sources']) >= 100
+          # Path well-formedness: nothing absolute, no '..'.
+          for s in d['common_sources'] + d['kernel_sources']:
+              assert not s.startswith('/'),  s
+              assert '..' not in s.split('/'), s
+          # Backend define contract.
+          want = {
+              'reference': [],
+              'cmsis_nn':  ['CMSIS_NN'],
+              'helia':     ['CMSIS_NN', 'NS_CMSIS_NN', 'HELIA'],
+          }['${{ matrix.backend }}']
+          assert d['backend_defines'] == want, (d['backend_defines'], want)
+          print(f\"OK: backend={d['backend']} kernels={len(d['kernel_sources'])} \"
+                f\"common={len(d['common_sources'])} defs={d['backend_defines']}\")
+          "
+
+  host-build:
+    name: Configure + build helia_rt::reference (host clang)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake ninja-build clang
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+              -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+              -DHELIA_RT_BUILD_TYPE=release_with_logs \
+              -DHELIA_RT_DISABLE_X86_NEON=ON
+      - name: Build
+        run: cmake --build build --target helia_rt_reference -j
+      - name: Sanity check archive
+        run: |
+          test -f build/libhelia_rt_reference.a
+          ls -lh build/libhelia_rt_reference.a
+
+  invariant:
+    name: Upstream-sync invariant (no SSoT edits under tensorflow/, signal/)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check diff scope
+        run: |
+          set -euo pipefail
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          # SSoT branches (those that touch cmake/ or root CMakeLists.txt) MUST NOT
+          # also touch upstream-managed paths. PRs that legitimately need to do so
+          # should be split.
+          if git diff --name-only "$base" "$head" -- cmake/ CMakeLists.txt \
+                | grep -q .; then
+              echo "PR touches SSoT files — verifying upstream paths are untouched..."
+              bad=$(git diff --name-only "$base" "$head" -- \
+                      tensorflow/ signal/ python/tflite_micro/ \
+                      tensorflow/lite/micro/tools/make/ || true)
+              if [ -n "$bad" ]; then
+                  echo "::error::SSoT PR also edits upstream-managed paths:"
+                  echo "$bad"
+                  exit 1
+              fi
+              echo "OK: SSoT-only change, upstream paths untouched."
+          else
+              echo "Not an SSoT change; invariant trivially holds."
+          fi
