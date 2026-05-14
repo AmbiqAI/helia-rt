@@ -1288,6 +1288,26 @@ code {
   box-shadow: 0 14px 36px rgba(11, 18, 32, 0.07);
   position: relative;
   overflow: hidden;
+  text-decoration: none !important;
+  color: inherit;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.perf-badge:hover,
+.perf-badge:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--hr-accent);
+  box-shadow: 0 20px 44px rgba(11, 18, 32, 0.12);
+}
+
+.perf-badge:focus-visible {
+  outline: 2px solid var(--hr-accent);
+  outline-offset: 3px;
+}
+
+.perf-badge:hover .perf-badge__cta {
+  transform: translateX(3px);
 }
 
 .perf-badge::before {
@@ -1390,6 +1410,17 @@ code {
 .perf-badge__copy em code {
   font-size: 0.76rem;
   padding: 0.05rem 0.35rem;
+}
+
+.perf-badge__cta {
+  position: absolute;
+  right: 1rem;
+  bottom: 0.65rem;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--hr-accent-2, var(--hr-accent));
+  transition: transform 0.18s ease;
 }
 
 @keyframes perf-count-up {
