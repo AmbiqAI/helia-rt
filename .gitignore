@@ -47,4 +47,6 @@ tensorflow/lite/micro/examples/**/*_image_data.cc
 tensorflow/lite/micro/examples/**/*_image_data.h
 tensorflow/lite/micro/models/**/*_model_data.cc
 tensorflow/lite/micro/models/**/*_model_data.h
+
+# Local scratch dir for cloned reference repos
 .scratch/

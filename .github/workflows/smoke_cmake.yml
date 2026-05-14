@@ -1,18 +1,20 @@
 name: cmake-ssot-smoke
 
-# Phase 1 smoke gate for the CMake source-of-truth (issue #147).
+# Smoke gates for the CMake source-of-truth (issue #147).
 # Validates that:
 #   1. cmake/helia_rt_sources.cmake loads in script mode for every backend.
 #   2. dump_manifest emits valid JSON with the expected schema.
 #   3. The top-level CMakeLists configures + builds helia_rt::reference on host clang.
 #   4. The upstream-sync invariant holds (no SSoT-time edits under tensorflow/, signal/,
 #      python/tflite_micro/).
+#   5. (Phase 2) nsx::heliart cross-compiles for Cortex-M55 against ns-cmsis-nn.
 
 on:
   pull_request:
     paths:
       - 'cmake/**'
       - 'CMakeLists.txt'
+      - 'nsx/**'
       - 'tensorflow/lite/micro/**'
       - 'signal/**'
       - 'tools/cmsis_pack/**'
@@ -174,3 +176,98 @@ jobs:
           name: heliart-cmsis-pack
           path: dist/Ambiq.heliaRT.*.pack
           if-no-files-found: error
+
+  nsx-cross-build:
+    name: nsx::heliart cross-compile (Cortex-M55, gcc)
+    runs-on: ubuntu-latest
+    # ns-cmsis-nn is a private repo. PRs from forks won't have access to the
+    # secret; skip cleanly there to avoid spurious failures.
+    if: >
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    env:
+      NS_CMSIS_NN_REF: v7.24.0
+    steps:
+      - name: Checkout helia-rt
+        uses: actions/checkout@v4
+        with:
+          path: helia-rt
+      - name: Checkout ns-cmsis-nn (pinned ref)
+        env:
+          NS_CMSIS_NN_TOKEN: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NS_CMSIS_NN_TOKEN:-}" ]; then
+            echo "::error::secrets.NS_CMSIS_NN_SSH_KEY is empty; cannot clone ns-cmsis-nn"
+            exit 1
+          fi
+          git clone --depth 1 --branch "${NS_CMSIS_NN_REF}" \
+              "https://${NS_CMSIS_NN_TOKEN}@github.com/AmbiqAI/ns-cmsis-nn.git" \
+              ns-cmsis-nn
+          (cd ns-cmsis-nn && git rev-parse HEAD)
+      - name: Install cross toolchain + ninja
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+              cmake ninja-build gcc-arm-none-eabi
+          arm-none-eabi-gcc --version | head -1
+      - name: Write smoke harness
+        run: |
+          mkdir -p smoke
+          cat > smoke/CMakeLists.txt <<'EOF'
+          cmake_minimum_required(VERSION 3.21)
+          project(nsx_heliart_smoke C CXX ASM)
+
+          # Stub of the NSX board flags interface that real boards ship.
+          add_library(nsx_board_flags INTERFACE)
+          target_compile_options(nsx_board_flags INTERFACE
+              -mcpu=cortex-m55 -mthumb -mfloat-abi=hard -mfpu=fpv5-d16
+              -ffunction-sections -fdata-sections
+              -Wno-unused-parameter)
+          target_compile_definitions(nsx_board_flags INTERFACE
+              ARM_MATH_LOOPUNROLL ARM_MATH_DSP)
+          set(NSX_BOARD_FLAGS_TARGET nsx_board_flags)
+          set(NSX_SOC_FAMILY apollo510)
+
+          # Stub SoC HAL — the real module ships from nsx-soc-hal.
+          add_library(nsx_soc_hal INTERFACE)
+
+          add_subdirectory(${NS_CMSIS_NN_DIR}/nsx ns_cmsis_nn EXCLUDE_FROM_ALL)
+          add_subdirectory(${HELIA_RT_DIR}/nsx   nsx_heliart   EXCLUDE_FROM_ALL)
+          EOF
+          cat > smoke/toolchain.cmake <<'EOF'
+          set(CMAKE_SYSTEM_NAME Generic)
+          set(CMAKE_SYSTEM_PROCESSOR cortex-m55)
+          set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+          set(CMAKE_C_COMPILER   arm-none-eabi-gcc)
+          set(CMAKE_CXX_COMPILER arm-none-eabi-g++)
+          set(CMAKE_ASM_COMPILER arm-none-eabi-gcc)
+          set(CMAKE_C_FLAGS_INIT
+              "-mcpu=cortex-m55 -mthumb -mfloat-abi=hard -mfpu=fpv5-d16")
+          set(CMAKE_CXX_FLAGS_INIT
+              "-mcpu=cortex-m55 -mthumb -mfloat-abi=hard -mfpu=fpv5-d16 \
+               -fno-exceptions -fno-rtti")
+          EOF
+      - name: Configure (Cortex-M55, gcc, release-with-logs)
+        run: |
+          cmake -S smoke -B smoke/build -G Ninja \
+              -DCMAKE_TOOLCHAIN_FILE="$(pwd)/smoke/toolchain.cmake" \
+              -DHELIA_RT_DIR="$(pwd)/helia-rt" \
+              -DNS_CMSIS_NN_DIR="$(pwd)/ns-cmsis-nn" \
+              -DHELIART_VARIANT=release-with-logs
+      - name: Build helia_rt::helia + nsx_heliart_glue + nsx::cmsis_nn
+        run: |
+          cmake --build smoke/build \
+              --target helia_rt_helia helia_rt_reference nsx_heliart_glue nsx_cmsis_nn \
+              -- -j
+      - name: Sanity check archives
+        run: |
+          set -euo pipefail
+          find smoke/build -name 'lib*.a' | sort
+          test -f smoke/build/nsx_heliart/heliart-src/libhelia_rt_helia.a
+          test -f smoke/build/ns_cmsis_nn/libnsx_cmsis_nn.a
+          # Confirm objects are Cortex-M (Thumb) ELF.
+          file smoke/build/nsx_heliart/heliart-src/libhelia_rt_helia.a | head -1
+          arm-none-eabi-objdump -a smoke/build/nsx_heliart/heliart-src/libhelia_rt_helia.a \
+              | head -5

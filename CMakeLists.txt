@@ -66,6 +66,23 @@ set_property(CACHE HELIA_RT_CXX_STANDARD PROPERTY STRINGS 14 17)
 set(HELIA_RT_EXTRA_DEFINES "" CACHE STRING
     "Free-form list of extra compile definitions to apply to all heliaRT targets")
 
+# Platform glue. The default tensorflow/lite/micro/debug_log.cc uses
+# fprintf(stderr, ...). Embedded targets (Cortex-M / NSX boards) typically
+# want a backend-specific implementation (e.g. ITM/SWO). Set OFF and
+# provide the override implementation as a separate target/source.
+option(HELIA_RT_PROVIDE_DEBUG_LOG
+    "Compile the default tensorflow/lite/micro/debug_log.cc into helia_rt targets" ON)
+
+# Backend dependency target names. Defensive default lists let us absorb
+# upstream renames in cmsis-nn / ns-cmsis-nn without breaking consumers:
+# the first existing TARGET in each list wins. Override with a single
+# explicit name (e.g. -DHELIA_RT_NSCMSISNN_TARGET=nsx::cmsis_nn) when the
+# upstream contract stabilizes.
+set(HELIA_RT_CMSISNN_TARGET   "" CACHE STRING
+    "Override CMSIS-NN target name for helia_rt::cmsis_nn linkage")
+set(HELIA_RT_NSCMSISNN_TARGET "" CACHE STRING
+    "Override ns-cmsis-nn target name for helia_rt::helia linkage")
+
 # ---------------------------------------------------------------------------
 # Helper: add one backend target (reference / cmsis_nn / helia).
 # ---------------------------------------------------------------------------
@@ -80,6 +97,10 @@ function(_helia_rt_add_backend_target backend)
     # relative in helia_rt_sources.cmake for portability).
     set(_common_abs)
     foreach(_s IN LISTS HELIA_RT_COMMON_SOURCES)
+        if(NOT HELIA_RT_PROVIDE_DEBUG_LOG AND
+           _s STREQUAL "tensorflow/lite/micro/debug_log.cc")
+            continue()
+        endif()
         list(APPEND _common_abs "${HELIA_RT_ROOT}/${_s}")
     endforeach()
 
@@ -126,26 +147,51 @@ function(_helia_rt_add_backend_target backend)
     # External kernel deps. Consumers must provide these targets *before*
     # add_subdirectory(helia-rt) — FetchContent makes this natural.
     if(backend STREQUAL "cmsis_nn")
-        if(TARGET cmsis-nn)
-            target_link_libraries(${_target} PUBLIC cmsis-nn)
-        elseif(TARGET CMSIS::NN)
-            target_link_libraries(${_target} PUBLIC CMSIS::NN)
+        if(HELIA_RT_CMSISNN_TARGET)
+            set(_candidates "${HELIA_RT_CMSISNN_TARGET}")
+        else()
+            set(_candidates cmsis-nn CMSIS::NN)
+        endif()
+        set(_resolved "")
+        foreach(_t IN LISTS _candidates)
+            if(TARGET ${_t})
+                set(_resolved "${_t}")
+                break()
+            endif()
+        endforeach()
+        if(_resolved)
+            target_link_libraries(${_target} PUBLIC ${_resolved})
         else()
             message(WARNING
-                "helia_rt_cmsis_nn: target 'cmsis-nn' (or 'CMSIS::NN') not found. "
+                "helia_rt_cmsis_nn: no CMSIS-NN target found among [${_candidates}]. "
                 "Provide it via add_subdirectory or FetchContent before adding helia-rt, "
-                "or link it manually after this CMakeLists is processed.")
+                "or set -DHELIA_RT_CMSISNN_TARGET=<name>, or link it manually after "
+                "this CMakeLists is processed.")
         endif()
     elseif(backend STREQUAL "helia")
-        if(TARGET ns-cmsis-nn)
-            target_link_libraries(${_target} PUBLIC ns-cmsis-nn)
-        elseif(TARGET ns_cmsis_nn)
-            target_link_libraries(${_target} PUBLIC ns_cmsis_nn)
+        if(HELIA_RT_NSCMSISNN_TARGET)
+            set(_candidates "${HELIA_RT_NSCMSISNN_TARGET}")
+        else()
+            # Defensive default order — current ns-cmsis-nn ships nsx::cmsis_nn
+            # as its public alias; older/alt names kept as fallbacks until
+            # the public contract stabilizes (issue #147 Phase 2).
+            set(_candidates nsx::cmsis_nn nsx_cmsis_nn ns-cmsis-nn ns_cmsis_nn)
+        endif()
+        set(_resolved "")
+        foreach(_t IN LISTS _candidates)
+            if(TARGET ${_t})
+                set(_resolved "${_t}")
+                break()
+            endif()
+        endforeach()
+        if(_resolved)
+            target_link_libraries(${_target} PUBLIC ${_resolved})
         else()
             message(WARNING
-                "helia_rt_helia: target 'ns-cmsis-nn' not found. "
+                "helia_rt_helia: no ns-cmsis-nn target found among [${_candidates}]. "
                 "Provide it via add_subdirectory or FetchContent before adding helia-rt, "
-                "or link it manually after this CMakeLists is processed.")
+                "or set -DHELIA_RT_NSCMSISNN_TARGET=<name>, or link it manually after "
+                "this CMakeLists is processed.")
         endif()
     endif()
 endfunction()
