@@ -82,12 +82,14 @@ We profiled the MLPerf Tiny v1.1 reference suite on the **Apollo510 EVB** (Corte
 
 #### Per-model results
 
-| Model | Latency: GCC → ATfE | Energy/inf: GCC → ATfE | **Inferences / Joule** |
-|---|---|---|---|
-| Keyword Spotting (DS-CNN) | 10.43 → 9.42 ms (**−9.7 %**) | 65.2 → 61.3 µJ (**−5.9 %**) | **+6.3 %** |
-| Visual Wake Words (MobileNetV1) | 38.99 → 34.11 ms (**−12.5 %**) | 272.9 → 229.4 µJ (**−15.9 %**) | **+19.0 %** |
-| Anomaly Detection (Deep Autoencoder) | 0.719 → 0.687 ms (**−4.4 %**) | 4.99 → 4.39 µJ (**−12.1 %**) | **+13.7 %** |
-| Image Classification (ResNet) | 27.12 → 24.28 ms (**−10.5 %**) | 197.7 → 159.0 µJ (**−19.6 %**) | **+24.4 %** |
+| Model | Latency reduction | Energy reduction | **Efficiency (inf / Joule)** |
+|---|---:|---:|---:|
+| Keyword Spotting (DS-CNN) | **−9.7 %** | **−5.9 %** | **+6.3 %** |
+| Visual Wake Words (MobileNetV1) | **−12.5 %** | **−15.9 %** | **+19.0 %** |
+| Anomaly Detection (Deep Autoencoder) | **−4.4 %** | **−12.1 %** | **+13.7 %** |
+| Image Classification (ResNet) | **−10.5 %** | **−19.6 %** | **+24.4 %** |
+
+All values are ATfE relative to GCC; negative is better for latency and energy, positive is better for efficiency.
 
 Across the four reference models, ATfE delivered **4 %–13 % lower latency**, **6 %–20 % less energy per inference**, and **6 %–24 % more inferences per Joule** than the same code built with GCC. The headline **"up to 24 %"** refers to the inferences-per-Joule improvement on Image Classification — the most demanding model in the suite. We have not observed a model where GCC outperformed ATfE on this target across any of these three metrics.
 
