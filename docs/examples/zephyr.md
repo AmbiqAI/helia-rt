@@ -422,7 +422,7 @@ The examples below use Apollo510 EVB; substitute your board and app source path 
     | `-DCONFIG_COMPILER_RT_RTLIB=y` | Link compiler-rt instead of libgcc |
 
 [^atfe-bench]:
-    Measured across the [MLPerf Tiny v1.1](https://mlcommons.org/benchmarks/inference-tiny/) model suite on Apollo510 (Cortex-M55 + Helium) using heliaRT v1.13.1 with `heliaPROFILER`. Compilers: ATfE 22.1.0 vs arm-none-eabi-gcc 15.2.1. Per-model speedup ranges 8 %–24 %; "up to 24 %" reflects the best-case model in this matrix.
+    Measured across the [MLPerf Tiny v1.1](https://mlcommons.org/benchmarks/inference-tiny/) model suite on Apollo510 (Cortex-M55 + Helium) using heliaRT v1.13.1 with `heliaPROFILER`. Compilers: ATfE 22.1.0 vs arm-none-eabi-gcc 14.3.0. Per-model speedup ranges 8 %–24 %; "up to 24 %" reflects the best-case model in this matrix.
 
 ## 5. Flash
 
