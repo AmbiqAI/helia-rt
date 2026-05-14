@@ -662,8 +662,23 @@
 .resource-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: 0.5rem 1.25rem;
   margin-top: 1rem;
+}
+
+.resource-links p {
+  display: contents;
+}
+
+.resource-links a {
+  position: relative;
+}
+
+.resource-links a + a::before {
+  content: '·';
+  margin-right: 1rem;
+  color: var(--hr-muted);
+  font-weight: 700;
 }
 
 .final-links {

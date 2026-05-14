@@ -265,7 +265,9 @@ As models and products mature, **heliaAOT** opens a deeper deployment path: Ambi
 
 <div class="resource-links" markdown>
 [Full Zephyr guide](getting-started/zephyr.md){ .text-link }
+
 [All getting started paths](getting-started/index.md){ .text-link }
+
 [Upgrade from upstream LiteRT](guides/upgrading-from-litert.md){ .text-link }
 </div>
 
