@@ -10,7 +10,7 @@ layering. It is consumed by:
 | Generic CMake / FetchContent | [`CMakeLists.txt`](../CMakeLists.txt) at the repo root |
 | Zephyr module | [`zephyr/CMakeLists.txt`](../zephyr/CMakeLists.txt) *(Phase 4 — refactor pending)* |
 | NSX module (source mode) | [`nsx/CMakeLists.txt`](../nsx/CMakeLists.txt) *(Phase 2 — pending)* |
-| CMSIS-Pack builder | [`tools/cmsis_pack/build_pack.py`](../tools/cmsis_pack/) via `cmake -P cmake/dump_manifest.cmake` *(Phase 3)* |
+| CMSIS-Pack builder | [`tools/cmsis_pack/build_pack.py`](../tools/cmsis_pack/build_pack.py) via `cmake -P cmake/dump_manifest.cmake` |
 
 Tracked in [issue #147](https://github.com/AmbiqAI/helia-rt/issues/147).
 
