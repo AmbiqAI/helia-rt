@@ -90,19 +90,30 @@ def dump_manifest(repo_root: Path, backend: str) -> BackendManifest:
     ) as tmp:
         out_path = Path(tmp.name)
     try:
-        subprocess.run(
-            [
-                "cmake",
-                f"-DBACKEND={backend}",
-                f"-DMANIFEST_OUT={out_path}",
-                "-P",
-                str(script),
-            ],
-            check=True,
-            cwd=repo_root,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+        try:
+            subprocess.run(
+                [
+                    "cmake",
+                    f"-DBACKEND={backend}",
+                    f"-DMANIFEST_OUT={out_path}",
+                    "-P",
+                    str(script),
+                ],
+                check=True,
+                cwd=repo_root,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+            )
+        except subprocess.CalledProcessError as exc:
+            # Surface cmake's diagnostics; the default CalledProcessError
+            # repr hides them, which makes manifest regressions opaque.
+            sys.stderr.write(
+                f"cmake -P dump_manifest.cmake failed for backend={backend!r}"
+                f" (exit {exc.returncode}):\n"
+            )
+            if exc.stdout:
+                sys.stderr.write(exc.stdout.decode(errors="replace"))
+            raise SystemExit(1) from exc
         data = json.loads(out_path.read_text())
     finally:
         out_path.unlink(missing_ok=True)
@@ -299,11 +310,6 @@ def build_pdsc(
 
     # ----- components --------------------------------------------------
     components = ET.SubElement(pkg, "components")
-
-    common_set = sorted(set.intersection(
-        *(set(m.common_sources) | set(m.kernel_sources) for m in manifests.values())
-    ))
-    common_only = set(common_set)
 
     for backend, cvariant, descr in BACKENDS:
         m = manifests[backend]
