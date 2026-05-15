@@ -20,6 +20,7 @@ on:
       - 'signal/**'
       - 'tools/cmsis_pack/**'
       - 'zephyr/**'
+      - '.github/zephyr-smoke/**'
       - '.github/workflows/smoke_cmake.yml'
   push:
     branches: [main]
