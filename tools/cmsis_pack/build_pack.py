@@ -81,10 +81,10 @@ CSUB = "heliaRT"
 # Pinned to the ns-cmsis-nn release that aligned its CMake / Zephyr / NSX /
 # CMSIS-Pack surfaces with heliaRT. Bump the lower bound when a newer
 # ns-cmsis-nn release introduces a breaking contract change; widen to a
-# range (e.g. "7.24.2:8.0.0") once the next-major compatibility window is
+# range (e.g. "7.25.0:8.0.0") once the next-major compatibility window is
 # known. The CI guard at tools/cmsis_pack/check_pdsc.py asserts this value.
 #
-# 7.24.2 introduced a Cvariant split ("Source" vs "Prebuilt") on the
+# 7.25.0 introduced a Cvariant split ("Source" vs "Prebuilt") on the
 # heliaCORE component. heliaRT itself ships as source via CMSIS-Pack, so
 # we pin our require to the "Source" variant to keep the stack source-
 # consistent. Consumers who need the prebuilt heliaCORE for binary-size
