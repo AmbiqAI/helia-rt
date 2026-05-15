@@ -53,7 +53,20 @@ PACK_DESCRIPTION = (
 PACK_URL = "https://github.com/AmbiqAI/helia-rt/releases/download/"
 PACK_LICENSE_FILE = "LICENSE"
 
-# Backend → (Cvariant, human description, Cclass/Cgroup are shared).
+# Backend → (Cvariant, human description). Cclass/Cgroup/Csub are shared
+# across all variants — see CCLASS/CGROUP/CSUB below.
+#
+# CMSIS-Pack component identity follows the same 4-level convention used by
+# Ambiq's ns-cmsis-nn pack so consumers can pin heliaRT with a parallel
+# <require> tag, e.g.::
+#
+#     <require Cclass="Machine Learning"
+#              Cgroup="TFLM Runtime"
+#              Csub="heliaRT"
+#              Cvendor="Ambiq"
+#              Cversion="1.13.1"/>     <!-- or "1.13.1:2.0.0" range -->
+#
+# The Cvariant axis selects the kernel backend; consumers pick exactly one.
 BACKENDS: list[tuple[str, str, str]] = [
     ("reference", "Reference", "Portable reference TFLM kernels"),
     ("cmsis_nn", "CMSIS-NN", "Arm CMSIS-NN optimized kernels (open source)"),
@@ -61,7 +74,8 @@ BACKENDS: list[tuple[str, str, str]] = [
 ]
 
 CCLASS = "Machine Learning"
-CGROUP = "heliaRT"
+CGROUP = "TFLM Runtime"
+CSUB = "heliaRT"
 
 
 # ---------------------------------------------------------------------------
@@ -308,19 +322,42 @@ def build_pdsc(
     for k in ("Ambiq", "TFLM", "TensorFlow Lite Micro", "Machine Learning"):
         ET.SubElement(keywords, "keyword").text = k
 
+    # ----- conditions --------------------------------------------------
+    # The HELIA backend depends on the Ambiq ns-cmsis-nn pack (which exposes
+    # the heliaCORE NN-Lib component). CMSIS-Pack expresses inter-pack
+    # dependencies through <conditions>; components reference a condition by
+    # id via the ``condition`` attribute.
+    conditions = ET.SubElement(pkg, "conditions")
+    ns_cmsis_nn_cond = ET.SubElement(
+        conditions, "condition", id="ns-cmsis-nn present"
+    )
+    ET.SubElement(ns_cmsis_nn_cond, "description").text = (
+        "Requires Ambiq ns-cmsis-nn (heliaCORE) component"
+    )
+    ET.SubElement(
+        ns_cmsis_nn_cond,
+        "require",
+        Cvendor=PACK_VENDOR,
+        Cclass=CCLASS,
+        Cgroup="NN Lib",
+        Csub="heliaCORE",
+    )
+
     # ----- components --------------------------------------------------
     components = ET.SubElement(pkg, "components")
 
     for backend, cvariant, descr in BACKENDS:
         m = manifests[backend]
-        comp = ET.SubElement(
-            components,
-            "component",
+        comp_attrs = dict(
             Cclass=CCLASS,
             Cgroup=CGROUP,
+            Csub=CSUB,
             Cvariant=cvariant,
             Cversion=version,
         )
+        if backend == "helia":
+            comp_attrs["condition"] = "ns-cmsis-nn present"
+        comp = ET.SubElement(components, "component", **comp_attrs)
         ET.SubElement(comp, "description").text = descr
         files = ET.SubElement(comp, "files")
 
