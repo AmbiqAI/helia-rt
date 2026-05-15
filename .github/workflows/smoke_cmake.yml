@@ -163,6 +163,11 @@ jobs:
               assert not missing, f'missing in archive: {missing[:5]}'
           print(f'OK: pack={pack.name} size={pack.stat().st_size:,} variants={sorted(variants)}')
           PY
+      - name: Validate pdsc contract (identity + ns-cmsis-nn pin)
+        run: |
+          set -euo pipefail
+          PACK=$(ls dist/Ambiq.heliaRT.*.pack | head -1)
+          python3 tools/cmsis_pack/check_pdsc.py "${PACK}"
       - name: Upload pack artifact
         uses: actions/upload-artifact@v4
         with:
