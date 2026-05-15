@@ -153,8 +153,8 @@ Use this when you want:
 - easy switching between source and prebuilt variants
 - simple local experimentation without modifying `west.yml`
 
-The Zephyr example page shows the exact `ZEPHYR_EXTRA_MODULES` setup for each
-integration path.
+The Zephyr example page shows the exact `ZEPHYR_EXTRA_MODULES` setup for the
+prebuilt integration path.
 
 ## Notes
 
