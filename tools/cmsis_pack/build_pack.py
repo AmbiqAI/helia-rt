@@ -94,7 +94,7 @@ NS_CMSIS_NN_CCLASS = "Machine Learning"
 NS_CMSIS_NN_CGROUP = "NN Lib"
 NS_CMSIS_NN_CSUB = "heliaCORE"
 NS_CMSIS_NN_CVARIANT = "Source"
-NS_CMSIS_NN_MIN_VERSION = "7.24.2"
+NS_CMSIS_NN_MIN_VERSION = "7.25.0"
 
 
 # ---------------------------------------------------------------------------
