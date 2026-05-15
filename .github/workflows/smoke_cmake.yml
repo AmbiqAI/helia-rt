@@ -8,6 +8,7 @@ name: cmake-ssot-smoke
 #   4. The upstream-sync invariant holds (no SSoT-time edits under tensorflow/, signal/,
 #      python/tflite_micro/).
 #   5. (Phase 2) nsx::heliart cross-compiles for Cortex-M55 against ns-cmsis-nn.
+#   6. (Phase 4) zephyr/CMakeLists.txt builds helia_rt against the SSoT for qemu_cortex_m3.
 
 on:
   pull_request:
@@ -18,6 +19,7 @@ on:
       - 'tensorflow/lite/micro/**'
       - 'signal/**'
       - 'tools/cmsis_pack/**'
+      - 'zephyr/**'
       - '.github/workflows/smoke_cmake.yml'
   push:
     branches: [main]
@@ -278,4 +280,79 @@ jobs:
           # Confirm objects are Cortex-M (Thumb) ELF.
           file smoke/build/nsx_heliart/heliart-src/libhelia_rt_helia.a | head -1
           arm-none-eabi-objdump -a smoke/build/nsx_heliart/heliart-src/libhelia_rt_helia.a \
+              | head -5
+
+  zephyr-build:
+    name: Zephyr module build (qemu_cortex_m3, REFERENCE)
+    runs-on: ubuntu-latest
+    # Use the official Zephyr CI image: SDK, west, python, and arm-zephyr-eabi
+    # toolchain are pre-installed at /opt/toolchains. The image does NOT ship
+    # a checked-out zephyr tree, so we `west init` one ourselves below.
+    container:
+      image: ghcr.io/zephyrproject-rtos/ci:v0.27.4
+      options: --user root
+    # The zephyrproject-rtos/ci image's default shell is /bin/sh (dash),
+    # which does not support `set -o pipefail`. Force bash for every
+    # `run:` step in this job.
+    defaults:
+      run:
+        shell: bash
+    env:
+      ZEPHYR_TOOLCHAIN_VARIANT: zephyr
+      ZEPHYR_REF: v4.0.0
+    steps:
+      - name: Checkout helia-rt
+        uses: actions/checkout@v4
+        with:
+          path: helia-rt
+      - name: Locate Zephyr SDK in CI image
+        run: |
+          set -euo pipefail
+          # The ghcr.io/zephyrproject-rtos/ci image installs the SDK under
+          # /opt/toolchains/zephyr-sdk-<ver>, but doesn't export
+          # ZEPHYR_SDK_INSTALL_DIR for non-default shells, so CMake's
+          # find_package(Zephyr-sdk) fails. Discover and export it.
+          sdk_dir=$(find /opt -maxdepth 3 -type d -name 'zephyr-sdk-*' \
+                      -not -name '*minimal*' | sort | tail -1)
+          test -n "$sdk_dir" || (echo "::error::No zephyr-sdk found under /opt"; \
+                                 ls /opt; exit 1)
+          echo "Zephyr SDK: $sdk_dir"
+          echo "ZEPHYR_SDK_INSTALL_DIR=$sdk_dir" >> "$GITHUB_ENV"
+      - name: West init + update zephyr (shallow)
+        run: |
+          set -euo pipefail
+          mkdir -p zephyrworkspace
+          cd zephyrworkspace
+          west init -m https://github.com/zephyrproject-rtos/zephyr \
+              --mr "${ZEPHYR_REF}" .
+          # --narrow keeps to manifest projects (no optional groups);
+          # -o=--depth=1 makes each project a shallow clone. Keeps the
+          # smoke under ~3 min instead of >10.
+          west update --narrow -o=--depth=1
+          west zephyr-export
+          echo "ZEPHYR_BASE=$(pwd)/zephyr" >> "$GITHUB_ENV"
+          (cd zephyr && git rev-parse --short HEAD)
+      - name: Build smoke app for qemu_cortex_m3
+        run: |
+          set -euo pipefail
+          # EXTRA_ZEPHYR_MODULES adds helia-rt to Zephyr's module list, which
+          # picks up zephyr/module.yml + zephyr/CMakeLists.txt + zephyr/Kconfig.
+          west build \
+              -b qemu_cortex_m3 \
+              -d build \
+              -p always \
+              helia-rt/.github/zephyr-smoke \
+              -- \
+              -DEXTRA_ZEPHYR_MODULES="$(pwd)/helia-rt"
+      - name: Sanity check ELF + helia_rt symbols
+        run: |
+          set -euo pipefail
+          test -f build/zephyr/zephyr.elf
+          ls -lh build/zephyr/zephyr.elf
+          # The Zephyr SDK toolchain binaries live under $ZEPHYR_SDK_INSTALL_DIR
+          # but aren't on PATH by default in CI. Add them.
+          export PATH="${ZEPHYR_SDK_INSTALL_DIR}/arm-zephyr-eabi/bin:$PATH"
+          # Confirm the heliaRT TFLM runtime actually linked in (not GC'd).
+          arm-zephyr-eabi-nm -C build/zephyr/zephyr.elf \
+              | grep -E ' T .*(MicroPrintf|MicroAllocator|MicroInterpreter)' \
               | head -5
