@@ -334,12 +334,15 @@ def build_pdsc(
         # Backend-specific compile definitions.
         if m.backend_defines:
             for d in m.backend_defines:
+                # preIncludeGlobal stubs encode the variant choice and must
+                # stay immutable in consumer projects, so we deliberately do
+                # NOT mark them attr="config" (which would copy them into
+                # the project tree as user-editable files).
                 ET.SubElement(
                     files,
                     "file",
                     category="preIncludeGlobal",
                     name=f".cmsis_pack/define_{d}.h",
-                    attr="config",
                 )
 
     # ----- enumerate every staged header for the indexer ----------------
