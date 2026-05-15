@@ -334,6 +334,10 @@ def build_pdsc(
     ET.SubElement(ns_cmsis_nn_cond, "description").text = (
         "Requires Ambiq ns-cmsis-nn (heliaCORE) component"
     )
+    # TODO(#147 follow-up): pin Cversion to a known-good ns-cmsis-nn range
+    # once the heliaCORE/heliaRT compatibility matrix is documented
+    # (e.g. Cversion="7.24.1:8.0.0"). Left open for now to avoid blocking
+    # consumers during initial rollout.
     ET.SubElement(
         ns_cmsis_nn_cond,
         "require",
