@@ -33,22 +33,24 @@ Known-good versions:
 
 === "Source Modules + CMSIS-NN"
 
-    ## 1. Fetch the default `cmsis-nn` module
+    ## 1. Fetch the modules
 
-    In a standard Zephyr west workspace, open `cmsis-nn` is already provided by the upstream manifest at `modules/lib/cmsis-nn`.
+    Add both `helia-rt` and open `cmsis-nn` as west projects. In a standard Zephyr west workspace,
+    open `cmsis-nn` is already provided by the upstream manifest at `modules/lib/cmsis-nn`.
 
-    Fetch it with west:
+    Add `helia-rt` to your workspace `west.yml` projects list:
 
-    ```bash
-    west update cmsis-nn
+    ```yaml
+    - name: helia-rt
+      url: https://github.com/AmbiqAI/helia-rt
+      revision: <helia-rt-version>   # e.g. heliaRT-v1.13.1
+      path: modules/helia-rt
     ```
 
-    ## 2. Add the local `helia-rt` source copy
-
-    Download the raw `helia-rt` source archive from the Ambiq content portal and copy it into `modules/`:
+    Then fetch both modules:
 
     ```bash
-    cp -r <download-dir>/helia-rt <ws>/modules/
+    west update helia-rt cmsis-nn
     ```
 
     Result:
@@ -64,16 +66,12 @@ Known-good versions:
         └── helia_rt_app/
     ```
 
-    ## 3. Create the application
+    ## 2. Create the application
 
     `CMakeLists.txt`
 
     ```cmake
     cmake_minimum_required(VERSION 3.20.0)
-
-    list(APPEND ZEPHYR_EXTRA_MODULES
-      ${CMAKE_CURRENT_SOURCE_DIR}/../../modules/helia-rt
-    )
 
     find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
     project(helia_rt_app)
@@ -84,30 +82,28 @@ Known-good versions:
     `prj.conf`
 
     ```conf
-    CONFIG_CPP=y
     CONFIG_STD_CPP17=y
-    CONFIG_FPU=y
 
     CONFIG_PRINTK=y
     CONFIG_CONSOLE=y
     CONFIG_UART_CONSOLE=y
 
+    CONFIG_HELIA_RT=y
+    CONFIG_NS_CMSIS_NN=n
     CONFIG_CMSIS_NN=y
     CONFIG_CMSIS_NN_CONVOLUTION=y
     CONFIG_CMSIS_NN_FULLYCONNECTED=y
-    CONFIG_HELIA_RT=y
-    CONFIG_HELIA_RT_BACKEND_CMSIS_NN=y
     ```
 
     Required heliaRT-specific settings:
 
-    - `CONFIG_CMSIS_NN=y`
     - `CONFIG_HELIA_RT=y`
-    - `CONFIG_HELIA_RT_BACKEND_CMSIS_NN=y`
+    - `CONFIG_NS_CMSIS_NN=n` (suppress the auto-imply)
+    - `CONFIG_CMSIS_NN=y` and per-op kernel configs for your model
 
     Notes:
 
-    - Add only `helia-rt` to `ZEPHYR_EXTRA_MODULES` on this path.
+    - With west-managed modules, no `ZEPHYR_EXTRA_MODULES` is needed.
     - Do not add open `cmsis-nn` to `ZEPHYR_EXTRA_MODULES` when it already comes from the standard west workspace.
     - In the default Zephyr workspace layout, open `cmsis-nn` is discovered at `modules/lib/cmsis-nn`.
     - Open `cmsis-nn` does not provide an `ALL` Kconfig switch in Zephyr. You must enable the CMSIS-NN kernel groups your model needs.
@@ -119,15 +115,26 @@ Known-good versions:
 
 === "Source Modules + HELIA"
 
-    ## 1. Download the sources
+    ## 1. Fetch the modules
 
-    Download the raw source archives for both `helia-rt` and `ns-cmsis-nn` from the Ambiq content portal.
+    Add both `helia-rt` and `ns-cmsis-nn` as west projects in your workspace `west.yml`:
 
-    After extracting them, copy the repositories into `modules/`:
+    ```yaml
+    - name: helia-rt
+      url: https://github.com/AmbiqAI/helia-rt
+      revision: <helia-rt-version>     # e.g. heliaRT-v1.13.1
+      path: modules/helia-rt
+
+    - name: ns-cmsis-nn
+      url: https://github.com/AmbiqAI/ns-cmsis-nn
+      revision: <ns-cmsis-nn-version>  # e.g. v7.24.1
+      path: modules/ns-cmsis-nn
+    ```
+
+    Then fetch both modules:
 
     ```bash
-    cp -r <download-dir>/helia-rt <ws>/modules/
-    cp -r <download-dir>/ns-cmsis-nn <ws>/modules/
+    west update helia-rt ns-cmsis-nn
     ```
 
     Result:
@@ -149,11 +156,6 @@ Known-good versions:
     ```cmake
     cmake_minimum_required(VERSION 3.20.0)
 
-    list(APPEND ZEPHYR_EXTRA_MODULES
-      ${CMAKE_CURRENT_SOURCE_DIR}/../../modules/helia-rt
-      ${CMAKE_CURRENT_SOURCE_DIR}/../../modules/ns-cmsis-nn
-    )
-
     find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
     project(helia_rt_app)
 
@@ -163,24 +165,18 @@ Known-good versions:
     `prj.conf`
 
     ```conf
-    CONFIG_CPP=y
     CONFIG_STD_CPP17=y
-    CONFIG_FPU=y
 
     CONFIG_PRINTK=y
     CONFIG_CONSOLE=y
     CONFIG_UART_CONSOLE=y
 
     CONFIG_HELIA_RT=y
-    CONFIG_NS_CMSIS_NN=y
-    CONFIG_HELIA_RT_BACKEND_HELIA=y
     ```
 
     Required heliaRT-specific settings:
 
     - `CONFIG_HELIA_RT=y`
-    - `CONFIG_NS_CMSIS_NN=y`
-    - `CONFIG_HELIA_RT_BACKEND_HELIA=y`
 
 === "Prebuilt Release Module"
 
@@ -229,9 +225,7 @@ Known-good versions:
     `prj.conf`
 
     ```conf
-    CONFIG_CPP=y
     CONFIG_STD_CPP17=y
-    CONFIG_FPU=y
 
     CONFIG_PRINTK=y
     CONFIG_CONSOLE=y
@@ -446,22 +440,19 @@ screen /dev/cu.usbmodemXXXX 115200
 
 Source modules + CMSIS-NN:
 
-- `modules/helia-rt` exists
-- `modules/lib/cmsis-nn` exists
-- `modules/helia-rt` is listed in `ZEPHYR_EXTRA_MODULES`
-- `CONFIG_CMSIS_NN=y` is enabled
+- `modules/helia-rt` exists (via `west update helia-rt`)
+- `modules/lib/cmsis-nn` exists (via `west update cmsis-nn`)
 - `CONFIG_HELIA_RT=y` is enabled
-- `CONFIG_HELIA_RT_BACKEND_CMSIS_NN=y` is enabled
+- `CONFIG_NS_CMSIS_NN=n` suppresses the auto-imply
+- `CONFIG_CMSIS_NN=y` and per-op kernel configs are enabled
 - no HELIA-only Kconfig options are enabled
 
 Source modules + HELIA:
 
-- `modules/helia-rt` exists
-- `modules/ns-cmsis-nn` exists
-- both module paths are listed in `ZEPHYR_EXTRA_MODULES`
+- `modules/helia-rt` exists (via `west update helia-rt`)
+- `modules/ns-cmsis-nn` exists (via `west update ns-cmsis-nn`)
 - `CONFIG_HELIA_RT=y` is enabled
-- `CONFIG_NS_CMSIS_NN=y` is enabled
-- `CONFIG_HELIA_RT_BACKEND_HELIA=y` is enabled
+- backend, CPP, FPU, and ns-cmsis-nn auto-configure
 
 Prebuilt release module:
 
