@@ -77,6 +77,18 @@ CCLASS = "Machine Learning"
 CGROUP = "TFLM Runtime"
 CSUB = "heliaRT"
 
+# Identity of the cross-pack dependency (Ambiq ns-cmsis-nn / heliaCORE).
+# Pinned to the ns-cmsis-nn release that aligned its CMake / Zephyr / NSX /
+# CMSIS-Pack surfaces with heliaRT. Bump the lower bound when a newer
+# ns-cmsis-nn release introduces a breaking contract change; widen to a
+# range (e.g. "7.24.1:8.0.0") once the next-major compatibility window is
+# known. The CI guard at tools/cmsis_pack/check_pdsc.py asserts this value.
+NS_CMSIS_NN_VENDOR = "Ambiq"
+NS_CMSIS_NN_CCLASS = "Machine Learning"
+NS_CMSIS_NN_CGROUP = "NN Lib"
+NS_CMSIS_NN_CSUB = "heliaCORE"
+NS_CMSIS_NN_MIN_VERSION = "7.24.1"
+
 
 # ---------------------------------------------------------------------------
 # Manifest extraction
@@ -334,17 +346,14 @@ def build_pdsc(
     ET.SubElement(ns_cmsis_nn_cond, "description").text = (
         "Requires Ambiq ns-cmsis-nn (heliaCORE) component"
     )
-    # TODO(#147 follow-up): pin Cversion to a known-good ns-cmsis-nn range
-    # once the heliaCORE/heliaRT compatibility matrix is documented
-    # (e.g. Cversion="7.24.1:8.0.0"). Left open for now to avoid blocking
-    # consumers during initial rollout.
     ET.SubElement(
         ns_cmsis_nn_cond,
         "require",
-        Cvendor=PACK_VENDOR,
-        Cclass=CCLASS,
-        Cgroup="NN Lib",
-        Csub="heliaCORE",
+        Cvendor=NS_CMSIS_NN_VENDOR,
+        Cclass=NS_CMSIS_NN_CCLASS,
+        Cgroup=NS_CMSIS_NN_CGROUP,
+        Csub=NS_CMSIS_NN_CSUB,
+        Cversion=NS_CMSIS_NN_MIN_VERSION,
     )
 
     # ----- components --------------------------------------------------
