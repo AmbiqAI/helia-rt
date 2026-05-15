@@ -210,8 +210,13 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-              cmake ninja-build gcc-arm-none-eabi
+              cmake ninja-build gcc-arm-none-eabi \
+              libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib
           arm-none-eabi-gcc --version | head -1
+          # Confirm libc headers (string.h etc.) and libgcc are reachable.
+          arm-none-eabi-gcc -print-sysroot
+          arm-none-eabi-gcc -E -x c -include string.h /dev/null > /dev/null
+          echo "OK: libc headers reachable"
       - name: Write smoke harness
         run: |
           mkdir -p smoke
