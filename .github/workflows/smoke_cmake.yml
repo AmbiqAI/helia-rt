@@ -15,6 +15,7 @@ on:
       - 'CMakeLists.txt'
       - 'tensorflow/lite/micro/**'
       - 'signal/**'
+      - 'tools/cmsis_pack/**'
       - '.github/workflows/smoke_cmake.yml'
   push:
     branches: [main]
@@ -115,3 +116,56 @@ jobs:
           else
               echo "Not an SSoT change; invariant trivially holds."
           fi
+
+  cmsis-pack-build:
+    name: Build CMSIS-Pack from SSoT manifest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cmake
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake
+      - name: Build pack
+        run: |
+          set -euo pipefail
+          python3 tools/cmsis_pack/build_pack.py --output dist
+          ls -lh dist/
+      - name: Validate pack archive + pdsc
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, subprocess, zipfile, sys
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          packs = list(Path('dist').glob('Ambiq.heliaRT.*.pack'))
+          assert len(packs) == 1, packs
+          pack = packs[0]
+          assert pack.stat().st_size > 100_000, f'pack too small: {pack.stat().st_size}'
+          assert pack.stat().st_size < 50 * 1024 * 1024, (
+              f'pack too large ({pack.stat().st_size} bytes); deny-list regression?'
+          )
+
+          with zipfile.ZipFile(pack) as zf:
+              names = set(zf.namelist())
+              pdsc_name = next(n for n in names if n.endswith('.pdsc'))
+              root = ET.fromstring(zf.read(pdsc_name))
+              assert root.tag == 'package', root.tag
+
+              variants = {c.get('Cvariant') for c in root.findall('components/component')}
+              assert variants == {'Reference', 'CMSIS-NN', 'HELIA'}, variants
+
+              # Every <file category="source"> must resolve in the archive.
+              missing = []
+              for f in root.findall('components/component/files/file'):
+                  if f.get('category') in ('source', 'preIncludeGlobal'):
+                      if f.get('name') not in names:
+                          missing.append(f.get('name'))
+              assert not missing, f'missing in archive: {missing[:5]}'
+          print(f'OK: pack={pack.name} size={pack.stat().st_size:,} variants={sorted(variants)}')
+          PY
+      - name: Upload pack artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: heliart-cmsis-pack
+          path: dist/Ambiq.heliaRT.*.pack
+          if-no-files-found: error
