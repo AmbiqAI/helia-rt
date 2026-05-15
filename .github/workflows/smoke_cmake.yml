@@ -260,7 +260,7 @@ jobs:
         run: |
           cmake --build smoke/build \
               --target helia_rt_helia helia_rt_reference nsx_heliart_glue nsx_cmsis_nn \
-              -- -j
+              -j
       - name: Sanity check archives
         run: |
           set -euo pipefail
