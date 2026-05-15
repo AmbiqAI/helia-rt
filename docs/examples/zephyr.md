@@ -254,6 +254,20 @@ Known-good versions:
     - The prebuilt Zephyr module supports Cortex-M55, and Cortex-M4 with FPU.
     - The prebuilt archive selection is automatic from board CPU, toolchain, and selected flavor.
 
+!!! tip "Using Reference kernels"
+
+    To use generic Reference kernels instead of an accelerated backend, suppress the
+    `ns-cmsis-nn` auto-imply in your `prj.conf`:
+
+    ```conf
+    CONFIG_STD_CPP17=y
+    CONFIG_HELIA_RT=y
+    CONFIG_NS_CMSIS_NN=n
+    ```
+
+    No `ns-cmsis-nn` or `cmsis-nn` module is needed. The Reference backend is selected
+    automatically when neither is active.
+
 ## 3. Minimal bring-up
 
 After wiring the module and `prj.conf`, the smallest useful app flow is:
@@ -462,4 +476,4 @@ Prebuilt release module:
 - `CONFIG_FPU=y` is enabled for Cortex-M55 builds
 - no source-backend Kconfig options are enabled
 
-For the broader setup guide, including `Reference`, open `CMSIS-NN`, and prebuilt flows, see [Zephyr setup](../getting-started/zephyr.md).
+For the broader setup guide, including `HELIA`, open `CMSIS-NN`, and prebuilt flows, see [Zephyr setup](../getting-started/zephyr.md).
