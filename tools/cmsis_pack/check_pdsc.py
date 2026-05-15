@@ -41,6 +41,7 @@ from build_pack import (  # noqa: E402
     NS_CMSIS_NN_CCLASS,
     NS_CMSIS_NN_CGROUP,
     NS_CMSIS_NN_CSUB,
+    NS_CMSIS_NN_CVARIANT,
     NS_CMSIS_NN_MIN_VERSION,
     NS_CMSIS_NN_VENDOR,
     PACK_NAME,
@@ -126,6 +127,7 @@ def check_contract(pdsc: ET.Element) -> list[str]:
                         ("Cclass", NS_CMSIS_NN_CCLASS),
                         ("Cgroup", NS_CMSIS_NN_CGROUP),
                         ("Csub", NS_CMSIS_NN_CSUB),
+                        ("Cvariant", NS_CMSIS_NN_CVARIANT),
                         ("Cversion", NS_CMSIS_NN_MIN_VERSION),
                     ):
                         got = req.get(attr)

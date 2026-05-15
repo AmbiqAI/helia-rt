@@ -81,13 +81,20 @@ CSUB = "heliaRT"
 # Pinned to the ns-cmsis-nn release that aligned its CMake / Zephyr / NSX /
 # CMSIS-Pack surfaces with heliaRT. Bump the lower bound when a newer
 # ns-cmsis-nn release introduces a breaking contract change; widen to a
-# range (e.g. "7.24.1:8.0.0") once the next-major compatibility window is
+# range (e.g. "7.24.2:8.0.0") once the next-major compatibility window is
 # known. The CI guard at tools/cmsis_pack/check_pdsc.py asserts this value.
+#
+# 7.24.2 introduced a Cvariant split ("Source" vs "Prebuilt") on the
+# heliaCORE component. heliaRT itself ships as source via CMSIS-Pack, so
+# we pin our require to the "Source" variant to keep the stack source-
+# consistent. Consumers who need the prebuilt heliaCORE for binary-size
+# reasons can override at integration time.
 NS_CMSIS_NN_VENDOR = "Ambiq"
 NS_CMSIS_NN_CCLASS = "Machine Learning"
 NS_CMSIS_NN_CGROUP = "NN Lib"
 NS_CMSIS_NN_CSUB = "heliaCORE"
-NS_CMSIS_NN_MIN_VERSION = "7.24.1"
+NS_CMSIS_NN_CVARIANT = "Source"
+NS_CMSIS_NN_MIN_VERSION = "7.24.2"
 
 
 # ---------------------------------------------------------------------------
@@ -353,6 +360,7 @@ def build_pdsc(
         Cclass=NS_CMSIS_NN_CCLASS,
         Cgroup=NS_CMSIS_NN_CGROUP,
         Csub=NS_CMSIS_NN_CSUB,
+        Cvariant=NS_CMSIS_NN_CVARIANT,
         Cversion=NS_CMSIS_NN_MIN_VERSION,
     )
 
