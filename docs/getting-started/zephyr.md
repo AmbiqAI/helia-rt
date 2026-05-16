@@ -153,8 +153,19 @@ Use this when you want:
 - easy switching between source and prebuilt variants
 - simple local experimentation without modifying `west.yml`
 
-The Zephyr example page shows the exact `ZEPHYR_EXTRA_MODULES` setup for the
-prebuilt integration path.
+For source modules, point `ZEPHYR_EXTRA_MODULES` at your local checkouts of
+`helia-rt` and (for the HELIA backend) `ns-cmsis-nn`:
+
+```cmake
+list(APPEND ZEPHYR_EXTRA_MODULES
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../modules/helia-rt
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../modules/ns-cmsis-nn
+)
+find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+```
+
+The Zephyr example page shows the exact `ZEPHYR_EXTRA_MODULES` setup for
+the prebuilt integration path.
 
 ## Notes
 

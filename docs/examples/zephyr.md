@@ -35,10 +35,13 @@ Known-good versions:
 
     ## 1. Fetch the modules
 
-    Add both `helia-rt` and open `cmsis-nn` as west projects. In a standard Zephyr west workspace,
-    open `cmsis-nn` is already provided by the upstream manifest at `modules/lib/cmsis-nn`.
+    Open `cmsis-nn` is already provided by the standard Zephyr west manifest
+    at `modules/lib/cmsis-nn`, so you only need to add `helia-rt` to your
+    workspace `west.yml` projects list. (If your workspace does not inherit
+    the standard manifest, add `cmsis-nn` from `github.com/zephyrproject-rtos/cmsis-nn`
+    as a second project with `path: modules/lib/cmsis-nn`.)
 
-    Add `helia-rt` to your workspace `west.yml` projects list:
+    Add `helia-rt`:
 
     ```yaml
     - name: helia-rt

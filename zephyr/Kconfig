@@ -42,4 +42,24 @@ config HELIA_RT_BACKEND_HELIA
 
 endchoice
 
+choice HELIA_RT_KERNEL_OPTIMIZE
+	prompt "Helia RT kernel optimization target"
+	depends on HELIA_RT_BACKEND_HELIA
+	default HELIA_RT_KERNEL_OPTIMIZE_SPEED
+	help
+		Selects whether HELIA kernels are tuned for speed or code size.
+		Maps to the HELIA_RT_GLOBAL_KERNEL_OPTIMIZE cache variable
+		consumed by cmake/helia_rt_sources.cmake (which in turn drives
+		CONV_KERNEL_OPTIMIZED_FOR_*, FC_KERNEL_OPTIMIZED_FOR_*, and
+		KERNELS_OPTIMIZED_FOR_* compile defines). SPEED matches the
+		Makefile/prebuilt default; SIZE trades runtime for smaller code.
+
+config HELIA_RT_KERNEL_OPTIMIZE_SPEED
+	bool "Speed"
+
+config HELIA_RT_KERNEL_OPTIMIZE_SIZE
+	bool "Size"
+
+endchoice
+
 endif # HELIA_RT
