@@ -32,9 +32,9 @@
 #   reference: (none)
 #
 # Advanced-user note: switching NSX_HELIART_BACKEND in an existing build
-# directory resets HELIA_RT_CMSISNN_TARGET / HELIA_RT_NSCMSISNN_TARGET to
-# the nsx-heliart defaults (nsx::cmsis_nn). If you supplied a custom -D
-# override and want it across a backend switch, re-pass it on reconfigure.
+# directory unsets the inactive backend's kernel-target var. For helia,
+# the active var resets to nsx::cmsis_nn. For cmsis_nn, you must re-pass
+# -DHELIA_RT_CMSISNN_TARGET=<name> on every reconfigure to that backend.
 # ---------------------------------------------------------------------------
 
 cmake_minimum_required(VERSION 3.21)
