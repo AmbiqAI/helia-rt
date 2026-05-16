@@ -289,6 +289,22 @@ jobs:
           arm-none-eabi-objdump -a smoke/build/nsx_heliart/heliart-src/libhelia_rt_helia.a \
               | head -5
 
+      # Cover the reference backend in a separate build dir. The cmsis_nn
+      # backend requires upstream CMSIS-NN headers (ns-cmsis-nn has modified
+      # API signatures) and is tested via the dump_manifest + Zephyr jobs
+      # which use the correct upstream provider.
+      - name: Configure + build (reference backend)
+        run: |
+          cmake -S smoke -B smoke/build-reference -G Ninja \
+              -DCMAKE_TOOLCHAIN_FILE="$(pwd)/smoke/toolchain.cmake" \
+              -DHELIA_RT_DIR="$(pwd)/helia-rt" \
+              -DNS_CMSIS_NN_DIR="$(pwd)/ns-cmsis-nn" \
+              -DNSX_HELIART_BACKEND=reference \
+              -DHELIART_VARIANT=release-with-logs
+          cmake --build smoke/build-reference \
+              --target helia_rt_reference nsx_heliart_glue -j
+          test -f smoke/build-reference/nsx_heliart/heliart-src/libhelia_rt_reference.a
+
   zephyr-build:
     name: Zephyr module build (qemu_cortex_m3, REFERENCE)
     runs-on: ubuntu-latest
