@@ -16,7 +16,7 @@ heliaRT is Ambiq's optimized LiteRT for Micro runtime for Apollo platforms, comp
 | **Drop-in** | Same `MicroInterpreter` / `Model` / `OpResolver` API. Swap the dependency, rebuild, ship. |
 | **More kernels** | heliaCORE adds optimized paths for activations, reduce, concat, reshape, and more — where upstream only offers Reference. |
 | **Open-source toolchains** | GCC, Arm Compiler 6, and **ATfE** (LLVM-Embedded for Arm, ~10–20 % faster than GCC). |
-| **Two variants** | **SPEED** (`-O2`) for latency, **SIZE** (`-Os`) for footprint. Both ship as prebuilt `.a` and source. |
+| **Kernel profiles** | Source HELIA builds can choose **SPEED** for latency or **SIZE** for footprint. |
 
 ## Supported Silicon
 

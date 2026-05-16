@@ -125,10 +125,10 @@ Every release is built across architecture, toolchain, and build-type combinatio
 </div>
 
 <div class="why-ship-panel" markdown>
-### Build variants
-Release artifacts ship in **SPEED** and **SIZE** variants so teams can choose the right tradeoff for each product. Audio and always-on workloads may prioritize latency; flash-constrained products may prefer smaller binaries.
+### Kernel profiles
+Source HELIA builds expose **SPEED** and **SIZE** kernel profiles so teams can choose the right tradeoff for each product. Audio and always-on workloads may prioritize latency; flash-constrained products may prefer smaller kernel code paths.
 
-| Variant | Best for |
+| Profile | Best for |
 |---|---|
 | SPEED | latency-critical inference |
 | SIZE | flash-constrained deployments |

@@ -16,7 +16,7 @@ These guides go deeper on specific topics after you've completed a [getting-star
 
     ---
 
-    What the two build variants tune and how to select them.
+    What the HELIA source-build kernel profiles tune and how to select them.
 
     [:octicons-arrow-right-24: SPEED vs SIZE](speed-vs-size.md)
 

@@ -63,9 +63,9 @@ region `FLASH' overflowed by 12345 bytes
 
 **Fix options:**
 
-1. Switch to the **SIZE** build variant (`-Os` / `-Oz`)
+1. For source HELIA builds, switch to the **SIZE** kernel profile
 2. Reduce your operator resolver — only register operators your model actually uses
-3. Use the prebuilt archive for the SIZE variant
+3. For source builds, lower compiler optimization for non-kernel code where appropriate
 4. Place code in a larger memory region via linker script
 
 ### Duplicate symbol errors

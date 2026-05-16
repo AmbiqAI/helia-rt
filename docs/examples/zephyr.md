@@ -181,6 +181,12 @@ Known-good versions:
 
     - `CONFIG_HELIA_RT=y`
 
+    Optional HELIA kernel profile:
+
+    - `CONFIG_HELIA_RT_KERNEL_OPTIMIZE_SPEED=y`
+      This is the default.
+    - `CONFIG_HELIA_RT_KERNEL_OPTIMIZE_SIZE=y`
+
 === "Prebuilt Release Module"
 
     ## 1. Download the prebuilt release
@@ -243,6 +249,12 @@ Known-good versions:
       This is the default.
     - `CONFIG_HELIA_RT_PREBUILT_BUILD_DEBUG=y`
     - `CONFIG_HELIA_RT_PREBUILT_BUILD_RELEASE_WITH_LOGS=y`
+
+    These options select the prebuilt archive's build flavor, not the HELIA
+    kernel SPEED/SIZE profile. Current prebuilt release bundles do not publish
+    separate SPEED/SIZE kernel-profile archives; use the source-module path if
+    you need to choose `CONFIG_HELIA_RT_KERNEL_OPTIMIZE_SPEED` or
+    `CONFIG_HELIA_RT_KERNEL_OPTIMIZE_SIZE`.
 
     Do not enable these source-module-only settings with the prebuilt bundle:
 

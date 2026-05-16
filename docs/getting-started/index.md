@@ -60,7 +60,7 @@ If you've used LiteRT for Micro before, you already know the model:
 | Statically-allocated tensor arenas | ✓ |
 | Embedded logging and profiling | ✓ |
 
-The key additions are [three kernel backends](../guides/kernel-selection.md) (Reference, CMSIS-NN, HELIA), [two build variants](../guides/speed-vs-size.md) (SPEED, SIZE), and [three toolchain options](../guides/toolchains.md) (GCC, armclang, ATfE).
+The key additions are [three kernel backends](../guides/kernel-selection.md) (Reference, CMSIS-NN, HELIA), source-build [HELIA kernel profiles](../guides/speed-vs-size.md) (SPEED, SIZE), and [three toolchain options](../guides/toolchains.md) (GCC, armclang, ATfE).
 
 ## Recommended Order
 
