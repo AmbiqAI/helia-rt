@@ -258,6 +258,39 @@ set(HELIA_RT_KERNEL_BASENAMES
 set(HELIA_RT_BACKENDS reference cmsis_nn helia)
 
 # ---------------------------------------------------------------------------
+# Per-kernel optimization knobs for the `helia` backend.
+#
+# Mirrors the Makefile contract documented in
+# tensorflow/lite/micro/kernels/helia/README.md and implemented in
+# tools/make/Makefile + ext_libs/helia.inc:
+#
+#   HELIA_RT_GLOBAL_KERNEL_OPTIMIZE   project-wide default (SPEED|SIZE)
+#   HELIA_RT_CONV_OPT                 override for conv / depthwise_conv /
+#                                     transpose_conv kernels (empty = global)
+#   HELIA_RT_FC_OPT                   override for fully_connected (empty =
+#                                     global)
+#
+# These drive the CONV_KERNEL_OPTIMIZED_FOR_*, FC_KERNEL_OPTIMIZED_FOR_*,
+# and KERNELS_OPTIMIZED_FOR_* compile defines emitted by
+# helia_rt_backend_compile_definitions() below. Without them the precomputed
+# weight-sum fast paths in kernels/helia/{fully_connected,svdf}.cc stay
+# disabled and the runtime regresses by 80–150%+ on MLPerf Tiny vs the
+# Makefile/prebuilt path. svdf.cc additionally `#error`s out unless one of
+# KERNELS_OPTIMIZED_FOR_{SPEED,SIZE} is defined, so SPEED is the safe default.
+# ---------------------------------------------------------------------------
+set(HELIA_RT_GLOBAL_KERNEL_OPTIMIZE "SPEED" CACHE STRING
+    "Default per-kernel optimization target for the helia backend (SPEED|SIZE).")
+set_property(CACHE HELIA_RT_GLOBAL_KERNEL_OPTIMIZE PROPERTY STRINGS SPEED SIZE)
+
+set(HELIA_RT_CONV_OPT "" CACHE STRING
+    "Override conv-family kernel optimization (SPEED|SIZE); empty inherits HELIA_RT_GLOBAL_KERNEL_OPTIMIZE.")
+set_property(CACHE HELIA_RT_CONV_OPT PROPERTY STRINGS "" SPEED SIZE)
+
+set(HELIA_RT_FC_OPT "" CACHE STRING
+    "Override fully-connected kernel optimization (SPEED|SIZE); empty inherits HELIA_RT_GLOBAL_KERNEL_OPTIMIZE.")
+set_property(CACHE HELIA_RT_FC_OPT PROPERTY STRINGS "" SPEED SIZE)
+
+# ---------------------------------------------------------------------------
 # helia_rt_select_kernel_sources(OUT_VAR BACKEND <name>)
 #
 # Resolves HELIA_RT_KERNEL_BASENAMES into absolute paths under the requested
@@ -313,6 +346,11 @@ endfunction()
 #   reference  → (none)
 #   cmsis_nn   → CMSIS_NN
 #   helia      → CMSIS_NN, NS_CMSIS_NN, HELIA   (kernel headers expect all 3)
+#                plus per-kernel optimization defines driven by
+#                HELIA_RT_{GLOBAL_KERNEL_OPTIMIZE,CONV_OPT,FC_OPT}:
+#                    CONV_KERNEL_OPTIMIZED_FOR_<SPEED|SIZE>
+#                    FC_KERNEL_OPTIMIZED_FOR_<SPEED|SIZE>
+#                    KERNELS_OPTIMIZED_FOR_<SPEED|SIZE>
 # ---------------------------------------------------------------------------
 function(helia_rt_backend_compile_definitions OUT_VAR)
     cmake_parse_arguments(_ARG "" "BACKEND" "" ${ARGN})
@@ -325,6 +363,38 @@ function(helia_rt_backend_compile_definitions OUT_VAR)
         set(_defs CMSIS_NN)
     elseif(_ARG_BACKEND STREQUAL "helia")
         set(_defs CMSIS_NN NS_CMSIS_NN HELIA)
+
+        # Resolve per-kernel overrides, falling back to the global default.
+        set(_global "${HELIA_RT_GLOBAL_KERNEL_OPTIMIZE}")
+        set(_conv "${HELIA_RT_CONV_OPT}")
+        if(_conv STREQUAL "")
+            set(_conv "${_global}")
+        endif()
+        set(_fc "${HELIA_RT_FC_OPT}")
+        if(_fc STREQUAL "")
+            set(_fc "${_global}")
+        endif()
+
+        # Validate. SPEED|SIZE only; anything else is a fast-fail.
+        foreach(_name HELIA_RT_GLOBAL_KERNEL_OPTIMIZE HELIA_RT_CONV_OPT HELIA_RT_FC_OPT)
+            if(_name STREQUAL "HELIA_RT_GLOBAL_KERNEL_OPTIMIZE")
+                set(_val "${_global}")
+            elseif(_name STREQUAL "HELIA_RT_CONV_OPT")
+                set(_val "${_conv}")
+            else()
+                set(_val "${_fc}")
+            endif()
+            if(NOT _val MATCHES "^(SPEED|SIZE)$")
+                message(FATAL_ERROR
+                    "helia_rt_backend_compile_definitions: ${_name}='${_val}' "
+                    "is invalid — must be SPEED or SIZE.")
+            endif()
+        endforeach()
+
+        list(APPEND _defs
+            CONV_KERNEL_OPTIMIZED_FOR_${_conv}
+            FC_KERNEL_OPTIMIZED_FOR_${_fc}
+            KERNELS_OPTIMIZED_FOR_${_global})
     endif()
     set(${OUT_VAR} ${_defs} PARENT_SCOPE)
 endfunction()
