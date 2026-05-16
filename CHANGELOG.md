@@ -7,7 +7,7 @@
 
 * **cmake:** unified source-of-truth for heliaRT ([#147](https://github.com/AmbiqAI/helia-rt/issues/147) Phase 1) ([#148](https://github.com/AmbiqAI/helia-rt/issues/148)) ([985139b](https://github.com/AmbiqAI/helia-rt/commit/985139b7832038cba2891ab92ba9db6381606175))
 * **cmsis-pack:** adopt Cclass/Cgroup/Csub/Cvariant convention; gate HELIA on ns-cmsis-nn ([6924641](https://github.com/AmbiqAI/helia-rt/commit/6924641ef3a5274b610df71b1a1f3edad6420637))
-* **cmsis-pack:** pin heliaCORE cross-pack require to Cvariant=Source, Cversion=7.24.2 ([7e2bae3](https://github.com/AmbiqAI/helia-rt/commit/7e2bae3e5065486d5bcbbf63237c2a672d249005))
+* **cmsis-pack:** pin heliaCORE cross-pack require to Cvariant=Source, Cversion=7.25.0 ([7e2bae3](https://github.com/AmbiqAI/helia-rt/commit/7e2bae3e5065486d5bcbbf63237c2a672d249005))
 * **cmsis-pack:** pin heliaCORE Cversion=7.24.1 and add pdsc contract guard ([32d471a](https://github.com/AmbiqAI/helia-rt/commit/32d471aa0daab23e659b9e232aa2824ae131b41f))
 * **nsx:** switch nsx-heliart to source build via SSoT ([#147](https://github.com/AmbiqAI/helia-rt/issues/147) Phase 2) ([4fb6191](https://github.com/AmbiqAI/helia-rt/commit/4fb6191cdae680de52cd9650739285161101c2c4))
 * **tools:** CMSIS-Pack builder consuming dump_manifest.cmake (Phase 3 of [#147](https://github.com/AmbiqAI/helia-rt/issues/147)) ([2ccb6a5](https://github.com/AmbiqAI/helia-rt/commit/2ccb6a5b5d0d492216af913fbe2757b8aec9ffda))
