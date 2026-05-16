@@ -23,6 +23,18 @@ endif()
 
 set(HELIA_RT_DIR ${ZEPHYR_CURRENT_MODULE_DIR})
 
+# Translate the Kconfig HELIA_RT_KERNEL_OPTIMIZE choice into the SSoT cache
+# variable BEFORE including helia_rt_sources.cmake, so its default-of-SPEED
+# does not win over the user's Kconfig selection. Only meaningful for the
+# HELIA backend; the cache var is harmless for reference / cmsis_nn builds.
+if(CONFIG_HELIA_RT_KERNEL_OPTIMIZE_SIZE)
+    set(HELIA_RT_GLOBAL_KERNEL_OPTIMIZE "SIZE" CACHE STRING
+        "Default per-kernel optimization target (set from Kconfig)" FORCE)
+elseif(CONFIG_HELIA_RT_KERNEL_OPTIMIZE_SPEED)
+    set(HELIA_RT_GLOBAL_KERNEL_OPTIMIZE "SPEED" CACHE STRING
+        "Default per-kernel optimization target (set from Kconfig)" FORCE)
+endif()
+
 # Pull in the canonical source manifest.
 include(${HELIA_RT_DIR}/cmake/helia_rt_sources.cmake)
 

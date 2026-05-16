@@ -68,9 +68,10 @@ matches the release build matrix.
 
     - local `helia-rt` source in `modules/helia-rt`
     - open `cmsis-nn` from the Zephyr workspace
-    - `CONFIG_CMSIS_NN=y`
+    - `CONFIG_STD_CPP17=y`
     - `CONFIG_HELIA_RT=y`
-    - `CONFIG_HELIA_RT_BACKEND_CMSIS_NN=y`
+    - `CONFIG_NS_CMSIS_NN=n` (suppress the auto-imply)
+    - `CONFIG_CMSIS_NN=y` and per-op kernel configs for your model
 
 === "Source Module + HELIA"
 
@@ -90,9 +91,8 @@ matches the release build matrix.
 
     - local `helia-rt` source in `modules/helia-rt`
     - local `ns-cmsis-nn` in `modules/ns-cmsis-nn`
+    - `CONFIG_STD_CPP17=y`
     - `CONFIG_HELIA_RT=y`
-    - `CONFIG_NS_CMSIS_NN=y`
-    - `CONFIG_HELIA_RT_BACKEND_HELIA=y`
 
 === "Prebuilt Release Module"
 
@@ -117,9 +117,24 @@ matches the release build matrix.
 
 ## Module Discovery
 
-Zephyr can discover heliaRT modules in two common ways:
+Zephyr can discover heliaRT modules in two common ways.
 
-### West-Managed Modules
+### West-Managed Modules (recommended)
+
+Add both repos as west projects in your workspace `west.yml` and run
+`west update helia-rt ns-cmsis-nn`:
+
+```yaml
+- name: helia-rt
+  url: https://github.com/AmbiqAI/helia-rt
+  revision: <helia-rt-version>     # e.g. heliaRT-v1.13.1
+  path: modules/helia-rt
+
+- name: ns-cmsis-nn
+  url: https://github.com/AmbiqAI/ns-cmsis-nn
+  revision: <ns-cmsis-nn-version>  # e.g. v7.24.1
+  path: modules/ns-cmsis-nn
+```
 
 Use this when you want:
 
@@ -127,16 +142,30 @@ Use this when you want:
 - consistent CI behavior
 - shared dependency management across apps
 
-### `ZEPHYR_EXTRA_MODULES`
+With west-managed modules, no `ZEPHYR_EXTRA_MODULES` is needed in
+`CMakeLists.txt` — Zephyr discovers the modules automatically.
+
+### `ZEPHYR_EXTRA_MODULES` (fallback)
 
 Use this when you want:
 
 - app-local control over module paths
 - easy switching between source and prebuilt variants
-- simple local experimentation
+- simple local experimentation without modifying `west.yml`
 
-The Zephyr example page shows the exact `ZEPHYR_EXTRA_MODULES` setup for each
-integration path.
+For source modules, point `ZEPHYR_EXTRA_MODULES` at your local checkouts of
+`helia-rt` and (for the HELIA backend) `ns-cmsis-nn`:
+
+```cmake
+list(APPEND ZEPHYR_EXTRA_MODULES
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../modules/helia-rt
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../modules/ns-cmsis-nn
+)
+find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+```
+
+The Zephyr example page shows the exact `ZEPHYR_EXTRA_MODULES` setup for
+the prebuilt integration path.
 
 ## Notes
 
