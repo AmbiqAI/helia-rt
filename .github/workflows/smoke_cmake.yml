@@ -37,7 +37,7 @@ jobs:
       matrix:
         backend: [reference, cmsis_nn, helia]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install cmake
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake
       - name: Dump + validate JSON manifest
@@ -78,7 +78,7 @@ jobs:
     name: Configure + build helia_rt::reference (host clang)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install toolchain
         run: |
           sudo apt-get update
@@ -101,7 +101,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Check diff scope
@@ -132,7 +132,7 @@ jobs:
     name: Build CMSIS-Pack from SSoT manifest
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install cmake
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake
       - name: Build pack
@@ -201,7 +201,7 @@ jobs:
       NS_CMSIS_NN_REF: v7.25.0
     steps:
       - name: Checkout helia-rt
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           path: helia-rt
       - name: Checkout ns-cmsis-nn (pinned ref)
@@ -325,7 +325,7 @@ jobs:
       ZEPHYR_REF: v4.0.0
     steps:
       - name: Checkout helia-rt
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           path: helia-rt
       - name: Locate Zephyr SDK in CI image
