@@ -57,11 +57,17 @@ jobs:
           for s in d['common_sources'] + d['kernel_sources']:
               assert not s.startswith('/'),  s
               assert '..' not in s.split('/'), s
-          # Backend define contract.
+          # Backend define contract. The helia backend additionally
+          # carries per-kernel optimization defines defaulted to SPEED
+          # (see HELIA_RT_GLOBAL_KERNEL_OPTIMIZE / _CONV_OPT / _FC_OPT in
+          # cmake/helia_rt_sources.cmake).
           want = {
               'reference': [],
               'cmsis_nn':  ['CMSIS_NN'],
-              'helia':     ['CMSIS_NN', 'NS_CMSIS_NN', 'HELIA'],
+              'helia':     ['CMSIS_NN', 'NS_CMSIS_NN', 'HELIA',
+                            'CONV_KERNEL_OPTIMIZED_FOR_SPEED',
+                            'FC_KERNEL_OPTIMIZED_FOR_SPEED',
+                            'KERNELS_OPTIMIZED_FOR_SPEED'],
           }['${{ matrix.backend }}']
           assert d['backend_defines'] == want, (d['backend_defines'], want)
           print(f\"OK: backend={d['backend']} kernels={len(d['kernel_sources'])} \"
