@@ -24,12 +24,11 @@
 # Backend-specific upstream targets:
 #   helia:    nsx::cmsis_nn (or alias) — ns-cmsis-nn kernels, with Ambiq's
 #             additive weight-sum / fast-path symbols actively referenced.
-#   cmsis_nn: nsx::cmsis_nn — same kernel library, but the TFLM cmsis_nn
-#             wrappers only call the upstream arm_* API. The Ambiq-added
-#             symbols sit unreferenced and --gc-sections drops them, giving
-#             apples-to-apples vanilla-CMSIS-NN behavior. Override with
-#             -DHELIA_RT_CMSISNN_TARGET=<name> to swap in a different
-#             CMSIS-NN provider.
+#   cmsis_nn: User-supplied upstream CMSIS-NN target. ns-cmsis-nn is NOT
+#             compatible (modified API signatures). Supply the target via
+#             -DHELIA_RT_CMSISNN_TARGET=<name> (e.g. CMSIS::NN from an
+#             upstream fetch). A future nsx-cmsis-nn-compat module may
+#             provide this natively.
 #   reference: (none)
 #
 # Advanced-user note: switching NSX_HELIART_BACKEND in an existing build
@@ -126,16 +125,14 @@ set(HELIA_RT_DISABLE_X86_NEON   OFF CACHE BOOL "" FORCE)
 # so we don't get duplicate-symbol link errors.
 set(HELIA_RT_PROVIDE_DEBUG_LOG  OFF CACHE BOOL "" FORCE)
 
-# Wire the kernel-library target for the selected backend. Both helia and
-# cmsis_nn point at nsx::cmsis_nn (the nsx-cmsis-nn module's public alias)
-# — ns-cmsis-nn is vanilla CMSIS-NN plus additive Ambiq-authored symbols,
-# so the cmsis_nn backend (whose TFLM wrappers only reference the upstream
-# arm_* API) gets apples-to-apples vanilla-CMSIS-NN behavior from the same
-# kernel library, making it a valid A/B baseline against HELIA. Override
-# per-build with -DHELIA_RT_{CMSISNN,NSCMSISNN}_TARGET=<name> if the
-# contract changes. The cache vars are kept consistent across reconfigures
-# (e.g. switching NSX_HELIART_BACKEND in the same build dir) by unsetting
-# the inactive one rather than leaving a stale FORCE entry behind.
+# Wire the kernel-library target for the selected backend. The helia
+# backend uses nsx::cmsis_nn (ns-cmsis-nn). The cmsis_nn backend requires
+# an upstream-CMSIS-NN-compatible target — ns-cmsis-nn has modified API
+# signatures and won't compile with the vanilla cmsis_nn wrappers. The
+# user must supply -DHELIA_RT_CMSISNN_TARGET=<name> explicitly.
+# The cache vars are kept consistent across reconfigures (e.g. switching
+# NSX_HELIART_BACKEND in the same build dir) by unsetting the inactive one
+# rather than leaving a stale FORCE entry behind.
 if(NSX_HELIART_BACKEND STREQUAL "helia")
     if(NOT HELIA_RT_NSCMSISNN_TARGET)
         set(HELIA_RT_NSCMSISNN_TARGET "nsx::cmsis_nn" CACHE STRING
@@ -144,8 +141,11 @@ if(NSX_HELIART_BACKEND STREQUAL "helia")
     unset(HELIA_RT_CMSISNN_TARGET CACHE)
 elseif(NSX_HELIART_BACKEND STREQUAL "cmsis_nn")
     if(NOT HELIA_RT_CMSISNN_TARGET)
-        set(HELIA_RT_CMSISNN_TARGET "nsx::cmsis_nn" CACHE STRING
-            "CMSIS-NN target to link from helia_rt::cmsis_nn (nsx-heliart default)" FORCE)
+        message(FATAL_ERROR
+            "nsx-heliart: NSX_HELIART_BACKEND=cmsis_nn requires an upstream "
+            "CMSIS-NN target. Set -DHELIA_RT_CMSISNN_TARGET=<name> (e.g. CMSIS::NN). "
+            "ns-cmsis-nn (nsx::cmsis_nn) is NOT compatible — its API signatures "
+            "differ from upstream CMSIS-NN.")
     endif()
     unset(HELIA_RT_NSCMSISNN_TARGET CACHE)
 else() # reference
@@ -197,14 +197,14 @@ target_link_libraries(${_nsx_heliart_concrete_target} PRIVATE ${NSX_BOARD_FLAGS_
 # assumption about the on-disk location. (See ns-cmsis-nn issue tracking
 # the root-include exposure; once the upstream module exports the parent
 # automatically, this block becomes a harmless no-op.)
-if(NSX_HELIART_BACKEND STREQUAL "helia" OR NSX_HELIART_BACKEND STREQUAL "cmsis_nn")
+if(NSX_HELIART_BACKEND STREQUAL "helia")
     get_target_property(_nsx_heliart_aliased nsx_cmsis_nn ALIASED_TARGET)
     if(_nsx_heliart_aliased)
         set(_nsx_heliart_cmsis_nn_target ${_nsx_heliart_aliased})
     else()
         set(_nsx_heliart_cmsis_nn_target nsx_cmsis_nn)
     endif()
-    target_include_directories(${_nsx_heliart_concrete_target} PRIVATE
+    target_include_directories(helia_rt_helia PRIVATE
         "$<TARGET_PROPERTY:${_nsx_heliart_cmsis_nn_target},SOURCE_DIR>/..")
 endif()
 
