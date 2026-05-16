@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.14.0](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.13.1...heliaRT-v1.14.0) (2026-05-15)
+
+
+### Features
+
+* **cmake:** unified source-of-truth for heliaRT ([#147](https://github.com/AmbiqAI/helia-rt/issues/147) Phase 1) ([#148](https://github.com/AmbiqAI/helia-rt/issues/148)) ([985139b](https://github.com/AmbiqAI/helia-rt/commit/985139b7832038cba2891ab92ba9db6381606175))
+* **cmsis-pack:** adopt Cclass/Cgroup/Csub/Cvariant convention; gate HELIA on ns-cmsis-nn ([6924641](https://github.com/AmbiqAI/helia-rt/commit/6924641ef3a5274b610df71b1a1f3edad6420637))
+* **cmsis-pack:** pin heliaCORE cross-pack require to Cvariant=Source, Cversion=7.25.0 ([7e2bae3](https://github.com/AmbiqAI/helia-rt/commit/7e2bae3e5065486d5bcbbf63237c2a672d249005))
+* **cmsis-pack:** pin heliaCORE Cversion=7.24.1 and add pdsc contract guard ([32d471a](https://github.com/AmbiqAI/helia-rt/commit/32d471aa0daab23e659b9e232aa2824ae131b41f))
+* **nsx:** switch nsx-heliart to source build via SSoT ([#147](https://github.com/AmbiqAI/helia-rt/issues/147) Phase 2) ([4fb6191](https://github.com/AmbiqAI/helia-rt/commit/4fb6191cdae680de52cd9650739285161101c2c4))
+* **tools:** CMSIS-Pack builder consuming dump_manifest.cmake (Phase 3 of [#147](https://github.com/AmbiqAI/helia-rt/issues/147)) ([2ccb6a5](https://github.com/AmbiqAI/helia-rt/commit/2ccb6a5b5d0d492216af913fbe2757b8aec9ffda))
+* **zephyr:** consume cmake/helia_rt_sources.cmake SSoT ([#147](https://github.com/AmbiqAI/helia-rt/issues/147) Phase 4) ([ecc5b37](https://github.com/AmbiqAI/helia-rt/commit/ecc5b37a95b4a7bd00b32be570f1eb7e3c7978e3))
+
+
+### Bug Fixes
+
+* **ci:** install newlib headers for arm-none-eabi cross-build ([eb72a3e](https://github.com/AmbiqAI/helia-rt/commit/eb72a3e180b3dad7deb96b59efc0295ab11f3165))
+* **ci:** use cmake --build -j (not -- -j) for nsx-cross-build ([a651ab2](https://github.com/AmbiqAI/helia-rt/commit/a651ab2ef26067aa429c868ecc8a103fed448dfe))
+* **cmsis_pack:** drop attr="config" on preIncludeGlobal stubs ([ca6e82f](https://github.com/AmbiqAI/helia-rt/commit/ca6e82fab89ef6858eabbd5ad44782096403f3a9))
+
+
+### Refactoring
+
+* **cmsis-pack:** drop dead common_set + surface cmake stderr on failure ([6a40e92](https://github.com/AmbiqAI/helia-rt/commit/6a40e92f0a36e18f91b5617b6d88a8aeb130da68))
+
 ## [1.13.1](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.13.0...heliaRT-v1.13.1) (2026-05-12)
 
 
