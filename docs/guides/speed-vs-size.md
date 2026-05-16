@@ -1,16 +1,18 @@
-# SPEED vs SIZE Build Variants
+# HELIA Kernel SPEED vs SIZE
 
-Every heliaRT release publishes two optimization profiles. Pick the one that matches your workload's constraints.
+The HELIA backend has a build-time kernel profile that selects between
+latency-oriented and footprint-oriented implementations for selected kernels.
+This is separate from the overall build flavor (`debug`, `release_with_logs`,
+or `release`) and separate from compiler flags such as `-O2` or `-Os`.
 
-## The Two Variants
+## The Two Profiles
 
-| Variant | Compiler flags | Optimizes for |
+| Profile | Optimizes for | Effect |
 |---|---|---|
-| **SPEED** (`release`) | `-O2` / `-Ofast` | Minimum inference latency |
-| **SIZE** (`release_with_logs` / custom `-Os`) | `-Os` / `-Oz` | Smallest Flash footprint |
+| **SPEED** | Minimum inference latency | Enables speed paths in HELIA kernels |
+| **SIZE** | Smaller HELIA kernel code paths | Trades runtime for footprint where the kernel offers both paths |
 
-!!! tip "Debug builds"
-    A third build type — `debug` (`-O0 -g`) — is also published for development. Never ship it in production.
+The default is **SPEED**, matching the historical Makefile/prebuilt behavior.
 
 ## Trade-Offs
 
@@ -27,44 +29,65 @@ quadrantChart
 |---|---|---|
 | Inference latency | ▼ Lower | ▲ Higher |
 | Flash usage | ▲ Larger | ▼ Smaller |
-| RAM usage | ~Same | ~Same |
+| RAM usage | Kernel-dependent | Kernel-dependent |
 | Best for | Real-time audio, always-on wake-word | Battery-first, Flash-constrained |
 
 ## How to Select
 
-=== "Prebuilt archive"
+=== "Source / CMake"
 
-    Download the variant you need from the [release bundle](https://github.com/AmbiqAI/helia-rt/releases):
-
+    ```bash
+    cmake -S . -B build \
+      -DHELIA_RT_ENABLE_HELIA=ON \
+      -DHELIA_RT_GLOBAL_KERNEL_OPTIMIZE=SPEED
     ```
-    helia-rt-<tag>/cortex-m55/atfe/release/          ← SPEED
-    helia-rt-<tag>/cortex-m55/atfe/release_with_logs/ ← SIZE + logging
+
+    `HELIA_RT_GLOBAL_KERNEL_OPTIMIZE` accepts `SPEED` or `SIZE`.
+
+    Advanced source builds can override specific HELIA kernel families:
+
+    ```bash
+    cmake -S . -B build \
+      -DHELIA_RT_ENABLE_HELIA=ON \
+      -DHELIA_RT_GLOBAL_KERNEL_OPTIMIZE=SIZE \
+      -DHELIA_RT_CONV_OPT=SPEED \
+      -DHELIA_RT_FC_OPT=SIZE
     ```
 
 === "Source / Makefile"
 
     ```bash
     # SPEED
-    make ... BUILD_TYPE=release microlite
+    make ... OPTIMIZED_KERNEL_DIR=helia GLOBAL_KERNEL_OPTIMIZE=SPEED microlite
 
     # SIZE
-    make ... BUILD_TYPE=release_with_logs microlite
+    make ... OPTIMIZED_KERNEL_DIR=helia GLOBAL_KERNEL_OPTIMIZE=SIZE microlite
     ```
 
-=== "Zephyr"
+    Per-family overrides are available through `CONV_OPT` and `FC_OPT`.
 
-    Standard Zephyr optimization flags apply:
+=== "Zephyr Source Module"
+
+    Select the HELIA backend, then choose the kernel profile:
 
     ```cfg
-    # prj.conf
-    CONFIG_SPEED_OPTIMIZATIONS=y    # SPEED
+    CONFIG_HELIA_RT=y
+    CONFIG_HELIA_RT_BACKEND_HELIA=y
+    CONFIG_HELIA_RT_KERNEL_OPTIMIZE_SPEED=y
     # or
-    CONFIG_SIZE_OPTIMIZATIONS=y     # SIZE
+    CONFIG_HELIA_RT_KERNEL_OPTIMIZE_SIZE=y
     ```
+
+=== "Prebuilt Archive"
+
+    Current prebuilt release bundles select archives by CPU, toolchain, and
+    build flavor (`debug`, `release_with_logs`, or `release`). They do not
+    publish a separate SPEED/SIZE kernel-profile axis. Use the source module
+    path when you need to choose the HELIA kernel profile explicitly.
 
 ## Kernel-Level Knobs
 
-The HELIA backend exposes per-kernel optimization overrides:
+The HELIA backend exposes per-kernel optimization overrides in source builds:
 
 ```makefile
 # Override individual kernels (values: SPEED or SIZE)
@@ -72,7 +95,8 @@ CONV_OPT=SPEED
 FC_OPT=SIZE
 ```
 
-This lets you optimize latency-critical operators (Conv2D) for SPEED while keeping less critical ones optimized for SIZE.
+This lets you optimize latency-critical operators for SPEED while keeping less
+critical ones optimized for SIZE.
 
 ## Next Steps
 

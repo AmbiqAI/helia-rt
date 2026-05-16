@@ -52,6 +52,9 @@ When consuming via the top-level `CMakeLists.txt` (or NSX/Zephyr source-mode she
 | `HELIA_RT_BUILD_TYPE` | `release_with_logs` | `debug` / `release_with_logs` (defines `NDEBUG`) / `release` (also `TF_LITE_STRIP_ERROR_STRINGS`) |
 | `HELIA_RT_ENABLE_CMSIS_NN` | `OFF` | Materialize `helia_rt::cmsis_nn`. Requires consumer-provided `cmsis-nn` target. |
 | `HELIA_RT_ENABLE_HELIA` | `OFF` | Materialize `helia_rt::helia`. Requires consumer-provided `ns-cmsis-nn` target. |
+| `HELIA_RT_GLOBAL_KERNEL_OPTIMIZE` | `SPEED` | HELIA backend kernel profile: `SPEED` or `SIZE`. |
+| `HELIA_RT_CONV_OPT` | (empty) | Optional HELIA conv-family override: `SPEED` or `SIZE`; empty inherits `HELIA_RT_GLOBAL_KERNEL_OPTIMIZE`. |
+| `HELIA_RT_FC_OPT` | (empty) | Optional HELIA fully-connected override: `SPEED` or `SIZE`; empty inherits `HELIA_RT_GLOBAL_KERNEL_OPTIMIZE`. |
 | `HELIA_RT_CORE_OPT` | `-Os` | Optimization flag for runtime core (`micro_allocator.cc`, etc.) |
 | `HELIA_RT_KERNEL_OPT` | `-O2` | Optimization flag for kernel `.cc` files |
 | `HELIA_RT_THIRD_PARTY_OPT` | `-O2` | Reserved — applied when `third_party_static/` ships compile units |
@@ -68,6 +71,16 @@ When consuming via the top-level `CMakeLists.txt` (or NSX/Zephyr source-mode she
 set(HELIA_RT_BUILD_TYPE release CACHE STRING "" FORCE)
 add_subdirectory(third_party/helia-rt)
 target_link_libraries(my_app PRIVATE helia_rt::reference)
+```
+
+For the HELIA backend, select the source-build kernel profile before adding
+the repo:
+
+```cmake
+set(HELIA_RT_ENABLE_HELIA ON CACHE BOOL "" FORCE)
+set(HELIA_RT_GLOBAL_KERNEL_OPTIMIZE SIZE CACHE STRING "" FORCE)
+add_subdirectory(third_party/helia-rt)
+target_link_libraries(my_app PRIVATE helia_rt::helia)
 ```
 
 ## Example: consuming via `FetchContent`

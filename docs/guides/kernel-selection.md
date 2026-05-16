@@ -61,16 +61,44 @@ The HELIA backend currently provides optimized implementations for **36 operator
 
 [:octicons-arrow-right-24: Full operator coverage matrix](../reference/operator-coverage.md)
 
-## Per-Kernel Optimization Knobs
+## HELIA Kernel Optimization Profile
 
-The HELIA backend supports per-kernel SPEED/SIZE overrides:
+The HELIA backend supports a SPEED/SIZE kernel profile in source builds. The
+default is SPEED.
+
+=== "Zephyr Source Module"
+
+    ```cfg
+    CONFIG_HELIA_RT=y
+    CONFIG_HELIA_RT_BACKEND_HELIA=y
+    CONFIG_HELIA_RT_KERNEL_OPTIMIZE_SPEED=y
+    # or
+    CONFIG_HELIA_RT_KERNEL_OPTIMIZE_SIZE=y
+    ```
+
+=== "CMake"
+
+    ```bash
+    cmake -S . -B build \
+      -DHELIA_RT_ENABLE_HELIA=ON \
+      -DHELIA_RT_GLOBAL_KERNEL_OPTIMIZE=SIZE
+    ```
+
+=== "Makefile"
+
+    ```bash
+    make ... OPTIMIZED_KERNEL_DIR=helia GLOBAL_KERNEL_OPTIMIZE=SIZE microlite
+    ```
+
+Advanced CMake and Makefile builds can also override selected kernel families:
 
 ```makefile
 CONV_OPT=SPEED    # optimize Conv2D for latency
 FC_OPT=SIZE       # optimize FullyConnected for code size
 ```
 
-These default to `GLOBAL_KERNEL_OPTIMIZE` when not set.
+For CMake, the equivalent cache variables are `HELIA_RT_CONV_OPT` and
+`HELIA_RT_FC_OPT`. These default to the global profile when unset.
 
 ## Next Steps
 

@@ -10,7 +10,7 @@ CMSIS-Pack support is planned for teams that use Keil MDK, CMSIS-Toolbox, or CMS
 When available, the CMSIS-Pack path is expected to cover:
 
 - installing heliaRT through CMSIS-Pack Manager or `cpackget`
-- selecting a SPEED or SIZE release variant
+- selecting a HELIA kernel profile where the pack exposes source-build controls
 - choosing the Reference, CMSIS-NN, or HELIA backend
 - building with Keil MDK, Arm Compiler 6, or CMSIS-Toolbox
 - consuming headers and static libraries without cloning the full source tree
@@ -33,4 +33,4 @@ The CMSIS-Pack flow should not change the application-facing runtime model. Team
 
 - [Zephyr setup](zephyr.md) — current recommended product integration path
 - [Toolchains](../guides/toolchains.md) — compare GCC, Arm Compiler 6, and ATfE
-- [SPEED vs SIZE](../guides/speed-vs-size.md) — choose the release artifact shape
+- [SPEED vs SIZE](../guides/speed-vs-size.md) — understand HELIA source-build kernel profiles

@@ -92,4 +92,4 @@ int main() {
 
 - [Source Builds](../getting-started/source.md) — building from source instead of prebuilt
 - [Static vs Source](../guides/static-vs-source.md) — choosing the right distribution form
-- [SPEED vs SIZE](../guides/speed-vs-size.md) — which build variant to link
+- [SPEED vs SIZE](../guides/speed-vs-size.md) — HELIA source-build kernel profiles

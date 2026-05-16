@@ -66,5 +66,5 @@ make -f tensorflow/lite/micro/tools/make/Makefile \
 
 ## Next Steps
 
-- [SPEED vs SIZE variants](speed-vs-size.md) — choose `release` or `release_with_logs`
+- [SPEED vs SIZE](speed-vs-size.md) — tune HELIA source-build kernel paths
 - [Toolchain selection](toolchains.md) — pick `gcc`, `armclang`, or `atfe`
