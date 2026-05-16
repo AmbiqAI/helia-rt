@@ -376,20 +376,24 @@ function(helia_rt_backend_compile_definitions OUT_VAR)
         endif()
 
         # Validate. SPEED|SIZE only; anything else is a fast-fail.
-        foreach(_name HELIA_RT_GLOBAL_KERNEL_OPTIMIZE HELIA_RT_CONV_OPT HELIA_RT_FC_OPT)
-            if(_name STREQUAL "HELIA_RT_GLOBAL_KERNEL_OPTIMIZE")
-                set(_val "${_global}")
-            elseif(_name STREQUAL "HELIA_RT_CONV_OPT")
-                set(_val "${_conv}")
-            else()
-                set(_val "${_fc}")
-            endif()
-            if(NOT _val MATCHES "^(SPEED|SIZE)$")
-                message(FATAL_ERROR
-                    "helia_rt_backend_compile_definitions: ${_name}='${_val}' "
-                    "is invalid — must be SPEED or SIZE.")
-            endif()
-        endforeach()
+        if(NOT _global MATCHES "^(SPEED|SIZE)$")
+            message(FATAL_ERROR
+                "helia_rt_backend_compile_definitions: "
+                "HELIA_RT_GLOBAL_KERNEL_OPTIMIZE='${_global}' "
+                "is invalid — must be SPEED or SIZE.")
+        endif()
+        if(NOT _conv MATCHES "^(SPEED|SIZE)$")
+            message(FATAL_ERROR
+                "helia_rt_backend_compile_definitions: "
+                "HELIA_RT_CONV_OPT='${_conv}' "
+                "is invalid — must be SPEED or SIZE.")
+        endif()
+        if(NOT _fc MATCHES "^(SPEED|SIZE)$")
+            message(FATAL_ERROR
+                "helia_rt_backend_compile_definitions: "
+                "HELIA_RT_FC_OPT='${_fc}' "
+                "is invalid — must be SPEED or SIZE.")
+        endif()
 
         list(APPEND _defs
             CONV_KERNEL_OPTIMIZED_FOR_${_conv}
