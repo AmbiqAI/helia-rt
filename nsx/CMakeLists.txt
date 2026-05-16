@@ -31,6 +31,11 @@
 #             -DHELIA_RT_CMSISNN_TARGET=<name> to swap in a different
 #             CMSIS-NN provider.
 #   reference: (none)
+#
+# Advanced-user note: switching NSX_HELIART_BACKEND in an existing build
+# directory resets HELIA_RT_CMSISNN_TARGET / HELIA_RT_NSCMSISNN_TARGET to
+# the nsx-heliart defaults (nsx::cmsis_nn). If you supplied a custom -D
+# override and want it across a backend switch, re-pass it on reconfigure.
 # ---------------------------------------------------------------------------
 
 cmake_minimum_required(VERSION 3.21)

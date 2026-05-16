@@ -289,6 +289,33 @@ jobs:
           arm-none-eabi-objdump -a smoke/build/nsx_heliart/heliart-src/libhelia_rt_helia.a \
               | head -5
 
+      # Cover the two non-default backends in separate build dirs. These
+      # are advanced / internal paths (cmsis_nn = A/B baseline against
+      # HELIA, reference = generic TFLM kernels) — the helia path above
+      # is the customer-facing default and gets the full sanity check.
+      - name: Configure + build (cmsis_nn backend)
+        run: |
+          cmake -S smoke -B smoke/build-cmsis_nn -G Ninja \
+              -DCMAKE_TOOLCHAIN_FILE="$(pwd)/smoke/toolchain.cmake" \
+              -DHELIA_RT_DIR="$(pwd)/helia-rt" \
+              -DNS_CMSIS_NN_DIR="$(pwd)/ns-cmsis-nn" \
+              -DNSX_HELIART_BACKEND=cmsis_nn \
+              -DHELIART_VARIANT=release-with-logs
+          cmake --build smoke/build-cmsis_nn \
+              --target helia_rt_cmsis_nn nsx_heliart_glue -j
+          test -f smoke/build-cmsis_nn/nsx_heliart/heliart-src/libhelia_rt_cmsis_nn.a
+      - name: Configure + build (reference backend)
+        run: |
+          cmake -S smoke -B smoke/build-reference -G Ninja \
+              -DCMAKE_TOOLCHAIN_FILE="$(pwd)/smoke/toolchain.cmake" \
+              -DHELIA_RT_DIR="$(pwd)/helia-rt" \
+              -DNS_CMSIS_NN_DIR="$(pwd)/ns-cmsis-nn" \
+              -DNSX_HELIART_BACKEND=reference \
+              -DHELIART_VARIANT=release-with-logs
+          cmake --build smoke/build-reference \
+              --target helia_rt_reference nsx_heliart_glue -j
+          test -f smoke/build-reference/nsx_heliart/heliart-src/libhelia_rt_reference.a
+
   zephyr-build:
     name: Zephyr module build (qemu_cortex_m3, REFERENCE)
     runs-on: ubuntu-latest
