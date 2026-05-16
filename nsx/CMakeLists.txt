@@ -22,8 +22,14 @@
 #   nsx_soc_hal                  SoC HAL (transitive deps for debug_log glue)
 #
 # Backend-specific upstream targets:
-#   helia:    nsx::cmsis_nn (or alias) — ns-cmsis-nn kernels
-#   cmsis_nn: cmsis-nn target resolved by repo-root CMakeLists
+#   helia:    nsx::cmsis_nn (or alias) — ns-cmsis-nn kernels, with Ambiq's
+#             additive weight-sum / fast-path symbols actively referenced.
+#   cmsis_nn: nsx::cmsis_nn — same kernel library, but the TFLM cmsis_nn
+#             wrappers only call the upstream arm_* API. The Ambiq-added
+#             symbols sit unreferenced and --gc-sections drops them, giving
+#             apples-to-apples vanilla-CMSIS-NN behavior. Override with
+#             -DHELIA_RT_CMSISNN_TARGET=<name> to swap in a different
+#             CMSIS-NN provider.
 #   reference: (none)
 # ---------------------------------------------------------------------------
 
@@ -115,24 +121,53 @@ set(HELIA_RT_DISABLE_X86_NEON   OFF CACHE BOOL "" FORCE)
 # so we don't get duplicate-symbol link errors.
 set(HELIA_RT_PROVIDE_DEBUG_LOG  OFF CACHE BOOL "" FORCE)
 
-# Tell helia_rt::helia which ns-cmsis-nn target to link (HELIA backend only).
-# Matches the nsx-cmsis-nn module's public alias (nsx::cmsis_nn). Override
-# per-build with -DHELIA_RT_NSCMSISNN_TARGET=<name> if the contract changes.
+# Wire the kernel-library target for the selected backend. Both helia and
+# cmsis_nn point at nsx::cmsis_nn (the nsx-cmsis-nn module's public alias)
+# — ns-cmsis-nn is vanilla CMSIS-NN plus additive Ambiq-authored symbols,
+# so the cmsis_nn backend (whose TFLM wrappers only reference the upstream
+# arm_* API) gets apples-to-apples vanilla-CMSIS-NN behavior from the same
+# kernel library, making it a valid A/B baseline against HELIA. Override
+# per-build with -DHELIA_RT_{CMSISNN,NSCMSISNN}_TARGET=<name> if the
+# contract changes. The cache vars are kept consistent across reconfigures
+# (e.g. switching NSX_HELIART_BACKEND in the same build dir) by unsetting
+# the inactive one rather than leaving a stale FORCE entry behind.
 if(NSX_HELIART_BACKEND STREQUAL "helia")
     if(NOT HELIA_RT_NSCMSISNN_TARGET)
         set(HELIA_RT_NSCMSISNN_TARGET "nsx::cmsis_nn" CACHE STRING
             "ns-cmsis-nn target to link from helia_rt::helia (nsx-heliart default)" FORCE)
     endif()
+    unset(HELIA_RT_CMSISNN_TARGET CACHE)
+elseif(NSX_HELIART_BACKEND STREQUAL "cmsis_nn")
+    if(NOT HELIA_RT_CMSISNN_TARGET)
+        set(HELIA_RT_CMSISNN_TARGET "nsx::cmsis_nn" CACHE STRING
+            "CMSIS-NN target to link from helia_rt::cmsis_nn (nsx-heliart default)" FORCE)
+    endif()
+    unset(HELIA_RT_NSCMSISNN_TARGET CACHE)
+else() # reference
+    unset(HELIA_RT_CMSISNN_TARGET CACHE)
+    unset(HELIA_RT_NSCMSISNN_TARGET CACHE)
 endif()
 
 # Compute backend target names for later use.
 set(_nsx_heliart_alias_target   "helia_rt::${NSX_HELIART_BACKEND}")
 set(_nsx_heliart_concrete_target "helia_rt_${NSX_HELIART_BACKEND}")
 
+# Backend-relevant kernel-target diagnostic for the status line. Only print
+# the variable actually consulted by the active backend so the log stays
+# uncluttered for cmsis_nn / reference builds.
+if(NSX_HELIART_BACKEND STREQUAL "helia")
+    set(_nsx_heliart_kernel_diag ", ns-cmsis-nn target=${HELIA_RT_NSCMSISNN_TARGET}")
+elseif(NSX_HELIART_BACKEND STREQUAL "cmsis_nn")
+    set(_nsx_heliart_kernel_diag ", cmsis-nn target=${HELIA_RT_CMSISNN_TARGET}")
+else()
+    set(_nsx_heliart_kernel_diag "")
+endif()
+
 message(STATUS "nsx-heliart: source build, "
                "backend=${NSX_HELIART_BACKEND}, "
                "variant=${HELIART_VARIANT} (HELIA_RT_BUILD_TYPE=${HELIA_RT_BUILD_TYPE}), "
-               "target=${_nsx_heliart_alias_target}, "
+               "target=${_nsx_heliart_alias_target}"
+               "${_nsx_heliart_kernel_diag}, "
                "repo=${HELIART_TFLM_ROOT}")
 
 # --- Bring in heliaRT ---
