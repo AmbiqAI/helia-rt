@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.15.0](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.14.0...heliaRT-v1.15.0) (2026-05-16)
+
+
+### Features
+
+* **nsx:** make nsx::heliart backend-selectable via NSX_HELIART_BACKEND ([#158](https://github.com/AmbiqAI/helia-rt/issues/158)) ([993d8b5](https://github.com/AmbiqAI/helia-rt/commit/993d8b5c4b8e3a53207409a000675ace7849c832))
+* **zephyr:** west-managed modules, HELIA default backend, auto-configure Kconfig ([#153](https://github.com/AmbiqAI/helia-rt/issues/153)) ([00e2299](https://github.com/AmbiqAI/helia-rt/commit/00e22995bebb7b8f0d279952a322b70553aba7ec))
+
+
+### Bug Fixes
+
+* **cmake:** expose helia per-kernel optimization defines (SPEED|SIZE) ([#159](https://github.com/AmbiqAI/helia-rt/issues/159)) ([de0d528](https://github.com/AmbiqAI/helia-rt/commit/de0d5288df95ee6234739267aae121a92959484b))
+
 ## [1.14.0](https://github.com/AmbiqAI/helia-rt/compare/heliaRT-v1.13.1...heliaRT-v1.14.0) (2026-05-15)
 
 
