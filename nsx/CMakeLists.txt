@@ -187,8 +187,8 @@ add_subdirectory("${HELIART_TFLM_ROOT}" heliart-src EXCLUDE_FROM_ALL)
 # on their own compile lines via nsx::heliart.
 target_link_libraries(${_nsx_heliart_concrete_target} PRIVATE ${NSX_BOARD_FLAGS_TARGET})
 
-# --- ns-cmsis-nn header-prefix shim (HELIA backend only) ---
-# heliaRT helia kernels include the cmsis-nn API as
+# --- ns-cmsis-nn header-prefix shim (helia + cmsis_nn backends) ---
+# heliaRT kernel wrappers include the cmsis-nn API as
 #     #include "Include/arm_nnfunctions.h"
 # (with the literal `Include/` prefix). The nsx::cmsis_nn target exposes
 # only its `Include/` directory on its INTERFACE_INCLUDE_DIRECTORIES, so the
@@ -197,14 +197,14 @@ target_link_libraries(${_nsx_heliart_concrete_target} PRIVATE ${NSX_BOARD_FLAGS_
 # assumption about the on-disk location. (See ns-cmsis-nn issue tracking
 # the root-include exposure; once the upstream module exports the parent
 # automatically, this block becomes a harmless no-op.)
-if(NSX_HELIART_BACKEND STREQUAL "helia")
+if(NSX_HELIART_BACKEND STREQUAL "helia" OR NSX_HELIART_BACKEND STREQUAL "cmsis_nn")
     get_target_property(_nsx_heliart_aliased nsx_cmsis_nn ALIASED_TARGET)
     if(_nsx_heliart_aliased)
         set(_nsx_heliart_cmsis_nn_target ${_nsx_heliart_aliased})
     else()
         set(_nsx_heliart_cmsis_nn_target nsx_cmsis_nn)
     endif()
-    target_include_directories(helia_rt_helia PRIVATE
+    target_include_directories(${_nsx_heliart_concrete_target} PRIVATE
         "$<TARGET_PROPERTY:${_nsx_heliart_cmsis_nn_target},SOURCE_DIR>/..")
 endif()
 
