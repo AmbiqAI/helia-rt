@@ -12,7 +12,7 @@ Per-operator comparison of heliaRT-optimized implementations vs upstream TFLM.
 |---|---|
 | Board | Apollo510 EVB (Cortex-M55 + Helium MVE) |
 | Toolchain | `arm-none-eabi-gcc` v15.2.1 |
-| heliaRT | v1.13.1 |
+| heliaRT | v1.16.0 |
 | tflm | upstream tflm, latest main |
 | Iterations | 100 (10 warmup) |
 | Quantization | int8 (all models) |
