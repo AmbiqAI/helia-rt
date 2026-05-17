@@ -1,7 +1,7 @@
 schema_version: 1
 
 module:
-  name: nsx-heliart
+  name: nsx-helia-rt
   type: algorithm
   version: "1.15.0" # x-release-please-version
 
@@ -30,14 +30,15 @@ agent_keywords:
   - inference
   - litert
   - machine_learning
-  - heliart
+  - helia-rt
+  - helia_rt
   - tflite
 
 build:
   cmake:
-    package: nsx_heliart
+    package: nsx_helia_rt
     targets:
-      - nsx::heliart
+      - nsx::helia_rt
 
 depends:
   required:

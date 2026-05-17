@@ -6,7 +6,7 @@ produces a CMSIS-Pack archive with one component variant per backend.
 
 Layout inside the .pack archive::
 
-    Ambiq.heliaRT.pdsc                 # pack description (XML)
+    Ambiq.helia-rt.pdsc                # pack description (XML)
     LICENSE
     src/                               # all .cc source files referenced by
         ...                            # the manifest, mirroring the repo
@@ -46,7 +46,7 @@ from typing import Iterable
 # ---------------------------------------------------------------------------
 
 PACK_VENDOR = "Ambiq"
-PACK_NAME = "heliaRT"
+PACK_NAME = "helia-rt"
 PACK_DESCRIPTION = (
     "Ambiq-optimized TensorFlow Lite for Microcontrollers (TFLM) runtime."
 )
@@ -62,9 +62,9 @@ PACK_LICENSE_FILE = "LICENSE"
 #
 #     <require Cclass="Machine Learning"
 #              Cgroup="TFLM Runtime"
-#              Csub="heliaRT"
+#              Csub="helia-rt"
 #              Cvendor="Ambiq"
-#              Cversion="1.13.1"/>     <!-- or "1.13.1:2.0.0" range -->
+#              Cversion="<version>"/>   <!-- or "<version>:2.0.0" range -->
 #
 # The Cvariant axis selects the kernel backend; consumers pick exactly one.
 BACKENDS: list[tuple[str, str, str]] = [
@@ -75,7 +75,7 @@ BACKENDS: list[tuple[str, str, str]] = [
 
 CCLASS = "Machine Learning"
 CGROUP = "TFLM Runtime"
-CSUB = "heliaRT"
+CSUB = "helia-rt"
 
 # Identity of the cross-pack dependency (Ambiq ns-cmsis-nn / heliaCORE).
 # Pinned to the ns-cmsis-nn release that aligned its CMake / Zephyr / NSX /

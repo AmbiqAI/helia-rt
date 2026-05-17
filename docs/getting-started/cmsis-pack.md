@@ -1,23 +1,64 @@
 # CMSIS-Pack Integration
 
-CMSIS-Pack support is planned for teams that use Keil MDK, CMSIS-Toolbox, or CMSIS-Pack Manager workflows. The goal is to make heliaRT available through the Arm ecosystem package flow while preserving the same backend choices and release artifacts documented elsewhere.
+heliaRT can be packaged as a source-only CMSIS-Pack for teams that use Keil MDK, CMSIS-Toolbox, CMSIS-Pack Manager, or Arm ecosystem IDEs. The pack is generated from the same CMake source manifest used by the source, Zephyr, and NSX builds.
 
-!!! note "Planned package path"
-    CMSIS-Pack distribution is not the recommended bring-up path yet. Use Zephyr, neuralSPOT, or source builds for current integration work, and track [#124](https://github.com/AmbiqAI/helia-rt/issues/124) for package availability.
+!!! note "Current scope"
+    The repository builds and validates a local source pack. Checked-in `csolution` examples and published pack-index distribution are still tracked by [#124](https://github.com/AmbiqAI/helia-rt/issues/124).
 
-## Expected Workflow
+## Build A Local Pack
 
-When available, the CMSIS-Pack path is expected to cover:
+Build the pack from a checkout:
 
-- installing heliaRT through CMSIS-Pack Manager or `cpackget`
-- selecting a HELIA kernel profile where the pack exposes source-build controls
-- choosing the Reference, CMSIS-NN, or HELIA backend
-- building with Keil MDK, Arm Compiler 6, or CMSIS-Toolbox
-- consuming headers and static libraries without cloning the full source tree
+```bash
+python3 tools/cmsis_pack/build_pack.py --output dist
+```
+
+The output follows CMSIS-Pack naming conventions:
+
+```plaintext
+dist/Ambiq.helia-rt.<version>.pack
+```
+
+The pack version comes from the release-please-managed `HELIA_RT_VERSION` macro in `tensorflow/lite/micro/helia_rt_version.h`.
+
+## Validate The Pack
+
+The CI pack job runs the repository's PDSC contract checker and `packchk` from CMSIS-Toolbox. To reproduce the same checks locally, install CMSIS-Toolbox, then run:
+
+```bash
+python3 tools/cmsis_pack/build_pack.py --output dist --keep-stage
+PACK=$(ls dist/Ambiq.helia-rt.*.pack | head -1)
+STAGE="${PACK%.pack}.stage"
+
+python3 tools/cmsis_pack/check_pdsc.py "${PACK}"
+packchk --disable-validation "${STAGE}/Ambiq.helia-rt.pdsc"
+```
+
+`packchk --disable-validation` keeps the semantic pack checks enabled while avoiding a CMSIS-Toolbox 2.13.0 XSD-validation crash seen on this generated PDSC. The workflow still parses and validates the archive structure and PDSC contract separately.
+
+## Install With cpackget
+
+After building the pack, add it to a local CMSIS-Pack installation:
+
+```bash
+cpackget add dist/Ambiq.helia-rt.<version>.pack
+```
+
+Use the exact file name generated in `dist/`. A consumer project can then select one of the pack's component variants.
+
+## Component Variants
+
+The generated pack exposes these source-build variants:
+
+| Variant | Backend | Notes |
+|---|---|---|
+| `Reference` | Portable TFLM kernels | No external NN library dependency. |
+| `CMSIS-NN` | Arm CMSIS-NN kernels | Uses the open CMSIS-NN backend source set. |
+| `HELIA` | Ambiq HELIA kernels | Requires the Ambiq `ns-cmsis-nn` / heliaCORE pack dependency. |
 
 ## Current Recommendation
 
-Choose one of the supported integration paths below while the pack is being prepared:
+Use CMSIS-Pack when your application is already built around CMSIS-Toolbox or Keil tooling. For Zephyr or neuralSPOT projects, the native integration paths remain more direct:
 
 | Path | Best for |
 |---|---|

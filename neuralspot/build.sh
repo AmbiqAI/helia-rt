@@ -67,7 +67,7 @@ cp "$DIR/module.mk" "$BUILD_DIR/module.mk"
 
 # --- NSX module bundle ---
 NSX_DIR="$TFLM_SRC_DIR/nsx"
-NSX_BUILD_DIR="$BUILD_DIR/nsx-heliart"
+NSX_BUILD_DIR="$BUILD_DIR/nsx-helia-rt"
 echo "Creating NSX module bundle at $NSX_BUILD_DIR" >&2
 mkdir -p "$NSX_BUILD_DIR"
 cp "$NSX_DIR/nsx-module.yaml" "$NSX_BUILD_DIR/nsx-module.yaml"

@@ -5,13 +5,13 @@ heliaRT's public API is intentionally minimal and fully compatible with upstream
 ## heliaRT Version Header
 
 ```c
-#include "tensorflow/lite/micro/heliart_version.h"
+#include "tensorflow/lite/micro/helia_rt_version.h"
 
 // Returns the heliaRT release version string
-const char* version = HELIART_VERSION;  // e.g. "v1.12.2"
+const char* version = HELIA_RT_VERSION;  // e.g. "v1.12.2"
 ```
 
-This header provides the `HELIART_VERSION` macro, which is managed by [release-please](https://github.com/googleapis/release-please) and updated automatically on every release.
+This header provides the `HELIA_RT_VERSION` macro, which is managed by [release-please](https://github.com/googleapis/release-please) and updated automatically on every release.
 
 ## Upstream LiteRT API
 

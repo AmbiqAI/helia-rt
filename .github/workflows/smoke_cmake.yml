@@ -7,7 +7,7 @@ name: cmake-ssot-smoke
 #   3. The top-level CMakeLists configures + builds helia_rt::reference on host clang.
 #   4. The upstream-sync invariant holds (no SSoT-time edits under tensorflow/, signal/,
 #      python/tflite_micro/).
-#   5. (Phase 2) nsx::heliart cross-compiles for Cortex-M55 against ns-cmsis-nn.
+#   5. (Phase 2) nsx::helia_rt cross-compiles for Cortex-M55 against ns-cmsis-nn.
 #   6. (Phase 4) zephyr/CMakeLists.txt builds helia_rt against the SSoT for qemu_cortex_m3.
 
 on:
@@ -117,7 +117,9 @@ jobs:
               echo "PR touches SSoT files — verifying upstream paths are untouched..."
               bad=$(git diff --name-only "$base" "$head" -- \
                       tensorflow/ signal/ python/tflite_micro/ \
-                      tensorflow/lite/micro/tools/make/ || true)
+                      tensorflow/lite/micro/tools/make/ \
+                    | grep -Ev '^tensorflow/lite/micro/(helia_rt_version|heliart_version)\.h$' \
+                    || true)
               if [ -n "$bad" ]; then
                   echo "::error::SSoT PR also edits upstream-managed paths:"
                   echo "$bad"
@@ -131,15 +133,32 @@ jobs:
   cmsis-pack-build:
     name: Build CMSIS-Pack from SSoT manifest
     runs-on: ubuntu-latest
+    env:
+      CMSIS_TOOLBOX_VERSION: 2.13.0
     steps:
       - uses: actions/checkout@v6
-      - name: Install cmake
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake
+      - name: Install cmake + CMSIS-Toolbox
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake curl ca-certificates
+          curl -fsSL \
+              "https://github.com/Open-CMSIS-Pack/cmsis-toolbox/releases/download/${CMSIS_TOOLBOX_VERSION}/cmsis-toolbox-linux-amd64.tar.gz" \
+              -o /tmp/cmsis-toolbox.tar.gz
+          sudo tar -C /opt -xzf /tmp/cmsis-toolbox.tar.gz
+          echo "/opt/cmsis-toolbox-linux-amd64/bin" >> "${GITHUB_PATH}"
+          /opt/cmsis-toolbox-linux-amd64/bin/packchk --version
       - name: Build pack
         run: |
           set -euo pipefail
-          python3 tools/cmsis_pack/build_pack.py --output dist
+          python3 tools/cmsis_pack/build_pack.py --output dist --keep-stage
           ls -lh dist/
+      - name: Validate pack with packchk
+        run: |
+          set -euo pipefail
+          PACK=$(ls dist/Ambiq.helia-rt.*.pack | head -1)
+          STAGE="${PACK%.pack}.stage"
+          packchk --disable-validation "${STAGE}/Ambiq.helia-rt.pdsc"
       - name: Validate pack archive + pdsc
         run: |
           set -euo pipefail
@@ -148,7 +167,7 @@ jobs:
           import xml.etree.ElementTree as ET
           from pathlib import Path
 
-          packs = list(Path('dist').glob('Ambiq.heliaRT.*.pack'))
+          packs = list(Path('dist').glob('Ambiq.helia-rt.*.pack'))
           assert len(packs) == 1, packs
           pack = packs[0]
           assert pack.stat().st_size > 100_000, f'pack too small: {pack.stat().st_size}'
@@ -177,17 +196,17 @@ jobs:
       - name: Validate pdsc contract (identity + ns-cmsis-nn pin)
         run: |
           set -euo pipefail
-          PACK=$(ls dist/Ambiq.heliaRT.*.pack | head -1)
+          PACK=$(ls dist/Ambiq.helia-rt.*.pack | head -1)
           python3 tools/cmsis_pack/check_pdsc.py "${PACK}"
       - name: Upload pack artifact
         uses: actions/upload-artifact@v7
         with:
-          name: heliart-cmsis-pack
-          path: dist/Ambiq.heliaRT.*.pack
+          name: helia-rt-cmsis-pack
+          path: dist/Ambiq.helia-rt.*.pack
           if-no-files-found: error
 
   nsx-cross-build:
-    name: nsx::heliart cross-compile (Cortex-M55, gcc)
+    name: nsx::helia_rt cross-compile (Cortex-M55, gcc)
     runs-on: ubuntu-latest
     # ns-cmsis-nn is a private repo. PRs from forks won't have access to the
     # secret; skip cleanly there to avoid spurious failures.
@@ -234,7 +253,7 @@ jobs:
           mkdir -p smoke
           cat > smoke/CMakeLists.txt <<'EOF'
           cmake_minimum_required(VERSION 3.21)
-          project(nsx_heliart_smoke C CXX ASM)
+          project(nsx_helia_rt_smoke C CXX ASM)
 
           # Stub of the NSX board flags interface that real boards ship.
           add_library(nsx_board_flags INTERFACE)
@@ -251,7 +270,7 @@ jobs:
           add_library(nsx_soc_hal INTERFACE)
 
           add_subdirectory(${NS_CMSIS_NN_DIR}/nsx ns_cmsis_nn EXCLUDE_FROM_ALL)
-          add_subdirectory(${HELIA_RT_DIR}/nsx   nsx_heliart   EXCLUDE_FROM_ALL)
+          add_subdirectory(${HELIA_RT_DIR}/nsx   nsx_helia_rt   EXCLUDE_FROM_ALL)
           EOF
           cat > smoke/toolchain.cmake <<'EOF'
           set(CMAKE_SYSTEM_NAME Generic)
@@ -272,21 +291,21 @@ jobs:
               -DCMAKE_TOOLCHAIN_FILE="$(pwd)/smoke/toolchain.cmake" \
               -DHELIA_RT_DIR="$(pwd)/helia-rt" \
               -DNS_CMSIS_NN_DIR="$(pwd)/ns-cmsis-nn" \
-              -DHELIART_VARIANT=release-with-logs
-      - name: Build helia_rt::helia + nsx_heliart_glue + nsx::cmsis_nn
+              -DHELIA_RT_VARIANT=release-with-logs
+      - name: Build helia_rt::helia + nsx_helia_rt_glue + nsx::cmsis_nn
         run: |
           cmake --build smoke/build \
-              --target helia_rt_helia helia_rt_reference nsx_heliart_glue nsx_cmsis_nn \
+              --target helia_rt_helia helia_rt_reference nsx_helia_rt_glue nsx_cmsis_nn \
               -j
       - name: Sanity check archives
         run: |
           set -euo pipefail
           find smoke/build -name 'lib*.a' | sort
-          test -f smoke/build/nsx_heliart/heliart-src/libhelia_rt_helia.a
+          test -f smoke/build/nsx_helia_rt/helia-rt-src/libhelia_rt_helia.a
           test -f smoke/build/ns_cmsis_nn/libnsx_cmsis_nn.a
           # Confirm objects are Cortex-M (Thumb) ELF.
-          file smoke/build/nsx_heliart/heliart-src/libhelia_rt_helia.a | head -1
-          arm-none-eabi-objdump -a smoke/build/nsx_heliart/heliart-src/libhelia_rt_helia.a \
+          file smoke/build/nsx_helia_rt/helia-rt-src/libhelia_rt_helia.a | head -1
+          arm-none-eabi-objdump -a smoke/build/nsx_helia_rt/helia-rt-src/libhelia_rt_helia.a \
               | head -5
 
       # Cover the reference backend in a separate build dir. The cmsis_nn
@@ -299,11 +318,11 @@ jobs:
               -DCMAKE_TOOLCHAIN_FILE="$(pwd)/smoke/toolchain.cmake" \
               -DHELIA_RT_DIR="$(pwd)/helia-rt" \
               -DNS_CMSIS_NN_DIR="$(pwd)/ns-cmsis-nn" \
-              -DNSX_HELIART_BACKEND=reference \
-              -DHELIART_VARIANT=release-with-logs
+              -DNSX_HELIA_RT_BACKEND=reference \
+              -DHELIA_RT_VARIANT=release-with-logs
           cmake --build smoke/build-reference \
-              --target helia_rt_reference nsx_heliart_glue -j
-          test -f smoke/build-reference/nsx_heliart/heliart-src/libhelia_rt_reference.a
+              --target helia_rt_reference nsx_helia_rt_glue -j
+          test -f smoke/build-reference/nsx_helia_rt/helia-rt-src/libhelia_rt_reference.a
 
   zephyr-build:
     name: Zephyr module build (qemu_cortex_m3, REFERENCE)

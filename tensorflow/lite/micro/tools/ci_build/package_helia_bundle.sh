@@ -62,7 +62,7 @@ done
 [[ -n "${BUNDLE_PREFIX}" ]] || die "Bundle prefix is required."
 [[ -n "${UPLOAD_DIR}" ]] || die "Upload dir is required."
 
-BUNDLE_DIR="${BUNDLE_PREFIX}-${TAG}"
+BUNDLE_DIR="$(release_bundle_name "${BUNDLE_PREFIX}" "${TAG}")"
 
 rm -rf "${BUNDLE_DIR}"
 mkdir -p "${BUNDLE_DIR}/lib"
@@ -110,5 +110,5 @@ write_manifest "${BUNDLE_PREFIX}" "${TAG}" "${SHA}" "${BUNDLE_DIR}/lib" "${BUNDL
 echo "== Final bundle structure =="
 find "${BUNDLE_DIR}" -maxdepth 3 -type f -print
 
-ZIP_NAME="${BUNDLE_PREFIX}-${TAG}.zip"
+ZIP_NAME="${BUNDLE_DIR}.zip"
 zip_bundle_into_upload_dir "${BUNDLE_DIR}" "${ZIP_NAME}" "${UPLOAD_DIR}"

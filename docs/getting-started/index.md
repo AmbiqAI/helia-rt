@@ -20,7 +20,7 @@ heliaRT keeps the familiar LiteRT programming model and adds Ambiq-tuned kernels
 
     ---
 
-    Planned package-manager flow for Arm ecosystem projects.
+    Source package flow for Arm ecosystem projects.
 
     **Best for:** Keil MDK, CMSIS-Toolbox users.
 

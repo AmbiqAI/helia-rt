@@ -130,7 +130,7 @@ heliaRT sits between your LiteRT application and Ambiq silicon. It keeps the ups
 
 <a class="platform-card" href="getting-started/cmsis-pack/">
   <span class="logo-mark">Arm</span><span class="platform-label">Arm ecosystem</span><strong>CMSIS-Pack</strong>
-  <span>Planned package-manager workflow for Keil, IAR, and Open-CMSIS-Pack users. Track the roadmap while source builds are available.</span><em>Roadmap -></em>
+  <span>Build a local source pack for Keil, IAR, and Open-CMSIS-Pack users, with variants generated from the CMake source manifest.</span><em>Pack guide -></em>
 </a>
 
 <a class="platform-card" href="getting-started/source/">

@@ -46,7 +46,7 @@ Known-good versions:
     ```yaml
     - name: helia-rt
       url: https://github.com/AmbiqAI/helia-rt
-      revision: <helia-rt-version>   # e.g. heliaRT-v1.13.1
+      revision: <helia-rt-version>   # e.g. helia-rt-v1.13.1
       path: modules/helia-rt
     ```
 
@@ -125,7 +125,7 @@ Known-good versions:
     ```yaml
     - name: helia-rt
       url: https://github.com/AmbiqAI/helia-rt
-      revision: <helia-rt-version>     # e.g. heliaRT-v1.13.1
+      revision: <helia-rt-version>     # e.g. helia-rt-v1.13.1
       path: modules/helia-rt
 
     - name: ns-cmsis-nn
@@ -485,7 +485,7 @@ Source modules + HELIA:
 
 Prebuilt release module:
 
-- `modules/helia-rt-heliaRT-v1.10.1` exists
+- `modules/helia-rt-v1.10.1` exists
 - only that path is listed in `ZEPHYR_EXTRA_MODULES`
 - `CONFIG_HELIA_RT=y` is enabled
 - `CONFIG_FPU=y` is enabled for Cortex-M55 builds

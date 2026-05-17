@@ -38,9 +38,16 @@ set(_HELIA_RT_SOURCES_INCLUDED TRUE)
 get_filename_component(HELIA_RT_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 set(HELIA_RT_KERNEL_ROOT "${HELIA_RT_ROOT}/tensorflow/lite/micro/kernels")
 
-# Pack version — kept in lockstep with pyproject.toml / release-please.
-# Bumped manually here when a release lands; CI could enforce drift later.
-set(HELIA_RT_VERSION "1.13.1")
+# Pack version — sourced from the release-please-managed public header.
+set(_HELIA_RT_VERSION_HEADER
+    "${HELIA_RT_ROOT}/tensorflow/lite/micro/helia_rt_version.h")
+file(READ "${_HELIA_RT_VERSION_HEADER}" _HELIA_RT_VERSION_HEADER_CONTENTS)
+if(NOT _HELIA_RT_VERSION_HEADER_CONTENTS MATCHES
+        "#[ \t]*define[ \t]+HELIA_RT_VERSION[ \t]+\"v?([^\"]+)\"")
+    message(FATAL_ERROR
+        "Could not parse HELIA_RT_VERSION from ${_HELIA_RT_VERSION_HEADER}")
+endif()
+set(HELIA_RT_VERSION "${CMAKE_MATCH_1}")
 
 # ---------------------------------------------------------------------------
 # Include directories. PUBLIC: propagate to consumers.

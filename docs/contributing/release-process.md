@@ -40,7 +40,7 @@ release-please updates these files:
 |---|---|
 | `CHANGELOG.md` | New changelog section |
 | `.release-please-manifest.json` | Version number |
-| `tensorflow/lite/micro/heliart_version.h` | `HELIART_VERSION` macro |
+| `tensorflow/lite/micro/helia_rt_version.h` | `HELIA_RT_VERSION` macro |
 
 ### 4. Artifact Build Matrix
 

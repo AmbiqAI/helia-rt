@@ -127,7 +127,7 @@ Add both repos as west projects in your workspace `west.yml` and run
 ```yaml
 - name: helia-rt
   url: https://github.com/AmbiqAI/helia-rt
-  revision: <helia-rt-version>     # e.g. heliaRT-v1.13.1
+  revision: <helia-rt-version>     # e.g. helia-rt-v1.13.1
   path: modules/helia-rt
 
 - name: ns-cmsis-nn
