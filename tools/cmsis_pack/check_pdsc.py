@@ -13,10 +13,10 @@ contract consumers depend on:
 Run modes:
 
   # Use an existing pdsc file (the workflow's preferred path).
-  python3 tools/cmsis_pack/check_pdsc.py path/to/Ambiq.heliaRT.pdsc
+    python3 tools/cmsis_pack/check_pdsc.py path/to/Ambiq.helia-rt.pdsc
 
   # Or: read the pdsc out of a built .pack archive.
-  python3 tools/cmsis_pack/check_pdsc.py path/to/Ambiq.heliaRT.1.13.1.pack
+    python3 tools/cmsis_pack/check_pdsc.py path/to/Ambiq.helia-rt.1.13.1.pack
 
 Exit code is 0 on success, 1 on contract violation (with a diff-style
 report on stderr).

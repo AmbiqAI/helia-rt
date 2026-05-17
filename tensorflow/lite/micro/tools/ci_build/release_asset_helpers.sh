@@ -13,6 +13,23 @@ sanitize_tag() {
   printf '%s' "${tag//\//-}"
 }
 
+release_bundle_name() {
+  local prefix="$1"
+  local tag="$2"
+
+  case "${tag}" in
+    "${prefix}"|"${prefix}-"*)
+      printf '%s' "${tag}"
+      ;;
+    heliaRT-*)
+      printf '%s-%s' "${prefix}" "${tag#heliaRT-}"
+      ;;
+    *)
+      printf '%s-%s' "${prefix}" "${tag}"
+      ;;
+  esac
+}
+
 emit_release_meta() {
   local ref="$1"
   local tag="$2"

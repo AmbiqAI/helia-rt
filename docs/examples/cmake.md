@@ -58,7 +58,7 @@ cmake --build build
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/micro/system_setup.h"
 #include "tensorflow/lite/schema/schema_generated.h"
-#include "tensorflow/lite/micro/heliart_version.h"
+#include "tensorflow/lite/micro/helia_rt_version.h"
 
 #include "model_data.h"  // your .tflite as a C array
 

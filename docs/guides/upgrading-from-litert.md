@@ -75,8 +75,8 @@ neuralSPOT already bundles heliaRT. If you're using `ns_autodeploy`, you're alre
 After building, confirm heliaRT is active:
 
 ```c
-#include "tensorflow/lite/micro/heliart_version.h"
-printf("heliaRT %s\n", HELIART_VERSION);
+#include "tensorflow/lite/micro/helia_rt_version.h"
+printf("heliaRT %s\n", HELIA_RT_VERSION);
 ```
 
 ## Next Steps

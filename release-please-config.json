@@ -2,7 +2,7 @@
   "bootstrap-sha": "645d1c2164a63368a5c60ec41fe7fbba320951a0",
   "packages": {
     ".": {
-      "component": "heliaRT",
+      "component": "helia-rt",
       "release-type": "simple",
       "include-component-in-tag": true,
       "include-v-in-tag": true,
@@ -13,7 +13,7 @@
       "extra-files": [
         {
           "type": "generic",
-          "path": "tensorflow/lite/micro/heliart_version.h"
+          "path": "tensorflow/lite/micro/helia_rt_version.h"
         },
         {
           "type": "generic",

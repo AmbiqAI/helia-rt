@@ -17,7 +17,7 @@ helia-rt/
 │   ├── tools/make/
 │   │   └── ext_libs/
 │   │       └── helia.inc           # ★ Makefile backend wiring
-│   └── heliart_version.h           # ★ Version macro
+│   └── helia_rt_version.h           # ★ Version macro
 ├── zephyr/
 │   ├── CMakeLists.txt              # ★ Zephyr build integration
 │   ├── Kconfig                     # ★ Backend selection menu
