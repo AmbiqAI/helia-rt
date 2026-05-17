@@ -3,7 +3,7 @@ schema_version: 1
 module:
   name: nsx-helia-rt
   type: algorithm
-  version: "1.15.0" # x-release-please-version
+  version: "1.16.0" # x-release-please-version
 
 support:
   ambiqsuite: true
