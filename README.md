@@ -57,7 +57,7 @@ See the full [Zephyr getting-started guide](https://ambiqai.github.io/helia-rt/g
 | Path | Best for | Guide |
 |---|---|---|
 | **Zephyr module** | Product integration via `west` | [Getting Started — Zephyr](https://ambiqai.github.io/helia-rt/getting-started/zephyr/) |
-| **CMSIS-Pack** | Keil / CMSIS-Toolbox _(coming soon)_ | [#124](https://github.com/AmbiqAI/helia-rt/issues/124) |
+| **CMSIS-Pack** | Local source pack for Keil / CMSIS-Toolbox | [Getting Started — CMSIS-Pack](https://ambiqai.github.io/helia-rt/getting-started/cmsis-pack/) |
 | **neuralSPOT** | Fast model profiling with `ns_autodeploy` | [Getting Started — neuralSPOT](https://ambiqai.github.io/helia-rt/getting-started/neuralspot/) |
 | **Source / CMake** | Full control over build and link | [Getting Started — Source](https://ambiqai.github.io/helia-rt/getting-started/source/) |
 

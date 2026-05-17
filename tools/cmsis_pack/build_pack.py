@@ -64,7 +64,7 @@ PACK_LICENSE_FILE = "LICENSE"
 #              Cgroup="TFLM Runtime"
 #              Csub="helia-rt"
 #              Cvendor="Ambiq"
-#              Cversion="1.13.1"/>     <!-- or "1.13.1:2.0.0" range -->
+#              Cversion="<version>"/>   <!-- or "<version>:2.0.0" range -->
 #
 # The Cvariant axis selects the kernel backend; consumers pick exactly one.
 BACKENDS: list[tuple[str, str, str]] = [

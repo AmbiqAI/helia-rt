@@ -117,7 +117,9 @@ jobs:
               echo "PR touches SSoT files — verifying upstream paths are untouched..."
               bad=$(git diff --name-only "$base" "$head" -- \
                       tensorflow/ signal/ python/tflite_micro/ \
-                      tensorflow/lite/micro/tools/make/ || true)
+                      tensorflow/lite/micro/tools/make/ \
+                    | grep -Ev '^tensorflow/lite/micro/(helia_rt_version|heliart_version)\.h$' \
+                    || true)
               if [ -n "$bad" ]; then
                   echo "::error::SSoT PR also edits upstream-managed paths:"
                   echo "$bad"
@@ -131,15 +133,32 @@ jobs:
   cmsis-pack-build:
     name: Build CMSIS-Pack from SSoT manifest
     runs-on: ubuntu-latest
+    env:
+      CMSIS_TOOLBOX_VERSION: 2.13.0
     steps:
       - uses: actions/checkout@v6
-      - name: Install cmake
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake
+      - name: Install cmake + CMSIS-Toolbox
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake curl ca-certificates
+          curl -fsSL \
+              "https://github.com/Open-CMSIS-Pack/cmsis-toolbox/releases/download/${CMSIS_TOOLBOX_VERSION}/cmsis-toolbox-linux-amd64.tar.gz" \
+              -o /tmp/cmsis-toolbox.tar.gz
+          sudo tar -C /opt -xzf /tmp/cmsis-toolbox.tar.gz
+          echo "/opt/cmsis-toolbox-linux-amd64/bin" >> "${GITHUB_PATH}"
+          /opt/cmsis-toolbox-linux-amd64/bin/packchk --version
       - name: Build pack
         run: |
           set -euo pipefail
-          python3 tools/cmsis_pack/build_pack.py --output dist
+          python3 tools/cmsis_pack/build_pack.py --output dist --keep-stage
           ls -lh dist/
+      - name: Validate pack with packchk
+        run: |
+          set -euo pipefail
+          PACK=$(ls dist/Ambiq.helia-rt.*.pack | head -1)
+          STAGE="${PACK%.pack}.stage"
+          packchk --disable-validation "${STAGE}/Ambiq.helia-rt.pdsc"
       - name: Validate pack archive + pdsc
         run: |
           set -euo pipefail

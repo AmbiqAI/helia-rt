@@ -16,7 +16,7 @@ Run modes:
     python3 tools/cmsis_pack/check_pdsc.py path/to/Ambiq.helia-rt.pdsc
 
   # Or: read the pdsc out of a built .pack archive.
-    python3 tools/cmsis_pack/check_pdsc.py path/to/Ambiq.helia-rt.1.13.1.pack
+    python3 tools/cmsis_pack/check_pdsc.py path/to/Ambiq.helia-rt.<version>.pack
 
 Exit code is 0 on success, 1 on contract violation (with a diff-style
 report on stderr).
