@@ -21,9 +21,6 @@ release_bundle_name() {
     "${prefix}"|"${prefix}-"*)
       printf '%s' "${tag}"
       ;;
-    heliaRT-*)
-      printf '%s-%s' "${prefix}" "${tag#heliaRT-}"
-      ;;
     *)
       printf '%s-%s' "${prefix}" "${tag}"
       ;;

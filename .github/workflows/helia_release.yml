@@ -1,4 +1,4 @@
-name: HeliaRT Release
+name: heliaRT Release
 
 on:
   workflow_call:

@@ -39,7 +39,7 @@ jobs:
       - name: Sync the code
         run: |
           ./ci/sync_from_upstream_tf.sh
-          git config --local user.name "heliaRT-bot"
+          git config --local user.name "helia-rt-bot"
           git config --local user.email "helia-rt-bot@ambiq.com"
           git add *
 
@@ -58,8 +58,8 @@ jobs:
           token: ${{ secrets.TFLM_BOT_REPO_TOKEN }}
           title: Automated sync from github.com/tensorflow/tensorflow
           commit-message: Automated sync from github.com/tensorflow/tensorflow
-          committer: heliaRT-bot <helia-rt-bot@ambiq.com>
-          author: heliaRT-bot <helia-rt-bot@ambiq.com>
+          committer: helia-rt-bot <helia-rt-bot@ambiq.com>
+          author: helia-rt-bot <helia-rt-bot@ambiq.com>
           body: "BUG=automated sync from upstream\nNO_CHECK_TFLITE_FILES=automated sync from upstream"
           labels: bot:sync-tf, ci:run
           reviewers: apage224
