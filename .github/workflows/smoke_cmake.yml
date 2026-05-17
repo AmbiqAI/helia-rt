@@ -119,6 +119,7 @@ jobs:
                       tensorflow/ signal/ python/tflite_micro/ \
                       tensorflow/lite/micro/tools/make/ \
                     | grep -Ev '^tensorflow/lite/micro/(helia_rt_version|heliart_version)\.h$' \
+                    | grep -Ev '^tensorflow/lite/micro/tools/ci_build/(package_helia_bundle|release_asset_helpers)\.sh$' \
                     || true)
               if [ -n "$bad" ]; then
                   echo "::error::SSoT PR also edits upstream-managed paths:"
