@@ -45,7 +45,7 @@ For detailed API documentation, refer to the [upstream LiteRT for Micro API docs
 | `CONFIG_HELIA_RT` | bool | Enable heliaRT module |
 | `CONFIG_HELIA_RT_BACKEND_REFERENCE` | choice | Use Reference kernels |
 | `CONFIG_HELIA_RT_BACKEND_CMSIS_NN` | choice | Use open CMSIS-NN kernels |
-| `CONFIG_HELIA_RT_BACKEND_HELIA` | choice | Use Ambiq HELIA kernels (default) |
+| `CONFIG_HELIA_RT_BACKEND_HELIA` | choice | Use Ambiq HELIA kernels (default when available) |
 | `CONFIG_HELIA_RT_KERNEL_OPTIMIZE_SPEED` | choice | Use HELIA speed-optimized kernel paths |
 | `CONFIG_HELIA_RT_KERNEL_OPTIMIZE_SIZE` | choice | Use HELIA size-optimized kernel paths |
 
