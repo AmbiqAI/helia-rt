@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.17.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.16.0...helia-rt-v1.17.0) (2026-05-19)
+
+
+### Features
+
+* update HELIA backend version on homepage ([d5220d1](https://github.com/AmbiqAI/helia-rt/commit/d5220d14e9bcf6de1c0f1b63fde2e5dbc3ead31f))
+
+
+### Bug Fixes
+
+* Revert zephyr.md Source + CMSIS-NN path to correct cmsis-nn module ([797e72c](https://github.com/AmbiqAI/helia-rt/commit/797e72c3acc2411783598e1496fe41e87f9957df))
+* Round 0.99 to 1 ([cc67923](https://github.com/AmbiqAI/helia-rt/commit/cc6792343ced1ae75c81ee7b20348e6fb7828414))
+
 ## [1.16.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.15.0...helia-rt-v1.16.0) (2026-05-17)
 
 
