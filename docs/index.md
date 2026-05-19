@@ -26,7 +26,7 @@ heliaRT is Ambiq's optimized LiteRT runtime: the same `.tflite` models and Micro
 
 <div class="hero-panel" markdown>
 
-<div class="panel-topline"><span>HELIA backend</span><span class="status-live">v1.13</span></div>
+<div class="panel-topline"><span>HELIA backend</span><span class="status-live">v1.16</span></div>
 
 <div class="metric-grid">
   <div><strong>230+</strong><span>kernel variants</span></div>
