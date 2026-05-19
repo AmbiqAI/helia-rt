@@ -113,7 +113,7 @@ reductions, and data-movement ops that LiteRT for Micro leaves unoptimized.
 
 ## Detailed Results
 
-| # | Operator | helia-rt Cycles | LiteRT Cycles | Speedup |
+| # | Operator | heliaRT Cycles | LiteRT Cycles | Speedup |
 |---|---|---:|---:|---:|
 | 1 | `CONV_2D` | 1,621,810 | 1,642,809 | **1.01×** |
 | 2 | `DEPTHWISE_CONV_2D` | 613,204 | 636,011 | **1.04×** |
