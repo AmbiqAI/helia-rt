@@ -65,7 +65,7 @@ Known-good versions:
         the new modules without re-downloading everything else.
 
     ```bash
-    west update helia-rt ns-cmsis-nn
+    west update helia-rt cmsis-nn
     ```
 
     Result:
