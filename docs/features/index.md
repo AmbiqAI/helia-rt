@@ -36,7 +36,7 @@ heliaRT is intended for the same class of microcontroller inference workloads as
 
 ### Ambiq-Focused Optimization
 
-heliaRT is tuned for Ambiq Apollo platforms and related build flows. Depending on target and configuration, this includes:
+heliaRT is tuned for Ambiq silicon and related build flows. Depending on target and configuration, this includes:
 
 - optimized int8 and int16 operator paths
 - DSP and MVE-aware kernel implementations where available

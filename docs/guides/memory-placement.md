@@ -1,7 +1,7 @@
 # Placing Model and Arena on Apollo + Zephyr
 
 This page shows how to control where the TFLite model flatbuffer and
-tensor arena are placed in memory on Ambiq Apollo SoCs when building with
+tensor arena are placed in memory on Ambiq SoCs when building with
 Zephyr.
 
 ## Principle

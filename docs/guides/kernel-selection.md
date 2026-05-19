@@ -35,7 +35,6 @@ For each operator, the build system checks whether an optimized implementation e
     ```cfg
     # prj.conf
     CONFIG_HELIA_RT=y
-    CONFIG_HELIA_RT_BACKEND_HELIA=y
     ```
 
     The Kconfig default depends on what modules are available:
@@ -70,7 +69,6 @@ default is SPEED.
 
     ```cfg
     CONFIG_HELIA_RT=y
-    CONFIG_HELIA_RT_BACKEND_HELIA=y
     CONFIG_HELIA_RT_KERNEL_OPTIMIZE_SPEED=y
     # or
     CONFIG_HELIA_RT_KERNEL_OPTIMIZE_SIZE=y

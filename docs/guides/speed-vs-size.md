@@ -68,11 +68,11 @@ quadrantChart
 
 === "Zephyr Source Module"
 
-    Select the HELIA backend, then choose the kernel profile:
+    The HELIA backend is selected by default. Choose the kernel profile in
+    `prj.conf`:
 
     ```cfg
     CONFIG_HELIA_RT=y
-    CONFIG_HELIA_RT_BACKEND_HELIA=y
     CONFIG_HELIA_RT_KERNEL_OPTIMIZE_SPEED=y
     # or
     CONFIG_HELIA_RT_KERNEL_OPTIMIZE_SIZE=y

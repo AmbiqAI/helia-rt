@@ -54,7 +54,7 @@ When the release PR merges, `helia_release.yml` builds **18 combinations**:
 Each combination produces a `libtensorflow-microlite.a` archive. All 18 are bundled into a single release zip:
 
 ```
-helia-rt-v1.13.0.zip
+helia-rt-v1.16.0.zip
 ├── cortex-m4+fp/
 │   ├── gcc/
 │   │   ├── debug/

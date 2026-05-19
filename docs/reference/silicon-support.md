@@ -1,6 +1,6 @@
 # Silicon Support
 
-heliaRT runs on all Ambiq Apollo SoC families with Cortex-M cores.
+heliaRT runs on all Ambiq SoC families with Cortex-M cores.
 
 ## SoC Feature Matrix
 
@@ -36,7 +36,7 @@ All backends are supported on all SoCs. The performance advantage of CMSIS-NN an
 
 ## Memory Regions
 
-Each Apollo SoC provides multiple memory regions. Where you place the tensor arena and model affects performance significantly.
+Each Ambiq SoC provides multiple memory regions. Where you place the tensor arena and model affects performance significantly.
 
 | Region | Apollo3/3p | Apollo4/4p | Apollo510 |
 |---|---|---|---|

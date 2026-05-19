@@ -1,5 +1,11 @@
 # :material-chip: Zephyr + heliaRT
 
+!!! note "Prerequisite"
+    This guide assumes you already have a working Zephyr development environment
+    (Zephyr repo, west, SDK). If not, follow the
+    [Zephyr Getting Started Guide](https://docs.zephyrproject.org/latest/develop/getting_started/index.html)
+    first.
+
 This example shows the minimum process to create, build, and run a Zephyr application that uses heliaRT.
 
 Use one integration path or the other:
@@ -46,11 +52,17 @@ Known-good versions:
     ```yaml
     - name: helia-rt
       url: https://github.com/AmbiqAI/helia-rt
-      revision: <helia-rt-version>   # e.g. helia-rt-v1.13.1
+      revision: <helia-rt-version>   # e.g. helia-rt-v1.16.0
       path: modules/helia-rt
     ```
 
-    Then fetch both modules:
+    Then fetch modules:
+
+    !!! note
+        If this is your first time setting up the workspace, run `west update`
+        to fetch all modules. If you already have a workspace and are just
+        adding these entries, `west update helia-rt ns-cmsis-nn` fetches only
+        the new modules without re-downloading everything else.
 
     ```bash
     west update helia-rt cmsis-nn
@@ -101,7 +113,7 @@ Known-good versions:
     Required heliaRT-specific settings:
 
     - `CONFIG_HELIA_RT=y`
-    - `CONFIG_NS_CMSIS_NN=n` (suppress the auto-imply)
+    - `CONFIG_NS_CMSIS_NN=n` (disable the HELIA backend that heliaRT enables by default)
     - `CONFIG_CMSIS_NN=y` and per-op kernel configs for your model
 
     Notes:
@@ -114,7 +126,6 @@ Known-good versions:
     Do not enable HELIA-only settings on this path:
 
     - `CONFIG_NS_CMSIS_NN`
-    - `CONFIG_HELIA_RT_BACKEND_HELIA`
 
 === "Source Modules + HELIA"
 
@@ -125,12 +136,12 @@ Known-good versions:
     ```yaml
     - name: helia-rt
       url: https://github.com/AmbiqAI/helia-rt
-      revision: <helia-rt-version>     # e.g. helia-rt-v1.13.1
+      revision: <helia-rt-version>     # e.g. helia-rt-v1.16.0
       path: modules/helia-rt
 
     - name: ns-cmsis-nn
       url: https://github.com/AmbiqAI/ns-cmsis-nn
-      revision: <ns-cmsis-nn-version>  # e.g. v7.24.1
+      revision: <ns-cmsis-nn-version>  # e.g. v7.25.0
       path: modules/ns-cmsis-nn
     ```
 
@@ -259,7 +270,6 @@ Known-good versions:
     Do not enable these source-module-only settings with the prebuilt bundle:
 
     - `CONFIG_NS_CMSIS_NN`
-    - `CONFIG_HELIA_RT_BACKEND_HELIA`
 
     Notes:
 
@@ -485,7 +495,7 @@ Source modules + HELIA:
 
 Prebuilt release module:
 
-- `modules/helia-rt-v1.10.1` exists
+- `modules/helia-rt-v1.16.0` exists
 - only that path is listed in `ZEPHYR_EXTRA_MODULES`
 - `CONFIG_HELIA_RT=y` is enabled
 - `CONFIG_FPU=y` is enabled for Cortex-M55 builds
