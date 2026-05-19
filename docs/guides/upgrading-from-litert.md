@@ -38,7 +38,6 @@ heliaRT is a **drop-in replacement** for upstream LiteRT for Micro, formerly Ten
 
     ```cfg
     CONFIG_HELIA_RT=y
-    CONFIG_HELIA_RT_BACKEND_HELIA=y   # or CMSIS_NN / REFERENCE
     ```
 
 === "Prebuilt bundle"

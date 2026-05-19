@@ -1450,3 +1450,98 @@ code {
   .perf-badge { max-width: 100%; }
   .perf-badge__value { font-size: clamp(2.2rem, 12vw, 2.8rem); }
 }
+
+/* ============================================================
+   Benchmark page styles
+   ============================================================ */
+
+.bench-page .section-eyebrow {
+  display: inline-block;
+  margin: 0 0 0.6rem;
+  color: var(--hr-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.bench-hero {
+  margin-bottom: 2rem;
+}
+
+.bench-hero h2 {
+  font-size: clamp(1.6rem, 4vw, 2.2rem) !important;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin-bottom: 0.7rem !important;
+}
+
+.bench-stat-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1.6rem 0 0;
+}
+
+.bench-stat-strip div {
+  padding: 1.05rem;
+  border: 1px solid var(--hr-line);
+  border-radius: var(--hr-radius);
+  background: var(--hr-soft);
+  box-shadow: 0 12px 34px rgba(11, 18, 32, 0.06);
+}
+
+.bench-stat-strip strong {
+  display: block;
+  color: var(--hr-accent);
+  font-size: 1.6rem;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+}
+
+.bench-stat-strip span {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--hr-muted);
+  font-size: 0.72rem;
+  font-weight: 780;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bench-legend {
+  text-align: center;
+  margin: 0.5rem 0 1.5rem;
+  font-size: 0.82rem;
+  color: var(--hr-muted);
+}
+
+.bench-legend-dramatic { color: #7c4dff !important; }
+.bench-legend-moderate  { color: #00c1b3 !important; }
+.bench-legend-parity    { color: #1d99ff !important; }
+
+.bench-takeaway-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1.4rem 0 2.4rem;
+}
+
+.bench-takeaway-card {
+  padding: 1.2rem;
+  border: 1px solid var(--hr-line);
+  border-radius: var(--hr-radius);
+  background: var(--hr-soft);
+  box-shadow: 0 12px 34px rgba(11, 18, 32, 0.06);
+}
+
+.bench-takeaway-card h4 {
+  margin-top: 0 !important;
+  margin-bottom: 0.5rem !important;
+  font-size: 0.95rem !important;
+}
+
+@media (max-width: 48rem) {
+  .bench-stat-strip { grid-template-columns: 1fr; }
+  .bench-takeaway-grid { grid-template-columns: 1fr; }
+}

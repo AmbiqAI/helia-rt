@@ -1,5 +1,11 @@
 # Zephyr setup
 
+!!! note "Prerequisite"
+    This guide assumes you already have a working Zephyr development environment
+    (Zephyr repo, west, SDK). If not, follow the
+    [Zephyr Getting Started Guide](https://docs.zephyrproject.org/latest/develop/getting_started/index.html)
+    first.
+
 <div class="zephyr-page" markdown>
 
 <section class="zephyr-hero" markdown>
@@ -70,7 +76,7 @@ matches the release build matrix.
     - open `cmsis-nn` from the Zephyr workspace
     - `CONFIG_STD_CPP17=y`
     - `CONFIG_HELIA_RT=y`
-    - `CONFIG_NS_CMSIS_NN=n` (suppress the auto-imply)
+    - `CONFIG_NS_CMSIS_NN=n` (disable the HELIA backend that heliaRT enables by default)
     - `CONFIG_CMSIS_NN=y` and per-op kernel configs for your model
 
 === "Source Module + HELIA"
@@ -124,15 +130,21 @@ Zephyr can discover heliaRT modules in two common ways.
 Add both repos as west projects in your workspace `west.yml` and run
 `west update helia-rt ns-cmsis-nn`:
 
+!!! note
+    If this is your first time setting up the workspace, run `west update` (no
+    arguments) to fetch all modules. If you already have a workspace and are
+    just adding these entries, `west update helia-rt ns-cmsis-nn` fetches only
+    the new modules without re-downloading everything else.
+
 ```yaml
 - name: helia-rt
   url: https://github.com/AmbiqAI/helia-rt
-  revision: <helia-rt-version>     # e.g. helia-rt-v1.13.1
+  revision: <helia-rt-version>     # e.g. helia-rt-v1.16.0
   path: modules/helia-rt
 
 - name: ns-cmsis-nn
   url: https://github.com/AmbiqAI/ns-cmsis-nn
-  revision: <ns-cmsis-nn-version>  # e.g. v7.24.1
+  revision: <ns-cmsis-nn-version>  # e.g. v7.25.0
   path: modules/ns-cmsis-nn
 ```
 

@@ -8,7 +8,7 @@ heliaRT's public API is intentionally minimal and fully compatible with upstream
 #include "tensorflow/lite/micro/helia_rt_version.h"
 
 // Returns the heliaRT release version string
-const char* version = HELIA_RT_VERSION;  // e.g. "v1.12.2"
+const char* version = HELIA_RT_VERSION;  // e.g. "v1.16.0"
 ```
 
 This header provides the `HELIA_RT_VERSION` macro, which is managed by [release-please](https://github.com/googleapis/release-please) and updated automatically on every release.
@@ -45,7 +45,7 @@ For detailed API documentation, refer to the [upstream LiteRT for Micro API docs
 | `CONFIG_HELIA_RT` | bool | Enable heliaRT module |
 | `CONFIG_HELIA_RT_BACKEND_REFERENCE` | choice | Use Reference kernels |
 | `CONFIG_HELIA_RT_BACKEND_CMSIS_NN` | choice | Use open CMSIS-NN kernels |
-| `CONFIG_HELIA_RT_BACKEND_HELIA` | choice | Use Ambiq HELIA kernels |
+| `CONFIG_HELIA_RT_BACKEND_HELIA` | choice | Use Ambiq HELIA kernels (default) |
 | `CONFIG_HELIA_RT_KERNEL_OPTIMIZE_SPEED` | choice | Use HELIA speed-optimized kernel paths |
 | `CONFIG_HELIA_RT_KERNEL_OPTIMIZE_SIZE` | choice | Use HELIA size-optimized kernel paths |
 

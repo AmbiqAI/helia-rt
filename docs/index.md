@@ -252,7 +252,6 @@ As models and products mature, **heliaAOT** opens a deeper deployment path: Ambi
 
     ```cfg
     CONFIG_HELIA_RT=y
-    CONFIG_HELIA_RT_BACKEND_HELIA=y
     ```
 
 === "Build"
