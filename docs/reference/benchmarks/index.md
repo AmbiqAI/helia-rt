@@ -6,11 +6,11 @@
 
 <p class="section-eyebrow">Apollo510 EVB · Cortex-M55 + Helium MVE</p>
 
-## heliaRT is up to 706× faster than upstream TFLM
+## heliaRT is up to 706× faster than upstream LiteRT for Micro
 
 Across 36 operators benchmarked on real hardware, heliaRT matches or beats
-upstream TFLM on every single operator — with dramatic gains on activations,
-reductions, and data-movement ops that TFLM leaves unoptimized.
+upstream LiteRT for Micro on every single operator — with dramatic gains on activations,
+reductions, and data-movement ops that LiteRT for Micro leaves unoptimized.
 
 <div class="bench-stat-strip" markdown>
 <div>
@@ -97,7 +97,7 @@ reductions, and data-movement ops that TFLM leaves unoptimized.
       "x": {
         "type": "logarithmic",
         "min": 1,
-        "title": {"display": true, "text": "Speedup vs TFLM (× — log scale)"},
+        "title": {"display": true, "text": "Speedup vs LiteRT for Micro (× — log scale)"},
         "grid": {"color": "rgba(0,0,0,0.06)"}
       },
       "y": {"grid": {"display": false}, "ticks": {"font": {"size": 11}}}
@@ -106,14 +106,14 @@ reductions, and data-movement ops that TFLM leaves unoptimized.
 }' style="width:100%;max-height:780px;height:780px;"></canvas>
 
 <div class="bench-legend" markdown>
-:material-circle:{ .bench-legend-dramatic } **50–706×** — TFLM falls back to scalar C reference
+:material-circle:{ .bench-legend-dramatic } **50–706×** — LiteRT for Micro falls back to scalar C reference
 · :material-circle:{ .bench-legend-moderate } **1.3–13×** — heliaRT MVE-optimized paths
 · :material-circle:{ .bench-legend-parity } **~1×** — Both use CMSIS-NN / Helium MVE
 </div>
 
 ## Detailed Results
 
-| # | Operator | helia-rt Cycles | tflm Cycles | Speedup |
+| # | Operator | helia-rt Cycles | LiteRT Cycles | Speedup |
 |---|---|---:|---:|---:|
 | 1 | `CONV_2D` | 1,621,810 | 1,642,809 | **1.01×** |
 | 2 | `DEPTHWISE_CONV_2D` | 613,204 | 636,011 | **1.04×** |
@@ -155,7 +155,7 @@ reductions, and data-movement ops that TFLM leaves unoptimized.
 ## Why It Matters
 
 !!! success "No silent fallbacks"
-    Upstream TFLM only optimizes ~14 operators with CMSIS-NN. The rest — activations
+    Upstream LiteRT for Micro only optimizes ~14 operators with CMSIS-NN. The rest — activations
     like `RELU` and `LOGISTIC`, reductions like `MEAN` and `REDUCE_MAX`, data-movement
     ops like `SPLIT` and `CONCATENATION` — fall back to **scalar C reference code** that
     ignores Helium MVE entirely. These "silent fallbacks" can dominate inference time
@@ -190,7 +190,7 @@ without changing your application code.
 
 <div class="bench-takeaway-card" markdown>
 #### :material-shield-check: No regressions
-Across all 18 operators, heliaRT matches or beats TFLM. Zero trade-offs,
+Across all operators, heliaRT matches or beats LiteRT for Micro. Zero trade-offs,
 zero surprises.
 </div>
 
@@ -203,7 +203,7 @@ zero surprises.
 | Board | Apollo510 EVB (Cortex-M55 + Helium MVE) |
 | Toolchain | `arm-none-eabi-gcc` v15.2.1 |
 | heliaRT | v1.16.0 |
-| tflm | upstream tflm (2.3a snapshot) |
+| LiteRT for Micro | upstream LiteRT for Micro (2.3a snapshot) |
 | Iterations | 100 (10 warmup) |
 | Quantization | int8 (all models) |
 
@@ -213,7 +213,7 @@ Each operator is exercised by a single-operator int8 TFLite model (input
 shape `[1,32,32,16]` for spatial ops, appropriate shapes for non-spatial ops).
 All cycle counts are **median** values over 100 iterations after 10 warmup
 iterations. The same Apollo510 EVB and GCC toolchain are used for all runs.
-Speedup is calculated as `tflm_cycles / helia_cycles`.
+Speedup is calculated as `litert_cycles / helia_cycles`.
 
 ## Toolchain Comparison (ATfE vs GCC)
 

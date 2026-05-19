@@ -23,7 +23,7 @@ The pack version comes from the release-please-managed `HELIA_RT_VERSION` macro 
 
 ## Validate The Pack
 
-The CI pack job runs the repository's PDSC contract checker and `packchk` from CMSIS-Toolbox. To reproduce the same checks locally, install CMSIS-Toolbox, then run:
+The CI pack job runs the repository's PDSC contract checker and `packchk` from CMSIS-Toolbox. To reproduce the same checks locally, [install CMSIS-Toolbox](https://open-cmsis-pack.github.io/cmsis-toolbox/installation/), then run:
 
 ```bash
 python3 tools/cmsis_pack/build_pack.py --output dist --keep-stage
