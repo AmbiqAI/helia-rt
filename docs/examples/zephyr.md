@@ -455,7 +455,8 @@ The examples below use Apollo510 EVB; substitute your board and app source path 
     ```bash
     west build -p always -b apollo510_evb \
       -s app/helia_rt_app -d build/helia_rt_app_atfe \
-      -- -DZEPHYR_TOOLCHAIN_VARIANT=host/llvm \
+      -- -DZEPHYR_TOOLCHAIN_VARIANT=host \
+         -DTOOLCHAIN_VARIANT_COMPILER=llvm \
          -DLLVM_TOOLCHAIN_PATH=/path/to/ATfE-<version> \
          -DCONFIG_LLVM_USE_LLD=y \
          -DCONFIG_COMPILER_RT_RTLIB=y
@@ -463,7 +464,8 @@ The examples below use Apollo510 EVB; substitute your board and app source path 
 
     | Flag | Purpose |
     |---|---|
-    | `-DZEPHYR_TOOLCHAIN_VARIANT=host/llvm` | Select the host LLVM toolchain variant |
+    | `-DZEPHYR_TOOLCHAIN_VARIANT=host` | Select the host toolchain variant |
+    | `-DTOOLCHAIN_VARIANT_COMPILER=llvm` | Use LLVM/Clang as the compiler within the host variant |
     | `-DLLVM_TOOLCHAIN_PATH=...` | Root of the ATfE installation (contains `bin/`, `lib/`, …) |
     | `-DCONFIG_LLVM_USE_LLD=y` | Use LLD instead of GNU ld |
     | `-DCONFIG_COMPILER_RT_RTLIB=y` | Link compiler-rt instead of libgcc |
