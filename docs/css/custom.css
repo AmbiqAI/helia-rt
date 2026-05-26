@@ -926,7 +926,8 @@ body:has(.why-page) .md-sidebar--secondary,
 
 /* Zephyr setup page */
 .zephyr-page {
-  max-width: 1040px;
+  max-width: none;
+  width: 100%;
 }
 
 .zephyr-hero {
