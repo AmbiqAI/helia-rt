@@ -131,7 +131,7 @@ Known-good versions:
 
     ## 1. Fetch the modules
 
-    Add both `helia-rt` and `ns-cmsis-nn` as west projects in your workspace `west.yml`:
+    Add both `helia-rt` and `ns-cmsis-nn` as west projects in your workspace's `west.yml`:
 
     ```yaml
     - name: helia-rt

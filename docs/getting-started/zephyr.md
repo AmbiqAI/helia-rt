@@ -127,7 +127,7 @@ Zephyr can discover heliaRT modules in two common ways.
 
 ### West-Managed Modules (recommended)
 
-Add both repos as west projects in your workspace `west.yml` and run
+Add both `helia-rt` and `ns-cmsis-nn` as west projects in your workspace's `west.yml` and run
 `west update helia-rt ns-cmsis-nn`:
 
 !!! note
