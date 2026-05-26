@@ -91,6 +91,9 @@ Known-good versions:
     find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
     project(helia_rt_app)
 
+    set(NO_THREADSAFE_STATICS $<TARGET_PROPERTY:compiler-cpp,no_threadsafe_statics>)
+    zephyr_compile_options($<$<COMPILE_LANGUAGE:CXX>:${NO_THREADSAFE_STATICS}>)
+
     target_sources(app PRIVATE src/main.cpp)
     ```
 
@@ -173,6 +176,9 @@ Known-good versions:
     find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
     project(helia_rt_app)
 
+    set(NO_THREADSAFE_STATICS $<TARGET_PROPERTY:compiler-cpp,no_threadsafe_statics>)
+    zephyr_compile_options($<$<COMPILE_LANGUAGE:CXX>:${NO_THREADSAFE_STATICS}>)
+
     target_sources(app PRIVATE src/main.cpp)
     ```
 
@@ -238,6 +244,9 @@ Known-good versions:
 
     find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
     project(helia_rt_app)
+
+    set(NO_THREADSAFE_STATICS $<TARGET_PROPERTY:compiler-cpp,no_threadsafe_statics>)
+    zephyr_compile_options($<$<COMPILE_LANGUAGE:CXX>:${NO_THREADSAFE_STATICS}>)
 
     target_sources(app PRIVATE src/main.cpp)
     ```
@@ -330,12 +339,17 @@ extern const int g_model_len;
 // xxd -i model.tflite > model_data.cpp
 ```
 
+Then add `src/model_data.cpp` to `CMakeLists.txt`:
+
+```cmake
+target_sources(app PRIVATE src/main.cpp src/model_data.cpp)
+```
+
 `src/main.cpp`
 
 ```cpp
 #include <cstdint>
 
-#include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
 
 #include <tensorflow/lite/micro/micro_interpreter.h>
@@ -402,7 +416,7 @@ int main() {
   }
 
   while (true) {
-    k_msleep(1000);
+
   }
 
   return 0;
