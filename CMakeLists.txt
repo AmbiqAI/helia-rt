@@ -73,6 +73,21 @@ set(HELIA_RT_EXTRA_DEFINES "" CACHE STRING
 option(HELIA_RT_PROVIDE_DEBUG_LOG
     "Compile the default tensorflow/lite/micro/debug_log.cc into helia_rt targets" ON)
 
+# Source profiles. By default heliaRT targets contain only the production
+# inference runtime. The recording/introspection allocators and the
+# test/mock/fake helpers are debug-time utilities that bloat the archive and
+# are not on the inference path, so they are opt-in:
+#
+#   HELIA_RT_ENABLE_RECORDING    -> RecordingMicroAllocator / -Interpreter
+#                                   (arena-usage auditing)
+#   HELIA_RT_ENABLE_TEST_HELPERS -> test_helpers / mock_micro_graph /
+#                                   fake_micro_context (unit-test & KernelRunner
+#                                   support)
+option(HELIA_RT_ENABLE_RECORDING
+    "Compile the recording/introspection allocators into helia_rt targets" OFF)
+option(HELIA_RT_ENABLE_TEST_HELPERS
+    "Compile the test/mock/fake helpers into helia_rt targets" OFF)
+
 # Backend dependency target names. Defensive default lists let us absorb
 # upstream renames in cmsis-nn / ns-cmsis-nn without breaking consumers:
 # the first existing TARGET in each list wins. Override with a single
@@ -93,10 +108,20 @@ function(_helia_rt_add_backend_target backend)
     helia_rt_backend_compile_definitions(_backend_defs BACKEND ${backend})
     helia_rt_build_type_compile_definitions(_buildtype_defs BUILD_TYPE ${HELIA_RT_BUILD_TYPE})
 
+    # Select the common (non-kernel) sources for this profile: production
+    # runtime always, recording / test-support only when opted in.
+    set(_common_rel ${HELIA_RT_RUNTIME_COMMON_SOURCES})
+    if(HELIA_RT_ENABLE_RECORDING)
+        list(APPEND _common_rel ${HELIA_RT_RECORDING_SOURCES})
+    endif()
+    if(HELIA_RT_ENABLE_TEST_HELPERS)
+        list(APPEND _common_rel ${HELIA_RT_TEST_SUPPORT_SOURCES})
+    endif()
+
     # Resolve common-source paths relative to repo root (they are stored
     # relative in helia_rt_sources.cmake for portability).
     set(_common_abs)
-    foreach(_s IN LISTS HELIA_RT_COMMON_SOURCES)
+    foreach(_s IN LISTS _common_rel)
         if(NOT HELIA_RT_PROVIDE_DEBUG_LOG AND
            _s STREQUAL "tensorflow/lite/micro/debug_log.cc")
             continue()
@@ -114,6 +139,12 @@ function(_helia_rt_add_backend_target backend)
         CXX_STANDARD_REQUIRED YES
         CXX_EXTENSIONS        NO
         POSITION_INDEPENDENT_CODE OFF)
+
+        # TODO: Remove this once upstream TFLM fixes the placement-new sites in
+        # micro_allocator.cc / recording_micro_allocator.cc to avoid class-scope
+        # operator delete lookup when TF_LITE_STATIC_MEMORY is enabled.
+        target_compile_options(${_target} PRIVATE
+            $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>)
 
     # Compile definitions: backend + build-type + feature toggles + extras.
     set(_defs ${_backend_defs} ${_buildtype_defs} ${HELIA_RT_EXTRA_DEFINES})

@@ -61,10 +61,21 @@ set(HELIA_RT_INCLUDE_DIRS
 )
 
 # ---------------------------------------------------------------------------
-# Always-on runtime sources (non-kernel). Backend-independent.
-# Mirrors the non-kernel portion of zephyr/CMakeLists.txt.
+# Common (non-kernel) sources, partitioned into profiles. Backend-independent.
+#
+# The source set is split into three buckets so production consumers can opt
+# out of the recording/introspection and test/mock helpers that are not needed
+# to run inference:
+#
+#   HELIA_RT_RUNTIME_COMMON_SOURCES  always-on production runtime
+#   HELIA_RT_RECORDING_SOURCES       arena recording / introspection (opt-in)
+#   HELIA_RT_TEST_SUPPORT_SOURCES    test / mock / fake helpers (opt-in)
+#
+# HELIA_RT_COMMON_SOURCES is preserved below as the union of all three, so
+# existing consumers (zephyr/CMakeLists.txt, nsx/CMakeLists.txt,
+# cmake/dump_manifest.cmake) keep their current behavior unchanged.
 # ---------------------------------------------------------------------------
-set(HELIA_RT_COMMON_SOURCES
+set(HELIA_RT_RUNTIME_COMMON_SOURCES
     # python_ops_resolver — full reference op set registration
     python/tflite_micro/python_ops_resolver.cc
 
@@ -94,17 +105,12 @@ set(HELIA_RT_COMMON_SOURCES
     # tensorflow/lite/micro (runtime)
     tensorflow/lite/micro/debug_log.cc
     tensorflow/lite/micro/hexdump.cc
-    tensorflow/lite/micro/fake_micro_context.cc
     tensorflow/lite/micro/memory_helpers.cc
     tensorflow/lite/micro/micro_allocation_info.cc
-    tensorflow/lite/micro/test_helpers.cc
-    tensorflow/lite/micro/test_helper_custom_ops.cc
-    tensorflow/lite/micro/recording_micro_allocator.cc
     tensorflow/lite/micro/micro_time.cc
     tensorflow/lite/micro/micro_profiler.cc
     tensorflow/lite/micro/micro_utils.cc
     tensorflow/lite/micro/flatbuffer_utils.cc
-    tensorflow/lite/micro/mock_micro_graph.cc
     tensorflow/lite/micro/micro_interpreter.cc
     tensorflow/lite/micro/micro_interpreter_context.cc
     tensorflow/lite/micro/micro_interpreter_graph.cc
@@ -118,7 +124,6 @@ set(HELIA_RT_COMMON_SOURCES
     # arena allocator
     tensorflow/lite/micro/arena_allocator/non_persistent_arena_buffer_allocator.cc
     tensorflow/lite/micro/arena_allocator/persistent_arena_buffer_allocator.cc
-    tensorflow/lite/micro/arena_allocator/recording_single_arena_buffer_allocator.cc
     tensorflow/lite/micro/arena_allocator/single_arena_buffer_allocator.cc
 
     # tflite_bridge
@@ -138,6 +143,31 @@ set(HELIA_RT_COMMON_SOURCES
     tensorflow/lite/kernels/internal/reference/comparisons.cc
     tensorflow/lite/kernels/internal/reference/portable_tensor_utils.cc
     tensorflow/lite/kernels/kernel_util.cc
+)
+
+# Arena recording / introspection. Only needed for RecordingMicroInterpreter /
+# RecordingMicroAllocator (memory-usage auditing). Not on the inference path.
+set(HELIA_RT_RECORDING_SOURCES
+    tensorflow/lite/micro/recording_micro_allocator.cc
+    tensorflow/lite/micro/arena_allocator/recording_single_arena_buffer_allocator.cc
+)
+
+# Test / mock / fake helpers. Used by unit tests and KernelRunner-based test
+# harnesses, not by production inference.
+set(HELIA_RT_TEST_SUPPORT_SOURCES
+    tensorflow/lite/micro/test_helpers.cc
+    tensorflow/lite/micro/test_helper_custom_ops.cc
+    tensorflow/lite/micro/mock_micro_graph.cc
+    tensorflow/lite/micro/fake_micro_context.cc
+)
+
+# Backward-compatible aggregate: the full common source set (runtime +
+# recording + test support). Existing consumers that reference
+# HELIA_RT_COMMON_SOURCES keep their current behavior.
+set(HELIA_RT_COMMON_SOURCES
+    ${HELIA_RT_RUNTIME_COMMON_SOURCES}
+    ${HELIA_RT_RECORDING_SOURCES}
+    ${HELIA_RT_TEST_SUPPORT_SOURCES}
 )
 
 # ---------------------------------------------------------------------------
