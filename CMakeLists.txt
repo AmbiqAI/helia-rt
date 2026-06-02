@@ -140,6 +140,12 @@ function(_helia_rt_add_backend_target backend)
         CXX_EXTENSIONS        NO
         POSITION_INDEPENDENT_CODE OFF)
 
+        # TODO: Remove this once upstream TFLM fixes the placement-new sites in
+        # micro_allocator.cc / recording_micro_allocator.cc to avoid class-scope
+        # operator delete lookup when TF_LITE_STATIC_MEMORY is enabled.
+        target_compile_options(${_target} PRIVATE
+            $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>)
+
     # Compile definitions: backend + build-type + feature toggles + extras.
     set(_defs ${_backend_defs} ${_buildtype_defs} ${HELIA_RT_EXTRA_DEFINES})
     if(HELIA_RT_STATIC_MEMORY)
