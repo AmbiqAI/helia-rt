@@ -30,13 +30,17 @@ if(CONFIG_HELIA_RT)
   if(ZEPHYR_TOOLCHAIN_VARIANT STREQUAL "armclang")
     set(HELIA_RT_TOOLCHAIN_TOKEN armclang)
   elseif(
+    ZEPHYR_TOOLCHAIN_VARIANT STREQUAL "host" AND
+    TOOLCHAIN_VARIANT_COMPILER STREQUAL "llvm")
+    set(HELIA_RT_TOOLCHAIN_TOKEN atfe)
+  elseif(
     ZEPHYR_TOOLCHAIN_VARIANT STREQUAL "gnuarmemb" OR
     ZEPHYR_TOOLCHAIN_VARIANT STREQUAL "zephyr" OR
     ZEPHYR_TOOLCHAIN_VARIANT STREQUAL "cross-compile")
     set(HELIA_RT_TOOLCHAIN_TOKEN gcc)
   else()
     message(FATAL_ERROR
-      "Unsupported heliaRT prebuilt toolchain '${ZEPHYR_TOOLCHAIN_VARIANT}'. Supported toolchains are gcc-compatible and armclang.")
+      "Unsupported heliaRT prebuilt toolchain '${ZEPHYR_TOOLCHAIN_VARIANT}'. Supported toolchains are gcc-compatible, ATfE host LLVM, and armclang.")
   endif()
 
   if(CONFIG_HELIA_RT_PREBUILT_BUILD_DEBUG)

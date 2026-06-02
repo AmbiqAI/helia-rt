@@ -91,6 +91,9 @@ Known-good versions:
     find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
     project(helia_rt_app)
 
+    set(NO_THREADSAFE_STATICS $<TARGET_PROPERTY:compiler-cpp,no_threadsafe_statics>)
+    zephyr_compile_options($<$<COMPILE_LANGUAGE:CXX>:${NO_THREADSAFE_STATICS}>)
+
     target_sources(app PRIVATE src/main.cpp)
     ```
 
@@ -173,6 +176,9 @@ Known-good versions:
     find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
     project(helia_rt_app)
 
+    set(NO_THREADSAFE_STATICS $<TARGET_PROPERTY:compiler-cpp,no_threadsafe_statics>)
+    zephyr_compile_options($<$<COMPILE_LANGUAGE:CXX>:${NO_THREADSAFE_STATICS}>)
+
     target_sources(app PRIVATE src/main.cpp)
     ```
 
@@ -238,6 +244,9 @@ Known-good versions:
 
     find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
     project(helia_rt_app)
+
+    set(NO_THREADSAFE_STATICS $<TARGET_PROPERTY:compiler-cpp,no_threadsafe_statics>)
+    zephyr_compile_options($<$<COMPILE_LANGUAGE:CXX>:${NO_THREADSAFE_STATICS}>)
 
     target_sources(app PRIVATE src/main.cpp)
     ```
@@ -330,12 +339,17 @@ extern const int g_model_len;
 // xxd -i model.tflite > model_data.cpp
 ```
 
+Then add `src/model_data.cpp` to `CMakeLists.txt`:
+
+```cmake
+target_sources(app PRIVATE src/main.cpp src/model_data.cpp)
+```
+
 `src/main.cpp`
 
 ```cpp
 #include <cstdint>
 
-#include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
 
 #include <tensorflow/lite/micro/micro_interpreter.h>
@@ -402,7 +416,7 @@ int main() {
   }
 
   while (true) {
-    k_msleep(1000);
+
   }
 
   return 0;
@@ -441,7 +455,8 @@ The examples below use Apollo510 EVB; substitute your board and app source path 
     ```bash
     west build -p always -b apollo510_evb \
       -s app/helia_rt_app -d build/helia_rt_app_atfe \
-      -- -DZEPHYR_TOOLCHAIN_VARIANT=host/llvm \
+      -- -DZEPHYR_TOOLCHAIN_VARIANT=host \
+         -DTOOLCHAIN_VARIANT_COMPILER=llvm \
          -DLLVM_TOOLCHAIN_PATH=/path/to/ATfE-<version> \
          -DCONFIG_LLVM_USE_LLD=y \
          -DCONFIG_COMPILER_RT_RTLIB=y
@@ -449,7 +464,8 @@ The examples below use Apollo510 EVB; substitute your board and app source path 
 
     | Flag | Purpose |
     |---|---|
-    | `-DZEPHYR_TOOLCHAIN_VARIANT=host/llvm` | Select the host LLVM toolchain variant |
+    | `-DZEPHYR_TOOLCHAIN_VARIANT=host` | Select the host toolchain variant |
+    | `-DTOOLCHAIN_VARIANT_COMPILER=llvm` | Use LLVM/Clang as the compiler within the host variant |
     | `-DLLVM_TOOLCHAIN_PATH=...` | Root of the ATfE installation (contains `bin/`, `lib/`, …) |
     | `-DCONFIG_LLVM_USE_LLD=y` | Use LLD instead of GNU ld |
     | `-DCONFIG_COMPILER_RT_RTLIB=y` | Link compiler-rt instead of libgcc |

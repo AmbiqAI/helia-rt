@@ -180,7 +180,8 @@ For a full build walkthrough on Apollo510 + Zephyr, see [Zephyr + heliaRT → Bu
 
     # ATfE
     west build -b apollo510_evb -s app/helia_rt_app -- \
-      -DZEPHYR_TOOLCHAIN_VARIANT=host/llvm \
+      -DZEPHYR_TOOLCHAIN_VARIANT=host \
+      -DTOOLCHAIN_VARIANT_COMPILER=llvm \
       -DLLVM_TOOLCHAIN_PATH=/path/to/ATfE \
       -DCONFIG_LLVM_USE_LLD=y -DCONFIG_COMPILER_RT_RTLIB=y
     ```
