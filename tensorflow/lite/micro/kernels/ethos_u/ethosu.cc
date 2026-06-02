@@ -13,13 +13,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#include <ethosu_driver.h>
-
 #include "flatbuffers/flexbuffers.h"
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_context.h"
 #include "tensorflow/lite/micro/micro_log.h"
+
+#if defined(HELIA_RT_ENABLE_ETHOSU)
+extern "C" {
+struct ethosu_driver;
+
+struct ethosu_driver* ethosu_reserve_driver(void);
+void ethosu_release_driver(struct ethosu_driver* drv);
+int ethosu_invoke_v3(struct ethosu_driver* drv,
+                     const void* custom_data_ptr,
+                     int custom_data_size,
+                     uint64_t* base_addr,
+                     const size_t* base_addr_size,
+                     int num_base_addr,
+                     void* user_arg);
+}
+#endif
 
 namespace tflite {
 namespace {
@@ -36,6 +50,8 @@ void* Init(TfLiteContext* context, const char* buffer, size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
   return context->AllocatePersistentBuffer(context, sizeof(OpData));
 }
+
+#if defined(HELIA_RT_ENABLE_ETHOSU)
 
 TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(context != nullptr);
@@ -161,7 +177,11 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
   }
 }
 
+#endif
+
 }  // namespace
+
+#if defined(HELIA_RT_ENABLE_ETHOSU)
 
 TFLMRegistration* Register_ETHOSU() {
   static TFLMRegistration r = tflite::micro::RegisterOp(Init, Prepare, Eval);
@@ -169,5 +189,13 @@ TFLMRegistration* Register_ETHOSU() {
 }
 
 const char* GetString_ETHOSU() { return "ethos-u"; }
+
+#else
+
+TFLMRegistration* Register_ETHOSU() { return nullptr; }
+
+const char* GetString_ETHOSU() { return ""; }
+
+#endif
 
 }  // namespace tflite

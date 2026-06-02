@@ -291,6 +291,12 @@ class MicroMutableOpResolver : public MicroOpResolver {
     return AddBuiltin(BuiltinOperator_EXP, registration, ParseExp);
   }
 
+  TfLiteStatus AddGelu(
+      const TFLMRegistration& registration,
+      TfLiteBridgeBuiltinParseFunction parser) {
+    return AddBuiltin(BuiltinOperator_GELU, registration, parser);
+  }
+
   TfLiteStatus AddExpandDims(
       const TFLMRegistration& registration = Register_EXPAND_DIMS()) {
     return AddBuiltin(BuiltinOperator_EXPAND_DIMS, registration,
