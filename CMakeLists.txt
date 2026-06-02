@@ -97,6 +97,8 @@ set(HELIA_RT_CMSISNN_TARGET   "" CACHE STRING
     "Override CMSIS-NN target name for helia_rt::cmsis_nn linkage")
 set(HELIA_RT_NSCMSISNN_TARGET "" CACHE STRING
     "Override ns-cmsis-nn target name for helia_rt::helia linkage")
+option(HELIA_RT_ENABLE_ETHOSU
+    "Enable Ethos-U operator support in heliaRT targets" OFF)
 
 # ---------------------------------------------------------------------------
 # Helper: add one backend target (reference / cmsis_nn / helia).
@@ -129,10 +131,16 @@ function(_helia_rt_add_backend_target backend)
         list(APPEND _common_abs "${HELIA_RT_ROOT}/${_s}")
     endforeach()
 
-    add_library(${_target} STATIC ${_common_abs} ${_kernels})
+    add_library(${_target} STATIC
+        ${_common_abs}
+        ${_kernels}
+        ${HELIA_RT_ROOT}/tensorflow/lite/micro/kernels/ethos_u/ethosu.cc)
     add_library(helia_rt::${backend} ALIAS ${_target})
 
     target_include_directories(${_target} PUBLIC ${HELIA_RT_INCLUDE_DIRS})
+    if(HELIA_RT_ENABLE_ETHOSU)
+        target_compile_definitions(${_target} PUBLIC HELIA_RT_ENABLE_ETHOSU=1)
+    endif()
 
     set_target_properties(${_target} PROPERTIES
         CXX_STANDARD          ${HELIA_RT_CXX_STANDARD}
@@ -217,6 +225,7 @@ function(_helia_rt_add_backend_target backend)
         endforeach()
         if(_resolved)
             target_link_libraries(${_target} PUBLIC ${_resolved})
+            target_include_directories(${_target} PRIVATE "$<TARGET_PROPERTY:${_resolved},SOURCE_DIR>")
         else()
             message(WARNING
                 "helia_rt_helia: no ns-cmsis-nn target found among [${_candidates}]. "

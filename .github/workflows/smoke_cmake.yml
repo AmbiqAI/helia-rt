@@ -115,11 +115,16 @@ jobs:
           if git diff --name-only "$base" "$head" -- cmake/ CMakeLists.txt \
                 | grep -q .; then
               echo "PR touches SSoT files — verifying upstream paths are untouched..."
+              # Allow the small set of upstream-owned paths that currently need
+              # heliaRT-local divergence for generic CMake integration. Keep
+              # this list narrow so the invariant still catches accidental drift.
               bad=$(git diff --name-only "$base" "$head" -- \
                       tensorflow/ signal/ python/tflite_micro/ \
                       tensorflow/lite/micro/tools/make/ \
                     | grep -Ev '^tensorflow/lite/micro/(helia_rt_version|heliart_version)\.h$' \
                     | grep -Ev '^tensorflow/lite/micro/tools/ci_build/(package_helia_bundle|release_asset_helpers)\.sh$' \
+                | grep -Ev '^tensorflow/lite/micro/kernels/ethos_u/ethosu\.cc$' \
+                | grep -Ev '^tensorflow/lite/micro/micro_mutable_op_resolver\.h$' \
                     || true)
               if [ -n "$bad" ]; then
                   echo "::error::SSoT PR also edits upstream-managed paths:"
