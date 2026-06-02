@@ -62,4 +62,19 @@ config HELIA_RT_KERNEL_OPTIMIZE_SIZE
 
 endchoice
 
+config HELIA_RT_ENABLE_RECORDING
+	bool "Enable recording allocator support"
+	help
+		Compile RecordingMicroAllocator and the recording single-arena
+		buffer allocator into the Zephyr heliaRT module. This is only
+		needed for RecordingMicroInterpreter-style arena usage auditing.
+
+config HELIA_RT_ENABLE_TEST_HELPERS
+	bool "Enable test and mock helper sources"
+	help
+		Compile test_helpers, test_helper_custom_ops, mock_micro_graph,
+		and fake_micro_context into the Zephyr heliaRT module. These are
+		intended for unit tests and KernelRunner-based harnesses, not
+		for production inference builds.
+
 endif # HELIA_RT

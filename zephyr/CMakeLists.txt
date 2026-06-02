@@ -97,8 +97,18 @@ helia_rt_select_kernel_sources(_HELIA_RT_KERNEL_SOURCES
     BACKEND ${_HELIA_RT_BACKEND})
 
 # --- Common (non-kernel) sources from SSoT (relative → absolute) ---
+# Match the generic CMake profile split: always compile the production
+# runtime, and gate recording / test-support sources behind Zephyr Kconfig.
+set(_HELIA_RT_COMMON_REL ${HELIA_RT_RUNTIME_COMMON_SOURCES})
+if(CONFIG_HELIA_RT_ENABLE_RECORDING)
+    list(APPEND _HELIA_RT_COMMON_REL ${HELIA_RT_RECORDING_SOURCES})
+endif()
+if(CONFIG_HELIA_RT_ENABLE_TEST_HELPERS)
+    list(APPEND _HELIA_RT_COMMON_REL ${HELIA_RT_TEST_SUPPORT_SOURCES})
+endif()
+
 set(_HELIA_RT_COMMON_ABS "")
-foreach(_rel IN LISTS HELIA_RT_COMMON_SOURCES)
+foreach(_rel IN LISTS _HELIA_RT_COMMON_REL)
     list(APPEND _HELIA_RT_COMMON_ABS "${HELIA_RT_DIR}/${_rel}")
 endforeach()
 
