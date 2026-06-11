@@ -64,7 +64,7 @@ jobs:
           want = {
               'reference': [],
               'cmsis_nn':  ['CMSIS_NN'],
-              'helia':     ['CMSIS_NN', 'NS_CMSIS_NN', 'HELIA',
+              'helia':     ['CMSIS_NN', 'HELIA',
                             'CONV_KERNEL_OPTIMIZED_FOR_SPEED',
                             'FC_KERNEL_OPTIMIZED_FOR_SPEED',
                             'KERNELS_OPTIMIZED_FOR_SPEED'],
