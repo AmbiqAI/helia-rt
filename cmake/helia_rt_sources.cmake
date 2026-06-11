@@ -382,7 +382,7 @@ endfunction()
 # Matches the historical Zephyr behavior:
 #   reference  → (none)
 #   cmsis_nn   → CMSIS_NN
-#   helia      → CMSIS_NN, NS_CMSIS_NN, HELIA   (kernel headers expect all 3)
+#   helia      → CMSIS_NN, HELIA
 #                plus per-kernel optimization defines driven by
 #                HELIA_RT_{GLOBAL_KERNEL_OPTIMIZE,CONV_OPT,FC_OPT}:
 #                    CONV_KERNEL_OPTIMIZED_FOR_<SPEED|SIZE>
@@ -399,7 +399,7 @@ function(helia_rt_backend_compile_definitions OUT_VAR)
     if(_ARG_BACKEND STREQUAL "cmsis_nn")
         set(_defs CMSIS_NN)
     elseif(_ARG_BACKEND STREQUAL "helia")
-        set(_defs CMSIS_NN NS_CMSIS_NN HELIA)
+        set(_defs CMSIS_NN HELIA)
 
         # Resolve per-kernel overrides, falling back to the global default.
         set(_global "${HELIA_RT_GLOBAL_KERNEL_OPTIMIZE}")
