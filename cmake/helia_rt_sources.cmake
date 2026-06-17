@@ -76,9 +76,6 @@ set(HELIA_RT_INCLUDE_DIRS
 # cmake/dump_manifest.cmake) keep their current behavior unchanged.
 # ---------------------------------------------------------------------------
 set(HELIA_RT_RUNTIME_COMMON_SOURCES
-    # python_ops_resolver — full reference op set registration
-    python/tflite_micro/python_ops_resolver.cc
-
     # signal/
     signal/micro/kernels/fft_flexbuffers_generated_data.cc
     signal/micro/kernels/rfft.cc
