@@ -51,15 +51,7 @@ compatibility:
   boards:
     - "*"
   socs:
-    - apollo3
-    - apollo3p
-    - apollo4l
-    - apollo4p
-    - apollo5b
-    - apollo510
-    - apollo510b
-    - apollo330P
-    - apollo510L
+    - "*"
   toolchains:
     - arm-none-eabi-gcc
     - armclang
