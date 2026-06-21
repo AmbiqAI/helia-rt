@@ -59,6 +59,7 @@ compatibility:
     - apollo510
     - apollo510b
     - apollo330P
+    - apollo510L
   toolchains:
     - arm-none-eabi-gcc
     - armclang
