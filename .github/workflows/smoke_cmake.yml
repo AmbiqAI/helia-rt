@@ -217,11 +217,15 @@ jobs:
   nsx-cross-build:
     name: nsx::helia_rt cross-compile (Cortex-M55, gcc)
     runs-on: ubuntu-latest
-    # ns-cmsis-nn is a private repo. PRs from forks won't have access to the
-    # secret; skip cleanly there to avoid spurious failures.
+    # ns-cmsis-nn is a private repo. PRs from forks and Dependabot PRs won't
+    # have access to the repo secret used for cloning it; skip cleanly there
+    # to avoid spurious failures unrelated to the checked-in code.
     if: >
       github.event_name == 'push' ||
-      github.event.pull_request.head.repo.full_name == github.repository
+      (
+        github.actor != 'dependabot[bot]' &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      )
     env:
       # Pinned to the ns-cmsis-nn release whose CMake / Zephyr / NSX / CMSIS-Pack
       # surfaces align with heliaRT. Bump in lockstep with NS_CMSIS_NN_MIN_VERSION
