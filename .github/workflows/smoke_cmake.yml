@@ -37,7 +37,7 @@ jobs:
       matrix:
         backend: [reference, cmsis_nn, helia]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install cmake
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake
       - name: Dump + validate JSON manifest
@@ -78,7 +78,7 @@ jobs:
     name: Configure + build helia_rt::reference (host clang)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install toolchain
         run: |
           sudo apt-get update
@@ -101,7 +101,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Check diff scope
@@ -145,7 +145,7 @@ jobs:
     env:
       CMSIS_TOOLBOX_VERSION: 2.13.0
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install cmake + CMSIS-Toolbox
         run: |
           set -euo pipefail
@@ -217,11 +217,15 @@ jobs:
   nsx-cross-build:
     name: nsx::helia_rt cross-compile (Cortex-M55, gcc)
     runs-on: ubuntu-latest
-    # ns-cmsis-nn is a private repo. PRs from forks won't have access to the
-    # secret; skip cleanly there to avoid spurious failures.
+    # ns-cmsis-nn is a private repo. PRs from forks and Dependabot PRs won't
+    # have access to the repo secret used for cloning it; skip cleanly there
+    # to avoid spurious failures unrelated to the checked-in code.
     if: >
       github.event_name == 'push' ||
-      github.event.pull_request.head.repo.full_name == github.repository
+      (
+        github.actor != 'dependabot[bot]' &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      )
     env:
       # Pinned to the ns-cmsis-nn release whose CMake / Zephyr / NSX / CMSIS-Pack
       # surfaces align with heliaRT. Bump in lockstep with NS_CMSIS_NN_MIN_VERSION
@@ -229,7 +233,7 @@ jobs:
       NS_CMSIS_NN_REF: v7.25.0
     steps:
       - name: Checkout helia-rt
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: helia-rt
       - name: Checkout ns-cmsis-nn (pinned ref)
@@ -353,7 +357,7 @@ jobs:
       ZEPHYR_REF: v4.0.0
     steps:
       - name: Checkout helia-rt
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: helia-rt
       - name: Locate Zephyr SDK in CI image
