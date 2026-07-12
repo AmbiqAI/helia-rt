@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.18.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.17.0...helia-rt-v1.18.0) (2026-07-12)
+
+
+### Features
+
+* **nsx:** Make heliaRT SoC compatibility wildcard ([#180](https://github.com/AmbiqAI/helia-rt/issues/180)) ([6bb086e](https://github.com/AmbiqAI/helia-rt/commit/6bb086e29bbbc90178eb07d532cbb09f8a3f357d))
+
+
+### Bug Fixes
+
+* Remove python ops resolver from runtime sources ([#176](https://github.com/AmbiqAI/helia-rt/issues/176)) ([595b892](https://github.com/AmbiqAI/helia-rt/commit/595b89276d450b4abc9a2851f74efbe8ce3b338b))
+
 ## [1.17.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.16.0...helia-rt-v1.17.0) (2026-06-11)
 
 
