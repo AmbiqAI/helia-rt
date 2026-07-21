@@ -59,6 +59,7 @@ compatibility:
     - apollo510
     - apollo510b
     - apollo330P
+    - atomiq110
   toolchains:
     - arm-none-eabi-gcc
     - armclang
