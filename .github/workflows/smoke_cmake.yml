@@ -310,7 +310,7 @@ jobs:
               add_executable(nsx_helia_rt_link_probe
                   ${CMAKE_CURRENT_SOURCE_DIR}/link_probe.cc)
               target_link_libraries(nsx_helia_rt_link_probe
-                  PRIVATE helia_rt::helia nsx_board_flags)
+                  PRIVATE nsx::helia_rt nsx_board_flags)
               target_link_options(nsx_helia_rt_link_probe PRIVATE
                   --specs=nosys.specs)
               set_target_properties(nsx_helia_rt_link_probe PROPERTIES
@@ -324,7 +324,7 @@ jobs:
           // what the archive-only smoke build cannot catch.
           #include <stdint.h>
 
-          #include "Include/arm_nnfunctions.h"
+          #include "arm_nnfunctions.h"
 
           #include "tensorflow/lite/micro/kernels/micro_ops.h"
 
