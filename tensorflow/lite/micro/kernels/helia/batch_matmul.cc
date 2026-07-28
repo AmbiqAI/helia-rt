@@ -294,12 +294,17 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
         .adj_y = false,
         .activation = {0.0f, 0.0f},
         .rhs_format = ARM_NN_WEIGHT_FORMAT_STANDARD};
-  const cmsis_nn_dims lhs_dims =
-    adj_x ? FillVariableShape(lhs_input->dims->size, lhs_input->dims->data)
-        : FillVariableShapeSwapInnerDims(lhs_input->dims->size,
-                         lhs_input->dims->data);
-  const cmsis_nn_dims rhs_dims = FillVariableShapeSwapInnerDims(
-    rhs_input->dims->size, rhs_input->dims->data);
+    const cmsis_nn_dims lhs_dims =
+        adj_x ? FillVariableShape(lhs_input->dims->size, lhs_input->dims->data)
+              : FillVariableShapeSwapInnerDims(lhs_input->dims->size,
+                                               lhs_input->dims->data);
+    // Eval transposes RHS data and shape only when adj_y is false. Project the
+    // original Prepare-time shape to the same normalized [N, K] kernel layout.
+    const cmsis_nn_dims rhs_dims =
+        adj_y ? FillVariableShapeSwapInnerDims(rhs_input->dims->size,
+                                               rhs_input->dims->data)
+              : FillVariableShape(rhs_input->dims->size,
+                                  rhs_input->dims->data);
     buf_size = arm_batch_matmul_f32_get_buffer_size(
         &bmm_params, &lhs_dims, &rhs_dims, &data->output_shape);
   }
@@ -312,12 +317,15 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
         .adj_y = false,
         .activation = {0.0f, 0.0f},
         .rhs_format = ARM_NN_WEIGHT_FORMAT_STANDARD};
-  const cmsis_nn_dims lhs_dims =
-    adj_x ? FillVariableShape(lhs_input->dims->size, lhs_input->dims->data)
-        : FillVariableShapeSwapInnerDims(lhs_input->dims->size,
-                         lhs_input->dims->data);
-  const cmsis_nn_dims rhs_dims = FillVariableShapeSwapInnerDims(
-    rhs_input->dims->size, rhs_input->dims->data);
+    const cmsis_nn_dims lhs_dims =
+        adj_x ? FillVariableShape(lhs_input->dims->size, lhs_input->dims->data)
+              : FillVariableShapeSwapInnerDims(lhs_input->dims->size,
+                                               lhs_input->dims->data);
+    const cmsis_nn_dims rhs_dims =
+        adj_y ? FillVariableShapeSwapInnerDims(rhs_input->dims->size,
+                                               rhs_input->dims->data)
+              : FillVariableShape(rhs_input->dims->size,
+                                  rhs_input->dims->data);
     buf_size = arm_batch_matmul_f16_get_buffer_size(
         &bmm_params, &lhs_dims, &rhs_dims, &data->output_shape);
   }

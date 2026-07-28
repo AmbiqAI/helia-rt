@@ -694,10 +694,11 @@ TEST(TransposeTest, Complex5DTestWithReorder) {
 #if ARM_NN_ENABLE_F16
 namespace tflite {
 namespace testing {
-TEST(TransposeTest, TransposeFloat16Golden) {
-  int input_dims_data[] = {2, 2, 2};
-  int perm_dims_data[] = {1, 2};
-  int perm[] = {1, 0};
+TEST(TransposeTest, TransposeFloat16ReferenceFallback) {
+  int input_dims_data[] = {5, 1, 1, 1, 2, 2};
+  int output_dims_data[] = {5, 1, 1, 1, 2, 2};
+  int perm_dims_data[] = {1, 5};
+  int perm[] = {0, 1, 2, 4, 3};
   float16_t input[] = {static_cast<float16_t>(1), static_cast<float16_t>(2),
                        static_cast<float16_t>(3), static_cast<float16_t>(4)};
   float16_t output[4] = {};
@@ -707,7 +708,7 @@ TEST(TransposeTest, TransposeFloat16Golden) {
       CreateTensor(input, IntArrayFromInts(input_dims_data), false,
                    kTfLiteFloat16),
       CreateTensor(perm, IntArrayFromInts(perm_dims_data), true, kTfLiteInt32),
-      CreateTensor(output, IntArrayFromInts(input_dims_data), false,
+      CreateTensor(output, IntArrayFromInts(output_dims_data), false,
                    kTfLiteFloat16),
   };
   tensors[1].allocation_type = kTfLiteMmapRo;

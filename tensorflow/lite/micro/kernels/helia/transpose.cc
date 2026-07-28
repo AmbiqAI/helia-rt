@@ -200,11 +200,10 @@ TfLiteStatus TransposeEval(TfLiteContext* context, TfLiteNode* node) {
   // ---- Reference fallback (all types, 1–5D) ----
   switch (input->type) {
     case kTfLiteFloat16:
-#if ARM_NN_ENABLE_F16
-      return kTfLiteError;
-#else
-      return kTfLiteError;
-#endif
+      reference_ops::Transpose(
+          ref_params, in_shape, tflite::micro::GetTensorData<int16_t>(input),
+          out_shape, tflite::micro::GetTensorData<int16_t>(output));
+      break;
     case kTfLiteFloat32:
       reference_ops::Transpose(ref_params, in_shape,
                                tflite::micro::GetTensorData<float>(input),
