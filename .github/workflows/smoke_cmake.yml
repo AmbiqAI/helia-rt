@@ -235,10 +235,9 @@ jobs:
         github.event.pull_request.head.repo.full_name == github.repository
       )
     env:
-      # Pinned to the ns-cmsis-nn release whose CMake / Zephyr / NSX / CMSIS-Pack
-      # surfaces align with heliaRT. Bump in lockstep with NS_CMSIS_NN_MIN_VERSION
-      # in tools/cmsis_pack/build_pack.py.
-      NS_CMSIS_NN_REF: v7.28.0
+      # Pin CI to the tested ns-cmsis-nn release. This may be newer than the
+      # minimum compatible version declared by the CMSIS-Pack metadata.
+      NS_CMSIS_NN_REF: v7.29.0
     steps:
       - name: Checkout helia-rt
         uses: actions/checkout@v7

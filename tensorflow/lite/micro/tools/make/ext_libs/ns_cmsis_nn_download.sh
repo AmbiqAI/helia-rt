@@ -45,8 +45,8 @@ else
 fi
 
 # Set GIT_COMMIT to NS_CMSIS_NN_COMMIT if set, otherwise use default.
-# Default tracks AmbiqAI/ns-cmsis-nn tag v7.28.0.
-GIT_COMMIT=${NS_CMSIS_NN_COMMIT:-450cb148b45fea2727e8852e8b2c06c946cf759e}
+# Default tracks AmbiqAI/ns-cmsis-nn tag v7.29.0.
+GIT_COMMIT=${NS_CMSIS_NN_COMMIT:-f757adc842a8fd15a58f2f0bbe8a4c8a681b3a45}
 
 # clone_ns_cmsis_nn: attempt git clone and surface a clear error on failure.
 clone_ns_cmsis_nn() {
@@ -99,9 +99,10 @@ elif [ -d ${DOWNLOADED_NS_CMSIS_NN_PATH} ]; then
     # Check that the existing clone is at the right commit
     pushd ${DOWNLOADED_NS_CMSIS_NN_PATH} > /dev/null
     CURRENT_COMMIT=$(git rev-parse HEAD)
+    EXPECTED_COMMIT=$(git rev-parse --verify "${GIT_COMMIT}^{commit}" 2>/dev/null || true)
     popd > /dev/null
 
-    if [ "${CURRENT_COMMIT}" = "${GIT_COMMIT}" ]; then
+    if [ -n "${EXPECTED_COMMIT}" ] && [ "${CURRENT_COMMIT}" = "${EXPECTED_COMMIT}" ]; then
       echo >&2 "ns-cmsis-nn is already at ${GIT_COMMIT}, skipping download."
     else
       echo >&2 "ns-cmsis-nn is at ${CURRENT_COMMIT} but expected ${GIT_COMMIT}, redownloading."

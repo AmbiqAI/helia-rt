@@ -78,17 +78,18 @@ parameters are supported by the optimized kernel.
   optimized configuration is unsupported.
 - HELIA softmax supports only unit beta. FP32 softmax falls back to reference
   for non-unit beta; FP16 non-unit beta is unsupported.
-- HELIA FP16/FP32 `UNIDIRECTIONAL_SEQUENCE_LSTM` is currently stateless because
-  the underlying kernels zero-initialize hidden and cell state. Optimized
-  dispatch requires zero initial state. FP32 can fall back for stateful use;
-  FP16 stateful execution is unsupported.
+- HELIA FP16/FP32 `UNIDIRECTIONAL_SEQUENCE_LSTM` preserves the TFLite hidden and
+  cell state tensors across invocations when built with ns-cmsis-nn v7.29.0 or
+  newer. With v7.28.0, optimized dispatch still requires zero initial state;
+  FP32 falls back to reference for subsequent invocations, while FP16 stateful
+  execution is unsupported.
 
 See [Operator Coverage](../reference/operator-coverage.md) for the available
 HELIA operator wrappers.
 
 ## Make builds
 
-The Make integration pins ns-cmsis-nn v7.28.0 and configures the float features
+The Make integration pins ns-cmsis-nn v7.29.0 and configures the float features
 from `TARGET_ARCH`:
 
 - FP32 is enabled for the HELIA backend.
