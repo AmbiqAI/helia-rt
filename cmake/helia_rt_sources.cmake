@@ -373,6 +373,49 @@ function(helia_rt_select_kernel_sources OUT_VAR)
 endfunction()
 
 # ---------------------------------------------------------------------------
+# helia_rt_float_feature_flags(OUT_F32 OUT_F16)
+#
+# Resolves whether the helia backend should expose the fp32 / fp16 kernel API,
+# in precedence order:
+#   1. Zephyr Kconfig  : CONFIG_NS_CMSIS_NN_ENABLE_F32 / _F16
+#   2. NSX/CMake option: NSX_CMSIS_NN_ENABLE_F32 / _F16
+#   3. Historical default: fp32 on, fp16 off
+#
+# These mirror the options that drive ns-cmsis-nn's own source selection. The
+# authoritative value is whatever the linked ns-cmsis-nn target exports as
+# ARM_NN_ENABLE_F32/F16; the root CMakeLists reconciles against it once the
+# target is resolved (see _helia_rt_sync_float_definitions).
+# ---------------------------------------------------------------------------
+function(helia_rt_float_feature_flags OUT_F32 OUT_F16)
+    if(DEFINED CONFIG_NS_CMSIS_NN_ENABLE_F32)
+        set(_f32 "${CONFIG_NS_CMSIS_NN_ENABLE_F32}")
+    elseif(DEFINED NSX_CMSIS_NN_ENABLE_F32)
+        set(_f32 "${NSX_CMSIS_NN_ENABLE_F32}")
+    else()
+        set(_f32 ON)
+    endif()
+
+    if(DEFINED CONFIG_NS_CMSIS_NN_ENABLE_F16)
+        set(_f16 "${CONFIG_NS_CMSIS_NN_ENABLE_F16}")
+    elseif(DEFINED NSX_CMSIS_NN_ENABLE_F16)
+        set(_f16 "${NSX_CMSIS_NN_ENABLE_F16}")
+    else()
+        set(_f16 OFF)
+    endif()
+
+    if(_f32)
+        set(${OUT_F32} ON PARENT_SCOPE)
+    else()
+        set(${OUT_F32} OFF PARENT_SCOPE)
+    endif()
+    if(_f16)
+        set(${OUT_F16} ON PARENT_SCOPE)
+    else()
+        set(${OUT_F16} OFF PARENT_SCOPE)
+    endif()
+endfunction()
+
+# ---------------------------------------------------------------------------
 # helia_rt_backend_compile_definitions(OUT_VAR BACKEND <name>)
 #
 # Returns the compile definitions a backend variant of heliaRT requires.
@@ -380,6 +423,7 @@ endfunction()
 #   reference  → (none)
 #   cmsis_nn   → CMSIS_NN
 #   helia      → CMSIS_NN, HELIA
+#                plus ARM_NN_ENABLE_F32/F16 mirroring the ns-cmsis-nn build
 #                plus per-kernel optimization defines driven by
 #                HELIA_RT_{GLOBAL_KERNEL_OPTIMIZE,CONV_OPT,FC_OPT}:
 #                    CONV_KERNEL_OPTIMIZED_FOR_<SPEED|SIZE>
@@ -396,7 +440,17 @@ function(helia_rt_backend_compile_definitions OUT_VAR)
     if(_ARG_BACKEND STREQUAL "cmsis_nn")
         set(_defs CMSIS_NN)
     elseif(_ARG_BACKEND STREQUAL "helia")
+        # heliaCore's float API is opt-in. Keep these definitions aligned with
+        # the external ns-cmsis-nn target so helia kernel headers expose the
+        # same API that the linked library provides.
         set(_defs CMSIS_NN HELIA)
+        helia_rt_float_feature_flags(_helia_f32 _helia_f16)
+        if(_helia_f32)
+            list(APPEND _defs ARM_NN_ENABLE_F32=1)
+        endif()
+        if(_helia_f16)
+            list(APPEND _defs ARM_NN_ENABLE_F16=1)
+        endif()
 
         # Resolve per-kernel overrides, falling back to the global default.
         set(_global "${HELIA_RT_GLOBAL_KERNEL_OPTIMIZE}")

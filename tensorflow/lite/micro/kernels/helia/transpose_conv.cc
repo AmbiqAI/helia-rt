@@ -14,6 +14,7 @@ limitations under the License.
 ==============================================================================*/
 #include "tensorflow/lite/micro/kernels/transpose_conv.h"
 
+#include <type_traits>
 #include "Include/arm_nnfunctions.h"
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
@@ -102,8 +103,11 @@ TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteNode* node,
       padding_values.height_offset + padding_values.height;
 
   // Note that quantized inference requires that all tensors have their
-  // parameters set. This is usually done during quantized training.
-  if (data_type != kTfLiteFloat32) {
+  // parameters set. This is usually done during quantized training. Float16
+  // inputs are unquantized like float32, so skip the affine-quantization
+  // setup for them too (PopulateConvolutionQuantizationParams asserts
+  // input->quantization.type == kTfLiteAffineQuantization).
+  if (data_type != kTfLiteFloat32 && data_type != kTfLiteFloat16) {
     MicroContext* micro_context = GetMicroContext(context);
 
     TfLiteTensor* input =
@@ -180,12 +184,14 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, input->type, output->type);
   TF_LITE_ENSURE_MSG(context,
                      input->type == kTfLiteFloat32 ||
+                     input->type == kTfLiteFloat16 ||
                          input->type == kTfLiteInt16 ||
                          input->type == kTfLiteInt8,
                      "Input data type not supported");
   TF_LITE_ENSURE_MSG(
       context,
       (input->type == kTfLiteFloat32 && filter->type == kTfLiteFloat32) ||
+      (input->type == kTfLiteFloat16 && filter->type == kTfLiteFloat16) ||
           (input->type == kTfLiteInt16 && filter->type == kTfLiteInt8) ||
           (input->type == kTfLiteInt8 && filter->type == kTfLiteInt8),
       "Hybrid models are not supported on TFLite Micro.");
@@ -422,7 +428,8 @@ TfLiteStatus EvalQuantizedPerChannel(TfLiteContext* context, TfLiteNode* node,
   if (data.weight_sum_buf != nullptr) {
 
     weight_sum_ctx.buf = data.weight_sum_buf;
-  } else {
+  }
+  else {
     if (data.weight_buffer_idx > -1) {
       weight_sum_ctx.buf = context->GetScratchBuffer(context, data.weight_buffer_idx);
       //now need to redo the weight sum because we didn't precompute
@@ -447,6 +454,106 @@ TfLiteStatus EvalQuantizedPerChannel(TfLiteContext* context, TfLiteNode* node,
   return kTfLiteOk;
 }
 
+template <typename T>
+TfLiteStatus EvalFloat(TfLiteContext* context, TfLiteNode* node,
+                       const TfLiteEvalTensor* input,
+                       const TfLiteEvalTensor* filter,
+                       const TfLiteEvalTensor* bias, TfLiteEvalTensor* output,
+                       const OpData& data) {
+  const auto& builtin =
+      *reinterpret_cast<const TfLiteTransposeConvParams*>(node->builtin_data);
+  RuntimeShape input_shape = tflite::micro::GetTensorShape(input);
+  RuntimeShape filter_shape = tflite::micro::GetTensorShape(filter);
+  RuntimeShape output_shape = tflite::micro::GetTensorShape(output);
+  cmsis_nn_dims input_dims{input_shape.Dims(0), input_shape.Dims(1),
+                           input_shape.Dims(2), input_shape.Dims(3)};
+  cmsis_nn_dims filter_dims{filter_shape.Dims(0), filter_shape.Dims(1),
+                            filter_shape.Dims(2), filter_shape.Dims(3)};
+  cmsis_nn_dims output_dims{output_shape.Dims(0), output_shape.Dims(1),
+                            output_shape.Dims(2), output_shape.Dims(3)};
+  float activation_min;
+  float activation_max;
+  CalculateActivationRange(builtin.activation, &activation_min, &activation_max);
+  if constexpr (std::is_same_v<T, float>) {
+#if ARM_NN_ENABLE_F32
+    cmsis_nn_dims bias_dims{1, 1, 1, filter_shape.Dims(0)};
+    cmsis_nn_context ctx{nullptr, 0};
+    cmsis_nn_transpose_conv_params_f32 params{};
+    params.stride = {builtin.stride_width, builtin.stride_height};
+    params.padding = {data.params.padding_values.width,
+                      data.params.padding_values.height};
+    // heliaCore's f32 transpose_conv indexes as
+    //   out = in*stride - pad + k*dil + pad_off,
+    // where pad_off is the asymmetric (front vs back) padding delta.
+    // The helia quantized kernel expects `padding_values.{h,w}_offset` to
+    // already hold the composite (raw_offset + pad), and Prepare() stores it
+    // that way, so recover the raw offset here for the float kernel.
+    params.padding_offsets = {
+        data.params.padding_values.width_offset - data.params.padding_values.width,
+        data.params.padding_values.height_offset -
+            data.params.padding_values.height};
+    params.dilation = {1, 1};
+    params.activation = {activation_min, activation_max};
+    if (arm_transpose_conv_f32(
+            &ctx, nullptr, &params, &input_dims,
+            tflite::micro::GetTensorData<const float>(input), &filter_dims,
+            tflite::micro::GetTensorData<const float>(filter), &bias_dims,
+            tflite::micro::GetOptionalTensorData<const float>(bias), &output_dims,
+            tflite::micro::GetTensorData<float>(output), ARM_NN_LAYOUT_NHWC) !=
+        ARM_CMSIS_NN_SUCCESS) {
+      // Fall through to the reference implementation.
+    } else {
+      return kTfLiteOk;
+    }
+#endif
+    ConvParams op_params = data.params;
+    op_params.float_activation_min = activation_min;
+    op_params.float_activation_max = activation_max;
+    reference_ops::TransposeConv(
+        op_params, tflite::micro::GetTensorShape(input),
+        tflite::micro::GetTensorData<float>(input),
+        tflite::micro::GetTensorShape(filter),
+        tflite::micro::GetTensorData<float>(filter),
+        tflite::micro::GetTensorShape(bias),
+        tflite::micro::GetOptionalTensorData<float>(bias),
+        tflite::micro::GetTensorShape(output),
+        tflite::micro::GetTensorData<float>(output),
+        tflite::micro::GetTensorShape(nullptr), nullptr);
+  }
+#if ARM_NN_ENABLE_F16
+  else {
+    cmsis_nn_dims bias_dims{1, 1, 1, filter_shape.Dims(0)};
+    cmsis_nn_context ctx{nullptr, 0};
+    cmsis_nn_transpose_conv_params_f16 params{};
+    params.stride = {builtin.stride_width, builtin.stride_height};
+    params.padding = {data.params.padding_values.width,
+                      data.params.padding_values.height};
+    // See note in the f32 branch: recover the raw asymmetric-pad offset from
+    // the composite stored by Prepare() for the helia quantized kernel.
+    params.padding_offsets = {
+        data.params.padding_values.width_offset - data.params.padding_values.width,
+        data.params.padding_values.height_offset -
+            data.params.padding_values.height};
+    params.dilation = {1, 1};
+    params.activation = {static_cast<float16_t>(activation_min),
+                         static_cast<float16_t>(activation_max)};
+    if (arm_transpose_conv_f16(
+            &ctx, nullptr, &params, &input_dims,
+            tflite::micro::GetTensorData<const float16_t>(input), &filter_dims,
+            tflite::micro::GetTensorData<const float16_t>(filter), &bias_dims,
+            tflite::micro::GetOptionalTensorData<const float16_t>(bias),
+            &output_dims, tflite::micro::GetTensorData<float16_t>(output),
+            ARM_NN_LAYOUT_NHWC) != ARM_CMSIS_NN_SUCCESS)
+      return kTfLiteError;
+  }
+#else
+  else {
+    return kTfLiteError;
+  }
+#endif
+  return kTfLiteOk;
+}
+
 TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
   const TfLiteEvalTensor* input =
       tflite::micro::GetEvalInput(context, node, kInputTensor);
@@ -468,23 +575,14 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
 
   switch (input->type) {  // Already know in/out types are same.
     case kTfLiteFloat32: {
-      ConvParams op_params = data.params;
-      CalculateActivationRange(params.activation,
-                               &op_params.float_activation_min,
-                               &op_params.float_activation_max);
-
-      reference_ops::TransposeConv(
-          op_params, tflite::micro::GetTensorShape(input),
-          tflite::micro::GetTensorData<float>(input),
-          tflite::micro::GetTensorShape(filter),
-          tflite::micro::GetTensorData<float>(filter),
-          tflite::micro::GetTensorShape(bias),
-          tflite::micro::GetOptionalTensorData<float>(bias),
-          tflite::micro::GetTensorShape(output),
-          tflite::micro::GetTensorData<float>(output),
-          tflite::micro::GetTensorShape(nullptr), nullptr);
-      break;
+      return EvalFloat<float>(context, node, input, filter, bias, output, data);
     }
+ #if ARM_NN_ENABLE_F16
+    case kTfLiteFloat16: {
+      return EvalFloat<float16_t>(context, node, input, filter, bias, output,
+                                  data);
+    }
+ #endif
     case kTfLiteInt8: {
       return EvalQuantizedPerChannel(context, node, params, data, input, filter,
                                      bias, output);

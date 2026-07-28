@@ -75,7 +75,7 @@ TfLiteStatus PoolingPrepare(TfLiteContext* context, TfLiteNode* node) {
                    input->params.zero_point == output->params.zero_point);
   }
 
-  if (input->type == kTfLiteFloat32) {
+  if (input->type == kTfLiteFloat32 || input->type == kTfLiteFloat16) {
     CalculateActivationRange(params->activation, &data->activation_min_f32,
                              &data->activation_max_f32);
   } else if (input->type == kTfLiteInt8 || input->type == kTfLiteInt16) {

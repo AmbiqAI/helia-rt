@@ -19,6 +19,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
+#if ARM_NN_ENABLE_F16
+#include "arm_nnfunctions_flt.h"
+#endif
+
 namespace tflite {
 namespace testing {
 namespace {
@@ -263,6 +267,47 @@ TEST(PadTest, Test2DFloatV2) {
                                   pad_values, pad_value, output_dims, golden,
                                   output_data);
 }
+
+#if ARM_NN_ENABLE_F16
+namespace tflite {
+namespace testing {
+TEST(PadTest, TestFloat16NontrivialPadGolden) {
+  int input_dims[] = {4, 1, 2, 2, 1};
+  float16_t input_values[] = {1, 2, 3, 4};
+  int pad_dims[] = {2, 4, 2};
+  const int32_t pad_values[] = {0, 0, 1, 1, 1, 1, 0, 0};
+  int output_dims[] = {4, 1, 4, 4, 1};
+  float16_t output_data[16] = {};
+  const float expected[] = {
+      0, 0, 0, 0,
+      0, 1, 2, 0,
+      0, 3, 4, 0,
+      0, 0, 0, 0,
+  };
+
+  TfLiteTensor tensors[] = {
+      CreateTensor(input_values, IntArrayFromInts(input_dims), false,
+                   kTfLiteFloat16),
+      CreateTensor(pad_values, IntArrayFromInts(pad_dims), true, kTfLiteInt32),
+      CreateTensor(output_data, IntArrayFromInts(output_dims), false,
+                   kTfLiteFloat16),
+  };
+  tensors[1].allocation_type = kTfLiteMmapRo;
+
+  int inputs_array_data[] = {2, 0, 1};
+  int outputs_array_data[] = {1, 2};
+  micro::KernelRunner runner(Register_PAD(), tensors, 3,
+                             IntArrayFromInts(inputs_array_data),
+                             IntArrayFromInts(outputs_array_data), nullptr);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  for (int i = 0; i < 16; ++i) {
+    EXPECT_NEAR(expected[i], static_cast<float>(output_data[i]), 1e-3f);
+  }
+}
+}  // namespace testing
+}  // namespace tflite
+#endif
 
 TEST(PadTest, Test2DInt8) {
   int input_dims[] = {4, 1, 2, 2, 1};

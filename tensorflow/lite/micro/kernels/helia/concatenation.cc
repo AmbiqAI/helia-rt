@@ -15,6 +15,7 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/reference/concatenation.h"
 
 #include <cstdint>
+#include <type_traits>
 #include "Include/arm_nnfunctions.h"
 #include "Include/arm_nnsupportfunctions.h"
 #include "tensorflow/lite/c/builtin_op_data.h"
@@ -103,6 +104,76 @@ void EvalUnquantized(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
   const OpData* data = static_cast<const OpData*>(node->user_data);
 
+  if constexpr (false
+#if ARM_NN_ENABLE_F32
+                || std::is_same_v<data_type, float>
+#endif
+#if ARM_NN_ENABLE_F16
+                || std::is_same_v<data_type, float16_t>
+#endif
+  ) {
+    // heliaCore's floating concat API handles up to four dimensions and
+    // concatenates one input at a time using an element offset. The API uses
+    // (x, y, z, w) with x = innermost/fastest and w = outermost dim, i.e. the
+    // reverse of TFLite's (N, ..., C) ordering.
+    const int rank = output_shape.DimensionsCount();
+    if (rank <= 4) {
+      int32_t out_dims_r[4] = {1, 1, 1, 1};
+      for (int j = 0; j < rank; ++j) {
+        out_dims_r[j] = output_shape.Dims(rank - 1 - j);
+      }
+      // TFLite axis: 0=outermost .. rank-1=innermost.
+      // heliaCore axis: 0=x=innermost .. 3=w=outermost.
+      const int helia_axis = rank - 1 - data->params.axis;
+      int32_t offset = 0;
+      for (int i = 0; i < data->params.inputs_count; ++i) {
+        int32_t in_dims_r[4] = {1, 1, 1, 1};
+        for (int j = 0; j < rank; ++j) {
+          in_dims_r[j] = inputs_shape_ptr[i]->Dims(rank - 1 - j);
+        }
+        const data_type* input = inputs_data[i];
+        if constexpr (std::is_same_v<data_type, float>) {
+#if ARM_NN_ENABLE_F32
+          switch (helia_axis) {
+            case 0: arm_concatenation_f32_x(input, in_dims_r[0], in_dims_r[1],
+                                             in_dims_r[2], in_dims_r[3],
+                                             output_data, out_dims_r[0], offset); break;
+            case 1: arm_concatenation_f32_y(input, in_dims_r[0], in_dims_r[1],
+                                             in_dims_r[2], in_dims_r[3],
+                                             output_data, out_dims_r[1], offset); break;
+            case 2: arm_concatenation_f32_z(input, in_dims_r[0], in_dims_r[1],
+                                             in_dims_r[2], in_dims_r[3],
+                                             output_data, out_dims_r[2], offset); break;
+            default: arm_concatenation_f32_w(input, in_dims_r[0], in_dims_r[1],
+                                             in_dims_r[2], in_dims_r[3],
+                                             output_data, offset); break;
+          }
+#endif
+        }
+#if ARM_NN_ENABLE_F16
+        else {
+          switch (helia_axis) {
+            case 0: arm_concatenation_f16_x(input, in_dims_r[0], in_dims_r[1],
+                                             in_dims_r[2], in_dims_r[3],
+                                             output_data, out_dims_r[0], offset); break;
+            case 1: arm_concatenation_f16_y(input, in_dims_r[0], in_dims_r[1],
+                                             in_dims_r[2], in_dims_r[3],
+                                             output_data, out_dims_r[1], offset); break;
+            case 2: arm_concatenation_f16_z(input, in_dims_r[0], in_dims_r[1],
+                                             in_dims_r[2], in_dims_r[3],
+                                             output_data, out_dims_r[2], offset); break;
+            default: arm_concatenation_f16_w(input, in_dims_r[0], in_dims_r[1],
+                                             in_dims_r[2], in_dims_r[3],
+                                             output_data, offset); break;
+          }
+        }
+#endif
+        offset += in_dims_r[helia_axis];
+      }
+      return;
+    }
+  }
+
   // Set input_concat_dims
   for (int i = 0; i < data->params.inputs_count; i++) {
     input_concat_dims[i] = inputs_shape_ptr[i]->Dims(data->params.axis);
@@ -169,7 +240,8 @@ TfLiteStatus ConcatenationPrepare(TfLiteContext* context, TfLiteNode* node) {
   // Check activation and input type
   TF_LITE_ENSURE_EQ(context, params->activation, kTfLiteActNone);
   TF_LITE_ENSURE(context,
-                 input_type == kTfLiteFloat32 || input_type == kTfLiteInt8 ||
+                 input_type == kTfLiteFloat32 || input_type == kTfLiteFloat16 ||
+                     input_type == kTfLiteInt8 ||
                      input_type == kTfLiteInt16 || input_type == kTfLiteInt32 ||
                      input_type == kTfLiteInt64 || input_type == kTfLiteBool);
 
@@ -207,6 +279,9 @@ TfLiteStatus ConcatenationPrepare(TfLiteContext* context, TfLiteNode* node) {
   switch (output_type) {  // Already know in/outtypes are same.
     case kTfLiteBool:
     case kTfLiteFloat32:
+#if ARM_NN_ENABLE_F16
+    case kTfLiteFloat16:
+#endif
     case kTfLiteInt16:
     case kTfLiteInt32:
     case kTfLiteInt64: {
@@ -263,6 +338,11 @@ TfLiteStatus ConcatenationEval(TfLiteContext* context, TfLiteNode* node) {
     case kTfLiteFloat32:
       EvalUnquantized<float>(context, node);
       break;
+ #if ARM_NN_ENABLE_F16
+    case kTfLiteFloat16:
+      EvalUnquantized<float16_t>(context, node);
+      break;
+ #endif
     case kTfLiteInt32:
       EvalUnquantized<int32_t>(context, node);
       break;

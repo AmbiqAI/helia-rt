@@ -19,6 +19,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
+#if ARM_NN_ENABLE_F16
+#include "arm_nnfunctions_flt.h"
+#endif
+
 namespace tflite {
 namespace testing {
 namespace {
@@ -244,5 +248,39 @@ TEST(MulTest, SimpleInt32NoActivationShouldMatchGolden) {
       tflite::testing::dims_simple, tflite::testing::golden_simple,
       golden_quantized, 0.0001, 0, output_data, kTfLiteActNone);
 }
+
+#if ARM_NN_ENABLE_F16
+namespace tflite {
+namespace testing {
+TEST(MulTest, Float16MulNoActivationGolden) {
+  int dims_data[] = {2, 2, 3};
+  float16_t lhs[] = {1, -2, 3, 4, 5, -6};
+  float16_t rhs[] = {2, 3, -1, 5, -4, 6};
+  float16_t output[6] = {};
+  const float expected[] = {2, -6, -3, 20, -20, -36};
+
+  TfLiteTensor tensors[] = {
+      CreateTensor(lhs, IntArrayFromInts(dims_data), false, kTfLiteFloat16),
+      CreateTensor(rhs, IntArrayFromInts(dims_data), false, kTfLiteFloat16),
+      CreateTensor(output, IntArrayFromInts(dims_data), false,
+                   kTfLiteFloat16),
+  };
+  int inputs_array_data[] = {2, 0, 1};
+  int outputs_array_data[] = {1, 2};
+  TfLiteMulParams params = {};
+  params.activation = kTfLiteActNone;
+
+  micro::KernelRunner runner(Register_MUL(), tensors, 3,
+                             IntArrayFromInts(inputs_array_data),
+                             IntArrayFromInts(outputs_array_data), &params);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  for (int i = 0; i < 6; ++i) {
+    EXPECT_NEAR(expected[i], static_cast<float>(output[i]), 5e-2f);
+  }
+}
+}  // namespace testing
+}  // namespace tflite
+#endif
 
 TF_LITE_MICRO_TESTS_MAIN

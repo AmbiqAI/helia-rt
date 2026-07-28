@@ -19,6 +19,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
+#if ARM_NN_ENABLE_F16
+#include "arm_nnfunctions_flt.h"
+#endif
+
 namespace tflite {
 namespace testing {
 namespace {
@@ -960,5 +964,86 @@ TEST(SvdfTest, SvdfQuantized1x16Input64x1OutputReluShouldMatchGoldenInt16) {
   tflite::testing::SvdfQuantized1x16Input64x1OutputReluShouldMatchGolden<
       int16_t>();
 }
+
+#if ARM_NN_ENABLE_F16
+namespace tflite {
+namespace testing {
+TEST(SvdfTest, SvdfFloat16_2x2Input2x4OutputShouldMatchGolden) {
+    constexpr int batch_size = 2;
+    constexpr int num_units = 4;
+    constexpr int input_size = 2;
+    constexpr int memory_size = 10;
+    constexpr int rank = 2;
+    constexpr int num_filters = num_units * rank;
+
+    float16_t input_data[batch_size * input_size] = {};
+    float16_t feature_weights_data[num_filters * input_size] = {};
+    float16_t time_weights_data[num_filters * memory_size] = {};
+    float16_t activation_state_data[batch_size * memory_size * num_filters] = {};
+    float16_t bias_data[num_filters] = {};
+    float16_t output_data[batch_size * num_units] = {};
+
+    for (int i = 0; i < num_filters * input_size; ++i) {
+        feature_weights_data[i] =
+                static_cast<float16_t>(tflite::testing::feature_weights_data_2x2x10[i]);
+    }
+    for (int i = 0; i < num_filters * memory_size; ++i) {
+        time_weights_data[i] =
+                static_cast<float16_t>(tflite::testing::time_weights_data_2x2x10[i]);
+    }
+    for (int i = 0; i < num_filters; ++i) {
+        bias_data[i] = static_cast<float16_t>(tflite::testing::bias_data_2x2x10[i]);
+    }
+
+    int input_dims_data[] = {2, batch_size, input_size};
+    int feature_dims_data[] = {2, num_filters, input_size};
+    int time_dims_data[] = {2, num_filters, memory_size};
+    int bias_dims_data[] = {1, num_units};
+    int state_dims_data[] = {2, batch_size, num_filters * memory_size};
+    int output_dims_data[] = {2, batch_size, num_units};
+    TfLiteTensor tensors[] = {
+            CreateTensor(input_data, IntArrayFromInts(input_dims_data), false,
+                                     kTfLiteFloat16),
+            CreateTensor(feature_weights_data, IntArrayFromInts(feature_dims_data),
+                                     true, kTfLiteFloat16),
+            CreateTensor(time_weights_data, IntArrayFromInts(time_dims_data), true,
+                                     kTfLiteFloat16),
+            CreateTensor(bias_data, IntArrayFromInts(bias_dims_data), true,
+                                     kTfLiteFloat16),
+            CreateTensor(activation_state_data, IntArrayFromInts(state_dims_data),
+                                     true, kTfLiteFloat16),
+            CreateTensor(output_data, IntArrayFromInts(output_dims_data), false,
+                                     kTfLiteFloat16),
+    };
+    int inputs_array_data[] = {5, 0, 1, 2, 3, 4};
+    int outputs_array_data[] = {1, 5};
+    TfLiteSVDFParams params = {};
+    params.rank = rank;
+    params.activation = kTfLiteActNone;
+    micro::KernelRunner runner(Register_SVDF(), tensors, 6,
+                                                         IntArrayFromInts(inputs_array_data),
+                                                         IntArrayFromInts(outputs_array_data), &params);
+
+    EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+    constexpr int kFrames = 10;
+    for (int step = 0; step < kFrames; ++step) {
+        for (int i = 0; i < batch_size * input_size; ++i) {
+            input_data[i] = static_cast<float16_t>(
+                    tflite::testing::input_data_2x2x10[step * batch_size * input_size +
+                                                                                         i]);
+        }
+        EXPECT_EQ(kTfLiteOk, runner.Invoke());
+        for (int i = 0; i < batch_size * num_units; ++i) {
+            const float actual = static_cast<float>(output_data[i]);
+            const float expected =
+                    tflite::testing::golden_output_2x2x10[step * batch_size * num_units +
+                                                                                                i];
+            EXPECT_NEAR(expected, actual, 0.15f);
+        }
+    }
+}
+}  // namespace testing
+}  // namespace tflite
+#endif
 
 TF_LITE_MICRO_TESTS_MAIN

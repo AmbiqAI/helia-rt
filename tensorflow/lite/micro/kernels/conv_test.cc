@@ -26,6 +26,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
+#if ARM_NN_ENABLE_F16
+#include "arm_nnfunctions_flt.h"
+#endif
+
 namespace tflite {
 namespace testing {
 namespace {
@@ -303,6 +307,112 @@ TEST(ConvTest, SimpleTestFloatCompressed) {
 }
 
 #endif
+
+namespace tflite {
+namespace testing {
+namespace {
+
+// Asymmetric spatial configurations. Backends that pass CMSIS-NN's
+// cmsis_nn_tile fields ({width, height}) in the wrong order still produce the
+// right answer for symmetric strides/dilations/paddings, so these goldens are
+// the ones that catch a transposed tile.
+constexpr int kAsymInputElements = 20;
+int kAsymInputShape[] = {4, 1, 4, 5, 1};
+const float kAsymInputData[kAsymInputElements] = {
+    1,  2,  3,  4,  5,   //
+    6,  7,  8,  9,  10,  //
+    11, 12, 13, 14, 15,  //
+    16, 17, 18, 19, 20};
+
+// 2 (height) x 3 (width) filter — deliberately non-square.
+int kAsymFilterShape[] = {4, 1, 2, 3, 1};
+const float kAsymFilterData[6] = {1, 2, 3, 4, 5, 6};
+
+int kAsymBiasShape[] = {1, 1};
+const float kAsymBiasData[1] = {1};
+
+// stride = {width: 2, height: 1}, VALID padding -> 3x2 output.
+TfLiteConvParams kAsymStrideConvParams = {
+    kTfLitePaddingValid,  // padding
+    2,                    // stride_width
+    1,                    // stride_height
+    kTfLiteActNone,       // activation
+    1,                    // dilation_width_factor
+    1,                    // dilation_height_factor
+    kTfLiteNoType         // quantized_bias_type
+};
+int kAsymStrideOutputShape[] = {4, 1, 3, 2, 1};
+const float kAsymStrideGolden[6] = {122, 164, 227, 269, 332, 374};
+
+// dilation = {width: 2, height: 1}, VALID padding -> 3x1 output.
+TfLiteConvParams kAsymDilationConvParams = {
+    kTfLitePaddingValid,  // padding
+    1,                    // stride_width
+    1,                    // stride_height
+    kTfLiteActNone,       // activation
+    2,                    // dilation_width_factor
+    1,                    // dilation_height_factor
+    kTfLiteNoType         // quantized_bias_type
+};
+int kAsymDilationOutputShape[] = {4, 1, 3, 1, 1};
+const float kAsymDilationGolden[3] = {147, 252, 357};
+
+// SAME padding with a 2x3 filter -> padding {width: 1, height: 0}.
+TfLiteConvParams kAsymPaddingConvParams = {
+    kTfLitePaddingSame,  // padding
+    1,                   // stride_width
+    1,                   // stride_height
+    kTfLiteActNone,      // activation
+    1,                   // dilation_width_factor
+    1,                   // dilation_height_factor
+    kTfLiteNoType        // quantized_bias_type
+};
+int kAsymPaddingOutputShape[] = {4, 1, 4, 5, 1};
+const float kAsymPaddingGolden[kAsymInputElements] = {
+    81,  122, 143, 164, 101,  //
+    161, 227, 248, 269, 161,  //
+    241, 332, 353, 374, 221,  //
+    84,  105, 111, 117, 60};
+
+}  // namespace
+}  // namespace testing
+}  // namespace tflite
+
+TEST(ConvTest, AsymmetricStrideFloatShouldMatchGolden) {
+  float output_data[6];
+  tflite::testing::TestConvFloat(
+      tflite::testing::kAsymInputShape, tflite::testing::kAsymInputData,
+      tflite::testing::kAsymFilterShape, tflite::testing::kAsymFilterData,
+      tflite::testing::kAsymBiasShape, tflite::testing::kAsymBiasData,
+      tflite::testing::kAsymStrideOutputShape,
+      tflite::testing::kAsymStrideGolden,
+      &tflite::testing::kAsymStrideConvParams, tflite::Register_CONV_2D(),
+      output_data);
+}
+
+TEST(ConvTest, AsymmetricDilationFloatShouldMatchGolden) {
+  float output_data[3];
+  tflite::testing::TestConvFloat(
+      tflite::testing::kAsymInputShape, tflite::testing::kAsymInputData,
+      tflite::testing::kAsymFilterShape, tflite::testing::kAsymFilterData,
+      tflite::testing::kAsymBiasShape, tflite::testing::kAsymBiasData,
+      tflite::testing::kAsymDilationOutputShape,
+      tflite::testing::kAsymDilationGolden,
+      &tflite::testing::kAsymDilationConvParams, tflite::Register_CONV_2D(),
+      output_data);
+}
+
+TEST(ConvTest, AsymmetricPaddingFloatShouldMatchGolden) {
+  float output_data[tflite::testing::kAsymInputElements];
+  tflite::testing::TestConvFloat(
+      tflite::testing::kAsymInputShape, tflite::testing::kAsymInputData,
+      tflite::testing::kAsymFilterShape, tflite::testing::kAsymFilterData,
+      tflite::testing::kAsymBiasShape, tflite::testing::kAsymBiasData,
+      tflite::testing::kAsymPaddingOutputShape,
+      tflite::testing::kAsymPaddingGolden,
+      &tflite::testing::kAsymPaddingConvParams, tflite::Register_CONV_2D(),
+      output_data);
+}
 
 TEST(ConvTest, InputAndFilterSameWidthHeight) {
   const int output_dims_count = 2;
@@ -1432,5 +1542,48 @@ TEST(ConvTest, Int8Filter8x3x3x3PerChannelScaleRelu6ShouldMatchGolden) {
                       tflite::Register_CONV_2D(), output_data,
                       1.0 /* tolerance */);
 }
+
+#if ARM_NN_ENABLE_F16
+namespace tflite {
+namespace testing {
+TEST(ConvTest, Float16MultiChannelGolden) {
+    int input_dims_data[] = {4, 1, 2, 2, 2};
+    int filter_dims_data[] = {4, 2, 2, 2, 2};
+    int bias_dims_data[] = {1, 2};
+    int output_dims_data[] = {4, 1, 1, 1, 2};
+    float16_t input[] = {1, 2, 3, 4, 5, 6, 7, 8};
+    float16_t filter[] = {
+            1, 0, 1, 0, 1, 0, 1, 0,
+            0, 1, 0, 1, 0, 1, 0, 1,
+    };
+    float16_t bias[] = {static_cast<float16_t>(0.5f),
+                                            static_cast<float16_t>(-0.5f)};
+    float16_t output[2] = {};
+
+    TfLiteConvParams params = {kTfLitePaddingValid, 1, 1, kTfLiteActNone, 1, 1,
+                                                         kTfLiteNoType};
+    TfLiteTensor tensors[] = {
+            CreateTensor(input, IntArrayFromInts(input_dims_data), false,
+                                     kTfLiteFloat16),
+            CreateTensor(filter, IntArrayFromInts(filter_dims_data), true,
+                                     kTfLiteFloat16),
+            CreateTensor(bias, IntArrayFromInts(bias_dims_data), true,
+                                     kTfLiteFloat16),
+            CreateTensor(output, IntArrayFromInts(output_dims_data), false,
+                                     kTfLiteFloat16),
+    };
+    int inputs_array_data[] = {3, 0, 1, 2};
+    int outputs_array_data[] = {1, 3};
+    micro::KernelRunner runner(Register_CONV_2D(), tensors, 4,
+                                                         IntArrayFromInts(inputs_array_data),
+                                                         IntArrayFromInts(outputs_array_data), &params);
+    EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+    EXPECT_EQ(kTfLiteOk, runner.Invoke());
+    EXPECT_NEAR(16.5f, static_cast<float>(output[0]), 5e-2f);
+    EXPECT_NEAR(19.5f, static_cast<float>(output[1]), 5e-2f);
+}
+}  // namespace testing
+}  // namespace tflite
+#endif
 
 TF_LITE_MICRO_TESTS_MAIN

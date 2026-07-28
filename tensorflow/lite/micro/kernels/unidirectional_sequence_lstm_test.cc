@@ -23,6 +23,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
+#if ARM_NN_ENABLE_F16
+#include "arm_nnfunctions_flt.h"
+#endif
+
 namespace tflite {
 namespace testing {
 namespace {
@@ -148,7 +152,10 @@ TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMFloat) {
       float_node_contents = tflite::testing::Create2x3x2X2FloatNodeContents(
           kernel_eval_data.input_data, kernel_eval_data.hidden_state);
 
-  const float tolerance = 1e-6;
+  // Tolerance accommodates float32 accumulation-order differences between
+  // reference and optimized (e.g. CMSIS-NN) LSTM implementations. The
+  // reference kernel still matches golden well within this bound.
+  const float tolerance = 1e-4;
   tflite::testing::TestUnidirectionalLSTMFloat(kernel_eval_data, tolerance,
                                                tolerance, float_node_contents);
 }
@@ -183,4 +190,54 @@ TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMInt16) {
       kernel_eval_data, hidden_state_tolerance, cell_state_tolerance,
       int16_node_contents);
 }
+
+#if ARM_NN_ENABLE_F16
+namespace tflite {
+namespace testing {
+TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMFloat16) {
+  const tflite::testing::LstmEvalCheckData<12, 4, 12> kernel_eval_data =
+      tflite::testing::Get2X2LstmEvalCheckData();
+  auto source = tflite::testing::Create2x3x2X2FloatNodeContents(
+      kernel_eval_data.input_data, kernel_eval_data.hidden_state);
+
+  TfLiteTensor tensors[25];
+  float16_t storage[25][64] = {};
+  for (int i = 0; i < 25; ++i) {
+    tensors[i] = source.GetTensors()[i];
+    if (tensors[i].data.raw == nullptr || tensors[i].dims == nullptr) {
+      continue;
+    }
+    const int elements = ElementCount(*tensors[i].dims);
+    for (int j = 0; j < elements; ++j) {
+      storage[i][j] = static_cast<float16_t>(tensors[i].data.f[j]);
+    }
+    tensors[i].data.f16 = reinterpret_cast<TfLiteFloat16*>(storage[i]);
+    tensors[i].type = kTfLiteFloat16;
+    tensors[i].bytes = elements * sizeof(float16_t);
+  }
+  for (int i = 1; i < 9; ++i) {
+    tensors[i].allocation_type = kTfLiteMmapRo;
+  }
+  for (int i = 12; i < 16; ++i) {
+    tensors[i].allocation_type = kTfLiteMmapRo;
+  }
+
+  auto builtin_data = source.BuiltinData();
+  micro::KernelRunner runner(Register_UNIDIRECTIONAL_SEQUENCE_LSTM(), tensors,
+                             25, source.KernelInputs(), source.KernelOutputs(),
+                             reinterpret_cast<void*>(&builtin_data));
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+
+  const int output_tensor_index = source.KernelOutputs()->data[0];
+  const auto* out_f16 =
+      reinterpret_cast<float16_t*>(tensors[output_tensor_index].data.raw);
+  for (int i = 0; i < 12; ++i) {
+    EXPECT_NEAR(kernel_eval_data.expected_output[i], static_cast<float>(out_f16[i]),
+                3e-2f);
+  }
+}
+}  // namespace testing
+}  // namespace tflite
+#endif
 TF_LITE_MICRO_TESTS_MAIN

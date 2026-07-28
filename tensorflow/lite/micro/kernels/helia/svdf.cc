@@ -96,7 +96,8 @@ TfLiteStatus CmsisNnPrepareSvdf(TfLiteContext* context, TfLiteNode* node) {
 
   // Validate Input Tensor:
   TF_LITE_ENSURE(context,
-                 input->type == kTfLiteFloat32 || input->type == kTfLiteInt8);
+                 input->type == kTfLiteFloat32 ||
+                         input->type == kTfLiteFloat16 || input->type == kTfLiteInt8);
   TF_LITE_ENSURE_EQ(context, NumDimensions(input), 2);
 
   // Validate Tensor Output:
@@ -214,19 +215,28 @@ TfLiteStatus CmsisNnPrepareSvdf(TfLiteContext* context, TfLiteNode* node) {
     }
 
   } else {
-    TF_LITE_ENSURE_EQ(context, weights_feature->type, kTfLiteFloat32);
-    TF_LITE_ENSURE_EQ(context, weights_time->type, kTfLiteFloat32);
-    TF_LITE_ENSURE_EQ(context, activation_state->type, kTfLiteFloat32);
+    // Non-quantized (fp32 or fp16) path. All tensors must match input type.
+    TF_LITE_ENSURE_EQ(context, weights_feature->type, input->type);
+    TF_LITE_ENSURE_EQ(context, weights_time->type, input->type);
+    TF_LITE_ENSURE_EQ(context, activation_state->type, input->type);
     if (bias != nullptr) {
-      TF_LITE_ENSURE_EQ(context, bias->type, kTfLiteFloat32);
+      TF_LITE_ENSURE_EQ(context, bias->type, input->type);
     }
-    TF_LITE_ENSURE_TYPES_EQ(context, output->type, kTfLiteFloat32);
+    TF_LITE_ENSURE_TYPES_EQ(context, output->type, input->type);
 
     TFLITE_DCHECK(context->RequestScratchBufferInArena != nullptr);
+    // arm_svdf_f16/f32 both require two scratch buffers (input_ctx/output_ctx)
+    // sized batch*num_filters and batch*num_units respectively. sizeof(float)
+    // (over)covers both fp16 and fp32.
     const TfLiteStatus scratch_status = context->RequestScratchBufferInArena(
         context, batch_size * num_filters * sizeof(float),
         &(data->scratch_tensor_index));
     TF_LITE_ENSURE_OK(context, scratch_status);
+    const TfLiteStatus scratch_output_status =
+        context->RequestScratchBufferInArena(
+            context, batch_size * num_units * sizeof(float),
+            &(data->scratch_output_tensor_index));
+    TF_LITE_ENSURE_OK(context, scratch_output_status);
   }
 
   micro_context->DeallocateTempTfLiteTensor(input);
@@ -380,7 +390,105 @@ TfLiteStatus EvalSvdf(TfLiteContext* context, TfLiteNode* node) {
       tflite::micro::GetEvalOutput(context, node, kSvdfOutputTensor);
 
   switch (weights_time->type) {
+    case kTfLiteFloat16: {
+#if ARM_NN_ENABLE_F16
+      if (input->type == kTfLiteFloat16 && weights_feature->type == kTfLiteFloat16 &&
+          activation_state->type == kTfLiteFloat16 &&
+          output->type == kTfLiteFloat16) {
+        const int batch = input->dims->data[0];
+        const int input_size = input->dims->data[1];
+        const int filters = weights_feature->dims->data[0];
+        const int memory = weights_time->dims->data[1];
+        const int units = filters / params->rank;
+        float activation_min;
+        float activation_max;
+        CalculateActivationRange(params->activation, &activation_min,
+                                 &activation_max);
+        cmsis_nn_svdf_params_f16 svdf_params = {
+            .rank = params->rank,
+            .input_activation = {ARM_NN_F16_FINITE_LOWEST, ARM_NN_F16_FINITE_MAX},
+            .output_activation = {static_cast<float16_t>(activation_min), static_cast<float16_t>(activation_max)}};
+        // arm_svdf_f16 reads input_size from input_dims.h and memory from
+        // weights_time_dims.h, so populate those fields (not .c).
+        cmsis_nn_dims input_dims = {batch, input_size, 1, 1};
+        cmsis_nn_dims state_dims = {batch, 1, 1, memory * filters};
+        cmsis_nn_dims feature_dims = {filters, input_size, 1, 1};
+        cmsis_nn_dims time_dims = {filters, memory, 1, 1};
+        cmsis_nn_dims bias_dims = {1, 1, 1, units};
+        cmsis_nn_dims output_dims = {batch, 1, 1, units};
+        cmsis_nn_context ctx = {nullptr, 0};
+        cmsis_nn_context input_ctx = {
+            context->GetScratchBuffer(context, data.scratch_tensor_index),
+            static_cast<int32_t>(batch * filters * sizeof(float16_t))};
+        cmsis_nn_context output_ctx = {
+            context->GetScratchBuffer(context,
+                                      data.scratch_output_tensor_index),
+            static_cast<int32_t>(batch * units * sizeof(float16_t))};
+        if (arm_svdf_f16(
+                &ctx, &input_ctx, &output_ctx, &svdf_params, &input_dims,
+                tflite::micro::GetTensorData<float16_t>(input), &state_dims,
+                tflite::micro::GetTensorData<float16_t>(activation_state),
+                &feature_dims, tflite::micro::GetTensorData<float16_t>(weights_feature),
+                &time_dims, tflite::micro::GetTensorData<float16_t>(weights_time),
+                &bias_dims, bias == nullptr ? nullptr : tflite::micro::GetTensorData<float16_t>(bias),
+                &output_dims, tflite::micro::GetTensorData<float16_t>(output)) ==
+            ARM_CMSIS_NN_SUCCESS) {
+          return kTfLiteOk;
+        }
+      }
+
+      return kTfLiteError;
+#else
+      return kTfLiteError;
+#endif
+    }
     case kTfLiteFloat32: {
+#if ARM_NN_ENABLE_F32
+      if (input->type == kTfLiteFloat32 && weights_feature->type == kTfLiteFloat32 &&
+          activation_state->type == kTfLiteFloat32 &&
+          output->type == kTfLiteFloat32) {
+        const int batch = input->dims->data[0];
+        const int input_size = input->dims->data[1];
+        const int filters = weights_feature->dims->data[0];
+        const int memory = weights_time->dims->data[1];
+        const int units = filters / params->rank;
+        float activation_min;
+        float activation_max;
+        CalculateActivationRange(params->activation, &activation_min,
+                                 &activation_max);
+        cmsis_nn_svdf_params_f32 svdf_params = {
+            .rank = params->rank,
+            .input_activation = {ARM_NN_F32_FINITE_LOWEST, ARM_NN_F32_FINITE_MAX},
+            .output_activation = {activation_min, activation_max}};
+        // arm_svdf_f32 reads input_size from input_dims.h and memory from
+        // weights_time_dims.h, so populate those fields (not .c).
+        cmsis_nn_dims input_dims = {batch, input_size, 1, 1};
+        cmsis_nn_dims state_dims = {batch, 1, 1, memory * filters};
+        cmsis_nn_dims feature_dims = {filters, input_size, 1, 1};
+        cmsis_nn_dims time_dims = {filters, memory, 1, 1};
+        cmsis_nn_dims bias_dims = {1, 1, 1, units};
+        cmsis_nn_dims output_dims = {batch, 1, 1, units};
+        cmsis_nn_context ctx = {nullptr, 0};
+        cmsis_nn_context input_ctx = {
+            context->GetScratchBuffer(context, data.scratch_tensor_index),
+            static_cast<int32_t>(batch * filters * sizeof(float))};
+        cmsis_nn_context output_ctx = {
+            context->GetScratchBuffer(context,
+                                      data.scratch_output_tensor_index),
+            static_cast<int32_t>(batch * units * sizeof(float))};
+        if (arm_svdf_f32(
+                &ctx, &input_ctx, &output_ctx, &svdf_params, &input_dims,
+                tflite::micro::GetTensorData<float>(input), &state_dims,
+                tflite::micro::GetTensorData<float>(activation_state),
+                &feature_dims, tflite::micro::GetTensorData<float>(weights_feature),
+                &time_dims, tflite::micro::GetTensorData<float>(weights_time),
+                &bias_dims, tflite::micro::GetOptionalTensorData<float>(bias),
+                &output_dims, tflite::micro::GetTensorData<float>(output)) ==
+            ARM_CMSIS_NN_SUCCESS) {
+          return kTfLiteOk;
+        }
+      }
+#endif
       EvalFloatSvdfReference(
           context, node, input, weights_feature, weights_time, bias, params,
           data.scratch_tensor_index, activation_state, output);

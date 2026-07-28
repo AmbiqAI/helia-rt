@@ -36,9 +36,13 @@ config HELIA_RT_BACKEND_HELIA
 	bool "HELIA (Ambiq optimized kernels)"
 	depends on SOC_FAMILY_AMBIQ && NS_CMSIS_NN
 	imply NS_CMSIS_NN_ALL
+	imply NS_CMSIS_NN_ENABLE_F32
+	imply NS_CMSIS_NN_ENABLE_F16 if ARMV8_1_M_MVEF
 	help
 		Uses Ambiq's HELIA acceleration module. This is currently
-		distributed as ns-cmsis-nn.
+		distributed as ns-cmsis-nn. FP32 kernels are enabled for all
+		HELIA targets; FP16 kernels are enabled only when the target
+		provides Armv8.1-M MVEF.
 
 endchoice
 

@@ -223,7 +223,7 @@ jobs:
       # Pinned to the ns-cmsis-nn release whose CMake / Zephyr / NSX / CMSIS-Pack
       # surfaces align with heliaRT. Bump in lockstep with NS_CMSIS_NN_MIN_VERSION
       # in tools/cmsis_pack/build_pack.py.
-      NS_CMSIS_NN_REF: v7.25.0
+      NS_CMSIS_NN_REF: v7.28.0
     steps:
       - name: Checkout helia-rt
         uses: actions/checkout@v6
@@ -275,8 +275,82 @@ jobs:
           # Stub SoC HAL — the real module ships from nsx-soc-hal.
           add_library(nsx_soc_hal INTERFACE)
 
+          # ns-cmsis-nn selects its fp32/fp16 sources — and decides whether to
+          # export ARM_NN_ENABLE_F32/F16 — while its own CMakeLists is
+          # processed. These options MUST therefore be set by the parent build
+          # BEFORE add_subdirectory(<ns-cmsis-nn>/nsx). Setting them later
+          # (e.g. from nsx-helia-rt) is a no-op. Requires ns-cmsis-nn v7.28.0+.
+          set(NSX_CMSIS_NN_ENABLE_F32 ON CACHE BOOL "" FORCE)
+          set(NSX_CMSIS_NN_ENABLE_F16 ON CACHE BOOL "" FORCE)
+
           add_subdirectory(${NS_CMSIS_NN_DIR}/nsx ns_cmsis_nn EXCLUDE_FROM_ALL)
           add_subdirectory(${HELIA_RT_DIR}/nsx   nsx_helia_rt   EXCLUDE_FROM_ALL)
+
+          # Archive-only builds cannot detect a float kernel that was never
+          # compiled into ns-cmsis-nn: the reference stays unresolved until
+          # something actually links. This probe forces a real link of the
+          # representative fp32/fp16 entry points plus the heliaRT kernels
+          # that call them.
+          if(NSX_HELIA_RT_BACKEND STREQUAL "helia")
+              add_executable(nsx_helia_rt_link_probe
+                  ${CMAKE_CURRENT_SOURCE_DIR}/link_probe.cc)
+              target_link_libraries(nsx_helia_rt_link_probe
+                  PRIVATE helia_rt::helia nsx_board_flags)
+              target_link_options(nsx_helia_rt_link_probe PRIVATE
+                  --specs=nosys.specs)
+              set_target_properties(nsx_helia_rt_link_probe PROPERTIES
+                  SUFFIX .elf)
+          endif()
+          EOF
+          cat > smoke/link_probe.cc <<'EOF'
+          // Forces the linker to resolve the optimized float kernels that the
+          // helia backend dispatches to. If ns-cmsis-nn was built without
+          // fp32/fp16 source selection, this fails to link — which is exactly
+          // what the archive-only smoke build cannot catch.
+          #include <stdint.h>
+
+          #include "Include/arm_nnfunctions.h"
+
+          #include "tensorflow/lite/micro/kernels/micro_ops.h"
+
+          #ifndef ARM_NN_ENABLE_F32
+          #error "helia backend must export ARM_NN_ENABLE_F32"
+          #endif
+          #ifndef ARM_NN_ENABLE_F16
+          #error "helia backend must export ARM_NN_ENABLE_F16"
+          #endif
+
+          namespace {
+          // Kernels reached through helia_rt::helia's float dispatch paths.
+          void* const kFloatKernels[] = {
+              reinterpret_cast<void*>(&arm_convolve_wrapper_f32),
+              reinterpret_cast<void*>(&arm_depthwise_conv_wrapper_f32),
+              reinterpret_cast<void*>(&arm_avg_pool_f32),
+              reinterpret_cast<void*>(&arm_max_pool_f32),
+              reinterpret_cast<void*>(&arm_softmax_f32),
+              reinterpret_cast<void*>(&arm_convolve_wrapper_f16),
+              reinterpret_cast<void*>(&arm_depthwise_conv_wrapper_f16),
+              reinterpret_cast<void*>(&arm_avg_pool_f16),
+              reinterpret_cast<void*>(&arm_max_pool_f16),
+              reinterpret_cast<void*>(&arm_softmax_f16),
+          };
+
+          // heliaRT kernels that dispatch to them; pulls the archive members in.
+          void* const kHeliaKernels[] = {
+              reinterpret_cast<void*>(&tflite::Register_CONV_2D),
+              reinterpret_cast<void*>(&tflite::Register_DEPTHWISE_CONV_2D),
+              reinterpret_cast<void*>(&tflite::Register_AVERAGE_POOL_2D),
+              reinterpret_cast<void*>(&tflite::Register_MAX_POOL_2D),
+              reinterpret_cast<void*>(&tflite::Register_SOFTMAX),
+          };
+          }  // namespace
+
+          extern "C" int main(void) {
+            uintptr_t acc = 0;
+            for (auto* p : kFloatKernels) acc ^= reinterpret_cast<uintptr_t>(p);
+            for (auto* p : kHeliaKernels) acc ^= reinterpret_cast<uintptr_t>(p);
+            return static_cast<int>(acc & 1u);
+          }
           EOF
           cat > smoke/toolchain.cmake <<'EOF'
           set(CMAKE_SYSTEM_NAME Generic)
@@ -303,6 +377,24 @@ jobs:
           cmake --build smoke/build \
               --target helia_rt_helia helia_rt_reference nsx_helia_rt_glue nsx_cmsis_nn \
               -j
+      - name: Link float-kernel probe (fp32 + fp16 must resolve)
+        run: |
+          set -euo pipefail
+          # Archives alone never resolve references, so a missing fp32/fp16
+          # source selection in ns-cmsis-nn would go unnoticed. Force a link.
+          cmake --build smoke/build --target nsx_helia_rt_link_probe -j
+          PROBE=$(find smoke/build -name 'nsx_helia_rt_link_probe.elf' | head -1)
+          test -n "${PROBE}"
+          file "${PROBE}"
+          # Assert the optimized float kernels are really in the image.
+          for sym in arm_convolve_wrapper_f32 arm_avg_pool_f32 arm_softmax_f32 \
+                     arm_convolve_wrapper_f16 arm_avg_pool_f16 arm_softmax_f16; do
+            if ! arm-none-eabi-nm -C "${PROBE}" | grep -qE " (T|t|W|w) ${sym}$"; then
+              echo "::error::${sym} missing from link probe image"
+              exit 1
+            fi
+          done
+          echo "OK: fp32 + fp16 kernels resolved at link time"
       - name: Sanity check archives
         run: |
           set -euo pipefail

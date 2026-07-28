@@ -37,6 +37,11 @@ cmsis_nn_dims FillVariableShape(int32_t rank, int32_t* tensor_dims) {
     return {1, tensor_dims[0], tensor_dims[1], tensor_dims[2]};
   } else if (rank == 2) {
     return {1, 1, tensor_dims[0], tensor_dims[1]};
+  } else if (rank == 1) {
+    // Represent rank-1 vectors as a channel-only tensor so heliaCore's
+    // broadcasting walker treats them as a length-N vector rather than a
+    // scalar (which would silently drop all but the first element).
+    return {1, 1, 1, tensor_dims[0]};
   } else {
     return {1, 1, 1, 1};
   }
@@ -67,7 +72,27 @@ TfLiteStatus EvalMaximum(TfLiteContext* context, TfLiteNode* node) {
   ctx.size = 0;
 
   switch (op_context.output->type) {
+    case kTfLiteFloat16:
+#if ARM_NN_ENABLE_F16
+      if (arm_maximum_f16(
+              &ctx, tflite::micro::GetTensorData<float16_t>(input1), &input_1_dims,
+              tflite::micro::GetTensorData<float16_t>(input2), &input_2_dims,
+              tflite::micro::GetTensorData<float16_t>(output), &output_dims) ==
+          ARM_CMSIS_NN_SUCCESS) {
+        break;
+      }
+#endif
+      return kTfLiteError;
     case kTfLiteFloat32:
+#if ARM_NN_ENABLE_F32
+      if (arm_maximum_f32(
+              &ctx, tflite::micro::GetTensorData<float>(input1), &input_1_dims,
+              tflite::micro::GetTensorData<float>(input2), &input_2_dims,
+              tflite::micro::GetTensorData<float>(output), &output_dims) ==
+          ARM_CMSIS_NN_SUCCESS) {
+        break;
+      }
+#endif
       TFLiteOperation<float, MaximumOp>(context, node, op_context);
       break;
     case kTfLiteInt8:
@@ -162,7 +187,27 @@ TfLiteStatus EvalMinimum(TfLiteContext* context, TfLiteNode* node) {
   ctx.size = 0;
 
   switch (op_context.output->type) {
+    case kTfLiteFloat16:
+#if ARM_NN_ENABLE_F16
+      if (arm_minimum_f16(
+              &ctx, tflite::micro::GetTensorData<float16_t>(input1), &input_1_dims,
+              tflite::micro::GetTensorData<float16_t>(input2), &input_2_dims,
+              tflite::micro::GetTensorData<float16_t>(output), &output_dims) ==
+          ARM_CMSIS_NN_SUCCESS) {
+        break;
+      }
+#endif
+      return kTfLiteError;
     case kTfLiteFloat32:
+#if ARM_NN_ENABLE_F32
+      if (arm_minimum_f32(
+              &ctx, tflite::micro::GetTensorData<float>(input1), &input_1_dims,
+              tflite::micro::GetTensorData<float>(input2), &input_2_dims,
+              tflite::micro::GetTensorData<float>(output), &output_dims) ==
+          ARM_CMSIS_NN_SUCCESS) {
+        break;
+      }
+#endif
       TFLiteOperation<float, MinimumOp>(context, node, op_context);
       break;
     case kTfLiteInt8:

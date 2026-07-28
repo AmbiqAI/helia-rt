@@ -175,7 +175,36 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
     case kTfLiteInt32:
       EvalMulQuantizedReference(context, node, data, input1, input2, output);
       break;
+    case kTfLiteFloat16:
+#if ARM_NN_ENABLE_F16
+      if (tflite::micro::HaveSameShapes(input1, input2) &&
+          arm_elementwise_mul_f16(
+              tflite::micro::GetTensorData<float16_t>(input1),
+              tflite::micro::GetTensorData<float16_t>(input2),
+              tflite::micro::GetTensorData<float16_t>(output),
+              static_cast<float16_t>(data->output_activation_min_f32),
+              static_cast<float16_t>(data->output_activation_max_f32),
+              tflite::micro::GetTensorShape(output).FlatSize()) ==
+          ARM_CMSIS_NN_SUCCESS) {
+        break;
+      }
+#endif
+      return kTfLiteError;
     case kTfLiteFloat32:
+#if ARM_NN_ENABLE_F32
+      if (tflite::micro::HaveSameShapes(input1, input2)) {
+        const int size = tflite::micro::GetTensorShape(output).FlatSize();
+        if (arm_elementwise_mul_f32(
+                tflite::micro::GetTensorData<float>(input1),
+                tflite::micro::GetTensorData<float>(input2),
+                tflite::micro::GetTensorData<float>(output),
+                data->output_activation_min_f32,
+                data->output_activation_max_f32, size) ==
+            ARM_CMSIS_NN_SUCCESS) {
+          break;
+        }
+      }
+#endif
       EvalMulFloatReference(context, node, params, data, input1, input2,
                             output);
       break;

@@ -128,7 +128,14 @@ TfLiteStatus TransposeEval(TfLiteContext* context, TfLiteNode* node) {
 
   // ---- CMSIS-NN fast path: int8/int16 and rank ≤ 4 ----
   if (in_rank <= 4 &&
-      (input->type == kTfLiteInt8 || input->type == kTfLiteInt16)) {
+      (input->type == kTfLiteInt8 || input->type == kTfLiteInt16
+#if ARM_NN_ENABLE_F16
+       || input->type == kTfLiteFloat16
+#endif
+#if ARM_NN_ENABLE_F32
+       || input->type == kTfLiteFloat32
+#endif
+      )) {
     cmsis_nn_dims in_dims{}, out_dims{};
     uint32_t perm_u32[4] = {0,0,0,0};
     int num_dims = 0;
@@ -149,12 +156,41 @@ TfLiteStatus TransposeEval(TfLiteContext* context, TfLiteNode* node) {
           tflite::micro::GetTensorData<int8_t>(input),
           tflite::micro::GetTensorData<int8_t>(output),
           &in_dims, &out_dims, &tp);
-    } else { // kTfLiteInt16
+    } else if (input->type == kTfLiteInt16) {
       st = arm_transpose_s16(
           tflite::micro::GetTensorData<int16_t>(input),
           tflite::micro::GetTensorData<int16_t>(output),
           &in_dims, &out_dims, &tp);
     }
+#if ARM_NN_ENABLE_F16
+    else if (input->type == kTfLiteFloat16) {
+      cmsis_nn_transpose_params_f16 tp_f16 = {
+          .num_dims = num_dims,
+          .perm = {static_cast<int32_t>(perm_u32[0]),
+                   static_cast<int32_t>(perm_u32[1]),
+                   static_cast<int32_t>(perm_u32[2]),
+                   static_cast<int32_t>(perm_u32[3])},
+          .layout = ARM_NN_LAYOUT_NHWC};
+      st = arm_transpose_f16(nullptr, &tp_f16, &in_dims,
+                             tflite::micro::GetTensorData<float16_t>(input), &out_dims,
+                             tflite::micro::GetTensorData<float16_t>(output));
+    }
+#endif
+#if ARM_NN_ENABLE_F32
+    else {
+      cmsis_nn_transpose_params_f32 tp_f32 = {
+          .num_dims = num_dims,
+          .perm = {static_cast<int32_t>(perm_u32[0]),
+                   static_cast<int32_t>(perm_u32[1]),
+                   static_cast<int32_t>(perm_u32[2]),
+                   static_cast<int32_t>(perm_u32[3])},
+          .layout = ARM_NN_LAYOUT_NHWC};
+      st = arm_transpose_f32(
+          nullptr, &tp_f32, &in_dims,
+          tflite::micro::GetTensorData<float>(input), &out_dims,
+          tflite::micro::GetTensorData<float>(output));
+    }
+#endif
 
     if (st == ARM_CMSIS_NN_SUCCESS) return kTfLiteOk;
     MicroPrintf("CMSIS-NN transpose fallback (status=%d)", (int)st);
@@ -163,6 +199,12 @@ TfLiteStatus TransposeEval(TfLiteContext* context, TfLiteNode* node) {
 
   // ---- Reference fallback (all types, 1–5D) ----
   switch (input->type) {
+    case kTfLiteFloat16:
+#if ARM_NN_ENABLE_F16
+      return kTfLiteError;
+#else
+      return kTfLiteError;
+#endif
     case kTfLiteFloat32:
       reference_ops::Transpose(ref_params, in_shape,
                                tflite::micro::GetTensorData<float>(input),

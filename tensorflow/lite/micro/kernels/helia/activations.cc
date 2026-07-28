@@ -47,7 +47,26 @@ TfLiteStatus ReluEval(TfLiteContext* context, TfLiteNode* node) {
       tflite::micro::GetEvalOutput(context, node, kActivationsOutputTensor);
 
   switch (input->type) {
+#if ARM_NN_ENABLE_F16
+    case kTfLiteFloat16:
+      return arm_nn_activation_f16(
+                 tflite::micro::GetTensorData<float16_t>(input),
+                 tflite::micro::GetTensorData<float16_t>(output),
+                 tflite::micro::GetTensorShape(input).FlatSize(), ARM_NN_FLT_ACT_RELU,
+                 0.0f) == ARM_CMSIS_NN_SUCCESS
+                 ? kTfLiteOk
+                 : kTfLiteError;
+#endif
     case kTfLiteFloat32: {
+#if ARM_NN_ENABLE_F32
+      if (arm_nn_activation_f32(
+              tflite::micro::GetTensorData<float>(input),
+              tflite::micro::GetTensorData<float>(output),
+              tflite::micro::GetTensorShape(input).FlatSize(),
+              ARM_NN_FLT_ACT_RELU, 0.0f) == ARM_CMSIS_NN_SUCCESS) {
+        return kTfLiteOk;
+      }
+#endif
       ReluFloat(tflite::micro::GetTensorShape(input),
                 tflite::micro::GetTensorData<float>(input),
                 tflite::micro::GetTensorShape(output),
@@ -109,7 +128,26 @@ TfLiteStatus Relu6Eval(TfLiteContext* context, TfLiteNode* node) {
       tflite::micro::GetEvalOutput(context, node, kActivationsOutputTensor);
 
   switch (input->type) {
+#if ARM_NN_ENABLE_F16
+    case kTfLiteFloat16:
+      return arm_nn_activation_f16(
+                 tflite::micro::GetTensorData<float16_t>(input),
+                 tflite::micro::GetTensorData<float16_t>(output),
+                 tflite::micro::GetTensorShape(input).FlatSize(), ARM_NN_FLT_ACT_RELU6,
+                 0.0f) == ARM_CMSIS_NN_SUCCESS
+                 ? kTfLiteOk
+                 : kTfLiteError;
+#endif
     case kTfLiteFloat32: {
+#if ARM_NN_ENABLE_F32
+      if (arm_nn_activation_f32(
+              tflite::micro::GetTensorData<float>(input),
+              tflite::micro::GetTensorData<float>(output),
+              tflite::micro::GetTensorShape(input).FlatSize(),
+              ARM_NN_FLT_ACT_RELU6, 0.0f) == ARM_CMSIS_NN_SUCCESS) {
+        return kTfLiteOk;
+      }
+#endif
       Relu6Float(tflite::micro::GetTensorShape(input),
                  tflite::micro::GetTensorData<float>(input),
                  tflite::micro::GetTensorShape(output),

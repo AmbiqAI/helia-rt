@@ -24,6 +24,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
+#if ARM_NN_ENABLE_F16
+#include "arm_nnfunctions_flt.h"
+#endif
+
 namespace tflite {
 namespace testing {
 namespace {
@@ -430,6 +434,36 @@ TEST(DepthwiseConvTest, SimpleTest) {
   conv_params.dilation_height_factor = 1;
   conv_params.stride_height = 1;
   conv_params.stride_width = 1;
+
+  tflite::testing::TestDepthwiseConvFloat(
+      input_shape, input_values, filter_shape, filter_values, bias_shape,
+      bias_values, golden, output_shape, &conv_params, output_data);
+}
+
+// Asymmetric stride + non-square filter. Symmetric configurations hide a
+// transposed CMSIS-NN cmsis_nn_tile ({width, height}); this one does not.
+TEST(DepthwiseConvTest, AsymmetricStrideFloatShouldMatchGolden) {
+  int input_shape[] = {4, 1, 4, 5, 2};
+  const float input_values[] = {
+      1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14,
+      15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28,
+      29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40};
+  int filter_shape[] = {4, 1, 2, 3, 2};
+  const float filter_values[] = {1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6};
+  int bias_shape[] = {4, 1, 1, 1, 2};
+  const float bias_values[] = {1, 2};
+  const float golden[] = {222,  -240, 306,  -324, 432,  -450,
+                          516,  -534, 642,  -660, 726,  -744};
+  int output_shape[] = {4, 1, 3, 2, 2};
+  float output_data[12];
+
+  TfLiteDepthwiseConvParams conv_params;
+  conv_params.padding = kTfLitePaddingValid;
+  conv_params.activation = kTfLiteActNone;
+  conv_params.dilation_width_factor = 1;
+  conv_params.dilation_height_factor = 1;
+  conv_params.stride_height = 1;
+  conv_params.stride_width = 2;
 
   tflite::testing::TestDepthwiseConvFloat(
       input_shape, input_values, filter_shape, filter_values, bias_shape,
@@ -1433,5 +1467,54 @@ TEST(DepthwiseConvTest, SimpleTestQuantizedPerChannelInt16Compressed) {
 }
 
 #endif  // USE_TFLM_COMPRESSION
+
+#if ARM_NN_ENABLE_F16
+namespace tflite {
+namespace testing {
+TEST(DepthwiseConvTest, Float16MultiChannelGolden) {
+    int input_dims_data[] = {4, 1, 2, 2, 2};
+    int filter_dims_data[] = {4, 1, 1, 1, 2};
+    int bias_dims_data[] = {1, 2};
+    int output_dims_data[] = {4, 1, 2, 2, 2};
+    float16_t input[] = {1, 2, 3, 4, 5, 6, 7, 8};
+    float16_t filter[] = {2, 3};
+    float16_t bias[] = {1, -1};
+    float16_t output[8] = {};
+    const float expected[] = {3, 5, 7, 11, 11, 17, 15, 23};
+
+    TfLiteDepthwiseConvParams params = {};
+    params.padding = kTfLitePaddingValid;
+    params.stride_width = 1;
+    params.stride_height = 1;
+    params.depth_multiplier = 1;
+    params.activation = kTfLiteActNone;
+    params.dilation_width_factor = 1;
+    params.dilation_height_factor = 1;
+
+    TfLiteTensor tensors[] = {
+            CreateTensor(input, IntArrayFromInts(input_dims_data), false,
+                                     kTfLiteFloat16),
+            CreateTensor(filter, IntArrayFromInts(filter_dims_data), true,
+                                     kTfLiteFloat16),
+            CreateTensor(bias, IntArrayFromInts(bias_dims_data), true,
+                                     kTfLiteFloat16),
+            CreateTensor(output, IntArrayFromInts(output_dims_data), false,
+                                     kTfLiteFloat16),
+    };
+    int inputs_array_data[] = {3, 0, 1, 2};
+    int outputs_array_data[] = {1, 3};
+
+    micro::KernelRunner runner(Register_DEPTHWISE_CONV_2D(), tensors, 4,
+                                                         IntArrayFromInts(inputs_array_data),
+                                                         IntArrayFromInts(outputs_array_data), &params);
+    EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+    EXPECT_EQ(kTfLiteOk, runner.Invoke());
+    for (int i = 0; i < 8; ++i) {
+        EXPECT_NEAR(expected[i], static_cast<float>(output[i]), 2e-2f);
+    }
+}
+}  // namespace testing
+}  // namespace tflite
+#endif
 
 TF_LITE_MICRO_TESTS_MAIN

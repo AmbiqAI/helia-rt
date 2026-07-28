@@ -65,6 +65,15 @@ TfLiteStatus LogisticEval(TfLiteContext* context, TfLiteNode* node) {
   if (input->type == kTfLiteFloat32) {
     switch (output->type) {
       case kTfLiteFloat32: {
+#if ARM_NN_ENABLE_F32
+        if (arm_nn_activation_f32(
+                tflite::micro::GetTensorData<float>(input),
+                tflite::micro::GetTensorData<float>(output),
+                NumElements(input->dims), ARM_NN_FLT_ACT_SIGMOID, 0.0f) ==
+            ARM_CMSIS_NN_SUCCESS) {
+          return kTfLiteOk;
+        }
+#endif
         reference_ops::Logistic(tflite::micro::GetTensorShape(input),
                                 tflite::micro::GetTensorData<float>(input),
                                 tflite::micro::GetTensorShape(output),
@@ -77,7 +86,20 @@ TfLiteStatus LogisticEval(TfLiteContext* context, TfLiteNode* node) {
                     TfLiteTypeGetName(output->type));
         return kTfLiteError;
     }
-  } else if (input->type == kTfLiteInt16) {
+  }
+#if ARM_NN_ENABLE_F16
+  else if (input->type == kTfLiteFloat16 &&
+           output->type == kTfLiteFloat16) {
+    return arm_nn_activation_f16(
+               tflite::micro::GetTensorData<float16_t>(input),
+               tflite::micro::GetTensorData<float16_t>(output),
+               NumElements(input->dims), ARM_NN_FLT_ACT_SIGMOID, 0.0f) ==
+               ARM_CMSIS_NN_SUCCESS
+               ? kTfLiteOk
+               : kTfLiteError;
+  }
+#endif
+  else if (input->type == kTfLiteInt16) {
     switch (output->type) {
       case kTfLiteInt16: {
         arm_logistic_s16(

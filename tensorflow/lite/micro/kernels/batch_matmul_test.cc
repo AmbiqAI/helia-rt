@@ -24,6 +24,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
+#if ARM_NN_ENABLE_F16
+#include "arm_nnfunctions_flt.h"
+#endif
+
 namespace tflite {
 namespace testing {
 namespace {
@@ -783,5 +787,39 @@ TEST(BatchMatmulTest, QuantizedBatchMatMulOpTestSimpleTestQuantizedInt16) {
       &quantization_params_output, kInputDims, kLhsInput, kRhsInput,
       kOutputDims, kExpect, output_data);
 }
+
+#if ARM_NN_ENABLE_F16
+namespace tflite {
+namespace testing {
+TEST(BatchMatmulTest, BatchMatMulFloat16SimpleGolden) {
+    int lhs_dims_data[] = {2, 2, 3};
+    int rhs_dims_data[] = {2, 3, 2};
+    int out_dims_data[] = {2, 2, 2};
+    float16_t lhs[] = {1, 2, 3, 4, 5, 6};
+    float16_t rhs[] = {1, 0, 0, 1, 1, 1};
+    float16_t output[4] = {};
+    const float expected[] = {4, 5, 10, 11};
+
+    TfLiteTensor tensors[] = {
+            CreateTensor(lhs, IntArrayFromInts(lhs_dims_data), false, kTfLiteFloat16),
+            CreateTensor(rhs, IntArrayFromInts(rhs_dims_data), false, kTfLiteFloat16),
+            CreateTensor(output, IntArrayFromInts(out_dims_data), false,
+                                     kTfLiteFloat16),
+    };
+    int inputs_array_data[] = {2, 0, 1};
+    int outputs_array_data[] = {1, 2};
+    TfLiteBatchMatMulParams params = {false, false, false};
+    micro::KernelRunner runner(Register_BATCH_MATMUL(), tensors, 3,
+                                                         IntArrayFromInts(inputs_array_data),
+                                                         IntArrayFromInts(outputs_array_data), &params);
+    EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+    EXPECT_EQ(kTfLiteOk, runner.Invoke());
+    for (int i = 0; i < 4; ++i) {
+        EXPECT_NEAR(expected[i], static_cast<float>(output[i]), 2e-2f);
+    }
+}
+}  // namespace testing
+}  // namespace tflite
+#endif
 
 TF_LITE_MICRO_TESTS_MAIN

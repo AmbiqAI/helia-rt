@@ -25,6 +25,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
+#if ARM_NN_ENABLE_F16
+#include "arm_nnfunctions_flt.h"
+#endif
+
 namespace tflite {
 namespace testing {
 namespace {
@@ -369,4 +373,38 @@ TEST(ReshapeTest, ReshapeWithLegacyScalarOutputShouldSucceed) {
       &input_tensor, &output_tensor, expected_output_no_shape,
       expected_output_no_shape_len, expected_dims, expected_dims_len, false);
 }
+
+#if ARM_NN_ENABLE_F16
+namespace tflite {
+namespace testing {
+TEST(ReshapeTest, ReshapeFloat16Golden) {
+  int input_dims_data[] = {1, 4};
+  int output_dims_data[] = {2, 2, 2};
+  float16_t input[] = {static_cast<float16_t>(1.0f),
+                       static_cast<float16_t>(2.0f),
+                       static_cast<float16_t>(3.0f),
+                       static_cast<float16_t>(4.0f)};
+  float16_t output[4] = {};
+
+  TfLiteTensor tensors[] = {
+      CreateTensor(input, IntArrayFromInts(input_dims_data), false,
+                   kTfLiteFloat16),
+      CreateTensor(output, IntArrayFromInts(output_dims_data), false,
+                   kTfLiteFloat16),
+  };
+  int inputs_array_data[] = {1, 0};
+  int outputs_array_data[] = {1, 1};
+  micro::KernelRunner runner(Register_RESHAPE(), tensors, 2,
+                             IntArrayFromInts(inputs_array_data),
+                             IntArrayFromInts(outputs_array_data), nullptr);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  for (int i = 0; i < 4; ++i) {
+    EXPECT_EQ(static_cast<float>(input[i]), static_cast<float>(output[i]));
+  }
+}
+}  // namespace testing
+}  // namespace tflite
+#endif
+
 TF_LITE_MICRO_TESTS_MAIN

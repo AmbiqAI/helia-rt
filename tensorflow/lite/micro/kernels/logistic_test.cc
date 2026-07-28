@@ -19,6 +19,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
+#if ARM_NN_ENABLE_F16
+#include "arm_nnfunctions_flt.h"
+#endif
+
 namespace tflite {
 namespace testing {
 namespace {
@@ -271,5 +275,36 @@ TEST(LogisticTest, LogisticQuantizedInt16ShouldMatchGolden) {
       tflite::testing::shape_int16_vec, output_scale, output_zero_point,
       output_data, 16.0f);
 }
+
+#if ARM_NN_ENABLE_F16
+namespace tflite {
+namespace testing {
+TEST(LogisticTest, SimpleTestFloat16Golden) {
+  int dims_data[] = {2, 2, 2};
+  float16_t input[] = {static_cast<float16_t>(-2), static_cast<float16_t>(0.5),
+                       static_cast<float16_t>(2), static_cast<float16_t>(4)};
+  float16_t output[4] = {};
+  // sigmoid: 1/(1+exp(-x))
+  // -2 => 0.1192, 0.5 => 0.6225, 2 => 0.8808, 4 => 0.9820
+  const float expected[] = {0.1192f, 0.6225f, 0.8808f, 0.9820f};
+
+  TfLiteTensor tensors[] = {
+      CreateTensor(input, IntArrayFromInts(dims_data), false, kTfLiteFloat16),
+      CreateTensor(output, IntArrayFromInts(dims_data), false, kTfLiteFloat16),
+  };
+  int inputs_array_data[] = {1, 0};
+  int outputs_array_data[] = {1, 1};
+  micro::KernelRunner runner(Register_LOGISTIC(), tensors, 2,
+                             IntArrayFromInts(inputs_array_data),
+                             IntArrayFromInts(outputs_array_data), nullptr);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  for (int i = 0; i < 4; ++i) {
+    EXPECT_NEAR(expected[i], static_cast<float>(output[i]), 1e-2f);
+  }
+}
+}  // namespace testing
+}  // namespace tflite
+#endif
 
 TF_LITE_MICRO_TESTS_MAIN
