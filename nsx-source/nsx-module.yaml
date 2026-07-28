@@ -1,0 +1,47 @@
+schema_version: 1
+
+module:
+  name: helia-rt-source
+  type: tooling
+  version: "1.17.0"
+
+support:
+  ambiqsuite: true
+  zephyr: false
+
+summary: >-
+  Source-provider module for consumers that compile the helia-rt TFLM source
+  tree with their own NSX runtime wrapper.
+
+capabilities:
+  - tflm_source
+  - source_provider
+
+use_cases:
+  - custom NSX TFLM wrappers
+  - reference or upstream CMSIS-NN TFLM builds
+
+agent_keywords:
+  - helia-rt
+  - tflm
+  - source
+
+build:
+  cmake:
+    package: helia_rt_source
+    targets:
+      - helia_rt::source
+
+depends:
+  required: []
+  optional: []
+
+compatibility:
+  boards:
+    - "*"
+  socs:
+    - "*"
+  toolchains:
+    - arm-none-eabi-gcc
+    - armclang
+    - atfe

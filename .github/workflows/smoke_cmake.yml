@@ -37,7 +37,7 @@ jobs:
       matrix:
         backend: [reference, cmsis_nn, helia]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install cmake
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake
       - name: Dump + validate JSON manifest
@@ -78,7 +78,7 @@ jobs:
     name: Configure + build helia_rt::reference (host clang)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install toolchain
         run: |
           sudo apt-get update
@@ -101,7 +101,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Check diff scope
@@ -109,10 +109,13 @@ jobs:
           set -euo pipefail
           base="${{ github.event.pull_request.base.sha }}"
           head="${{ github.event.pull_request.head.sha }}"
+          range="$base...$head"
           # SSoT branches (those that touch cmake/ or root CMakeLists.txt) MUST NOT
           # also touch upstream-managed paths. PRs that legitimately need to do so
           # should be split.
-          if git diff --name-only "$base" "$head" -- cmake/ CMakeLists.txt \
+          # Use the PR merge-base diff so branches cut from older tags do not
+          # inherit unrelated main-branch churn into this invariant check.
+          if git diff --name-only "$range" -- cmake/ CMakeLists.txt \
                 | grep -q .; then
               echo "PR touches SSoT files — verifying upstream paths are untouched..."
               # Allow the small set of upstream-owned paths that currently need
@@ -122,7 +125,7 @@ jobs:
               # HELIA backend implementations, their operator-specific common
               # code/tests, and HELIA's Make/CI adapters evolve together with
               # the backend definitions in the SSoT.
-              bad=$(git diff --name-only "$base" "$head" -- \
+              bad=$(git diff --name-only "$range" -- \
                       tensorflow/ signal/ python/tflite_micro/ \
                       tensorflow/lite/micro/tools/make/ \
                     | grep -Ev '^tensorflow/lite/micro/(helia_rt_version|heliart_version)\.h$' \
@@ -131,8 +134,8 @@ jobs:
                     | grep -Ev '^tensorflow/lite/micro/tools/make/ext_libs/(helia\.inc|ns_cmsis_nn_download\.sh)$' \
                     | grep -Ev '^tensorflow/lite/micro/kernels/helia/' \
                     | grep -Ev '^tensorflow/lite/micro/kernels/(activations|add|batch_matmul|concatenation|conv|depthwise_conv|fully_connected|logistic|maximum_minimum|mul|pad|pooling|reshape|softmax|svdf|tanh|transpose|transpose_conv|unidirectional_sequence_lstm)(_common|_test)?\.cc$' \
-                | grep -Ev '^tensorflow/lite/micro/kernels/ethos_u/ethosu\.cc$' \
-                | grep -Ev '^tensorflow/lite/micro/micro_mutable_op_resolver\.h$' \
+                    | grep -Ev '^tensorflow/lite/micro/kernels/ethos_u/ethosu\.cc$' \
+                    | grep -Ev '^tensorflow/lite/micro/micro_mutable_op_resolver\.h$' \
                     || true)
               if [ -n "$bad" ]; then
                   echo "::error::SSoT PR also edits upstream-managed paths:"
@@ -150,7 +153,7 @@ jobs:
     env:
       CMSIS_TOOLBOX_VERSION: 2.13.0
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install cmake + CMSIS-Toolbox
         run: |
           set -euo pipefail
@@ -222,11 +225,15 @@ jobs:
   nsx-cross-build:
     name: nsx::helia_rt cross-compile (Cortex-M55, gcc)
     runs-on: ubuntu-latest
-    # ns-cmsis-nn is a private repo. PRs from forks won't have access to the
-    # secret; skip cleanly there to avoid spurious failures.
+    # ns-cmsis-nn is a private repo. PRs from forks and Dependabot PRs won't
+    # have access to the repo secret used for cloning it; skip cleanly there
+    # to avoid spurious failures unrelated to the checked-in code.
     if: >
       github.event_name == 'push' ||
-      github.event.pull_request.head.repo.full_name == github.repository
+      (
+        github.actor != 'dependabot[bot]' &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      )
     env:
       # Pinned to the ns-cmsis-nn release whose CMake / Zephyr / NSX / CMSIS-Pack
       # surfaces align with heliaRT. Bump in lockstep with NS_CMSIS_NN_MIN_VERSION
@@ -234,7 +241,7 @@ jobs:
       NS_CMSIS_NN_REF: v7.28.0
     steps:
       - name: Checkout helia-rt
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: helia-rt
       - name: Checkout ns-cmsis-nn (pinned ref)
@@ -450,7 +457,7 @@ jobs:
       ZEPHYR_REF: v4.0.0
     steps:
       - name: Checkout helia-rt
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: helia-rt
       - name: Locate Zephyr SDK in CI image
