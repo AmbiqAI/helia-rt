@@ -45,8 +45,8 @@ else
 fi
 
 # Set GIT_COMMIT to NS_CMSIS_NN_COMMIT if set, otherwise use default.
-# Default tracks AmbiqAI/ns-cmsis-nn tag v7.29.0.
-GIT_COMMIT=${NS_CMSIS_NN_COMMIT:-f757adc842a8fd15a58f2f0bbe8a4c8a681b3a45}
+# Default tracks AmbiqAI/ns-cmsis-nn tag v7.29.1.
+GIT_COMMIT=${NS_CMSIS_NN_COMMIT:-50ea825abdb97c9b1ed78aff09f3752469e3b00d}
 
 # clone_ns_cmsis_nn: attempt git clone and surface a clear error on failure.
 clone_ns_cmsis_nn() {

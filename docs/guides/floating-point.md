@@ -89,7 +89,7 @@ HELIA operator wrappers.
 
 ## Make builds
 
-The Make integration pins ns-cmsis-nn v7.29.0 and configures the float features
+The Make integration pins ns-cmsis-nn v7.29.1 and configures the float features
 from `TARGET_ARCH`:
 
 - FP32 is enabled for the HELIA backend.

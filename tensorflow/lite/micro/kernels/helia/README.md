@@ -9,7 +9,7 @@ For more information about the optimizations, check out
 [CMSIS-NN documentation](https://github.com/ARM-software/CMSIS-NN/blob/main/README.md),
 
 The helia backend's floating-point build support is provided by the pinned
-`AmbiqAI/ns-cmsis-nn` v7.29.0 release. The Make build enables the fp32 API for helia
+`AmbiqAI/ns-cmsis-nn` v7.29.1 release. The Make build enables the fp32 API for helia
 targets and enables the fp16 API only for `TARGET_ARCH=cortex-m55`. fp16 requires an
 ARMv8.1-M MVEF-capable toolchain.
 
