@@ -143,9 +143,13 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
             context, num_channels * sizeof(int32_t)));
   }
 
+  // Float16 is unquantized like Float32; present it as Float32 so the
+  // upstream helper skips quantization-parameter population. Keeps
+  // conv_common.cc identical to upstream, which has no Float16 branch.
   TF_LITE_ENSURE_STATUS(CalculateOpDataConv(
       context, node, params, input_dims.w, input_dims.h, filter_dims.w,
-      filter_dims.h, output_dims.w, output_dims.h, input->type,
+      filter_dims.h, output_dims.w, output_dims.h,
+      input->type == kTfLiteFloat16 ? kTfLiteFloat32 : input->type,
       &data->reference_op_data));
 
   // CMSIS_NN allows INT64, INT32 or nullptr bias data pointer

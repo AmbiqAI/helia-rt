@@ -64,6 +64,20 @@ cmsis_nn_dims FillVariableShapeSwapInnerDims(int32_t rank,
   return dims;
 }
 
+// TransposeRowsColumns() (batch_matmul_common.cc, kept identical to
+// upstream) does not know Float16. Transposition is a pure element
+// permutation with no arithmetic, so Float16 tensors are presented to it as
+// Int16 and shuffled bit-for-bit.
+TfLiteStatus HeliaTransposeRowsColumns(const TfLiteEvalTensor& tensor_in,
+                                       TfLiteEvalTensor* tensor_out) {
+  if (tensor_in.type == kTfLiteFloat16) {
+    TfLiteEvalTensor int16_view = tensor_in;
+    int16_view.type = kTfLiteInt16;
+    return TransposeRowsColumns(int16_view, tensor_out);
+  }
+  return TransposeRowsColumns(tensor_in, tensor_out);
+}
+
 inline TfLiteStatus PopulateEvalData(
     TfLiteContext* context, OpData* data, const TfLiteBatchMatMulParams* params,
     TfLiteNode* node, const TfLiteEvalTensor* original_lhs_input,
@@ -86,12 +100,12 @@ inline TfLiteStatus PopulateEvalData(
     // we transpose once if necessary for now.
     if (!(data->reference_op_data.rhs_is_constant_tensor &&
           data->reference_op_data.rhs_is_transposed)) {
-      TransposeRowsColumns(*original_rhs_input, *updated_rhs_input);
+      HeliaTransposeRowsColumns(*original_rhs_input, *updated_rhs_input);
       data->reference_op_data.rhs_is_transposed = true;
     }
   }
   if (params->adj_x) {
-    TransposeRowsColumns(*original_lhs_input, *updated_lhs_input);
+    HeliaTransposeRowsColumns(*original_lhs_input, *updated_lhs_input);
   }
 
   // Compress BatchMatMul when third from last RHS dimension is one.

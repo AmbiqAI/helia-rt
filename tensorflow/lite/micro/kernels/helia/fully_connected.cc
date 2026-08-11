@@ -119,9 +119,14 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   data->weight_buffer_idx = -1;
   data->buffer_conv_1x1_idx = -1;
 
+  // Float16 is unquantized like Float32; present it as Float32 so the
+  // upstream helper takes its no-op float path. Keeps
+  // fully_connected_common.cc identical to upstream, which has no Float16
+  // branch.
   TF_LITE_ENSURE_STATUS(CalculateOpDataFullyConnected(
-      context, params->activation, input->type, input, filter, bias, output,
-      &(data->reference_op_data)));
+      context, params->activation,
+      input->type == kTfLiteFloat16 ? kTfLiteFloat32 : input->type, input,
+      filter, bias, output, &(data->reference_op_data)));
 
   //  Currently only Int8/Int16 is supported for per channel quantization.
   TF_LITE_ENSURE(context, !data->reference_op_data.is_per_channel || (

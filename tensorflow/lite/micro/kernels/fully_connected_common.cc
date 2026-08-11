@@ -61,7 +61,7 @@ TfLiteStatus CalculateOpDataFullyConnected(
   data->is_per_channel = false;
 #endif
 
-  if (data_type == kTfLiteFloat32 || data_type == kTfLiteFloat16) {
+  if (data_type == kTfLiteFloat32) {
     return kTfLiteOk;
   }
 

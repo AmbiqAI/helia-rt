@@ -130,11 +130,8 @@ TfLiteStatus CalculateSoftmaxParams(TfLiteContext* context,
                                               op_data->input_left_shift);
     }
   } else {
-    TF_LITE_ENSURE_MSG(
-        context,
-        input->type == kTfLiteFloat32 || input->type == kTfLiteFloat16,
-        "Softmax float path requires kTfLiteFloat32 or kTfLiteFloat16 input.");
-    TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
+    TF_LITE_ENSURE_TYPES_EQ(context, input->type, kTfLiteFloat32);
+    TF_LITE_ENSURE_TYPES_EQ(context, output->type, kTfLiteFloat32);
     op_data->beta = static_cast<double>(params->beta);
   }
   return kTfLiteOk;

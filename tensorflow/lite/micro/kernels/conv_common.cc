@@ -111,8 +111,7 @@ TfLiteStatus CalculateOpDataConv(TfLiteContext* context, TfLiteNode* node,
 
   // Note that quantized inference requires that all tensors have their
   // parameters set. This is usually done during quantized training.
-  // Float16, like Float32, is unquantized and skips this population.
-  if (data_type != kTfLiteFloat32 && data_type != kTfLiteFloat16) {
+  if (data_type != kTfLiteFloat32) {
     int output_channels = filter->dims->data[kConvQuantizedDimension];
 
     TF_LITE_ENSURE_STATUS(tflite::PopulateConvolutionQuantizationParams(

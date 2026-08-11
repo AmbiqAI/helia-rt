@@ -140,9 +140,14 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
             context, num_channels * sizeof(int32_t)));
   }
 
+  // Float16 is unquantized like Float32; present it as Float32 so the
+  // upstream helper skips quantization-parameter population. Keeps
+  // depthwise_conv_common.cc identical to upstream, which has no Float16
+  // branch.
   TF_LITE_ENSURE_STATUS(CalculateOpDataDepthwiseConv(
       context, node, params, input_width, input_height, filter_width,
-      filter_height, output_width, output_height, data_type,
+      filter_height, output_width, output_height,
+      data_type == kTfLiteFloat16 ? kTfLiteFloat32 : data_type,
       &data->reference_op_data));
 
   //reset weight buffer idx

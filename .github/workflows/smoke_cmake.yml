@@ -122,9 +122,12 @@ jobs:
               # heliaRT-local divergence for generic CMake integration. Keep
               # this list narrow so the invariant still catches accidental drift.
               #
-              # HELIA backend implementations, their operator-specific common
-              # code/tests, and HELIA's Make/CI adapters evolve together with
-              # the backend definitions in the SSoT.
+              # HELIA backend implementations (kernels/helia/), the shared
+              # kernel tests that carry HELIA float16 coverage (*_test.cc
+              # only — never the shared kernel sources or *_common.cc, which
+              # must stay byte-identical to upstream), and HELIA's Make/CI
+              # adapters evolve together with the backend definitions in the
+              # SSoT.
               bad=$(git diff --name-only "$range" -- \
                       tensorflow/ signal/ python/tflite_micro/ \
                       tensorflow/lite/micro/tools/make/ \
@@ -134,7 +137,7 @@ jobs:
                     | grep -Ev '^tensorflow/lite/micro/tools/make/ext_libs/(helia\.inc|ns_cmsis_nn_download\.sh)$' \
                     | grep -Ev '^tensorflow/lite/micro/tools/make/ext_libs/(cmsis|cmsis_nn|xtensa)_download\.sh$' \
                     | grep -Ev '^tensorflow/lite/micro/kernels/helia/' \
-                    | grep -Ev '^tensorflow/lite/micro/kernels/(activations|add|batch_matmul|concatenation|conv|depthwise_conv|fully_connected|logistic|maximum_minimum|mul|pad|pooling|reshape|softmax|svdf|tanh|transpose|transpose_conv|unidirectional_sequence_lstm)(_common|_test)?\.cc$' \
+                    | grep -Ev '^tensorflow/lite/micro/kernels/(activations|add|batch_matmul|concatenation|conv|depthwise_conv|fully_connected|logistic|maximum_minimum|mul|pad|pooling|reshape|softmax|svdf|tanh|transpose|transpose_conv|unidirectional_sequence_lstm)_test\.cc$' \
                     | grep -Ev '^tensorflow/lite/micro/kernels/ethos_u/ethosu\.cc$' \
                     | grep -Ev '^tensorflow/lite/micro/micro_mutable_op_resolver\.h$' \
                     || true)
