@@ -71,10 +71,19 @@ TfLiteStatus EvalMaximum(TfLiteContext* context, TfLiteNode* node) {
   ctx.buf = nullptr;
   ctx.size = 0;
 
+  // FillVariableShape collapses rank >= 5 tensors to {1, 1, 1, 1}, which
+  // would make the heliaCore kernels silently compute a single element.
+  // Restrict the optimized float paths to rank <= 4; higher ranks fall back
+  // to the reference loop (float32) or fail with a message (float16).
+  const bool arm_rank_supported = input_1_shape.DimensionsCount() <= 4 &&
+                                  input_2_shape.DimensionsCount() <= 4 &&
+                                  output_shape.DimensionsCount() <= 4;
+
   switch (op_context.output->type) {
     case kTfLiteFloat16:
 #if ARM_NN_ENABLE_F16
-      if (arm_maximum_f16(
+      if (arm_rank_supported &&
+          arm_maximum_f16(
               &ctx, tflite::micro::GetTensorData<float16_t>(input1), &input_1_dims,
               tflite::micro::GetTensorData<float16_t>(input2), &input_2_dims,
               tflite::micro::GetTensorData<float16_t>(output), &output_dims) ==
@@ -88,7 +97,8 @@ TfLiteStatus EvalMaximum(TfLiteContext* context, TfLiteNode* node) {
       return kTfLiteError;
     case kTfLiteFloat32:
 #if ARM_NN_ENABLE_F32
-      if (arm_maximum_f32(
+      if (arm_rank_supported &&
+          arm_maximum_f32(
               &ctx, tflite::micro::GetTensorData<float>(input1), &input_1_dims,
               tflite::micro::GetTensorData<float>(input2), &input_2_dims,
               tflite::micro::GetTensorData<float>(output), &output_dims) ==
@@ -189,10 +199,19 @@ TfLiteStatus EvalMinimum(TfLiteContext* context, TfLiteNode* node) {
   ctx.buf = nullptr;
   ctx.size = 0;
 
+  // FillVariableShape collapses rank >= 5 tensors to {1, 1, 1, 1}, which
+  // would make the heliaCore kernels silently compute a single element.
+  // Restrict the optimized float paths to rank <= 4; higher ranks fall back
+  // to the reference loop (float32) or fail with a message (float16).
+  const bool arm_rank_supported = input_1_shape.DimensionsCount() <= 4 &&
+                                  input_2_shape.DimensionsCount() <= 4 &&
+                                  output_shape.DimensionsCount() <= 4;
+
   switch (op_context.output->type) {
     case kTfLiteFloat16:
 #if ARM_NN_ENABLE_F16
-      if (arm_minimum_f16(
+      if (arm_rank_supported &&
+          arm_minimum_f16(
               &ctx, tflite::micro::GetTensorData<float16_t>(input1), &input_1_dims,
               tflite::micro::GetTensorData<float16_t>(input2), &input_2_dims,
               tflite::micro::GetTensorData<float16_t>(output), &output_dims) ==
@@ -206,7 +225,8 @@ TfLiteStatus EvalMinimum(TfLiteContext* context, TfLiteNode* node) {
       return kTfLiteError;
     case kTfLiteFloat32:
 #if ARM_NN_ENABLE_F32
-      if (arm_minimum_f32(
+      if (arm_rank_supported &&
+          arm_minimum_f32(
               &ctx, tflite::micro::GetTensorData<float>(input1), &input_1_dims,
               tflite::micro::GetTensorData<float>(input2), &input_2_dims,
               tflite::micro::GetTensorData<float>(output), &output_dims) ==

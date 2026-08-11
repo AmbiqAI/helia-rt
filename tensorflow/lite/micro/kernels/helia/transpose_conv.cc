@@ -484,16 +484,16 @@ TfLiteStatus EvalFloat(TfLiteContext* context, TfLiteNode* node,
     params.stride = {builtin.stride_width, builtin.stride_height};
     params.padding = {data.params.padding_values.width,
                       data.params.padding_values.height};
-    // heliaCore's f32 transpose_conv indexes as
+    // heliaCore's f32 transpose_conv scatters to
     //   out = in*stride - pad + k*dil + pad_off,
-    // where pad_off is the asymmetric (front vs back) padding delta.
-    // The helia quantized kernel expects `padding_values.{h,w}_offset` to
-    // already hold the composite (raw_offset + pad), and Prepare() stores it
-    // that way, so recover the raw offset here for the float kernel.
-    params.padding_offsets = {
-        data.params.padding_values.width_offset - data.params.padding_values.width,
-        data.params.padding_values.height_offset -
-            data.params.padding_values.height};
+    // while the TFLite semantics (reference_ops::TransposeConv) are
+    //   out = in*stride - pad + k
+    // with no offset term: TFLM's ComputePaddingWithOffset() remainder
+    // (total_padding % 2) is size bookkeeping only and must never shift the
+    // scatter. The helia s8 transpose_conv ignores padding_offsets for the
+    // same reason. Passing the TFLM offset here would shift the whole output
+    // by one pixel for any odd total padding (e.g. SAME, stride 2, 3x3).
+    params.padding_offsets = {0, 0};
     params.dilation = {1, 1};
     params.activation = {activation_min, activation_max};
     if (arm_transpose_conv_f32(
@@ -530,12 +530,9 @@ TfLiteStatus EvalFloat(TfLiteContext* context, TfLiteNode* node,
     params.stride = {builtin.stride_width, builtin.stride_height};
     params.padding = {data.params.padding_values.width,
                       data.params.padding_values.height};
-    // See note in the f32 branch: recover the raw asymmetric-pad offset from
-    // the composite stored by Prepare() for the helia quantized kernel.
-    params.padding_offsets = {
-        data.params.padding_values.width_offset - data.params.padding_values.width,
-        data.params.padding_values.height_offset -
-            data.params.padding_values.height};
+    // See the f32 branch: TFLite transpose-conv semantics have no scatter
+    // offset, so this must stay zero.
+    params.padding_offsets = {0, 0};
     params.dilation = {1, 1};
     params.activation = {HeliaFloat16ActivationBound(activation_min),
                          HeliaFloat16ActivationBound(activation_max)};

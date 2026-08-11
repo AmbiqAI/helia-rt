@@ -201,6 +201,24 @@ TEST(MaximumMinimumTest, FloatTest) {
                                    dims, data2, golden_min, dims, output_data);
 }
 
+// Rank-5 tensors exceed what 4-D optimized kernels can describe; a backend
+// whose dims mapping collapses rank >= 5 shapes to a scalar computes only
+// one element and leaves the rest stale. The reference loop must serve this.
+TEST(MaximumMinimumTest, FloatRank5Test) {
+  int dims[] = {5, 1, 1, 1, 2, 3};
+  const float data1[] = {1.0, -2.0, 3.0, 4.0, 5.0, -6.0};
+  const float data2[] = {2.0, 3.0, -1.0, 5.0, -4.0, 6.0};
+  const float golden_max[] = {2.0, 3.0, 3.0, 5.0, 5.0, 6.0};
+  const float golden_min[] = {1.0, -2.0, -1.0, 4.0, -4.0, -6.0};
+  float output_data[6];
+
+  tflite::testing::TestMaxMinFloat(tflite::Register_MAXIMUM(), dims, data1,
+                                   dims, data2, golden_max, dims, output_data);
+
+  tflite::testing::TestMaxMinFloat(tflite::Register_MINIMUM(), dims, data1,
+                                   dims, data2, golden_min, dims, output_data);
+}
+
 TEST(MaximumMinimumTest, Int8Test) {
   int dims[] = {3, 3, 1, 2};
   const int8_t data1[] = {1, 0, 2, 11, 2, 23};

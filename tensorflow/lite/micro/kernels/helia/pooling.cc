@@ -223,8 +223,26 @@ void* Init(TfLiteContext* context, const char* buffer, size_t length) {
   return context->AllocatePersistentBuffer(context, sizeof(OpData));
 }
 
+// Float16 pooling has no reference fallback, so without the heliaCore FP16
+// API the type cannot be served at all; reject it at Prepare rather than at
+// the first Invoke. (The shared PoolingPrepare accepts float16 activation
+// ranges unconditionally.)
+TfLiteStatus EnsureFloat16Supported(TfLiteContext* context, TfLiteNode* node) {
+  MicroContext* micro_context = GetMicroContext(context);
+  TfLiteTensor* input =
+      micro_context->AllocateTempInputTensor(node, kPoolingInputTensor);
+  TF_LITE_ENSURE(context, input != nullptr);
+  const bool supported =
+      kHeliaFloat16Enabled || input->type != kTfLiteFloat16;
+  micro_context->DeallocateTempTfLiteTensor(input);
+  TF_LITE_ENSURE_MSG(context, supported,
+                     "Float16 pooling requires ARM_NN_ENABLE_F16.");
+  return kTfLiteOk;
+}
+
 TfLiteStatus MaxPrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_STATUS(PoolingPrepare(context, node));
+  TF_LITE_ENSURE_STATUS(EnsureFloat16Supported(context, node));
   // Set buffer index to a reset value
   static_cast<OpData*>(node->user_data)->buffer_idx = -1;
   return kTfLiteOk;
@@ -232,6 +250,7 @@ TfLiteStatus MaxPrepare(TfLiteContext* context, TfLiteNode* node) {
 
 TfLiteStatus AveragePrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_STATUS(PoolingPrepare(context, node));
+  TF_LITE_ENSURE_STATUS(EnsureFloat16Supported(context, node));
 
   MicroContext* micro_context = GetMicroContext(context);
 

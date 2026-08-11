@@ -450,6 +450,35 @@ void TestTransposeConvQuantizedCompressed(
 }  // namespace testing
 }  // namespace tflite
 
+// SAME padding, stride 2, 3x3 filter, 2x2 -> 4x4: total padding is odd
+// (offset 1), the canonical decoder-upsampling shape. TFLite semantics
+// scatter to `in*stride - pad + k` with NO offset term; a backend that adds
+// the ComputePaddingWithOffset() remainder to the scatter index shifts the
+// entire output by one pixel while still reporting success.
+TEST(TransposeConvTest, OddTotalPaddingFloatShouldMatchGolden) {
+  int input_shape[] = {4, 1, 2, 2, 1};
+  const float input_values[] = {1, 2, 3, 4};
+  int filter_shape[] = {4, 1, 3, 3, 1};
+  const float filter_values[] = {1, 1, 1, 1, 1, 1, 1, 1, 1};
+  int bias_shape[] = {1, 1};
+  const float bias_values[] = {0};
+  TfLiteConvParams conv_params = {
+      kTfLitePaddingSame,  // padding
+      2,                   // stride_width
+      2,                   // stride_height
+      kTfLiteActNone,      // activation
+      1,                   // dilation_width_factor
+      1,                   // dilation_height_factor
+      kTfLiteNoType        // quantized_bias_type
+  };
+  int output_shape[] = {4, 1, 4, 4, 1};
+  const float golden[] = {1, 1, 3, 2, 1, 1, 3, 2, 4, 4, 10, 6, 3, 3, 7, 4};
+  float output_data[16];
+  tflite::testing::TestTransposeConvFloat(
+      input_shape, input_values, filter_shape, filter_values, bias_shape,
+      bias_values, output_shape, golden, &conv_params, output_data);
+}
+
 TEST(TransposeConvTest, SimpleTestFloat) {
   float output_data[tflite::testing::kOutputElements];
 

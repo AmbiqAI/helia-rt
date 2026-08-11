@@ -96,10 +96,18 @@ elif [ -d ${DOWNLOADED_NS_CMSIS_NN_PATH} ]; then
     git checkout ${GIT_COMMIT} >&2
     popd > /dev/null
   else
-    # Check that the existing clone is at the right commit
+    # Check that the existing clone is at the right commit. Only trust the
+    # skip when GIT_COMMIT is a full SHA: resolving a branch or tag name
+    # inside the stale local clone would compare against the stale ref and
+    # could keep an outdated tree (branches move; tags can be re-cut).
+    # Non-SHA pins always redownload, matching the historical behavior.
     pushd ${DOWNLOADED_NS_CMSIS_NN_PATH} > /dev/null
     CURRENT_COMMIT=$(git rev-parse HEAD)
-    EXPECTED_COMMIT=$(git rev-parse --verify "${GIT_COMMIT}^{commit}" 2>/dev/null || true)
+    if [[ "${GIT_COMMIT}" =~ ^[0-9a-f]{40}$ ]]; then
+      EXPECTED_COMMIT=$(git rev-parse --verify "${GIT_COMMIT}^{commit}" 2>/dev/null || true)
+    else
+      EXPECTED_COMMIT=""
+    fi
     popd > /dev/null
 
     if [ -n "${EXPECTED_COMMIT}" ] && [ "${CURRENT_COMMIT}" = "${EXPECTED_COMMIT}" ]; then

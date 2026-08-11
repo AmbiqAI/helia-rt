@@ -375,11 +375,12 @@ endfunction()
 # ---------------------------------------------------------------------------
 # helia_rt_float_feature_flags(OUT_F32 OUT_F16)
 #
-# Resolves whether the helia backend should expose the fp32 / fp16 kernel API,
-# in precedence order:
-#   1. Zephyr Kconfig  : CONFIG_NS_CMSIS_NN_ENABLE_F32 / _F16
-#   2. NSX/CMake option: NSX_CMSIS_NN_ENABLE_F32 / _F16
-#   3. Historical default: fp32 on, fp16 off
+# Resolves whether the helia backend should expose the fp32 / fp16 kernel API:
+#   - Zephyr module builds (CONFIG_HELIA_RT defined): the final Kconfig values
+#     CONFIG_NS_CMSIS_NN_ENABLE_F32 / _F16 are authoritative; an absent
+#     (disabled) symbol means OFF.
+#   - Otherwise: NSX/CMake option NSX_CMSIS_NN_ENABLE_F32 / _F16, falling back
+#     to the historical default of fp32 on, fp16 off.
 #
 # These mirror the options that drive ns-cmsis-nn's own source selection. The
 # authoritative value is whatever the linked ns-cmsis-nn target exports as
@@ -387,20 +388,27 @@ endfunction()
 # target is resolved (see _helia_rt_sync_float_definitions).
 # ---------------------------------------------------------------------------
 function(helia_rt_float_feature_flags OUT_F32 OUT_F16)
-    if(DEFINED CONFIG_NS_CMSIS_NN_ENABLE_F32)
+    if(DEFINED CONFIG_HELIA_RT)
+        # Zephyr module build: Kconfig is the single source of truth, and a
+        # DISABLED Kconfig bool is simply absent from the imported CMake
+        # variables — it is not defined as "n". Absence therefore means OFF
+        # here; falling through to the non-Zephyr default (F32=ON) would make
+        # heliaRT reference arm_*_f32 symbols that ns-cmsis-nn (driven by the
+        # same Kconfig) never compiled, breaking the final link.
         set(_f32 "${CONFIG_NS_CMSIS_NN_ENABLE_F32}")
-    elseif(DEFINED NSX_CMSIS_NN_ENABLE_F32)
-        set(_f32 "${NSX_CMSIS_NN_ENABLE_F32}")
-    else()
-        set(_f32 ON)
-    endif()
-
-    if(DEFINED CONFIG_NS_CMSIS_NN_ENABLE_F16)
         set(_f16 "${CONFIG_NS_CMSIS_NN_ENABLE_F16}")
-    elseif(DEFINED NSX_CMSIS_NN_ENABLE_F16)
-        set(_f16 "${NSX_CMSIS_NN_ENABLE_F16}")
     else()
-        set(_f16 OFF)
+        if(DEFINED NSX_CMSIS_NN_ENABLE_F32)
+            set(_f32 "${NSX_CMSIS_NN_ENABLE_F32}")
+        else()
+            set(_f32 ON)
+        endif()
+
+        if(DEFINED NSX_CMSIS_NN_ENABLE_F16)
+            set(_f16 "${NSX_CMSIS_NN_ENABLE_F16}")
+        else()
+            set(_f16 OFF)
+        endif()
     endif()
 
     if(_f32)

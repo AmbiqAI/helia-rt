@@ -73,6 +73,15 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
                          input->type == kTfLiteInt8,
                      "Input data type not supported");
 
+  // Float16 softmax has no reference fallback and heliaCore's kernel only
+  // implements beta == 1.0, so reject other betas at Prepare.
+  if (input->type == kTfLiteFloat16) {
+    const auto* params =
+        static_cast<const TfLiteSoftmaxParams*>(node->builtin_data);
+    TF_LITE_ENSURE_MSG(context, params != nullptr && params->beta == 1.0f,
+                       "Float16 SOFTMAX requires beta == 1.0.");
+  }
+
   TF_LITE_ENSURE(context, node->user_data != nullptr);
   CMSISNNSoftmaxParams* op_data =
       static_cast<CMSISNNSoftmaxParams*>(node->user_data);

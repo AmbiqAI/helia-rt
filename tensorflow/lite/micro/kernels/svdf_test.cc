@@ -1038,7 +1038,10 @@ TEST(SvdfTest, SvdfFloat16_2x2Input2x4OutputShouldMatchGolden) {
       const float expected =
           tflite::testing::golden_output_2x2x10[step * batch_size * num_units +
                                                 i];
-      EXPECT_NEAR(expected, actual, 0.15f);
+      // Observed fp16 accumulation error is ~1e-2; keep the bound tight
+      // enough that every golden element (most are < 0.15 in magnitude)
+      // actually constrains the kernel output.
+      EXPECT_NEAR(expected, actual, 5e-2f);
     }
   }
 }

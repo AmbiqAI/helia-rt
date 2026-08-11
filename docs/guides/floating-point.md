@@ -75,9 +75,13 @@ parameters are supported by the optimized kernel.
   the optimized API is disabled or rejects the configuration.
 - Many FP16 operators do not have a TFLM FP16 reference implementation. Where
   the limitation is knowable at graph preparation (FP16 disabled at build time,
-  broadcast `ADD`/`MUL`, non-4D `PAD`), the operator fails `AllocateTensors()`
-  with a logged message; configurations the optimized kernel rejects at run
-  time return `kTfLiteError` from `Invoke()` with a logged message.
+  broadcast `ADD`/`MUL`, non-4D `PAD`, grouped `CONV_2D`, non-unit-beta
+  `SOFTMAX`), the operator fails `AllocateTensors()` with a logged message;
+  configurations the optimized kernel rejects at run time return
+  `kTfLiteError` from `Invoke()` with a logged message.
+- Grouped `CONV_2D` (input channels a multiple of filter channels) is outside
+  the optimized float kernels' support: FP32 uses the reference kernel, FP16
+  is rejected at `AllocateTensors()`.
 - Pure data-movement operators (`TRANSPOSE`, `RESHAPE`) handle FP16 tensors
   bitwise through their 16-bit reference paths, so they work even without
   `ARM_NN_ENABLE_F16`.

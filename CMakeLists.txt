@@ -153,7 +153,8 @@ function(_helia_rt_sync_float_definitions target dep)
                 "helia_rt_helia: requested ARM_NN_ENABLE_${_feature}="
                 "${_want_${_feature}} but the linked target '${dep}' exports "
                 "${_dep_${_feature}}. Using the dependency's value. Configure "
-                "NSX_CMSIS_NN_ENABLE_${_feature} (CMake) or "
+                "NSX_CMSIS_NN_ENABLE_${_feature} (NSX module), "
+                "ARM_NN_ENABLE_${_feature} (ns-cmsis-nn root CMakeLists), or "
                 "CONFIG_NS_CMSIS_NN_ENABLE_${_feature} (Zephyr) *before* "
                 "ns-cmsis-nn is added — it selects its sources at that point. "
                 "Requires ns-cmsis-nn v7.28.0 or later.")

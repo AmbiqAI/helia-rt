@@ -402,6 +402,37 @@ TEST(ConvTest, AsymmetricDilationFloatShouldMatchGolden) {
       output_data);
 }
 
+// Grouped convolution (input channels a multiple of filter channels).
+// Optimized backends whose float kernels only implement groups == 1 must
+// fall back to the reference kernel here; a backend that feeds a grouped
+// filter to a dense kernel reads out of bounds and returns garbage.
+TEST(ConvTest, GroupedFloatShouldMatchGolden) {
+  int input_shape[] = {4, 1, 2, 2, 4};
+  const float input_values[] = {1, 2,  3,  4,  5,  6,  7,  8,
+                                9, 10, 11, 12, 13, 14, 15, 16};
+  // 2 output channels, 1x1 kernel, 2 filter channels -> groups = 2.
+  int filter_shape[] = {4, 2, 1, 1, 2};
+  const float filter_values[] = {1, 1, 1, 1};
+  int bias_shape[] = {1, 2};
+  const float bias_values[] = {1, -1};
+  TfLiteConvParams conv_params = {
+      kTfLitePaddingValid,  // padding
+      1,                    // stride_width
+      1,                    // stride_height
+      kTfLiteActNone,       // activation
+      1,                    // dilation_width_factor
+      1,                    // dilation_height_factor
+      kTfLiteNoType         // quantized_bias_type
+  };
+  int output_shape[] = {4, 1, 2, 2, 2};
+  const float golden[] = {4, 6, 12, 14, 20, 22, 28, 30};
+  float output_data[8];
+  tflite::testing::TestConvFloat(input_shape, input_values, filter_shape,
+                                 filter_values, bias_shape, bias_values,
+                                 output_shape, golden, &conv_params,
+                                 tflite::Register_CONV_2D(), output_data);
+}
+
 TEST(ConvTest, AsymmetricPaddingFloatShouldMatchGolden) {
   float output_data[tflite::testing::kAsymInputElements];
   tflite::testing::TestConvFloat(

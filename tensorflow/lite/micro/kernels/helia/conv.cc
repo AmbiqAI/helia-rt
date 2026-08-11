@@ -101,6 +101,15 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   const int groups = input->dims->data[3] / filter->dims->data[3];
   TFLITE_DCHECK_EQ(output->dims->data[3] % groups, 0);
 
+  // heliaCore's float convolution kernels do not implement grouped
+  // convolution: they stride the filter by the full input channel count, so
+  // groups > 1 would read out of bounds and return success. Float32 falls
+  // back to the reference kernel at Eval; float16 has no reference path, so
+  // reject grouped float16 here.
+  TF_LITE_ENSURE_MSG(
+      context, input->type != kTfLiteFloat16 || groups == 1,
+      "Float16 CONV_2D does not support grouped convolution.");
+
   //reset weight buffer idx
   data->weight_buffer_idx = -1;
   data->activation_buffer_idx = -1;
@@ -203,7 +212,9 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     }
   }
 #if ARM_NN_ENABLE_F32
-  if (input->type == kTfLiteFloat32) {
+  // groups > 1 is served by the reference kernel, which needs no scratch.
+  if (input->type == kTfLiteFloat32 &&
+      input->dims->data[3] == filter->dims->data[3]) {
     data->activation_buffer_idx = -1;
     const cmsis_nn_conv_params_f32 conv_params = {
         .stride = {params.stride_width, params.stride_height},
@@ -553,7 +564,11 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
         ctx.size = arm_convolve_wrapper_f16_get_buffer_size(
             &conv_params, &input_dims, &filter_dims, &output_dims);
       }
-      if (arm_convolve_wrapper_f16(
+      // Grouped convolution is rejected at Prepare; keep the guard here so
+      // the heliaCore kernel can never see a filter with fewer channels than
+      // the input (it would read the filter out of bounds).
+      if (input_dims.c == filter_dims.c &&
+          arm_convolve_wrapper_f16(
               &ctx, &conv_params, &input_dims,
               tflite::micro::GetTensorData<float16_t>(input), &filter_dims,
               tflite::micro::GetTensorData<float16_t>(filter), &bias_dims,
@@ -594,7 +609,10 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
         ctx.size = arm_convolve_wrapper_f32_get_buffer_size(
             &conv_params, &input_dims, &filter_dims, &output_dims);
       }
-      if (arm_convolve_wrapper_f32(
+      // Grouped convolution (input_c != filter_c) is not implemented by the
+      // heliaCore float kernels; use the reference fallback for it.
+      if (input_dims.c == filter_dims.c &&
+          arm_convolve_wrapper_f32(
               &ctx, &conv_params, &input_dims,
               tflite::micro::GetTensorData<float>(input), &filter_dims,
               tflite::micro::GetTensorData<float>(filter), &bias_dims,
