@@ -1547,40 +1547,40 @@ TEST(ConvTest, Int8Filter8x3x3x3PerChannelScaleRelu6ShouldMatchGolden) {
 namespace tflite {
 namespace testing {
 TEST(ConvTest, Float16MultiChannelGolden) {
-    int input_dims_data[] = {4, 1, 2, 2, 2};
-    int filter_dims_data[] = {4, 2, 2, 2, 2};
-    int bias_dims_data[] = {1, 2};
-    int output_dims_data[] = {4, 1, 1, 1, 2};
-    float16_t input[] = {1, 2, 3, 4, 5, 6, 7, 8};
-    float16_t filter[] = {
-            1, 0, 1, 0, 1, 0, 1, 0,
-            0, 1, 0, 1, 0, 1, 0, 1,
-    };
-    float16_t bias[] = {static_cast<float16_t>(0.5f),
-                                            static_cast<float16_t>(-0.5f)};
-    float16_t output[2] = {};
+  int input_dims_data[] = {4, 1, 2, 2, 2};
+  int filter_dims_data[] = {4, 2, 2, 2, 2};
+  int bias_dims_data[] = {1, 2};
+  int output_dims_data[] = {4, 1, 1, 1, 2};
+  float16_t input[] = {1, 2, 3, 4, 5, 6, 7, 8};
+  float16_t filter[] = {
+      1, 0, 1, 0, 1, 0, 1, 0,
+      0, 1, 0, 1, 0, 1, 0, 1,
+  };
+  float16_t bias[] = {static_cast<float16_t>(0.5f),
+                      static_cast<float16_t>(-0.5f)};
+  float16_t output[2] = {};
 
-    TfLiteConvParams params = {kTfLitePaddingValid, 1, 1, kTfLiteActNone, 1, 1,
-                                                         kTfLiteNoType};
-    TfLiteTensor tensors[] = {
-            CreateTensor(input, IntArrayFromInts(input_dims_data), false,
-                                     kTfLiteFloat16),
-            CreateTensor(filter, IntArrayFromInts(filter_dims_data), true,
-                                     kTfLiteFloat16),
-            CreateTensor(bias, IntArrayFromInts(bias_dims_data), true,
-                                     kTfLiteFloat16),
-            CreateTensor(output, IntArrayFromInts(output_dims_data), false,
-                                     kTfLiteFloat16),
-    };
-    int inputs_array_data[] = {3, 0, 1, 2};
-    int outputs_array_data[] = {1, 3};
-    micro::KernelRunner runner(Register_CONV_2D(), tensors, 4,
-                                                         IntArrayFromInts(inputs_array_data),
-                                                         IntArrayFromInts(outputs_array_data), &params);
-    EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
-    EXPECT_EQ(kTfLiteOk, runner.Invoke());
-    EXPECT_NEAR(16.5f, static_cast<float>(output[0]), 5e-2f);
-    EXPECT_NEAR(19.5f, static_cast<float>(output[1]), 5e-2f);
+  TfLiteConvParams params = {kTfLitePaddingValid, 1, 1, kTfLiteActNone, 1, 1,
+                             kTfLiteNoType};
+  TfLiteTensor tensors[] = {
+      CreateTensor(input, IntArrayFromInts(input_dims_data), false,
+                   kTfLiteFloat16),
+      CreateTensor(filter, IntArrayFromInts(filter_dims_data), true,
+                   kTfLiteFloat16),
+      CreateTensor(bias, IntArrayFromInts(bias_dims_data), true,
+                   kTfLiteFloat16),
+      CreateTensor(output, IntArrayFromInts(output_dims_data), false,
+                   kTfLiteFloat16),
+  };
+  int inputs_array_data[] = {3, 0, 1, 2};
+  int outputs_array_data[] = {1, 3};
+  micro::KernelRunner runner(Register_CONV_2D(), tensors, 4,
+                             IntArrayFromInts(inputs_array_data),
+                             IntArrayFromInts(outputs_array_data), &params);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  EXPECT_NEAR(16.5f, static_cast<float>(output[0]), 5e-2f);
+  EXPECT_NEAR(19.5f, static_cast<float>(output[1]), 5e-2f);
 }
 }  // namespace testing
 }  // namespace tflite

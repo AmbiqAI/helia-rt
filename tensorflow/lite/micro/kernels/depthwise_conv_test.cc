@@ -1472,46 +1472,46 @@ TEST(DepthwiseConvTest, SimpleTestQuantizedPerChannelInt16Compressed) {
 namespace tflite {
 namespace testing {
 TEST(DepthwiseConvTest, Float16MultiChannelGolden) {
-    int input_dims_data[] = {4, 1, 2, 2, 2};
-    int filter_dims_data[] = {4, 1, 1, 1, 2};
-    int bias_dims_data[] = {1, 2};
-    int output_dims_data[] = {4, 1, 2, 2, 2};
-    float16_t input[] = {1, 2, 3, 4, 5, 6, 7, 8};
-    float16_t filter[] = {2, 3};
-    float16_t bias[] = {1, -1};
-    float16_t output[8] = {};
-    const float expected[] = {3, 5, 7, 11, 11, 17, 15, 23};
+  int input_dims_data[] = {4, 1, 2, 2, 2};
+  int filter_dims_data[] = {4, 1, 1, 1, 2};
+  int bias_dims_data[] = {1, 2};
+  int output_dims_data[] = {4, 1, 2, 2, 2};
+  float16_t input[] = {1, 2, 3, 4, 5, 6, 7, 8};
+  float16_t filter[] = {2, 3};
+  float16_t bias[] = {1, -1};
+  float16_t output[8] = {};
+  const float expected[] = {3, 5, 7, 11, 11, 17, 15, 23};
 
-    TfLiteDepthwiseConvParams params = {};
-    params.padding = kTfLitePaddingValid;
-    params.stride_width = 1;
-    params.stride_height = 1;
-    params.depth_multiplier = 1;
-    params.activation = kTfLiteActNone;
-    params.dilation_width_factor = 1;
-    params.dilation_height_factor = 1;
+  TfLiteDepthwiseConvParams params = {};
+  params.padding = kTfLitePaddingValid;
+  params.stride_width = 1;
+  params.stride_height = 1;
+  params.depth_multiplier = 1;
+  params.activation = kTfLiteActNone;
+  params.dilation_width_factor = 1;
+  params.dilation_height_factor = 1;
 
-    TfLiteTensor tensors[] = {
-            CreateTensor(input, IntArrayFromInts(input_dims_data), false,
-                                     kTfLiteFloat16),
-            CreateTensor(filter, IntArrayFromInts(filter_dims_data), true,
-                                     kTfLiteFloat16),
-            CreateTensor(bias, IntArrayFromInts(bias_dims_data), true,
-                                     kTfLiteFloat16),
-            CreateTensor(output, IntArrayFromInts(output_dims_data), false,
-                                     kTfLiteFloat16),
-    };
-    int inputs_array_data[] = {3, 0, 1, 2};
-    int outputs_array_data[] = {1, 3};
+  TfLiteTensor tensors[] = {
+      CreateTensor(input, IntArrayFromInts(input_dims_data), false,
+                   kTfLiteFloat16),
+      CreateTensor(filter, IntArrayFromInts(filter_dims_data), true,
+                   kTfLiteFloat16),
+      CreateTensor(bias, IntArrayFromInts(bias_dims_data), true,
+                   kTfLiteFloat16),
+      CreateTensor(output, IntArrayFromInts(output_dims_data), false,
+                   kTfLiteFloat16),
+  };
+  int inputs_array_data[] = {3, 0, 1, 2};
+  int outputs_array_data[] = {1, 3};
 
-    micro::KernelRunner runner(Register_DEPTHWISE_CONV_2D(), tensors, 4,
-                                                         IntArrayFromInts(inputs_array_data),
-                                                         IntArrayFromInts(outputs_array_data), &params);
-    EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
-    EXPECT_EQ(kTfLiteOk, runner.Invoke());
-    for (int i = 0; i < 8; ++i) {
-        EXPECT_NEAR(expected[i], static_cast<float>(output[i]), 2e-2f);
-    }
+  micro::KernelRunner runner(Register_DEPTHWISE_CONV_2D(), tensors, 4,
+                             IntArrayFromInts(inputs_array_data),
+                             IntArrayFromInts(outputs_array_data), &params);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  for (int i = 0; i < 8; ++i) {
+    EXPECT_NEAR(expected[i], static_cast<float>(output[i]), 2e-2f);
+  }
 }
 }  // namespace testing
 }  // namespace tflite

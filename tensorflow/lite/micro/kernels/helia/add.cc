@@ -24,6 +24,7 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/op_macros.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/memory_helpers.h"
 #include "tensorflow/lite/micro/micro_log.h"
@@ -286,13 +287,14 @@ TfLiteStatus EvalAdd(TfLiteContext* context, TfLiteNode* node,
               tflite::micro::GetTensorData<float16_t>(input1),
               tflite::micro::GetTensorData<float16_t>(input2),
               tflite::micro::GetTensorData<float16_t>(output),
-              static_cast<float16_t>(data->output_activation_min_f32),
-              static_cast<float16_t>(data->output_activation_max_f32),
+              HeliaFloat16ActivationBound(data->output_activation_min_f32),
+              HeliaFloat16ActivationBound(data->output_activation_max_f32),
               tflite::micro::GetTensorShape(output).FlatSize()) ==
           ARM_CMSIS_NN_SUCCESS) {
         break;
       }
 #endif
+      MicroPrintf("Float16 ADD: optimized kernel rejected the configuration.");
       return kTfLiteError;
     }
     case kTfLiteFloat32: {
@@ -410,8 +412,10 @@ TfLiteStatus PrepareAdd(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, input1->type, output->type);
   TF_LITE_ENSURE_MSG(
       context,
-      input1->type == kTfLiteFloat32 || input1->type == kTfLiteFloat16 || input1->type == kTfLiteInt32 ||
-          input1->type == kTfLiteInt16 || input1->type == kTfLiteInt8,
+      input1->type == kTfLiteFloat32 ||
+          (kHeliaFloat16Enabled && input1->type == kTfLiteFloat16) ||
+          input1->type == kTfLiteInt32 || input1->type == kTfLiteInt16 ||
+          input1->type == kTfLiteInt8,
       "Input data type not supported");
   TF_LITE_ENSURE_MSG(context, input1->type == input2->type,
                      "Hybrid models are not supported on TFLite Micro.");
@@ -427,6 +431,13 @@ TfLiteStatus PrepareAdd(TfLiteContext* context, TfLiteNode* node) {
 
   TF_LITE_ENSURE_STATUS(
       CalculateOpData(context, params, input1, input2, output, data));
+
+  // The float16 kernel has no broadcast support and no reference fallback,
+  // so reject broadcasting configurations here rather than at Invoke time.
+  TF_LITE_ENSURE_MSG(
+      context,
+      output->type != kTfLiteFloat16 || !data->requires_broadcast,
+      "Float16 ADD does not support broadcasting between input shapes.");
 
   if (output->type == kTfLiteInt32) {
     // Only support int32 unquantized add for now.

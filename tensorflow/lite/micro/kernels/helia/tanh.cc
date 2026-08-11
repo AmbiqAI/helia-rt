@@ -222,6 +222,7 @@ TfLiteStatus TanhEval(TfLiteContext* context, TfLiteNode* node) {
                  ? kTfLiteOk
                  : kTfLiteError;
 #else
+      MicroPrintf("Float16 TANH requires ARM_NN_ENABLE_F16.");
       return kTfLiteError;
 #endif
     case kTfLiteFloat32: {

@@ -82,6 +82,9 @@ TfLiteStatus EvalMaximum(TfLiteContext* context, TfLiteNode* node) {
         break;
       }
 #endif
+      MicroPrintf(
+          "Float16 MAXIMUM requires ARM_NN_ENABLE_F16 and a configuration "
+          "supported by the optimized kernel.");
       return kTfLiteError;
     case kTfLiteFloat32:
 #if ARM_NN_ENABLE_F32
@@ -197,6 +200,9 @@ TfLiteStatus EvalMinimum(TfLiteContext* context, TfLiteNode* node) {
         break;
       }
 #endif
+      MicroPrintf(
+          "Float16 MINIMUM requires ARM_NN_ENABLE_F16 and a configuration "
+          "supported by the optimized kernel.");
       return kTfLiteError;
     case kTfLiteFloat32:
 #if ARM_NN_ENABLE_F32

@@ -73,9 +73,14 @@ parameters are supported by the optimized kernel.
 
 - FP32 operators generally fall back to the TFLM reference implementation when
   the optimized API is disabled or rejects the configuration.
-- Many FP16 operators do not have a TFLM FP16 reference implementation. Those
-  operators return `kTfLiteError` when FP16 support is unavailable or the
-  optimized configuration is unsupported.
+- Many FP16 operators do not have a TFLM FP16 reference implementation. Where
+  the limitation is knowable at graph preparation (FP16 disabled at build time,
+  broadcast `ADD`/`MUL`, non-4D `PAD`), the operator fails `AllocateTensors()`
+  with a logged message; configurations the optimized kernel rejects at run
+  time return `kTfLiteError` from `Invoke()` with a logged message.
+- Pure data-movement operators (`TRANSPOSE`, `RESHAPE`) handle FP16 tensors
+  bitwise through their 16-bit reference paths, so they work even without
+  `ARM_NN_ENABLE_F16`.
 - HELIA softmax supports only unit beta. FP32 softmax falls back to reference
   for non-unit beta; FP16 non-unit beta is unsupported.
 - HELIA FP16/FP32 `UNIDIRECTIONAL_SEQUENCE_LSTM` preserves the TFLite hidden and
@@ -256,6 +261,29 @@ Float support in a prebuilt heliaRT archive is fixed when that archive is
 created. Application compiler definitions cannot add a kernel omitted from the
 archive. Always choose the archive matching the target architecture, floating
 point ABI, toolchain, and build variant.
+
+## Migration notes for existing consumers
+
+Enabling the float feature contract changes behavior for integrations built
+against earlier heliaRT releases:
+
+- **NSX apps**: the helia backend now fails configuration with a
+  `FATAL_ERROR` unless `NSX_CMSIS_NN_ENABLE_F32` is set before
+  `nsx_bootstrap_app()` **and** the resolved `nsx-cmsis-nn` module is
+  v7.28.0 or newer. Every existing NSX helia application needs the two
+  `set(... CACHE BOOL "" FORCE)` lines shown above plus a registry or
+  `nsx.yml` revision bump.
+- **Zephyr**: `CONFIG_HELIA_RT_BACKEND_HELIA` now `imply`s
+  `NS_CMSIS_NN_ENABLE_F32/F16`. If your west workspace pins an ns-cmsis-nn
+  module older than v7.28.0, those Kconfig symbols do not exist and the
+  configuration step emits undefined-symbol warnings; update the module
+  revision to silence them and to get the float kernels.
+- **Library size**: Make-based helia builds now always compile the FP32
+  kernels (and FP16 on `cortex-m55`) into the combined archive. Integer-only
+  models still reference them transitively through the operator wrappers, so
+  build applications with `-ffunction-sections -fdata-sections` and link with
+  `--gc-sections` (the standard embedded configuration) to keep unused float
+  code out of flash.
 
 ## Troubleshooting
 

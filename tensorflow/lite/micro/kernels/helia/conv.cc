@@ -24,6 +24,7 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/padding.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_log.h"
 
@@ -72,7 +73,8 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, input->type, output->type);
   TF_LITE_ENSURE_MSG(context,
                      input->type == kTfLiteFloat32 ||
-                         input->type == kTfLiteFloat16 ||
+                         (kHeliaFloat16Enabled &&
+                          input->type == kTfLiteFloat16) ||
                          input->type == kTfLiteInt16 ||
                          input->type == kTfLiteInt8,
                      "Input data type not supported");
@@ -542,8 +544,8 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
                       data.reference_op_data.padding.height},
           .dilation = {params.dilation_width_factor,
                        params.dilation_height_factor},
-          .activation = {static_cast<float16_t>(activation_min),
-                         static_cast<float16_t>(activation_max)},
+          .activation = {HeliaFloat16ActivationBound(activation_min),
+                         HeliaFloat16ActivationBound(activation_max)},
           .weight_format = ARM_NN_WEIGHT_FORMAT_STANDARD};
       cmsis_nn_context ctx = {nullptr, 0};
       if (data.activation_buffer_idx >= 0) {
@@ -555,12 +557,14 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
               &ctx, &conv_params, &input_dims,
               tflite::micro::GetTensorData<float16_t>(input), &filter_dims,
               tflite::micro::GetTensorData<float16_t>(filter), &bias_dims,
-              bias == nullptr ? nullptr : tflite::micro::GetTensorData<float16_t>(bias),
+              tflite::micro::GetOptionalTensorData<float16_t>(bias),
               &output_dims, tflite::micro::GetTensorData<float16_t>(output)) ==
           ARM_CMSIS_NN_SUCCESS) {
         break;
       }
 #endif
+      MicroPrintf(
+          "Float16 CONV_2D: optimized kernel rejected the configuration.");
       return kTfLiteError;
     }
     case kTfLiteFloat32: {

@@ -23,6 +23,7 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/op_macros.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_log.h"
 
@@ -66,7 +67,8 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
       "Input and output data types are not supported together.");
   TF_LITE_ENSURE_MSG(context,
                      input->type == kTfLiteFloat32 ||
-                         input->type == kTfLiteFloat16 ||
+                         (kHeliaFloat16Enabled &&
+                          input->type == kTfLiteFloat16) ||
                          input->type == kTfLiteInt16 ||
                          input->type == kTfLiteInt8,
                      "Input data type not supported");
@@ -105,15 +107,16 @@ TfLiteStatus SoftmaxEval(TfLiteContext* context, TfLiteNode* node) {
   switch (input->type) {
     case kTfLiteFloat16:
 #if ARM_NN_ENABLE_F16
-      if (HasUnitBeta(op_data)) {
-        return arm_softmax_f16(tflite::micro::GetTensorData<float16_t>(input),
-                               op_data.num_rows, op_data.row_size,
-                               tflite::micro::GetTensorData<float16_t>(
-                                   output)) == ARM_CMSIS_NN_SUCCESS
-                   ? kTfLiteOk
-                   : kTfLiteError;
+      if (HasUnitBeta(op_data) &&
+          arm_softmax_f16(tflite::micro::GetTensorData<float16_t>(input),
+                          op_data.num_rows, op_data.row_size,
+                          tflite::micro::GetTensorData<float16_t>(output)) ==
+              ARM_CMSIS_NN_SUCCESS) {
+        return kTfLiteOk;
       }
-      MicroPrintf("Softmax float16 requires beta == 1.0.");
+      MicroPrintf(
+          "Float16 SOFTMAX requires beta == 1.0 and a configuration "
+          "supported by the optimized kernel.");
 #endif
       return kTfLiteError;
     case kTfLiteFloat32: {

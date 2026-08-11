@@ -234,6 +234,16 @@ void TestTanhQuantized(int input_dims_data[], const float* input_data,
 }  // namespace testing
 }  // namespace tflite
 
+// The helia backend dispatches float32 TANH to the optimized CMSIS-NN
+// activation kernel, whose polynomial approximation differs from the
+// reference std::tanh by up to ~1e-3. Keep the reference implementations
+// held to the original tight bound.
+#if defined(HELIA)
+constexpr float kTanhFloatTolerance = 1e-3f;
+#else
+constexpr float kTanhFloatTolerance = 1e-7f;
+#endif
+
 TEST(TanhTest, SimpleTestTanhFloat) {
   using tflite::testing::tanh_input_vec_fp;
   using tflite::testing::tanh_output_vec_fp;
@@ -248,7 +258,7 @@ TEST(TanhTest, SimpleTestTanhFloat) {
       tanh_input_vec_fp,           // Input data
       tanh_output_vec_fp,          // Expected results.
       output_shape,                // Output shape.
-      output_data, 1e-3 /* tolerance */);
+      output_data, kTanhFloatTolerance);
 }
 
 TEST(TanhTest, SimpleTestTanhInt8) {

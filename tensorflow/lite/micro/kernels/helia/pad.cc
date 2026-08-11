@@ -10,6 +10,7 @@
 #include "tensorflow/lite/kernels/internal/types.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/op_macros.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_log.h"
 
@@ -78,6 +79,17 @@ TfLiteStatus Prepare(TfLiteContext *context, TfLiteNode *node)
 
   // Current implementations rely on the inputs being <= 4D.
   TF_LITE_ENSURE(context, NumDimensions(input) <= reference_ops::PadKernelMaxDimensionCount());
+
+  // The float16 pad path is optimized-only (no reference fallback) and
+  // handles exactly 4-D tensors; reject anything else here rather than
+  // failing at Invoke time.
+  if (input->type == kTfLiteFloat16)
+  {
+    TF_LITE_ENSURE_MSG(context, kHeliaFloat16Enabled,
+                       "Float16 PAD requires ARM_NN_ENABLE_F16.");
+    TF_LITE_ENSURE_MSG(context, NumDimensions(input) == 4,
+                       "Float16 PAD supports only 4-D tensors.");
+  }
 
   if (constant_values != nullptr)
   {
@@ -185,6 +197,7 @@ TfLiteStatus Eval(TfLiteContext *context, TfLiteNode *node)
       }
     }
 #endif
+    MicroPrintf("Float16 PAD: optimized kernel rejected the configuration.");
     return kTfLiteError;
   }
   case kTfLiteFloat32:

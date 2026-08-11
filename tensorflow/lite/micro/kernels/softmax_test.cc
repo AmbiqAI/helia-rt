@@ -333,7 +333,7 @@ void TestSoftmaxQuantized(int* input_dims_data, const float* input_data,
 TEST(SoftmaxTest, Softmax1DFloatShouldMatchGolden) {
   float output_data[tflite::testing::flat_size_1d];
   tflite::testing::TestSoftmaxFloat(
-      tflite::testing ::shape_1d, tflite::testing::input_data_1d,
+      tflite::testing::shape_1d, tflite::testing::input_data_1d,
       tflite::testing::shape_1d, tflite::testing::golden_1d, output_data);
 }
 
@@ -370,14 +370,14 @@ TEST(SoftmaxTest, Softmax1DQuantizedInt16ShouldMatchGolden) {
 TEST(SoftmaxTest, Softmax2DFloatShouldMatchGolden) {
   float output_data[tflite::testing::flat_size_2d];
   tflite::testing::TestSoftmaxFloat(
-      tflite::testing ::shape_2d, tflite::testing::input_data_2d,
+      tflite::testing::shape_2d, tflite::testing::input_data_2d,
       tflite::testing::shape_2d, tflite::testing::golden_2d, output_data);
 }
 
 TEST(SoftmaxTest, Softmax2DFloatNonUnitBetaShouldMatchGolden) {
   float output_data[tflite::testing::flat_size_2d];
   tflite::testing::TestSoftmaxFloat(
-      tflite::testing ::shape_2d, tflite::testing::input_data_2d,
+      tflite::testing::shape_2d, tflite::testing::input_data_2d,
       tflite::testing::shape_2d, tflite::testing::golden_2d_beta_half,
       output_data, tflite::testing::beta_2d);
 }
@@ -415,7 +415,7 @@ TEST(SoftmaxTest, Softmax2DQuantizedInt16ShouldMatchGolden) {
 TEST(SoftmaxTest, Softmax3DFloatShouldMatchGolden) {
   float output_data[tflite::testing::flat_size_3d];
   tflite::testing::TestSoftmaxFloat(
-      tflite::testing ::shape_3d, tflite::testing::input_data_3d,
+      tflite::testing::shape_3d, tflite::testing::input_data_3d,
       tflite::testing::shape_3d, tflite::testing::golden_3d, output_data);
 }
 
@@ -453,7 +453,7 @@ TEST(SoftmaxTest, Softmax3DQuantizedInt16ShouldMatchGolden) {
 TEST(SoftmaxTest, Softmax4DFloatShouldMatchGolden) {
   float output_data[tflite::testing::flat_size_4d];
   tflite::testing::TestSoftmaxFloat(
-      tflite::testing ::shape_4d, tflite::testing::input_data_4d,
+      tflite::testing::shape_4d, tflite::testing::input_data_4d,
       tflite::testing::shape_4d, tflite::testing::golden_4d, output_data);
 }
 

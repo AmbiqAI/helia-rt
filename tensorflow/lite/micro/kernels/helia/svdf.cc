@@ -24,6 +24,7 @@ limitations under the License.
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/op_macros.h"
 #include "tensorflow/lite/micro/kernels/activation_utils.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/micro_utils.h"
@@ -97,7 +98,8 @@ TfLiteStatus CmsisNnPrepareSvdf(TfLiteContext* context, TfLiteNode* node) {
   // Validate Input Tensor:
   TF_LITE_ENSURE(context,
                  input->type == kTfLiteFloat32 ||
-                         input->type == kTfLiteFloat16 || input->type == kTfLiteInt8);
+                     (kHeliaFloat16Enabled && input->type == kTfLiteFloat16) ||
+                     input->type == kTfLiteInt8);
   TF_LITE_ENSURE_EQ(context, NumDimensions(input), 2);
 
   // Validate Tensor Output:
@@ -407,7 +409,8 @@ TfLiteStatus EvalSvdf(TfLiteContext* context, TfLiteNode* node) {
         cmsis_nn_svdf_params_f16 svdf_params = {
             .rank = params->rank,
             .input_activation = {ARM_NN_F16_FINITE_LOWEST, ARM_NN_F16_FINITE_MAX},
-            .output_activation = {static_cast<float16_t>(activation_min), static_cast<float16_t>(activation_max)}};
+            .output_activation = {HeliaFloat16ActivationBound(activation_min),
+                                  HeliaFloat16ActivationBound(activation_max)}};
         // arm_svdf_f16 reads input_size from input_dims.h and memory from
         // weights_time_dims.h, so populate those fields (not .c).
         cmsis_nn_dims input_dims = {batch, input_size, 1, 1};
@@ -430,17 +433,16 @@ TfLiteStatus EvalSvdf(TfLiteContext* context, TfLiteNode* node) {
                 tflite::micro::GetTensorData<float16_t>(activation_state),
                 &feature_dims, tflite::micro::GetTensorData<float16_t>(weights_feature),
                 &time_dims, tflite::micro::GetTensorData<float16_t>(weights_time),
-                &bias_dims, bias == nullptr ? nullptr : tflite::micro::GetTensorData<float16_t>(bias),
+                &bias_dims,
+                tflite::micro::GetOptionalTensorData<float16_t>(bias),
                 &output_dims, tflite::micro::GetTensorData<float16_t>(output)) ==
             ARM_CMSIS_NN_SUCCESS) {
           return kTfLiteOk;
         }
       }
-
-      return kTfLiteError;
-#else
-      return kTfLiteError;
 #endif
+      MicroPrintf("Float16 SVDF: optimized kernel rejected the configuration.");
+      return kTfLiteError;
     }
     case kTfLiteFloat32: {
 #if ARM_NN_ENABLE_F32

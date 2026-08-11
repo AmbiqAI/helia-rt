@@ -26,6 +26,7 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/fully_connected.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_arena_constants.h"
 #include "tensorflow/lite/micro/micro_log.h"
@@ -79,7 +80,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_MSG(
     context, (
       input->type == kTfLiteFloat32 ||
-          input->type == kTfLiteFloat16 ||
+          (kHeliaFloat16Enabled && input->type == kTfLiteFloat16) ||
       input->type == kTfLiteInt16 ||
       input->type == kTfLiteInt8
     ),
@@ -478,8 +479,8 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
       float activation_min, activation_max;
       CalculateActivationRange(params->activation, &activation_min,
                                &activation_max);
-      fc_params.activation.min = static_cast<float16_t>(activation_min);
-      fc_params.activation.max = static_cast<float16_t>(activation_max);
+      fc_params.activation.min = HeliaFloat16ActivationBound(activation_min);
+      fc_params.activation.max = HeliaFloat16ActivationBound(activation_max);
       cmsis_nn_dims input_dims = {data.batches, 1, 1, data.accum_depth};
       cmsis_nn_dims filter_dims = {data.accum_depth, 1, 1, data.output_depth};
       cmsis_nn_dims bias_dims = {1, 1, 1, data.output_depth};
@@ -488,12 +489,15 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
       if (arm_fully_connected_f16(
               &ctx, &fc_params, &input_dims, tflite::micro::GetTensorData<float16_t>(input),
               &filter_dims, tflite::micro::GetTensorData<float16_t>(filter), &bias_dims,
-              bias == nullptr ? nullptr : tflite::micro::GetTensorData<float16_t>(bias),
+              tflite::micro::GetOptionalTensorData<float16_t>(bias),
               &output_dims, tflite::micro::GetTensorData<float16_t>(output),
               ARM_NN_LAYOUT_NHWC) == ARM_CMSIS_NN_SUCCESS) {
         break;
       }
 #endif
+      MicroPrintf(
+          "Float16 FULLY_CONNECTED: optimized kernel rejected the "
+          "configuration.");
       return kTfLiteError;
     }
     case kTfLiteFloat32: {

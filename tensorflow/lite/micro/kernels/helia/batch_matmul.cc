@@ -25,6 +25,7 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/reference/transpose.h"
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_arena_constants.h"
 #include "tensorflow/lite/micro/micro_log.h"
@@ -211,7 +212,8 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, lhs_input->type, output->type);
   TF_LITE_ENSURE_MSG(context,
                      lhs_input->type == kTfLiteFloat32 ||
-                         lhs_input->type == kTfLiteFloat16 ||
+                         (kHeliaFloat16Enabled &&
+                          lhs_input->type == kTfLiteFloat16) ||
                          lhs_input->type == kTfLiteInt16 ||
                          lhs_input->type == kTfLiteInt8,
                      "Input data type not supported");
@@ -581,6 +583,9 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
         break;
         }
 #endif
+        MicroPrintf(
+            "Float16 BATCH_MATMUL: optimized kernel rejected the "
+            "configuration.");
         return kTfLiteError;
     }
     case kTfLiteFloat32: {

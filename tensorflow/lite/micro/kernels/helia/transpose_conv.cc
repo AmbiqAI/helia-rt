@@ -25,6 +25,7 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/padding.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_log.h"
 
@@ -184,7 +185,8 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, input->type, output->type);
   TF_LITE_ENSURE_MSG(context,
                      input->type == kTfLiteFloat32 ||
-                     input->type == kTfLiteFloat16 ||
+                         (kHeliaFloat16Enabled &&
+                          input->type == kTfLiteFloat16) ||
                          input->type == kTfLiteInt16 ||
                          input->type == kTfLiteInt8,
                      "Input data type not supported");
@@ -535,16 +537,20 @@ TfLiteStatus EvalFloat(TfLiteContext* context, TfLiteNode* node,
         data.params.padding_values.height_offset -
             data.params.padding_values.height};
     params.dilation = {1, 1};
-    params.activation = {static_cast<float16_t>(activation_min),
-                         static_cast<float16_t>(activation_max)};
+    params.activation = {HeliaFloat16ActivationBound(activation_min),
+                         HeliaFloat16ActivationBound(activation_max)};
     if (arm_transpose_conv_f16(
             &ctx, nullptr, &params, &input_dims,
             tflite::micro::GetTensorData<const float16_t>(input), &filter_dims,
             tflite::micro::GetTensorData<const float16_t>(filter), &bias_dims,
             tflite::micro::GetOptionalTensorData<const float16_t>(bias),
             &output_dims, tflite::micro::GetTensorData<float16_t>(output),
-            ARM_NN_LAYOUT_NHWC) != ARM_CMSIS_NN_SUCCESS)
+            ARM_NN_LAYOUT_NHWC) != ARM_CMSIS_NN_SUCCESS) {
+      MicroPrintf(
+          "Float16 TRANSPOSE_CONV: optimized kernel rejected the "
+          "configuration.");
       return kTfLiteError;
+    }
   }
 #else
   else {

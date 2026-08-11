@@ -14,11 +14,14 @@ limitations under the License.
 ==============================================================================*/
 #include "tensorflow/lite/kernels/internal/reference/pooling.h"
 
+#include <type_traits>
+
 #include "Include/arm_nnfunctions.h"
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/pooling.h"
 #include "tensorflow/lite/micro/micro_log.h"
@@ -73,7 +76,11 @@ void PopulateCommonParams(
   }
 }
 
-#if ARM_NN_ENABLE_F32
+#if ARM_NN_ENABLE_F32 || ARM_NN_ENABLE_F16
+// Shared float32/float16 dispatch to the optimized pooling kernels. Returns
+// false when the corresponding float API is disabled, the tensors are not
+// 4-D, or the kernel rejects the configuration.
+template <typename T>
 bool EvalFloat(TfLiteContext* context, const TfLitePoolParams* params,
                const OpData& data, const TfLiteEvalTensor* input,
                TfLiteEvalTensor* output, bool average) {
@@ -90,21 +97,49 @@ bool EvalFloat(TfLiteContext* context, const TfLitePoolParams* params,
   // Pooling uses cmsis_nn_dims only for the window shape; n/c are unused.
   cmsis_nn_dims filter_dims = {1, params->filter_height, params->filter_width,
                                1};
-  cmsis_nn_pool_params_f32 pool_params = {
-      .stride = {params->stride_width, params->stride_height},
-      .padding = {data.reference_op_data.padding.width,
-                  data.reference_op_data.padding.height},
-      .activation = {data.reference_op_data.activation_min_f32,
-                     data.reference_op_data.activation_max_f32}};
   cmsis_nn_context ctx = {nullptr, 0};
-  const arm_cmsis_nn_status status =
-      average
-          ? arm_avg_pool_f32(&ctx, &pool_params, &input_dims,
-                             tflite::micro::GetTensorData<float>(input), &filter_dims,
-                             &output_dims, tflite::micro::GetTensorData<float>(output))
-          : arm_max_pool_f32(&ctx, &pool_params, &input_dims,
-                             tflite::micro::GetTensorData<float>(input), &filter_dims,
-                             &output_dims, tflite::micro::GetTensorData<float>(output));
+  arm_cmsis_nn_status status = ARM_CMSIS_NN_ARG_ERROR;
+  if constexpr (std::is_same_v<T, float>) {
+#if ARM_NN_ENABLE_F32
+    cmsis_nn_pool_params_f32 pool_params = {
+        .stride = {params->stride_width, params->stride_height},
+        .padding = {data.reference_op_data.padding.width,
+                    data.reference_op_data.padding.height},
+        .activation = {data.reference_op_data.activation_min_f32,
+                       data.reference_op_data.activation_max_f32}};
+    status =
+        average
+            ? arm_avg_pool_f32(&ctx, &pool_params, &input_dims,
+                               tflite::micro::GetTensorData<float>(input),
+                               &filter_dims, &output_dims,
+                               tflite::micro::GetTensorData<float>(output))
+            : arm_max_pool_f32(&ctx, &pool_params, &input_dims,
+                               tflite::micro::GetTensorData<float>(input),
+                               &filter_dims, &output_dims,
+                               tflite::micro::GetTensorData<float>(output));
+#endif
+  } else {
+#if ARM_NN_ENABLE_F16
+    cmsis_nn_pool_params_f16 pool_params = {
+        .stride = {params->stride_width, params->stride_height},
+        .padding = {data.reference_op_data.padding.width,
+                    data.reference_op_data.padding.height},
+        .activation = {HeliaFloat16ActivationBound(
+                           data.reference_op_data.activation_min_f32),
+                       HeliaFloat16ActivationBound(
+                           data.reference_op_data.activation_max_f32)}};
+    status =
+        average
+            ? arm_avg_pool_f16(&ctx, &pool_params, &input_dims,
+                               tflite::micro::GetTensorData<float16_t>(input),
+                               &filter_dims, &output_dims,
+                               tflite::micro::GetTensorData<float16_t>(output))
+            : arm_max_pool_f16(&ctx, &pool_params, &input_dims,
+                               tflite::micro::GetTensorData<float16_t>(input),
+                               &filter_dims, &output_dims,
+                               tflite::micro::GetTensorData<float16_t>(output));
+#endif
+  }
   return status == ARM_CMSIS_NN_SUCCESS;
 }
 #endif
@@ -249,33 +284,17 @@ TfLiteStatus AverageEval(TfLiteContext* context, TfLiteNode* node) {
   // Inputs and outputs share the same type, guaranteed by the converter.
   if (input->type == kTfLiteFloat16) {
 #if ARM_NN_ENABLE_F16
-    const RuntimeShape input_shape = tflite::micro::GetTensorShape(input);
-    const RuntimeShape output_shape = tflite::micro::GetTensorShape(output);
-    cmsis_nn_dims input_dims = {input_shape.Dims(0), input_shape.Dims(1),
-                                input_shape.Dims(2), input_shape.Dims(3)};
-    cmsis_nn_dims output_dims = {output_shape.Dims(0), output_shape.Dims(1),
-                                 output_shape.Dims(2), output_shape.Dims(3)};
-    cmsis_nn_dims filter_dims = {1, params->filter_height, params->filter_width,
-                                 1};
-    cmsis_nn_pool_params_f16 pool_params = {
-        .stride = {params->stride_width, params->stride_height},
-        .padding = {data.reference_op_data.padding.width,
-                    data.reference_op_data.padding.height},
-        .activation = {static_cast<float16_t>(
-                           data.reference_op_data.activation_min_f32),
-                       static_cast<float16_t>(
-                           data.reference_op_data.activation_max_f32)}};
-    cmsis_nn_context ctx = {nullptr, 0};
-    const arm_cmsis_nn_status status =
-        arm_avg_pool_f16(&ctx, &pool_params, &input_dims,
-                         tflite::micro::GetTensorData<float16_t>(input), &filter_dims,
-                         &output_dims, tflite::micro::GetTensorData<float16_t>(output));
-    if (status == ARM_CMSIS_NN_SUCCESS) return kTfLiteOk;
+    if (EvalFloat<float16_t>(context, params, data, input, output, true)) {
+      return kTfLiteOk;
+    }
 #endif
+    MicroPrintf(
+        "Float16 AVERAGE_POOL_2D requires ARM_NN_ENABLE_F16 and a "
+        "configuration supported by the optimized kernel.");
     return kTfLiteError;
   } else if (input->type == kTfLiteFloat32) {
 #if ARM_NN_ENABLE_F32
-    if (EvalFloat(context, params, data, input, output, true)) {
+    if (EvalFloat<float>(context, params, data, input, output, true)) {
       return kTfLiteOk;
     }
 #endif
@@ -341,33 +360,17 @@ TfLiteStatus MaxEval(TfLiteContext* context, TfLiteNode* node) {
 
   if (input->type == kTfLiteFloat16) {
 #if ARM_NN_ENABLE_F16
-    const RuntimeShape input_shape = tflite::micro::GetTensorShape(input);
-    const RuntimeShape output_shape = tflite::micro::GetTensorShape(output);
-    cmsis_nn_dims input_dims = {input_shape.Dims(0), input_shape.Dims(1),
-                                input_shape.Dims(2), input_shape.Dims(3)};
-    cmsis_nn_dims output_dims = {output_shape.Dims(0), output_shape.Dims(1),
-                                 output_shape.Dims(2), output_shape.Dims(3)};
-    cmsis_nn_dims filter_dims = {1, params->filter_height, params->filter_width,
-                                 1};
-    cmsis_nn_pool_params_f16 pool_params = {
-        .stride = {params->stride_width, params->stride_height},
-        .padding = {data.reference_op_data.padding.width,
-                    data.reference_op_data.padding.height},
-        .activation = {static_cast<float16_t>(
-                           data.reference_op_data.activation_min_f32),
-                       static_cast<float16_t>(
-                           data.reference_op_data.activation_max_f32)}};
-    cmsis_nn_context ctx = {nullptr, 0};
-    const arm_cmsis_nn_status status =
-        arm_max_pool_f16(&ctx, &pool_params, &input_dims,
-                         tflite::micro::GetTensorData<float16_t>(input), &filter_dims,
-                         &output_dims, tflite::micro::GetTensorData<float16_t>(output));
-    if (status == ARM_CMSIS_NN_SUCCESS) return kTfLiteOk;
+    if (EvalFloat<float16_t>(context, params, data, input, output, false)) {
+      return kTfLiteOk;
+    }
 #endif
+    MicroPrintf(
+        "Float16 MAX_POOL_2D requires ARM_NN_ENABLE_F16 and a configuration "
+        "supported by the optimized kernel.");
     return kTfLiteError;
   } else if (input->type == kTfLiteFloat32) {
 #if ARM_NN_ENABLE_F32
-    if (EvalFloat(context, params, data, input, output, false)) {
+    if (EvalFloat<float>(context, params, data, input, output, false)) {
       return kTfLiteOk;
     }
 #endif
