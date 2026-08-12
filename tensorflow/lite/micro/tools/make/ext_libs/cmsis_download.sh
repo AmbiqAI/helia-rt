@@ -72,14 +72,14 @@ fi
 
   # wget is much faster than git clone of the entire repo. So we wget a specific
   # version and can then apply a patch, as needed.
-  wget ${CMSIS_URL} -O ${TEMP_DIR}/${CMSIS_COMMIT}.zip >&2
+  wget_with_retries ${CMSIS_URL} ${TEMP_DIR}/${CMSIS_COMMIT}.zip
   check_md5 ${TEMP_DIR}/${CMSIS_COMMIT}.zip ${CMSIS_MD5}
 
   unzip -qo ${TEMP_DIR}/${CMSIS_COMMIT}.zip -d ${TEMP_DIR} >&2
   mv ${TEMP_DIR}/CMSIS_6-${CMSIS_COMMIT} ${DOWNLOADED_CMSIS_PATH}
 
   # Also pull the related CMSIS Cortex_DFP component for generic Arm Cortex-M device support
-  wget ${CMSIS_DFP_URL} -O ${TEMP_DIR}/${CMSIS_DFP_COMMIT}.zip >&2
+  wget_with_retries ${CMSIS_DFP_URL} ${TEMP_DIR}/${CMSIS_DFP_COMMIT}.zip
   check_md5 ${TEMP_DIR}/${CMSIS_DFP_COMMIT}.zip ${CMSIS_DFP_MD5}
 
   unzip -qo ${TEMP_DIR}/${CMSIS_DFP_COMMIT}.zip -d ${TEMP_DIR} >&2

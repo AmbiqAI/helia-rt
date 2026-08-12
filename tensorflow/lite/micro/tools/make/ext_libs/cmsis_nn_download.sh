@@ -63,7 +63,7 @@ elif [ -d ${DOWNLOADED_CMSIS_NN_PATH} ]; then
     # Set up cleanup trap for all exit conditions
     trap 'rm -rf "${TEMP_DIR}"' EXIT INT TERM
 
-    wget ${CMSIS_NN_URL} -O ${TEMP_DIR}/${ZIP_PREFIX_NN}.zip >&2
+    wget_with_retries ${CMSIS_NN_URL} ${TEMP_DIR}/${ZIP_PREFIX_NN}.zip
     check_md5 ${TEMP_DIR}/${ZIP_PREFIX_NN}.zip ${CMSIS_NN_MD5}
 
     unzip -qo ${TEMP_DIR}/${ZIP_PREFIX_NN}.zip -d ${TEMP_DIR} >&2
@@ -81,7 +81,7 @@ else
 
   # wget is much faster than git clone of the entire repo. So we wget a specific
   # version and can then apply a patch, as needed.
-  wget ${CMSIS_NN_URL} -O ${TEMP_DIR}/${ZIP_PREFIX_NN}.zip >&2
+  wget_with_retries ${CMSIS_NN_URL} ${TEMP_DIR}/${ZIP_PREFIX_NN}.zip
   check_md5 ${TEMP_DIR}/${ZIP_PREFIX_NN}.zip ${CMSIS_NN_MD5}
 
   unzip -qo ${TEMP_DIR}/${ZIP_PREFIX_NN}.zip -d ${TEMP_DIR} >&2

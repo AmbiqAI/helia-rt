@@ -76,7 +76,7 @@ elif [ -d ${LIBRARY_INSTALL_PATH} ]; then
 else
   TEMPDIR="$(mktemp -d)"
   TEMPFILE="${TEMPDIR}/${LIBRARY_DIRNAME}.zip"
-  wget ${LIBRARY_URL} -O "$TEMPFILE" >&2
+  wget_with_retries ${LIBRARY_URL} "$TEMPFILE"
   check_md5 "${TEMPFILE}" ${LIBRARY_MD5}
 
   unzip -qo "$TEMPFILE" -d ${DOWNLOADS_DIR} >&2

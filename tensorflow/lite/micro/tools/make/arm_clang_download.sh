@@ -85,7 +85,7 @@ else
   trap 'rm -rf "${tempdir}"' EXIT
   tempfile=${tempdir}/temp_file
 
-  wget -4 "${ARM_COMPILER_URL}" -O "${tempfile}" >&2
+  wget_with_retries "${ARM_COMPILER_URL}" "${tempfile}" -4
 
   mkdir "${DOWNLOADED_ARM_COMPILER_PATH}"
 

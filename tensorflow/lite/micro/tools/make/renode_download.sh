@@ -50,7 +50,7 @@ else
   TEMP_ARCHIVE="/tmp/renode.tar.gz"
 
   echo >&2 "Downloading from url: ${LINUX_PORTABLE_URL}"
-  wget ${LINUX_PORTABLE_URL} -O ${TEMP_ARCHIVE} >&2
+  wget_with_retries ${LINUX_PORTABLE_URL} ${TEMP_ARCHIVE}
 
   EXPECTED_MD5="cf940256fd32597975f10f9146925d9b"
   check_md5 ${TEMP_ARCHIVE} ${EXPECTED_MD5}

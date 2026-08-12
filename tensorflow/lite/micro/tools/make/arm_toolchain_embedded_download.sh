@@ -95,7 +95,7 @@ else
   tempfile=${tempdir}/${ATFE_ARCHIVE}
 
   echo >&2 "Downloading ATfE ${ATFE_VERSION} from ${ATFE_URL}"
-  wget -4 "${ATFE_URL}" -O "${tempfile}" >&2
+  wget_with_retries "${ATFE_URL}" "${tempfile}" -4
 
   mkdir -p "${DOWNLOADED_ATFE_PATH}"
 

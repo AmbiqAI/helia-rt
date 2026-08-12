@@ -50,7 +50,7 @@ else
 
   TEMPDIR="$(mktemp -d)"
   TEMPFILE="${TEMPDIR}/v130.zip"
-  wget ${KISSFFT_URL} -O "${TEMPFILE}" >&2
+  wget_with_retries ${KISSFFT_URL} "${TEMPFILE}"
   check_md5 "${TEMPFILE}" ${KISSFFT_MD5}
 
   unzip -qo "$TEMPFILE" -d "${TEMPDIR}" >&2
