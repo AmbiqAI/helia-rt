@@ -241,7 +241,7 @@ jobs:
     env:
       # Pin CI to the tested ns-cmsis-nn release. This may be newer than the
       # minimum compatible version declared by the CMSIS-Pack metadata.
-      NS_CMSIS_NN_REF: v7.29.1
+      NS_CMSIS_NN_REF: v7.29.2
     steps:
       - name: Checkout helia-rt
         uses: actions/checkout@v7
