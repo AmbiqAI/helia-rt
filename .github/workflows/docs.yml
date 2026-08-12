@@ -40,7 +40,10 @@ jobs:
           PUBLIC_URL: "${{ steps.pages.outputs.base_url }}/"
         run: |
           uv sync
-          uv run mkdocs build
+          # --strict turns the validation warnings configured in mkdocs.yaml
+          # (pages missing from nav, broken internal links) into build
+          # failures, so documentation cannot land unreachable or broken.
+          uv run mkdocs build --strict
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
         with:

@@ -39,6 +39,8 @@ heliaRT is intended for the same class of microcontroller inference workloads as
 heliaRT is tuned for Ambiq silicon and related build flows. Depending on target and configuration, this includes:
 
 - optimized int8 and int16 operator paths
+- optimized FP32 and FP16 operator paths — see
+  [FP16 and FP32](../guides/floating-point.md)
 - DSP and MVE-aware kernel implementations where available
 - release bundles prepared for supported Ambiq-oriented build matrices
 
