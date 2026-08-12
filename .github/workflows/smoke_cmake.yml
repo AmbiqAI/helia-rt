@@ -132,6 +132,7 @@ jobs:
                     | grep -Ev '^tensorflow/lite/micro/tools/ci_build/(package_helia_bundle|release_asset_helpers)\.sh$' \
                     | grep -Ev '^tensorflow/lite/micro/tools/ci_build/build_helia\.sh$' \
                     | grep -Ev '^tensorflow/lite/micro/tools/make/ext_libs/(helia\.inc|ns_cmsis_nn_download\.sh)$' \
+                    | grep -Ev '^tensorflow/lite/micro/tools/make/ext_libs/(cmsis|cmsis_nn|xtensa)_download\.sh$' \
                     | grep -Ev '^tensorflow/lite/micro/kernels/helia/' \
                     | grep -Ev '^tensorflow/lite/micro/kernels/(activations|add|batch_matmul|concatenation|conv|depthwise_conv|fully_connected|logistic|maximum_minimum|mul|pad|pooling|reshape|softmax|svdf|tanh|transpose|transpose_conv|unidirectional_sequence_lstm)(_common|_test)?\.cc$' \
                     | grep -Ev '^tensorflow/lite/micro/kernels/ethos_u/ethosu\.cc$' \
