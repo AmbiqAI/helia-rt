@@ -15,6 +15,10 @@
 #                        Selects which helia_rt::* backend nsx::helia_rt wraps.
 #   HELIA_RT_VARIANT      debug | release-with-logs | release   (default: release-with-logs)
 #                        Mapped onto HELIA_RT_BUILD_TYPE (- replaced with _).
+#   NSX_HELIA_RT_ENABLE_ETHOSU  ON | OFF  (default: OFF)
+#                        Enables Ethos-U custom-op dispatch in the runtime.
+#                        The app must link an Ethos-U core-driver provider
+#                        (e.g. the nsx-npu module) and initialize it.
 #   HELIA_RT_TFLM_ROOT    Override repo root. Defaults to the parent dir of nsx/.
 #
 # Required upstream targets (provided by NSX board package):
@@ -77,6 +81,15 @@ set(HELIA_RT_VARIANT "release-with-logs" CACHE STRING
 set_property(CACHE HELIA_RT_VARIANT PROPERTY STRINGS
     "debug" "release-with-logs" "release")
 
+# --- Ethos-U custom-op dispatch (opt-in) ---
+# Enables the real ethos-u kernel implementation in the heliaRT build
+# (HELIA_RT_ENABLE_ETHOSU). The kernel externs the Ethos-U core-driver entry
+# points (ethosu_reserve_driver / ethosu_invoke_v3 / ...), so the final app
+# must link a core-driver provider such as the nsx-npu module and initialize
+# it (nsx_npu_init) before invoking a Vela-compiled model.
+option(NSX_HELIA_RT_ENABLE_ETHOSU
+    "Enable Ethos-U custom-op dispatch (requires an Ethos-U core driver, e.g. nsx-npu)" OFF)
+
 # Map HELIA_RT_VARIANT (dash form) -> HELIA_RT_BUILD_TYPE (underscore form
 # expected by helia_rt_sources.cmake).
 string(REPLACE "-" "_" _helia_rt_build_type "${HELIA_RT_VARIANT}")
@@ -132,6 +145,13 @@ set(HELIA_RT_DISABLE_X86_NEON   OFF CACHE BOOL "" FORCE)
 # We provide our own Cortex-M debug_log.cc below; suppress the default stub
 # so we don't get duplicate-symbol link errors.
 set(HELIA_RT_PROVIDE_DEBUG_LOG  OFF CACHE BOOL "" FORCE)
+
+# Map NSX_HELIA_RT_ENABLE_ETHOSU -> repo-root HELIA_RT_ENABLE_ETHOSU toggle.
+if(NSX_HELIA_RT_ENABLE_ETHOSU)
+    set(HELIA_RT_ENABLE_ETHOSU ON  CACHE BOOL "" FORCE)
+else()
+    set(HELIA_RT_ENABLE_ETHOSU OFF CACHE BOOL "" FORCE)
+endif()
 
 # Wire the kernel-library target for the selected backend. The helia
 # backend uses nsx::cmsis_nn (ns-cmsis-nn). The cmsis_nn backend requires
