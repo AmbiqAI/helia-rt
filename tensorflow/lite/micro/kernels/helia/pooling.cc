@@ -244,26 +244,35 @@ TfLiteStatus HeliaPoolingPrepare(TfLiteContext* context, TfLiteNode* node) {
     return PoolingPrepare(context, node);
   }
 
-  TF_LITE_ENSURE_MSG(context, kHeliaFloat16Enabled,
-                     "Float16 pooling requires ARM_NN_ENABLE_F16.");
-
   TfLiteTensor* output =
       micro_context->AllocateTempOutputTensor(node, kPoolingOutputTensor);
+  if (output == nullptr) {
+    micro_context->DeallocateTempTfLiteTensor(input);
+  }
   TF_LITE_ENSURE(context, output != nullptr);
-  TF_LITE_ENSURE_TYPES_EQ(context, output->type, kTfLiteFloat16);
 
-  auto* params = reinterpret_cast<TfLitePoolParams*>(node->builtin_data);
-  OpDataPooling* data =
-      &static_cast<OpData*>(node->user_data)->reference_op_data;
+  const bool output_is_float16 = output->type == kTfLiteFloat16;
+  TfLiteStatus status = kTfLiteError;
+  if (kHeliaFloat16Enabled && output_is_float16) {
+    auto* params = reinterpret_cast<TfLitePoolParams*>(node->builtin_data);
+    OpDataPooling* data =
+        &static_cast<OpData*>(node->user_data)->reference_op_data;
+    status = CalculateOpDataPooling(context, params, input, output, data);
+    if (status == kTfLiteOk) {
+      CalculateActivationRange(params->activation, &data->activation_min_f32,
+                               &data->activation_max_f32);
+    }
+  }
 
-  TF_LITE_ENSURE_STATUS(
-      CalculateOpDataPooling(context, params, input, output, data));
-  CalculateActivationRange(params->activation, &data->activation_min_f32,
-                           &data->activation_max_f32);
-
+  // Temps are released before the ENSUREs below can return.
   micro_context->DeallocateTempTfLiteTensor(output);
   micro_context->DeallocateTempTfLiteTensor(input);
-  return kTfLiteOk;
+
+  TF_LITE_ENSURE_MSG(context, kHeliaFloat16Enabled,
+                     "Float16 pooling requires ARM_NN_ENABLE_F16.");
+  TF_LITE_ENSURE_MSG(context, output_is_float16,
+                     "Float16 pooling requires a Float16 output tensor.");
+  return status;
 }
 
 TfLiteStatus MaxPrepare(TfLiteContext* context, TfLiteNode* node) {
