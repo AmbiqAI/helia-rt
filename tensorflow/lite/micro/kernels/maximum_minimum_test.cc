@@ -244,6 +244,34 @@ TEST(MaximumMinimumTest, Int8Test) {
       output_zero_point, dims, output_data);
 }
 
+// Rank-5 counterpart of FloatRank5Test: dims mappings limited to 4-D collapse
+// rank >= 5 shapes to a scalar and compute only one element, so the int8 path
+// must fall back to the reference loop here.
+TEST(MaximumMinimumTest, Int8Rank5Test) {
+  int dims[] = {5, 1, 1, 1, 2, 3};
+  const int8_t data1[] = {1, -2, 3, 4, 5, -6};
+  const int8_t data2[] = {2, 3, -1, 5, -4, 6};
+  const int8_t golden_max[] = {2, 3, 3, 5, 5, 6};
+  const int8_t golden_min[] = {1, -2, -1, 4, -4, -6};
+
+  const float input_scale = 1.0;
+  const int input_zero_point = 0;
+  const float output_scale = 1.0;
+  const int output_zero_point = 0;
+
+  int8_t output_data[6];
+
+  tflite::testing::TestMaxMinQuantized(
+      tflite::Register_MAXIMUM(), dims, data1, input_scale, input_zero_point,
+      dims, data2, input_scale, input_zero_point, golden_max, output_scale,
+      output_zero_point, dims, output_data);
+
+  tflite::testing::TestMaxMinQuantized(
+      tflite::Register_MINIMUM(), dims, data1, input_scale, input_zero_point,
+      dims, data2, input_scale, input_zero_point, golden_min, output_scale,
+      output_zero_point, dims, output_data);
+}
+
 TEST(MaximumMinimumTest, Int16Test) {
   int dims[] = {3, 3, 1, 2};
   const int16_t data1[] = {-30, 0, 2124, -123, -32768, 26236};
