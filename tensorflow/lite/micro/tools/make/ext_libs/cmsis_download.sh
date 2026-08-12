@@ -45,11 +45,11 @@ DOWNLOADED_CMSIS_PATH=${DOWNLOADS_DIR}/cmsis
 DOWNLOADED_CORTEX_DFP_PATH=${DOWNLOADS_DIR}/cmsis/Cortex_DFP
 
 CMSIS_COMMIT="5782d6f8057906d360f4b95ec08a2354afe5c9b9"
-CMSIS_URL="http://github.com/ARM-software/CMSIS_6/archive/${CMSIS_COMMIT}.zip"
+CMSIS_URL="https://github.com/ARM-software/CMSIS_6/archive/${CMSIS_COMMIT}.zip"
 CMSIS_MD5="563e7c6465f63bdc034359e9b536b366"
 
 CMSIS_DFP_COMMIT="c2c70a97a20fb355815e2ead3d4a40e35a4a3cdf"
-CMSIS_DFP_URL="http://github.com/ARM-software/Cortex_DFP/archive/${CMSIS_DFP_COMMIT}.zip"
+CMSIS_DFP_URL="https://github.com/ARM-software/Cortex_DFP/archive/${CMSIS_DFP_COMMIT}.zip"
 CMSIS_DFP_MD5="3cbb6955b6d093a2fe078ef2341f6b89"
 
 CMSIS_SEED="${CMSIS_URL} ${CMSIS_MD5} ${CMSIS_DFP_URL} ${CMSIS_DFP_MD5}"
