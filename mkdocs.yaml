@@ -7,6 +7,18 @@ repo_url: "https://github.com/AmbiqAI/helia-rt"
 edit_uri: ""
 copyright: Copyright &copy; 2025-2026 Ambiq
 
+# A page that is not reachable from the nav is effectively unpublished, and
+# mkdocs reports that at INFO by default — which `--strict` does not escalate.
+# Raise the cases that silently lose content to warnings so the `--strict`
+# build in .github/workflows/docs.yml fails on them.
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+  links:
+    not_found: warn
+    unrecognized_links: warn
+
 nav:
   - Home: index.md
   - Why heliaRT: why-helia-rt.md
@@ -23,6 +35,7 @@ nav:
       - SPEED vs SIZE: guides/speed-vs-size.md
       - Toolchains: guides/toolchains.md
       - Kernel Selection: guides/kernel-selection.md
+      - FP16 and FP32: guides/floating-point.md
       - Memory Placement: guides/memory-placement.md
       - Upgrading from LiteRT: guides/upgrading-from-litert.md
       - Troubleshooting: guides/troubleshooting.md

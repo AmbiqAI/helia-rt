@@ -53,7 +53,7 @@ For each operator, the build system checks whether an optimized implementation e
 
 ## HELIA Kernel Coverage
 
-The HELIA backend currently provides optimized implementations for **36 operators** — expanding to **230+ kernel variants** when counting per-dtype paths (int8 / int16 / float):
+The HELIA backend currently provides optimized implementations for **36 operators** — expanding to **230+ kernel variants** when counting per-dtype paths (int8 / int16 / FP32 / FP16):
 
 ??? info "Full list"
     `activations` · `add` · `batch_matmul` · `comparisons` · `concatenation` · `conv` · `depthwise_conv` · `dequantize` · `fill` · `fully_connected` · `hard_swish` · `leaky_relu` · `logistic` · `maximum_minimum` · `mul` · `pack` · `pad` · `pooling` · `quantize_common` · `reduce` · `reshape` · `softmax` · `split` · `split_v` · `squeeze` · `strided_slice` · `sub` · `svdf` · `tanh` · `transpose` · `transpose_conv` · `unidirectional_sequence_lstm` · `zeros_like`
@@ -101,5 +101,6 @@ For CMake, the equivalent cache variables are `HELIA_RT_CONV_OPT` and
 ## Next Steps
 
 - [Operator Coverage](../reference/operator-coverage.md) — the complete REF / CMSIS-NN / HELIA matrix
+- [FP16 and FP32](floating-point.md) — enabling the floating-point kernels
 - [SPEED vs SIZE](speed-vs-size.md) — build variant details
 - [Toolchains](toolchains.md) — toolchain selection

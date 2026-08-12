@@ -81,7 +81,7 @@ heliaRT sits between your LiteRT application and Ambiq silicon. It keeps the ups
 <a class="takeaway-card" href="reference/operator-coverage/">
   <span class="card-icon">02</span>
   <strong>More fast paths</strong>
-  <span>36 HELIA operators expand into 230+ kernel variants when int8, int16, float, and specialized code paths are counted separately.</span>
+  <span>36 HELIA operators expand into 230+ kernel variants when int8, int16, FP32, FP16, and specialized code paths are counted separately.</span>
 </a>
 
 <a class="takeaway-card" href="reference/silicon-support/">
@@ -200,7 +200,7 @@ CMSIS-NN covers the common convolutional core. HELIA adds optimized paths for ac
 <div class="coverage-row"><span>Activations</span><span class="no">-</span><span class="yes hot">✓</span></div>
 <div class="coverage-row"><span>Reduce</span><span class="no">-</span><span class="yes hot">✓</span></div>
 <div class="coverage-row"><span>Data movement</span><span class="no">-</span><span class="yes hot">✓</span></div>
-<div class="coverage-foot"><strong>230+</strong> kernel variants across int8 / int16 / float paths</div>
+<div class="coverage-foot"><strong>230+</strong> kernel variants across int8 / int16 / FP32 / FP16 paths</div>
 
 </div>
 

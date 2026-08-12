@@ -3,6 +3,10 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  # Validate the docs build on pull requests too. Without this the --strict
+  # build only ran after merge, so a broken or unreachable page failed the
+  # Pages deploy on main instead of the PR that introduced it.
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -10,8 +14,10 @@ permissions:
   pages: write
   id-token: write
 
+# Scope concurrency per ref so pull-request validation runs do not queue
+# behind (or against) the single shared Pages deploy lane on main.
 concurrency:
-  group: "pages"
+  group: "pages-${{ github.ref }}"
   cancel-in-progress: false
 
 # Default to bash
@@ -20,8 +26,36 @@ defaults:
     shell: bash
 
 jobs:
+  # Pull-request validation. Deliberately does not touch the Pages API or
+  # upload an artifact, so it needs no pages permissions and works for
+  # fork pull requests.
+  validate:
+    name: Validate docs build (strict)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    # This job builds pull-request-controlled code (mkdocs config can execute
+    # arbitrary Python), so do not inherit the workflow-level pages/id-token
+    # write grants — it only needs to read the repository.
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout 🛎️
+        uses: actions/checkout@v7
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+            enable-cache: true
+      - name: Build docs 🔧
+        env:
+          CI: ""
+        run: |
+          uv sync --locked
+          uv run mkdocs build --strict
+
   # Build job
   build:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
 
     steps:
@@ -40,7 +74,10 @@ jobs:
           PUBLIC_URL: "${{ steps.pages.outputs.base_url }}/"
         run: |
           uv sync
-          uv run mkdocs build
+          # --strict turns the validation warnings configured in mkdocs.yaml
+          # (pages missing from nav, broken internal links) into build
+          # failures, so documentation cannot land unreachable or broken.
+          uv run mkdocs build --strict
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
         with:

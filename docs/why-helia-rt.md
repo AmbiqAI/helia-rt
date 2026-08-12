@@ -74,7 +74,7 @@ graph LR
 
 ## What HELIA adds
 
-HELIA is most useful when a model is already functionally correct and the next problem is production readiness: lower latency, predictable build outputs, and fewer unexpected Reference fallbacks. It broadens the optimized path beyond the convolutional core and includes separate optimization paths for int8, int16, float, and specialized cases where those variants matter.
+HELIA is most useful when a model is already functionally correct and the next problem is production readiness: lower latency, predictable build outputs, and fewer unexpected Reference fallbacks. It broadens the optimized path beyond the convolutional core and includes separate optimization paths for int8, int16, FP32, FP16, and specialized cases where those variants matter.
 
 <div class="why-feature-grid" markdown>
 
@@ -85,7 +85,7 @@ HELIA covers categories that often sit outside CMSIS-NN, including activation, r
 
 <div markdown>
 ### Variant-aware optimization
-Kernel counts are not just operator names. Int8 and int16 paths can have different implementations, tradeoffs, and vectorization strategies. heliaRT tracks those paths as separate kernel variants.
+Kernel counts are not just operator names. Int8, int16, FP32, and FP16 paths can have different implementations, tradeoffs, and vectorization strategies. heliaRT tracks those paths as separate kernel variants.
 </div>
 
 <div markdown>
