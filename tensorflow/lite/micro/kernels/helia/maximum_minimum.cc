@@ -73,8 +73,9 @@ TfLiteStatus EvalMaximum(TfLiteContext* context, TfLiteNode* node) {
 
   // FillVariableShape collapses rank >= 5 tensors to {1, 1, 1, 1}, which
   // would make the heliaCore kernels silently compute a single element.
-  // Restrict the optimized float paths to rank <= 4; higher ranks fall back
-  // to the reference loop (float32) or fail with a message (float16).
+  // Restrict the optimized paths to rank <= 4; higher ranks fall back to
+  // the reference loop (float32/int8/int16) or fail with a message
+  // (float16).
   const bool arm_rank_supported = input_1_shape.DimensionsCount() <= 4 &&
                                   input_2_shape.DimensionsCount() <= 4 &&
                                   output_shape.DimensionsCount() <= 4;
@@ -109,16 +110,24 @@ TfLiteStatus EvalMaximum(TfLiteContext* context, TfLiteNode* node) {
       TFLiteOperation<float, MaximumOp>(context, node, op_context);
       break;
     case kTfLiteInt8:
-      arm_maximum_s8(
-          &ctx, tflite::micro::GetTensorData<int8_t>(input1), &input_1_dims,
-          tflite::micro::GetTensorData<int8_t>(input2), &input_2_dims,
-          tflite::micro::GetTensorData<int8_t>(output), &output_dims);
+      if (arm_rank_supported) {
+        arm_maximum_s8(
+            &ctx, tflite::micro::GetTensorData<int8_t>(input1), &input_1_dims,
+            tflite::micro::GetTensorData<int8_t>(input2), &input_2_dims,
+            tflite::micro::GetTensorData<int8_t>(output), &output_dims);
+      } else {
+        TFLiteOperation<int8_t, MaximumOp>(context, node, op_context);
+      }
       break;
     case kTfLiteInt16:
-      arm_maximum_s16(
-          &ctx, tflite::micro::GetTensorData<int16_t>(input1), &input_1_dims,
-          tflite::micro::GetTensorData<int16_t>(input2), &input_2_dims,
-          tflite::micro::GetTensorData<int16_t>(output), &output_dims);
+      if (arm_rank_supported) {
+        arm_maximum_s16(
+            &ctx, tflite::micro::GetTensorData<int16_t>(input1), &input_1_dims,
+            tflite::micro::GetTensorData<int16_t>(input2), &input_2_dims,
+            tflite::micro::GetTensorData<int16_t>(output), &output_dims);
+      } else {
+        TFLiteOperation<int16_t, MaximumOp>(context, node, op_context);
+      }
       break;
     case kTfLiteInt32:
       TFLiteOperation<int32_t, MaximumOp>(context, node, op_context);
@@ -157,14 +166,22 @@ TfLiteStatus EvalMaximumInt8(TfLiteContext* context, TfLiteNode* node) {
 
   switch (op_context.output->type) {
     case kTfLiteInt8:
-      cmsis_nn_context ctx;
-      ctx.buf = nullptr;
-      ctx.size = 0;
+      // Rank >= 5 shapes collapse to {1,1,1,1} in FillVariableShape; use the
+      // reference loop for them (see EvalMaximum).
+      if (input_1_shape.DimensionsCount() <= 4 &&
+          input_2_shape.DimensionsCount() <= 4 &&
+          output_shape.DimensionsCount() <= 4) {
+        cmsis_nn_context ctx;
+        ctx.buf = nullptr;
+        ctx.size = 0;
 
-      arm_maximum_s8(
-          &ctx, tflite::micro::GetTensorData<int8_t>(input1), &input_1_dims,
-          tflite::micro::GetTensorData<int8_t>(input2), &input_2_dims,
-          tflite::micro::GetTensorData<int8_t>(output), &output_dims);
+        arm_maximum_s8(
+            &ctx, tflite::micro::GetTensorData<int8_t>(input1), &input_1_dims,
+            tflite::micro::GetTensorData<int8_t>(input2), &input_2_dims,
+            tflite::micro::GetTensorData<int8_t>(output), &output_dims);
+      } else {
+        TFLiteOperation<int8_t, MaximumOp>(context, node, op_context);
+      }
       break;
     default:
       MicroPrintf("Type %s (%d) is not supported by Maximum Int8 Registration.",
@@ -201,8 +218,9 @@ TfLiteStatus EvalMinimum(TfLiteContext* context, TfLiteNode* node) {
 
   // FillVariableShape collapses rank >= 5 tensors to {1, 1, 1, 1}, which
   // would make the heliaCore kernels silently compute a single element.
-  // Restrict the optimized float paths to rank <= 4; higher ranks fall back
-  // to the reference loop (float32) or fail with a message (float16).
+  // Restrict the optimized paths to rank <= 4; higher ranks fall back to
+  // the reference loop (float32/int8/int16) or fail with a message
+  // (float16).
   const bool arm_rank_supported = input_1_shape.DimensionsCount() <= 4 &&
                                   input_2_shape.DimensionsCount() <= 4 &&
                                   output_shape.DimensionsCount() <= 4;
@@ -237,17 +255,25 @@ TfLiteStatus EvalMinimum(TfLiteContext* context, TfLiteNode* node) {
       TFLiteOperation<float, MinimumOp>(context, node, op_context);
       break;
     case kTfLiteInt8:
-      arm_minimum_s8(
-          &ctx, tflite::micro::GetTensorData<int8_t>(input1), &input_1_dims,
-          tflite::micro::GetTensorData<int8_t>(input2), &input_2_dims,
-          tflite::micro::GetTensorData<int8_t>(output), &output_dims);
+      if (arm_rank_supported) {
+        arm_minimum_s8(
+            &ctx, tflite::micro::GetTensorData<int8_t>(input1), &input_1_dims,
+            tflite::micro::GetTensorData<int8_t>(input2), &input_2_dims,
+            tflite::micro::GetTensorData<int8_t>(output), &output_dims);
+      } else {
+        TFLiteOperation<int8_t, MinimumOp>(context, node, op_context);
+      }
       break;
 
     case kTfLiteInt16:
-      arm_minimum_s16(
-          &ctx, tflite::micro::GetTensorData<int16_t>(input1), &input_1_dims,
-          tflite::micro::GetTensorData<int16_t>(input2), &input_2_dims,
-          tflite::micro::GetTensorData<int16_t>(output), &output_dims);
+      if (arm_rank_supported) {
+        arm_minimum_s16(
+            &ctx, tflite::micro::GetTensorData<int16_t>(input1), &input_1_dims,
+            tflite::micro::GetTensorData<int16_t>(input2), &input_2_dims,
+            tflite::micro::GetTensorData<int16_t>(output), &output_dims);
+      } else {
+        TFLiteOperation<int16_t, MinimumOp>(context, node, op_context);
+      }
       break;
     case kTfLiteInt32:
       TFLiteOperation<int32_t, MinimumOp>(context, node, op_context);
@@ -286,14 +312,22 @@ TfLiteStatus EvalMinimumInt8(TfLiteContext* context, TfLiteNode* node) {
 
   switch (op_context.output->type) {
     case kTfLiteInt8:
-      cmsis_nn_context ctx;
-      ctx.buf = nullptr;
-      ctx.size = 0;
+      // Rank >= 5 shapes collapse to {1,1,1,1} in FillVariableShape; use the
+      // reference loop for them (see EvalMinimum).
+      if (input_1_shape.DimensionsCount() <= 4 &&
+          input_2_shape.DimensionsCount() <= 4 &&
+          output_shape.DimensionsCount() <= 4) {
+        cmsis_nn_context ctx;
+        ctx.buf = nullptr;
+        ctx.size = 0;
 
-      arm_minimum_s8(
-          &ctx, tflite::micro::GetTensorData<int8_t>(input1), &input_1_dims,
-          tflite::micro::GetTensorData<int8_t>(input2), &input_2_dims,
-          tflite::micro::GetTensorData<int8_t>(output), &output_dims);
+        arm_minimum_s8(
+            &ctx, tflite::micro::GetTensorData<int8_t>(input1), &input_1_dims,
+            tflite::micro::GetTensorData<int8_t>(input2), &input_2_dims,
+            tflite::micro::GetTensorData<int8_t>(output), &output_dims);
+      } else {
+        TFLiteOperation<int8_t, MinimumOp>(context, node, op_context);
+      }
       break;
     default:
       MicroPrintf("Type %s (%d) is not supported by Minimum Int8 registration.",
