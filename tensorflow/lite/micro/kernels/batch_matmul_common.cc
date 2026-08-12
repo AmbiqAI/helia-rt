@@ -97,17 +97,13 @@ TfLiteStatus TransposeRowsColumns(const TfLiteEvalTensor& tensor_in,
   } else if (tensor_in.type == kTfLiteInt8) {
     TransposeRowsColumnsImpl<int8_t>(tensor_in, tensor_out);
     return kTfLiteOk;
-  } else if (tensor_in.type == kTfLiteInt16 ||
-             tensor_in.type == kTfLiteFloat16) {
-    // Transposition is pure element permutation with no arithmetic, so
-    // 16-bit float tensors can be shuffled bit-for-bit through the int16
-    // path. This keeps the shared helper free of any float16_t dependency.
+  } else if (tensor_in.type == kTfLiteInt16) {
     TransposeRowsColumnsImpl<int16_t>(tensor_in, tensor_out);
     return kTfLiteOk;
   } else {
     MicroPrintf(
-        "BATCH_MATMUL can only transpose tensors with FLOAT32, FLOAT16, INT8, "
-        "INT16 type.");
+        "BATCH_MATMUL can only transpose tensors with FLOAT32, INT8, INT16 "
+        "type.");
   }
   return kTfLiteError;
 }

@@ -87,8 +87,17 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
       static_cast<CMSISNNSoftmaxParams*>(node->user_data);
 
   auto* params = static_cast<TfLiteSoftmaxParams*>(node->builtin_data);
-  auto ret_val = CalculateSoftmaxParams(context, input, output, params,
-                                        &op_data->softmax_params);
+  TfLiteStatus ret_val;
+  if (input->type == kTfLiteFloat16) {
+    // The Float16 float path only needs beta; input/output type equality is
+    // already enforced above. Handled here so softmax_common.cc stays
+    // identical to upstream, whose float path only knows Float32.
+    op_data->softmax_params.beta = static_cast<double>(params->beta);
+    ret_val = kTfLiteOk;
+  } else {
+    ret_val = CalculateSoftmaxParams(context, input, output, params,
+                                     &op_data->softmax_params);
+  }
 
   const auto input_shape = GetTensorShape(input);
   const auto output_shape = GetTensorShape(output);
