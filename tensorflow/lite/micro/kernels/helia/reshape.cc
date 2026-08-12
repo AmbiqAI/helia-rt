@@ -16,6 +16,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/kernels/reshape.h"
 
 #include <cstring>
+#include "Include/arm_nnfunctions.h"
 #include "Include/arm_nnsupportfunctions.h"
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
@@ -43,12 +44,26 @@ TfLiteStatus EvalReshapeReference(TfLiteContext* context, TfLiteNode* node) {
 
   // Do nothing for in-place reshape.
   if (input->data.raw != output->data.raw) {
+#if ARM_NN_ENABLE_F32
+    if (input->type == kTfLiteFloat32) {
+      arm_reshape_f32(tflite::micro::GetTensorData<const float>(input),
+                      tflite::micro::GetTensorData<float>(output),
+                      ElementCount(*input->dims));
+      return kTfLiteOk;
+    }
+#endif
+#if ARM_NN_ENABLE_F16
+    if (input->type == kTfLiteFloat16) {
+      arm_reshape_f16(tflite::micro::GetTensorData<const float16_t>(input),
+                      tflite::micro::GetTensorData<float16_t>(output),
+                      ElementCount(*input->dims));
+      return kTfLiteOk;
+    }
+#endif
     // Otherwise perform reshape with copy.
-    arm_memcpy_s8(
-      reinterpret_cast<int8_t*>(output->data.raw),
-      reinterpret_cast<const int8_t*>(input->data.raw),
-      input_bytes
-    );
+    arm_memcpy_s8(reinterpret_cast<int8_t*>(output->data.raw),
+                  reinterpret_cast<const int8_t*>(input->data.raw),
+                  input_bytes);
   }
   return kTfLiteOk;
 }

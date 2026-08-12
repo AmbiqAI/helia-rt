@@ -19,6 +19,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
+#if ARM_NN_ENABLE_F16
+#include "arm_nnfunctions_flt.h"
+#endif
+
 namespace tflite {
 namespace testing {
 namespace {
@@ -48,6 +52,14 @@ const float input_data_2d[] = {1.0,  2.0,  3.0,  4.0,  5.0,
 const float golden_2d[] = {0.011656231, 0.031684921, 0.086128544, 0.234121657,
                            0.636408647, 0.636408647, 0.234121657, 0.086128544,
                            0.031684921, 0.011656231};
+
+// Same input as above, but scaled by beta = 0.5. Optimized backends must not
+// ignore beta; the CMSIS-NN float kernels only implement the beta == 1.0 case
+// and have to defer to the reference implementation here.
+const float beta_2d = 0.5f;
+const float golden_2d_beta_half[] = {
+    0.058012217, 0.095645977, 0.157693556, 0.259992721, 0.428655529,
+    0.428655529, 0.259992721, 0.157693556, 0.095645977, 0.058012217};
 
 // 3-dimensional test data.
 const int flat_size_3d = 60;
@@ -246,8 +258,9 @@ const float golden_4d[] = {
 template <typename T>
 void ValidateSoftmaxGoldens(TfLiteTensor* tensors, const int tensor_count,
                             T* output_data, const T* expected_output,
-                            int output_dims_count, float tolerance) {
-  TfLiteSoftmaxParams builtin_data = {1.0f};
+                            int output_dims_count, float tolerance,
+                            float beta = 1.0f) {
+  TfLiteSoftmaxParams builtin_data = {beta};
 
   int inputs_array_data[] = {1, 0};
   TfLiteIntArray* inputs_array = IntArrayFromInts(inputs_array_data);
@@ -268,7 +281,7 @@ void ValidateSoftmaxGoldens(TfLiteTensor* tensors, const int tensor_count,
 
 void TestSoftmaxFloat(int* input_dims_data, const float* input_data,
                       int* output_dims_data, const float* expected_output_data,
-                      float* output_data) {
+                      float* output_data, float beta = 1.0f) {
   TfLiteIntArray* input_dims = IntArrayFromInts(input_dims_data);
   TfLiteIntArray* output_dims = IntArrayFromInts(output_dims_data);
   const int output_dims_count = ElementCount(*output_dims);
@@ -282,7 +295,7 @@ void TestSoftmaxFloat(int* input_dims_data, const float* input_data,
   };
 
   ValidateSoftmaxGoldens(tensors, tensors_size, output_data,
-                         expected_output_data, output_dims_count, 1e-5);
+                         expected_output_data, output_dims_count, 1e-5, beta);
 }
 
 template <typename inputT, typename outputT>
@@ -320,7 +333,7 @@ void TestSoftmaxQuantized(int* input_dims_data, const float* input_data,
 TEST(SoftmaxTest, Softmax1DFloatShouldMatchGolden) {
   float output_data[tflite::testing::flat_size_1d];
   tflite::testing::TestSoftmaxFloat(
-      tflite::testing ::shape_1d, tflite::testing::input_data_1d,
+      tflite::testing::shape_1d, tflite::testing::input_data_1d,
       tflite::testing::shape_1d, tflite::testing::golden_1d, output_data);
 }
 
@@ -357,8 +370,16 @@ TEST(SoftmaxTest, Softmax1DQuantizedInt16ShouldMatchGolden) {
 TEST(SoftmaxTest, Softmax2DFloatShouldMatchGolden) {
   float output_data[tflite::testing::flat_size_2d];
   tflite::testing::TestSoftmaxFloat(
-      tflite::testing ::shape_2d, tflite::testing::input_data_2d,
+      tflite::testing::shape_2d, tflite::testing::input_data_2d,
       tflite::testing::shape_2d, tflite::testing::golden_2d, output_data);
+}
+
+TEST(SoftmaxTest, Softmax2DFloatNonUnitBetaShouldMatchGolden) {
+  float output_data[tflite::testing::flat_size_2d];
+  tflite::testing::TestSoftmaxFloat(
+      tflite::testing::shape_2d, tflite::testing::input_data_2d,
+      tflite::testing::shape_2d, tflite::testing::golden_2d_beta_half,
+      output_data, tflite::testing::beta_2d);
 }
 
 TEST(SoftmaxTest, Softmax2DQuantizedInt8ShouldMatchGolden) {
@@ -394,7 +415,7 @@ TEST(SoftmaxTest, Softmax2DQuantizedInt16ShouldMatchGolden) {
 TEST(SoftmaxTest, Softmax3DFloatShouldMatchGolden) {
   float output_data[tflite::testing::flat_size_3d];
   tflite::testing::TestSoftmaxFloat(
-      tflite::testing ::shape_3d, tflite::testing::input_data_3d,
+      tflite::testing::shape_3d, tflite::testing::input_data_3d,
       tflite::testing::shape_3d, tflite::testing::golden_3d, output_data);
 }
 
@@ -432,7 +453,7 @@ TEST(SoftmaxTest, Softmax3DQuantizedInt16ShouldMatchGolden) {
 TEST(SoftmaxTest, Softmax4DFloatShouldMatchGolden) {
   float output_data[tflite::testing::flat_size_4d];
   tflite::testing::TestSoftmaxFloat(
-      tflite::testing ::shape_4d, tflite::testing::input_data_4d,
+      tflite::testing::shape_4d, tflite::testing::input_data_4d,
       tflite::testing::shape_4d, tflite::testing::golden_4d, output_data);
 }
 
@@ -482,5 +503,44 @@ TEST(SoftmaxTest, Softmax2DQuantizedInt8InputInt16OutputShouldMatchGolden) {
       tflite::testing::golden_2d, golden_quantized, output_scale,
       output_zero_point, output_data);
 }
+
+#if ARM_NN_ENABLE_F16
+namespace tflite {
+namespace testing {
+TEST(SoftmaxTest, Softmax2DFloat16ShouldMatchGolden) {
+  int shape[] = {2, 2, 3};
+  float16_t input_data[] = {1, 2, 3, 0, 0, 10};
+  float16_t output_data[6] = {};
+  const float golden[] = {0.0900f, 0.2447f, 0.6652f, 0.0f, 0.0f, 1.0f};
+
+  TfLiteTensor tensors[] = {
+      CreateTensor(input_data, IntArrayFromInts(shape), false, kTfLiteFloat16),
+      CreateTensor(output_data, IntArrayFromInts(shape), false, kTfLiteFloat16),
+  };
+  int inputs_array_data[] = {1, 0};
+  int outputs_array_data[] = {1, 1};
+  TfLiteSoftmaxParams params = {1.0f};
+  micro::KernelRunner runner(Register_SOFTMAX(), tensors, 2,
+                             IntArrayFromInts(inputs_array_data),
+                             IntArrayFromInts(outputs_array_data), &params);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+
+  float row0_sum = 0.0f;
+  float row1_sum = 0.0f;
+  for (int i = 0; i < 6; ++i) {
+    EXPECT_NEAR(golden[i], static_cast<float>(output_data[i]), 2e-2f);
+    if (i < 3) {
+      row0_sum += static_cast<float>(output_data[i]);
+    } else {
+      row1_sum += static_cast<float>(output_data[i]);
+    }
+  }
+  EXPECT_NEAR(1.0f, row0_sum, 2e-2f);
+  EXPECT_NEAR(1.0f, row1_sum, 2e-2f);
+}
+}  // namespace testing
+}  // namespace tflite
+#endif
 
 TF_LITE_MICRO_TESTS_MAIN

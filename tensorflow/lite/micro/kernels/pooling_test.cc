@@ -22,6 +22,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
+#if ARM_NN_ENABLE_F16
+#include "arm_nnfunctions_flt.h"
+#endif
+
 namespace tflite {
 namespace testing {
 namespace {
@@ -119,8 +123,8 @@ void TestAveragePoolQuantized(
 }
 
 void TestMaxPoolFloat(int* input_dims_data, const float* input_data,
-                      int filter_width, int filter_height, int stride_width,
-                      int stride_height, const float* expected_output_data,
+                      int filter_height, int filter_width, int stride_height,
+                      int stride_width, const float* expected_output_data,
                       int* output_dims_data, TfLitePadding padding,
                       TfLiteFusedActivation activation, float* output_data) {
   TfLiteIntArray* input_dims = IntArrayFromInts(input_dims_data);
@@ -191,6 +195,43 @@ TEST(PoolingTest, SimpleAveragePoolTestFloat) {
       input_shape, input_values, filter_height, filter_width, stride_height,
       stride_width, golden, output_shape, kTfLitePaddingValid, kTfLiteActNone,
       output_data);
+}
+
+// Asymmetric window/stride. A backend that transposes CMSIS-NN's
+// cmsis_nn_tile ({width, height}) still passes every symmetric pooling test
+// above, so this is the configuration that catches it.
+TEST(PoolingTest, AsymmetricAveragePoolTestFloat) {
+  int input_shape[] = {4, 1, 4, 5, 1};
+  const float input_values[] = {1,  2,  3,  4,  5,  6,  7,  8,  9,  10,
+                                11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
+  const int filter_height = 2;
+  const int filter_width = 3;
+  const int stride_height = 1;
+  const int stride_width = 2;
+  const float golden[] = {4.5, 6.5, 9.5, 11.5, 14.5, 16.5};
+  int output_shape[] = {4, 1, 3, 2, 1};
+  float output_data[6];
+  tflite::testing::TestAveragePoolFloat(
+      input_shape, input_values, filter_height, filter_width, stride_height,
+      stride_width, golden, output_shape, kTfLitePaddingValid, kTfLiteActNone,
+      output_data);
+}
+
+TEST(PoolingTest, AsymmetricMaxPoolTestFloat) {
+  int input_shape[] = {4, 1, 4, 5, 1};
+  const float input_values[] = {1,  2,  3,  4,  5,  6,  7,  8,  9,  10,
+                                11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
+  const int filter_height = 2;
+  const int filter_width = 3;
+  const int stride_height = 1;
+  const int stride_width = 2;
+  const float golden[] = {8, 10, 13, 15, 18, 20};
+  int output_shape[] = {4, 1, 3, 2, 1};
+  float output_data[6];
+  tflite::testing::TestMaxPoolFloat(input_shape, input_values, filter_height,
+                                    filter_width, stride_height, stride_width,
+                                    golden, output_shape, kTfLitePaddingValid,
+                                    kTfLiteActNone, output_data);
 }
 
 TEST(PoolingTest, SimpleAveragePoolTestInt8PaddingValidStride2ActNone) {
@@ -700,5 +741,59 @@ TEST(PoolingTest, MaxPoolTestInt16ActRelu6) {
       output_scale, output_zero_point, kTfLitePaddingValid, kTfLiteActRelu6,
       output_data);
 }
+
+#if ARM_NN_ENABLE_F16
+namespace tflite {
+namespace testing {
+TEST(PoolingTest, Float16MaxAndAveragePoolGolden) {
+  int input_shape[] = {4, 1, 2, 4, 1};
+  int output_shape[] = {4, 1, 1, 2, 1};
+  float16_t input_values[] = {1, 2, 3, 4, 5, 6, 7, 8};
+  float16_t output_data[2] = {};
+
+  const int filter_width = 2;
+  const int filter_height = 2;
+  const int stride_width = 2;
+  const int stride_height = 2;
+
+  TfLiteTensor tensors[] = {
+      CreateTensor(input_values, IntArrayFromInts(input_shape), false,
+                   kTfLiteFloat16),
+      CreateTensor(output_data, IntArrayFromInts(output_shape), false,
+                   kTfLiteFloat16),
+  };
+  int inputs_array_data[] = {1, 0};
+  int outputs_array_data[] = {1, 1};
+  TfLitePoolParams params = {kTfLitePaddingValid,
+                             stride_width,
+                             stride_height,
+                             filter_width,
+                             filter_height,
+                             kTfLiteActNone,
+                             {}};
+
+  micro::KernelRunner max_runner(Register_MAX_POOL_2D(), tensors, 2,
+                                 IntArrayFromInts(inputs_array_data),
+                                 IntArrayFromInts(outputs_array_data),
+                                 &params);
+  EXPECT_EQ(kTfLiteOk, max_runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, max_runner.Invoke());
+  EXPECT_NEAR(6.0f, static_cast<float>(output_data[0]), 1e-3f);
+  EXPECT_NEAR(8.0f, static_cast<float>(output_data[1]), 1e-3f);
+
+  output_data[0] = static_cast<float16_t>(0);
+  output_data[1] = static_cast<float16_t>(0);
+  micro::KernelRunner avg_runner(Register_AVERAGE_POOL_2D(), tensors, 2,
+                                 IntArrayFromInts(inputs_array_data),
+                                 IntArrayFromInts(outputs_array_data),
+                                 &params);
+  EXPECT_EQ(kTfLiteOk, avg_runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, avg_runner.Invoke());
+  EXPECT_NEAR(3.5f, static_cast<float>(output_data[0]), 1e-2f);
+  EXPECT_NEAR(5.5f, static_cast<float>(output_data[1]), 1e-2f);
+}
+}  // namespace testing
+}  // namespace tflite
+#endif
 
 TF_LITE_MICRO_TESTS_MAIN

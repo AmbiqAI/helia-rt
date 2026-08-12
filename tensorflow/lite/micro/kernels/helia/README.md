@@ -8,6 +8,28 @@ processors, developed by Ambiq. To use NS-CMSIS-NN optimized kernels instead of 
 For more information about the optimizations, check out
 [CMSIS-NN documentation](https://github.com/ARM-software/CMSIS-NN/blob/main/README.md),
 
+The helia backend's floating-point build support is provided by the pinned
+`AmbiqAI/ns-cmsis-nn` v7.29.1 release. The Make build enables the fp32 API for helia
+targets and enables the fp16 API only for `TARGET_ARCH=cortex-m55`. fp16 requires an
+ARMv8.1-M MVEF-capable toolchain.
+
+`UNIDIRECTIONAL_SEQUENCE_LSTM` dispatches standard fp32/fp16 models to
+heliaCore's floating-point APIs and falls back to the reference implementation
+for unsupported optional variants. TFLM has no standalone batch-normalization
+kernel to dispatch.
+
+A local heliaCore checkout can still be used to test newer or unreleased kernel changes:
+
+```
+make -f tensorflow/lite/micro/tools/make/Makefile \
+  OPTIMIZED_KERNEL_DIR=helia \
+  NS_CMSIS_NN_PATH=/path/to/heliaCore \
+  TARGET=cortex_m_corstone_300 TARGET_ARCH=cortex-m55 \
+  kernel_conv_test
+```
+
+When `NS_CMSIS_NN_PATH` is omitted, the normal pinned ns-cmsis-nn download is used.
+
 ## Example - FVP based on Arm Corstone-300 software.
 In this example, the kernel conv unit test is built. For more information about
 this specific target, check out the [Corstone-300 readme](https://github.com/tensorflow/tflite-micro/tree/main/tensorflow/lite/micro/cortex_m_corstone_300/README.md).

@@ -26,6 +26,7 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/fully_connected.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_arena_constants.h"
 #include "tensorflow/lite/micro/micro_log.h"
@@ -79,6 +80,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_MSG(
     context, (
       input->type == kTfLiteFloat32 ||
+          (kHeliaFloat16Enabled && input->type == kTfLiteFloat16) ||
       input->type == kTfLiteInt16 ||
       input->type == kTfLiteInt8
     ),
@@ -87,6 +89,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_MSG(
       context,
       (input->type == kTfLiteFloat32 && filter->type == kTfLiteFloat32) ||
+          (input->type == kTfLiteFloat16 && filter->type == kTfLiteFloat16) ||
           (input->type == kTfLiteInt16 &&
           (filter->type == kTfLiteInt16 || filter->type == kTfLiteInt8)) ||
           (input->type == kTfLiteInt8 &&
@@ -468,9 +471,59 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
 
   // Checks in Prepare ensure input, output and filter types are all the same.
   switch (input->type) {
+    case kTfLiteFloat16: {
+#if ARM_NN_ENABLE_F16
+      cmsis_nn_fc_params_f16 fc_params = {
+          .activation = {0.0f, 0.0f},
+          .weight_format = ARM_NN_WEIGHT_FORMAT_STANDARD};
+      float activation_min, activation_max;
+      CalculateActivationRange(params->activation, &activation_min,
+                               &activation_max);
+      fc_params.activation.min = HeliaFloat16ActivationBound(activation_min);
+      fc_params.activation.max = HeliaFloat16ActivationBound(activation_max);
+      cmsis_nn_dims input_dims = {data.batches, 1, 1, data.accum_depth};
+      cmsis_nn_dims filter_dims = {data.accum_depth, 1, 1, data.output_depth};
+      cmsis_nn_dims bias_dims = {1, 1, 1, data.output_depth};
+      cmsis_nn_dims output_dims = {data.batches, 1, 1, data.output_depth};
+      cmsis_nn_context ctx = {nullptr, 0};
+      if (arm_fully_connected_f16(
+              &ctx, &fc_params, &input_dims, tflite::micro::GetTensorData<float16_t>(input),
+              &filter_dims, tflite::micro::GetTensorData<float16_t>(filter), &bias_dims,
+              tflite::micro::GetOptionalTensorData<float16_t>(bias),
+              &output_dims, tflite::micro::GetTensorData<float16_t>(output),
+              ARM_NN_LAYOUT_NHWC) == ARM_CMSIS_NN_SUCCESS) {
+        break;
+      }
+#endif
+      MicroPrintf(
+          "Float16 FULLY_CONNECTED: optimized kernel rejected the "
+          "configuration.");
+      return kTfLiteError;
+    }
     case kTfLiteFloat32: {
       const float* bias_data =
           tflite::micro::GetOptionalTensorData<float>(bias);
+#if ARM_NN_ENABLE_F32
+      cmsis_nn_fc_params_f32 fc_params = {
+          .activation = {0.0f, 0.0f},
+          .weight_format = ARM_NN_WEIGHT_FORMAT_STANDARD};
+      CalculateActivationRange(params->activation, &fc_params.activation.min,
+                               &fc_params.activation.max);
+      cmsis_nn_dims input_dims = {data.batches, 1, 1, data.accum_depth};
+      cmsis_nn_dims filter_dims = {data.accum_depth, 1, 1, data.output_depth};
+      cmsis_nn_dims bias_dims = {1, 1, 1, data.output_depth};
+      cmsis_nn_dims output_dims = {data.batches, 1, 1, data.output_depth};
+      cmsis_nn_context ctx = {nullptr, 0};
+      if (arm_fully_connected_f32(
+              &ctx, &fc_params, &input_dims,
+              tflite::micro::GetTensorData<float>(input), &filter_dims,
+              tflite::micro::GetTensorData<float>(filter), &bias_dims,
+              bias_data, &output_dims,
+              tflite::micro::GetTensorData<float>(output),
+              ARM_NN_LAYOUT_NHWC) == ARM_CMSIS_NN_SUCCESS) {
+        break;
+      }
+#endif
       tflite::reference_ops::FullyConnected(
           FullyConnectedParamsFloat(params->activation),
           tflite::micro::GetTensorShape(input),

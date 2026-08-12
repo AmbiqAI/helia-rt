@@ -25,6 +25,7 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/reference/transpose.h"
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_arena_constants.h"
 #include "tensorflow/lite/micro/micro_log.h"
@@ -40,7 +41,8 @@ struct OpData {
   int buffer_idx;
 };
 
-cmsis_nn_dims FillVariableShape(int32_t rank, int32_t* tensor_dims) {
+template <typename T>
+cmsis_nn_dims FillVariableShape(int32_t rank, const T* tensor_dims) {
   if (rank == 4) {
     return {tensor_dims[0], tensor_dims[1], tensor_dims[2], tensor_dims[3]};
   } else if (rank == 3) {
@@ -52,23 +54,33 @@ cmsis_nn_dims FillVariableShape(int32_t rank, int32_t* tensor_dims) {
   }
 }
 
+template <typename T>
+cmsis_nn_dims FillVariableShapeSwapInnerDims(int32_t rank,
+                                             const T* tensor_dims) {
+  cmsis_nn_dims dims = FillVariableShape(rank, tensor_dims);
+  const int32_t tmp = dims.w;
+  dims.w = dims.c;
+  dims.c = tmp;
+  return dims;
+}
+
 inline TfLiteStatus PopulateEvalData(
     TfLiteContext* context, OpData* data, const TfLiteBatchMatMulParams* params,
     TfLiteNode* node, const TfLiteEvalTensor* original_lhs_input,
     RuntimeShape* lhs_shape, TfLiteEvalTensor** updated_lhs_input,
     const TfLiteEvalTensor* original_rhs_input, RuntimeShape* rhs_shape,
     TfLiteEvalTensor** updated_rhs_input, const TfLiteEvalTensor* output) {
+  (void)node;
   RuntimeShape orig_out_shape = tflite::micro::GetTensorShape(output);
-
   *updated_rhs_input = params->adj_y
                            ? const_cast<TfLiteEvalTensor*>(original_rhs_input)
                            : data->reference_op_data.rhs_transposed_tensor;
   *updated_lhs_input = params->adj_x
                            ? data->reference_op_data.lhs_transposed_tensor
                            : const_cast<TfLiteEvalTensor*>(original_lhs_input);
-
   TF_LITE_ENSURE(context, *updated_rhs_input != nullptr);
   TF_LITE_ENSURE(context, *updated_lhs_input != nullptr);
+
   if (!params->adj_y) {
     // TODO(b/154760341): Constant tensors should already be transposed, but
     // we transpose once if necessary for now.
@@ -123,10 +135,12 @@ inline TfLiteStatus PopulateEvalData(
   }
   // ReferenceOps and CMSIS-NN have different requirements for when the
   // lhs shape should be transposed, so we have to treat float differently.
-  if (!params->adj_x && original_lhs_input->type == kTfLiteFloat32) {
+  if (!params->adj_x && (original_lhs_input->type == kTfLiteFloat32 ||
+                         original_lhs_input->type == kTfLiteFloat16)) {
     RuntimeShape tmp_l = SwapRowColumnDims(*lhs_shape);
     lhs_shape->ReplaceWith(tmp_l.DimensionsCount(), tmp_l.DimsData());
-  } else if (params->adj_x && original_lhs_input->type != kTfLiteFloat32) {
+  } else if (params->adj_x && original_lhs_input->type != kTfLiteFloat32 &&
+             original_lhs_input->type != kTfLiteFloat16) {
     RuntimeShape tmp_l = SwapRowColumnDims(*lhs_shape);
     lhs_shape->ReplaceWith(tmp_l.DimensionsCount(), tmp_l.DimsData());
   }
@@ -198,6 +212,8 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, lhs_input->type, output->type);
   TF_LITE_ENSURE_MSG(context,
                      lhs_input->type == kTfLiteFloat32 ||
+                         (kHeliaFloat16Enabled &&
+                          lhs_input->type == kTfLiteFloat16) ||
                          lhs_input->type == kTfLiteInt16 ||
                          lhs_input->type == kTfLiteInt8,
                      "Input data type not supported");
@@ -270,8 +286,56 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   data->output_shape = FillVariableShape(
       output_rank, reinterpret_cast<int32_t*>(output->dims->data));
 
+  data->buffer_idx = -1;
   int buf_size = 0;
-  if (lhs_input->type != kTfLiteFloat32 && rhs_input->type != kTfLiteFloat32) {
+#if ARM_NN_ENABLE_F32
+  if (lhs_input->type == kTfLiteFloat32 &&
+      rhs_input->type == kTfLiteFloat32) {
+    const cmsis_nn_bmm_params_f32 bmm_params = {
+        .adj_x = false,
+        .adj_y = false,
+        .activation = {0.0f, 0.0f},
+        .rhs_format = ARM_NN_WEIGHT_FORMAT_STANDARD};
+    const cmsis_nn_dims lhs_dims =
+        adj_x ? FillVariableShape(lhs_input->dims->size, lhs_input->dims->data)
+              : FillVariableShapeSwapInnerDims(lhs_input->dims->size,
+                                               lhs_input->dims->data);
+    // Eval transposes RHS data and shape only when adj_y is false. Project the
+    // original Prepare-time shape to the same normalized [N, K] kernel layout.
+    const cmsis_nn_dims rhs_dims =
+        adj_y ? FillVariableShapeSwapInnerDims(rhs_input->dims->size,
+                                               rhs_input->dims->data)
+              : FillVariableShape(rhs_input->dims->size,
+                                  rhs_input->dims->data);
+    buf_size = arm_batch_matmul_f32_get_buffer_size(
+        &bmm_params, &lhs_dims, &rhs_dims, &data->output_shape);
+  }
+#endif
+#if ARM_NN_ENABLE_F16
+  if (lhs_input->type == kTfLiteFloat16 &&
+      rhs_input->type == kTfLiteFloat16) {
+    const cmsis_nn_bmm_params_f16 bmm_params = {
+        .adj_x = false,
+        .adj_y = false,
+        .activation = {0.0f, 0.0f},
+        .rhs_format = ARM_NN_WEIGHT_FORMAT_STANDARD};
+    const cmsis_nn_dims lhs_dims =
+        adj_x ? FillVariableShape(lhs_input->dims->size, lhs_input->dims->data)
+              : FillVariableShapeSwapInnerDims(lhs_input->dims->size,
+                                               lhs_input->dims->data);
+    const cmsis_nn_dims rhs_dims =
+        adj_y ? FillVariableShapeSwapInnerDims(rhs_input->dims->size,
+                                               rhs_input->dims->data)
+              : FillVariableShape(rhs_input->dims->size,
+                                  rhs_input->dims->data);
+    buf_size = arm_batch_matmul_f16_get_buffer_size(
+        &bmm_params, &lhs_dims, &rhs_dims, &data->output_shape);
+  }
+#endif
+  if (lhs_input->type != kTfLiteFloat32 &&
+      lhs_input->type != kTfLiteFloat16 &&
+      rhs_input->type != kTfLiteFloat32 &&
+      rhs_input->type != kTfLiteFloat16) {
     data->reference_op_data.quantization =
         static_cast<decltype(data->reference_op_data.quantization)>(
             micro_context->AllocatePersistentBuffer(
@@ -298,7 +362,6 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
       data->reference_op_data.quantization->output_activation_max =
           std::numeric_limits<int8_t>::max();
 
-      data->buffer_idx = -1;
       buf_size = arm_fully_connected_s8_get_buffer_size(&data->output_shape);
     } else {
       data->reference_op_data.quantization->output_activation_min =
@@ -474,6 +537,57 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
   const TfLiteEvalTensor* original_lhs_input =
       tflite::micro::GetEvalInput(context, node, kBatchMatmulInputLhsTensor);
   switch (original_lhs_input->type) {
+    case kTfLiteFloat16: {
+      const TfLiteEvalTensor* original_rhs_input = tflite::micro::GetEvalInput(context, node, kBatchMatmulInputRhsTensor);
+      TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, kBatchMatmulOutputTensor);
+      TFLITE_DCHECK(node->user_data != nullptr);
+      OpData& data = *(static_cast<OpData*>(node->user_data));
+      const auto* params = static_cast<const TfLiteBatchMatMulParams*>(node->builtin_data);
+      RuntimeShape rhs_shape = tflite::micro::GetTensorShape(original_rhs_input);
+      RuntimeShape lhs_shape = tflite::micro::GetTensorShape(original_lhs_input);
+      TfLiteEvalTensor* updated_lhs_input;
+      TfLiteEvalTensor* updated_rhs_input;
+      TF_LITE_ENSURE_STATUS(PopulateEvalData(context, &data, params, node, original_lhs_input, &lhs_shape, &updated_lhs_input, original_rhs_input, &rhs_shape, &updated_rhs_input, output));
+#if ARM_NN_ENABLE_F16
+        // PopulateEvalData normalizes lhs to natural [M,K] and rhs to
+        // pre-transposed [N,K] regardless of the TFLite adj_x/adj_y flags. That
+        // layout matches heliaCore's !adj_x && !adj_y fast path exactly, so we
+        // hardcode the flags below instead of forwarding params->adj_{x,y}.
+        // BatchMatMul has no fused activation; signal "unbounded" using the
+        // heliaCore finite-range sentinels rather than std::numeric_limits,
+        // whose infinity() is not guaranteed to be specialized for float16_t.
+        const cmsis_nn_bmm_params_f16 bmm_params = {
+          .adj_x = false,
+          .adj_y = false,
+          .activation = {ARM_NN_F16_FINITE_LOWEST, ARM_NN_F16_FINITE_MAX},
+          .rhs_format = ARM_NN_WEIGHT_FORMAT_STANDARD};
+        const cmsis_nn_dims lhs_dims =
+          FillVariableShape(lhs_shape.DimensionsCount(), lhs_shape.DimsData());
+        const cmsis_nn_dims rhs_dims = FillVariableShapeSwapInnerDims(
+          rhs_shape.DimensionsCount(), rhs_shape.DimsData());
+        cmsis_nn_context ctx = {nullptr, 0};
+        if (data.buffer_idx >= 0) {
+        ctx.buf = context->GetScratchBuffer(context, data.buffer_idx);
+        ctx.size = arm_batch_matmul_f16_get_buffer_size(
+          &bmm_params, &lhs_dims, &rhs_dims, &data.output_shape);
+        }
+        if (arm_batch_matmul_f16(&ctx, &bmm_params, &lhs_dims,
+                     tflite::micro::GetTensorData<float16_t>(
+                       updated_lhs_input),
+                     &rhs_dims,
+                     tflite::micro::GetTensorData<float16_t>(
+                       updated_rhs_input),
+                     &data.output_shape,
+                     tflite::micro::GetTensorData<float16_t>(
+                       output)) == ARM_CMSIS_NN_SUCCESS) {
+        break;
+        }
+#endif
+        MicroPrintf(
+            "Float16 BATCH_MATMUL: optimized kernel rejected the "
+            "configuration.");
+        return kTfLiteError;
+    }
     case kTfLiteFloat32: {
       const TfLiteEvalTensor* original_rhs_input = tflite::micro::GetEvalInput(
           context, node, kBatchMatmulInputRhsTensor);
@@ -497,6 +611,35 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
                            &lhs_shape, &updated_lhs_input, original_rhs_input,
                            &rhs_shape, &updated_rhs_input, output));
 
+    #if ARM_NN_ENABLE_F32
+        // PopulateEvalData normalizes lhs to natural [M,K] and rhs to
+        // pre-transposed [N,K] regardless of TFLite adj_x/adj_y flags, matching
+        // heliaCore's !adj_x && !adj_y fast path. Hardcode the flags instead of
+        // forwarding params->adj_{x,y}.
+        const cmsis_nn_bmm_params_f32 bmm_params = {
+          .adj_x = false,
+          .adj_y = false,
+          .activation = {ARM_NN_F32_FINITE_LOWEST, ARM_NN_F32_FINITE_MAX},
+          .rhs_format = ARM_NN_WEIGHT_FORMAT_STANDARD};
+        const cmsis_nn_dims lhs_dims =
+          FillVariableShape(lhs_shape.DimensionsCount(), lhs_shape.DimsData());
+        const cmsis_nn_dims rhs_dims = FillVariableShapeSwapInnerDims(
+          rhs_shape.DimensionsCount(), rhs_shape.DimsData());
+        cmsis_nn_context ctx = {nullptr, 0};
+        if (data.buffer_idx >= 0) {
+        ctx.buf = context->GetScratchBuffer(context, data.buffer_idx);
+        ctx.size = arm_batch_matmul_f32_get_buffer_size(
+          &bmm_params, &lhs_dims, &rhs_dims, &data.output_shape);
+        }
+        if (arm_batch_matmul_f32(
+            &ctx, &bmm_params, &lhs_dims,
+            tflite::micro::GetTensorData<float>(updated_lhs_input), &rhs_dims,
+            tflite::micro::GetTensorData<float>(updated_rhs_input),
+            &data.output_shape, tflite::micro::GetTensorData<float>(output)) ==
+          ARM_CMSIS_NN_SUCCESS) {
+        break;
+        }
+    #endif
       // Note we pass RHS args first, LHS args second.
       reference_ops::BatchMatMul(
           rhs_shape, tflite::micro::GetTensorData<float>(updated_rhs_input),

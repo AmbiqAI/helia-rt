@@ -19,6 +19,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
+#if ARM_NN_ENABLE_F16
+#include "arm_nnfunctions_flt.h"
+#endif
+
 namespace tflite {
 namespace testing {
 namespace {
@@ -197,6 +201,24 @@ TEST(MaximumMinimumTest, FloatTest) {
                                    dims, data2, golden_min, dims, output_data);
 }
 
+// Rank-5 tensors exceed what 4-D optimized kernels can describe; a backend
+// whose dims mapping collapses rank >= 5 shapes to a scalar computes only
+// one element and leaves the rest stale. The reference loop must serve this.
+TEST(MaximumMinimumTest, FloatRank5Test) {
+  int dims[] = {5, 1, 1, 1, 2, 3};
+  const float data1[] = {1.0, -2.0, 3.0, 4.0, 5.0, -6.0};
+  const float data2[] = {2.0, 3.0, -1.0, 5.0, -4.0, 6.0};
+  const float golden_max[] = {2.0, 3.0, 3.0, 5.0, 5.0, 6.0};
+  const float golden_min[] = {1.0, -2.0, -1.0, 4.0, -4.0, -6.0};
+  float output_data[6];
+
+  tflite::testing::TestMaxMinFloat(tflite::Register_MAXIMUM(), dims, data1,
+                                   dims, data2, golden_max, dims, output_data);
+
+  tflite::testing::TestMaxMinFloat(tflite::Register_MINIMUM(), dims, data1,
+                                   dims, data2, golden_min, dims, output_data);
+}
+
 TEST(MaximumMinimumTest, Int8Test) {
   int dims[] = {3, 3, 1, 2};
   const int8_t data1[] = {1, 0, 2, 11, 2, 23};
@@ -282,5 +304,52 @@ TEST(MaximumMinimumTest, Int32WithBroadcastTest) {
                                             data1, dims_scalar, data2,
                                             golden_min, dims, output_data);
 }
+
+#if ARM_NN_ENABLE_F16
+namespace tflite {
+namespace testing {
+TEST(MaximumMinimumTest, Float16MultiElementGolden) {
+  int dims[] = {2, 2, 3};
+  float16_t data1[] = {1, -2, 3, 4, 5, -6};
+  float16_t data2[] = {2, 3, -1, 5, -4, 6};
+  const float golden_max[] = {2, 3, 3, 5, 5, 6};
+  const float golden_min[] = {1, -2, -1, 4, -4, -6};
+  float16_t output_data[6] = {};
+
+  TfLiteTensor max_tensors[] = {
+      CreateTensor(data1, IntArrayFromInts(dims), false, kTfLiteFloat16),
+      CreateTensor(data2, IntArrayFromInts(dims), false, kTfLiteFloat16),
+      CreateTensor(output_data, IntArrayFromInts(dims), false, kTfLiteFloat16),
+  };
+  int inputs_array_data[] = {2, 0, 1};
+  int outputs_array_data[] = {1, 2};
+  micro::KernelRunner max_runner(Register_MAXIMUM(), max_tensors, 3,
+                                 IntArrayFromInts(inputs_array_data),
+                                 IntArrayFromInts(outputs_array_data),
+                                 nullptr);
+  EXPECT_EQ(kTfLiteOk, max_runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, max_runner.Invoke());
+  for (int i = 0; i < 6; ++i) {
+    EXPECT_NEAR(golden_max[i], static_cast<float>(output_data[i]), 1e-3f);
+  }
+
+  TfLiteTensor min_tensors[] = {
+      CreateTensor(data1, IntArrayFromInts(dims), false, kTfLiteFloat16),
+      CreateTensor(data2, IntArrayFromInts(dims), false, kTfLiteFloat16),
+      CreateTensor(output_data, IntArrayFromInts(dims), false, kTfLiteFloat16),
+  };
+  micro::KernelRunner min_runner(Register_MINIMUM(), min_tensors, 3,
+                                 IntArrayFromInts(inputs_array_data),
+                                 IntArrayFromInts(outputs_array_data),
+                                 nullptr);
+  EXPECT_EQ(kTfLiteOk, min_runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, min_runner.Invoke());
+  for (int i = 0; i < 6; ++i) {
+    EXPECT_NEAR(golden_min[i], static_cast<float>(output_data[i]), 1e-3f);
+  }
+}
+}  // namespace testing
+}  // namespace tflite
+#endif
 
 TF_LITE_MICRO_TESTS_MAIN

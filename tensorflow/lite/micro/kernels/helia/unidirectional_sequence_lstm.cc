@@ -35,7 +35,66 @@ namespace {
 struct OpData {
   OpDataLSTM params_ref;                 // Used for fallback implementation
   cmsis_nn_lstm_params params_cmsis_nn;  // Used for  CMSIS-NN implementation
+#if ARM_NN_ENABLE_F32
+  cmsis_nn_lstm_params_f32 params_cmsis_nn_f32;
+#endif
+#if ARM_NN_ENABLE_F16
+  cmsis_nn_lstm_params_f16 params_cmsis_nn_f16;
+#endif
 };
+
+#if ARM_NN_ENABLE_F32 || ARM_NN_ENABLE_F16
+bool IsSupportedFloatLstm(const LSTMKernelContents& content,
+                          TfLiteType activation_type) {
+  // The Helia float kernel implements the standard (Keras) LSTM with all four
+  // gates. Every input-to-gate and recurrent-to-gate weight matrix (including
+  // the input gate, i.e. non-CIFG) and every gate bias must be present and
+  // match the activation type.
+  auto is_present = [&](int i) {
+    const TfLiteEvalTensor* tensor = content.GetInternalTensor(i);
+    return tensor != nullptr && tensor->type == activation_type;
+  };
+  for (int i = kLstmInputToInputWeightsTensor;
+       i <= kLstmRecurrentToOutputWeightsTensor; ++i) {
+    if (!is_present(i)) return false;
+  }
+  for (int i = kLstmInputGateBiasTensor; i <= kLstmOutputGateBiasTensor; ++i) {
+    if (!is_present(i)) return false;
+  }
+  // The Helia float kernel does not implement optional LSTM variants
+  // (peephole connections, projection, or layer normalization); reject any
+  // model that provides those tensors.
+  for (int i = kLstmCellToInputWeightsTensor;
+       i <= kLstmCellToOutputWeightsTensor; ++i) {
+    if (content.GetInternalTensor(i) != nullptr) return false;
+  }
+  for (int i = kLstmProjectionWeightsTensor; i <= kLstmProjectionBiasTensor;
+       ++i) {
+    if (content.GetInternalTensor(i) != nullptr) return false;
+  }
+  for (int i = kLstmInputLayerNormCoefficientsTensor;
+       i <= kLstmOutputLayerNormCoefficientsTensor; ++i) {
+    if (content.GetInternalTensor(i) != nullptr) return false;
+  }
+  return true;
+}
+
+#if NS_CMSIS_NN_VERSION < 7029000
+template <typename T>
+bool IsZeroInitialState(const TfLiteEvalTensor* hidden,
+                        const TfLiteEvalTensor* cell, int count) {
+  const T* hidden_data = tflite::micro::GetTensorData<T>(hidden);
+  const T* cell_data = tflite::micro::GetTensorData<T>(cell);
+  for (int i = 0; i < count; ++i) {
+    if (hidden_data[i] != static_cast<T>(0) ||
+        cell_data[i] != static_cast<T>(0)) {
+      return false;
+    }
+  }
+  return true;
+}
+#endif
+#endif
 
 LSTMBuffers<int16_t> CMSIS_NN_CreateLSTMBuffers(TfLiteContext* context,
                                                 const int* buffer_indices) {
@@ -283,8 +342,12 @@ TfLiteStatus CMSIS_NN_EvalInteger8x8_16Lstm(
   int8_t* output =
       tflite::micro::GetTensorData<int8_t>(kernel_content.output_tensor);
 
-  // Create lstm buffer struct
-  cmsis_nn_lstm_context cmsis_buffers;
+  // Create lstm buffer struct. Zero-initialize so that the optional
+  // hidden_state pointer is NULL; arm_lstm_unidirectional_s8 uses that as the
+  // "no persistent hidden state" signal and will zero the cell_state buffer.
+  // Leaving the field uninitialized causes the kernel to skip cell-state
+  // clearing and dereference garbage as the initial hidden state.
+  cmsis_nn_lstm_context cmsis_buffers = {};
   cmsis_buffers.temp1 = reinterpret_cast<int16_t*>(buffers.buffer0);
   cmsis_buffers.temp2 = reinterpret_cast<int16_t*>(buffers.buffer1);
   cmsis_buffers.cell_state = reinterpret_cast<int16_t*>(buffers.buffer2);
@@ -309,8 +372,12 @@ TfLiteStatus CMSIS_NN_EvalInteger16x8_16Lstm(
   int16_t* output =
       tflite::micro::GetTensorData<int16_t>(kernel_content.output_tensor);
 
-  // Create lstm buffer struct
-  cmsis_nn_lstm_context cmsis_buffers;
+  // Create lstm buffer struct. Zero-initialize so that the optional
+  // hidden_state pointer is NULL; arm_lstm_unidirectional_s16 uses that as
+  // the "no persistent hidden state" signal and will zero the cell_state
+  // buffer. Leaving the field uninitialized causes the kernel to skip
+  // cell-state clearing and dereference garbage as the initial hidden state.
+  cmsis_nn_lstm_context cmsis_buffers = {};
   cmsis_buffers.temp1 = reinterpret_cast<int16_t*>(buffers.buffer0);
   cmsis_buffers.temp2 = reinterpret_cast<int16_t*>(buffers.buffer1);
   cmsis_buffers.cell_state = reinterpret_cast<int16_t*>(buffers.buffer2);
@@ -320,6 +387,174 @@ TfLiteStatus CMSIS_NN_EvalInteger16x8_16Lstm(
 
   return kTfLiteOk;
 }
+
+#if ARM_NN_ENABLE_F32
+TfLiteStatus CMSIS_NN_EvalFloat32(
+    OpData* op_data, LSTMKernelContents& content,
+    const LSTMBuffers<float>& buffers) {
+  const auto activation = op_data->params_ref.cell_gate_nonlinear_type;
+  if ((activation != kTfLiteActTanh && activation != kTfLiteActSigmoid) ||
+      !IsSupportedFloatLstm(content, kTfLiteFloat32)) {
+    return kTfLiteError;
+  }
+#if NS_CMSIS_NN_VERSION < 7029000
+  const int state_count = op_data->params_ref.size_info.batch_size *
+                          op_data->params_ref.size_info.state_dimension;
+  if (!IsZeroInitialState<float>(content.HiddenStateTensor(),
+                                 content.CellStateTensor(), state_count)) {
+    return kTfLiteError;
+  }
+#endif
+  const auto gate = [&](int iw, int hw, int b, arm_nn_activation_type_flt a) {
+    return cmsis_nn_lstm_gate_f32{
+        tflite::micro::GetTensorData<float>(content.GetInternalTensor(iw)),
+        tflite::micro::GetTensorData<float>(content.GetInternalTensor(hw)),
+        tflite::micro::GetOptionalTensorData<float>(
+            content.GetInternalTensor(b)),
+        a};
+  };
+  op_data->params_cmsis_nn_f32 = {
+      op_data->params_ref.size_info.time_major,
+      op_data->params_ref.size_info.batch_size,
+      op_data->params_ref.size_info.time_steps,
+      op_data->params_ref.size_info.input_dimension,
+      op_data->params_ref.size_info.state_dimension,
+      op_data->params_ref.cell_state_info.cell_clip,
+      gate(kLstmInputToForgetWeightsTensor, kLstmRecurrentToForgetWeightsTensor,
+           kLstmForgetGateBiasTensor, ARM_NN_FLT_ACT_SIGMOID),
+      gate(kLstmInputToInputWeightsTensor, kLstmRecurrentToInputWeightsTensor,
+           kLstmInputGateBiasTensor, ARM_NN_FLT_ACT_SIGMOID),
+      gate(kLstmInputToCellWeightsTensor, kLstmRecurrentToCellWeightsTensor,
+           kLstmCellGateBiasTensor,
+           activation == kTfLiteActTanh ? ARM_NN_FLT_ACT_TANH
+                                        : ARM_NN_FLT_ACT_SIGMOID),
+      gate(kLstmInputToOutputWeightsTensor, kLstmRecurrentToOutputWeightsTensor,
+           kLstmOutputGateBiasTensor, ARM_NN_FLT_ACT_SIGMOID)};
+  cmsis_nn_lstm_context_f32 cmsis_buffers = {};
+  cmsis_buffers.temp1 = buffers.buffer0;
+  cmsis_buffers.temp2 = buffers.buffer1;
+#if NS_CMSIS_NN_VERSION >= 7029000
+  cmsis_buffers.cell_state =
+      tflite::micro::GetTensorData<float>(content.CellStateTensor());
+  cmsis_buffers.hidden_state =
+      tflite::micro::GetTensorData<float>(content.HiddenStateTensor());
+#else
+  cmsis_buffers.cell_state = buffers.buffer2;
+#endif
+  const auto* input =
+      tflite::micro::GetTensorData<float>(
+          content.GetInternalTensor(kLstmInputTensor));
+  auto* output = tflite::micro::GetTensorData<float>(content.output_tensor);
+  if (arm_lstm_unidirectional_f32(input, output, &op_data->params_cmsis_nn_f32,
+                                  &cmsis_buffers) != ARM_CMSIS_NN_SUCCESS) {
+    return kTfLiteError;
+  }
+#if NS_CMSIS_NN_VERSION < 7029000
+  auto* hidden = tflite::micro::GetTensorData<float>(content.HiddenStateTensor());
+  auto* cell = tflite::micro::GetTensorData<float>(content.CellStateTensor());
+  const int batch = op_data->params_ref.size_info.batch_size;
+  const int time = op_data->params_ref.size_info.time_steps;
+  const int hidden_size = op_data->params_ref.size_info.state_dimension;
+  for (int b = 0; b < batch; ++b) {
+    const int src = op_data->params_ref.size_info.time_major
+                        ? (time - 1) * batch * hidden_size + b * hidden_size
+                        : (b * time + time - 1) * hidden_size;
+    for (int h = 0; h < hidden_size; ++h) {
+      hidden[b * hidden_size + h] = output[src + h];
+      cell[b * hidden_size + h] = buffers.buffer2[b * hidden_size + h];
+    }
+  }
+#endif
+  return kTfLiteOk;
+}
+#endif
+
+#if ARM_NN_ENABLE_F16
+TfLiteStatus CMSIS_NN_EvalFloat16(
+    OpData* op_data, LSTMKernelContents& content,
+    const LSTMBuffers<float16_t>& buffers) {
+  const auto activation = op_data->params_ref.cell_gate_nonlinear_type;
+  if ((activation != kTfLiteActTanh && activation != kTfLiteActSigmoid) ||
+      !IsSupportedFloatLstm(content, kTfLiteFloat16)) {
+    return kTfLiteError;
+  }
+#if NS_CMSIS_NN_VERSION < 7029000
+  const int state_count = op_data->params_ref.size_info.batch_size *
+                          op_data->params_ref.size_info.state_dimension;
+  if (!IsZeroInitialState<float16_t>(content.HiddenStateTensor(),
+                                     content.CellStateTensor(), state_count)) {
+    MicroPrintf(
+        "Helia float16 LSTM requires zero initial hidden/cell state; "
+        "stateful float16 LSTM requires ns-cmsis-nn v7.29.0 or newer.");
+    return kTfLiteError;
+  }
+#endif
+  const auto gate = [&](int iw, int hw, int b, arm_nn_activation_type_flt a) {
+    return cmsis_nn_lstm_gate_f16{
+        tflite::micro::GetTensorData<float16_t>(content.GetInternalTensor(iw)),
+        tflite::micro::GetTensorData<float16_t>(content.GetInternalTensor(hw)),
+        tflite::micro::GetOptionalTensorData<float16_t>(
+            content.GetInternalTensor(b)),
+        a};
+  };
+  op_data->params_cmsis_nn_f16 = {
+      op_data->params_ref.size_info.time_major,
+      op_data->params_ref.size_info.batch_size,
+      op_data->params_ref.size_info.time_steps,
+      op_data->params_ref.size_info.input_dimension,
+      op_data->params_ref.size_info.state_dimension,
+      static_cast<float16_t>(op_data->params_ref.cell_state_info.cell_clip),
+      gate(kLstmInputToForgetWeightsTensor, kLstmRecurrentToForgetWeightsTensor,
+           kLstmForgetGateBiasTensor, ARM_NN_FLT_ACT_SIGMOID),
+      gate(kLstmInputToInputWeightsTensor, kLstmRecurrentToInputWeightsTensor,
+           kLstmInputGateBiasTensor, ARM_NN_FLT_ACT_SIGMOID),
+      gate(kLstmInputToCellWeightsTensor, kLstmRecurrentToCellWeightsTensor,
+           kLstmCellGateBiasTensor,
+           activation == kTfLiteActTanh ? ARM_NN_FLT_ACT_TANH
+                                        : ARM_NN_FLT_ACT_SIGMOID),
+      gate(kLstmInputToOutputWeightsTensor, kLstmRecurrentToOutputWeightsTensor,
+           kLstmOutputGateBiasTensor, ARM_NN_FLT_ACT_SIGMOID)};
+  cmsis_nn_lstm_context_f16 cmsis_buffers = {};
+  cmsis_buffers.temp1 = buffers.buffer0;
+  cmsis_buffers.temp2 = buffers.buffer1;
+#if NS_CMSIS_NN_VERSION >= 7029000
+  cmsis_buffers.cell_state =
+      tflite::micro::GetTensorData<float16_t>(content.CellStateTensor());
+  cmsis_buffers.hidden_state =
+      tflite::micro::GetTensorData<float16_t>(content.HiddenStateTensor());
+#else
+  cmsis_buffers.cell_state = buffers.buffer2;
+#endif
+  const auto* input =
+      tflite::micro::GetTensorData<float16_t>(
+          content.GetInternalTensor(kLstmInputTensor));
+  auto* output =
+      tflite::micro::GetTensorData<float16_t>(content.output_tensor);
+  if (arm_lstm_unidirectional_f16(input, output, &op_data->params_cmsis_nn_f16,
+                                  &cmsis_buffers) != ARM_CMSIS_NN_SUCCESS) {
+    return kTfLiteError;
+  }
+#if NS_CMSIS_NN_VERSION < 7029000
+  auto* hidden =
+      tflite::micro::GetTensorData<float16_t>(content.HiddenStateTensor());
+  auto* cell =
+      tflite::micro::GetTensorData<float16_t>(content.CellStateTensor());
+  const int batch = op_data->params_ref.size_info.batch_size;
+  const int time = op_data->params_ref.size_info.time_steps;
+  const int hidden_size = op_data->params_ref.size_info.state_dimension;
+  for (int b = 0; b < batch; ++b) {
+    const int src = op_data->params_ref.size_info.time_major
+                        ? (time - 1) * batch * hidden_size + b * hidden_size
+                        : (b * time + time - 1) * hidden_size;
+    for (int h = 0; h < hidden_size; ++h) {
+      hidden[b * hidden_size + h] = output[src + h];
+      cell[b * hidden_size + h] = buffers.buffer2[b * hidden_size + h];
+    }
+  }
+#endif
+  return kTfLiteOk;
+}
+#endif
 
 /*Kernel functions*/
 void* UnidirectionalSequenceLstmInit(TfLiteContext* context, const char* buffer,
@@ -359,7 +594,11 @@ TfLiteStatus UnidirectionalSequenceLstmPrepare(TfLiteContext* context,
 
   auto cell_state_type =
       lstm_tensors.GetInternalTensor(kLstmCellStateTensor)->type;
-  if (cell_state_type == kTfLiteFloat32) {
+  if (cell_state_type == kTfLiteFloat32
+#if ARM_NN_ENABLE_F16
+      || cell_state_type == kTfLiteFloat16
+#endif
+  ) {
     op_data_lstm->cell_state_info =
         CreateLstmCellStateInfoFloat(builtin_data->cell_clip);
     TF_LITE_ENSURE_OK(context, PrepareGateParametersFloat(context, lstm_tensors,
@@ -408,7 +647,7 @@ TfLiteStatus UnidirectionalSequenceLstmPrepare(TfLiteContext* context,
 TfLiteStatus UnidirectionalSequenceLstmEval(TfLiteContext* context,
                                             TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
-  const OpData& op_data = *reinterpret_cast<const OpData*>(node->user_data);
+  OpData& op_data = *reinterpret_cast<OpData*>(node->user_data);
   const OpDataLSTM& op_data_lstm = op_data.params_ref;
 
   auto kernel_content = CreateLSTMKernelContent(context, node);
@@ -420,10 +659,36 @@ TfLiteStatus UnidirectionalSequenceLstmEval(TfLiteContext* context,
 
   switch (activation_type) {
     case kTfLiteFloat32: {
+#if ARM_NN_ENABLE_F32
+      LSTMBuffers<float> buffers =
+          CreateLSTMBuffers<float>(context, op_data_lstm.buffer_indices);
+      if (CMSIS_NN_EvalFloat32(&op_data, kernel_content, buffers) !=
+          kTfLiteOk) {
+        EvalLstm<float, float, float, float>(op_data_lstm, kernel_content,
+                                             buffers);
+      }
+#else
       LSTMBuffers<float> buffers =
           CreateLSTMBuffers<float>(context, op_data_lstm.buffer_indices);
       EvalLstm<float, float, float, float>(op_data_lstm, kernel_content,
                                            buffers);
+#endif
+      break;
+    }
+    case kTfLiteFloat16: {
+#if ARM_NN_ENABLE_F16
+      LSTMBuffers<float16_t> buffers =
+          CreateLSTMBuffers<float16_t>(context, op_data_lstm.buffer_indices);
+      if (CMSIS_NN_EvalFloat16(&op_data, kernel_content, buffers) !=
+          kTfLiteOk) {
+        MicroPrintf("Unsupported float16 Unidirectional Sequence LSTM "
+                    "configuration.");
+        return kTfLiteError;
+      }
+#else
+      MicroPrintf("Float16 LSTM support is disabled.");
+      return kTfLiteError;
+#endif
       break;
     }
     case kTfLiteInt8: {

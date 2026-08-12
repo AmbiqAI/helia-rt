@@ -144,7 +144,7 @@ Add both `helia-rt` and `ns-cmsis-nn` as west projects in your workspace's `west
 
 - name: ns-cmsis-nn
   url: https://github.com/AmbiqAI/ns-cmsis-nn
-  revision: <ns-cmsis-nn-version>  # e.g. v7.25.0
+  revision: <ns-cmsis-nn-version>  # e.g. v7.28.0 (min for fp32/fp16)
   path: modules/ns-cmsis-nn
 ```
 

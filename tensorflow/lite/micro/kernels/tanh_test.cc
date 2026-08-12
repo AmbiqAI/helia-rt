@@ -19,6 +19,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
+#if ARM_NN_ENABLE_F16
+#include "arm_nnfunctions_flt.h"
+#endif
+
 namespace tflite {
 namespace testing {
 namespace {
@@ -230,6 +234,16 @@ void TestTanhQuantized(int input_dims_data[], const float* input_data,
 }  // namespace testing
 }  // namespace tflite
 
+// The helia backend dispatches float32 TANH to the optimized CMSIS-NN
+// activation kernel, whose polynomial approximation differs from the
+// reference std::tanh by up to ~1e-3. Keep the reference implementations
+// held to the original tight bound.
+#if defined(HELIA)
+constexpr float kTanhFloatTolerance = 1e-3f;
+#else
+constexpr float kTanhFloatTolerance = 1e-7f;
+#endif
+
 TEST(TanhTest, SimpleTestTanhFloat) {
   using tflite::testing::tanh_input_vec_fp;
   using tflite::testing::tanh_output_vec_fp;
@@ -244,7 +258,7 @@ TEST(TanhTest, SimpleTestTanhFloat) {
       tanh_input_vec_fp,           // Input data
       tanh_output_vec_fp,          // Expected results.
       output_shape,                // Output shape.
-      output_data, 1e-7 /* tolerance */);
+      output_data, kTanhFloatTolerance);
 }
 
 TEST(TanhTest, SimpleTestTanhInt8) {
@@ -304,5 +318,35 @@ TEST(TanhTest, TestTanhInt16WideRange) {
       16                                        // Tolerance.
   );
 }
+
+#if ARM_NN_ENABLE_F16
+namespace tflite {
+namespace testing {
+TEST(TanhTest, SimpleTestFloat16Golden) {
+  int dims_data[] = {2, 2, 2};
+  float16_t input[] = {static_cast<float16_t>(-2), static_cast<float16_t>(0.5),
+                       static_cast<float16_t>(2), static_cast<float16_t>(4)};
+  float16_t output[4] = {};
+  // tanh(-2) = -0.9640, tanh(0.5) = 0.4621, tanh(2) = 0.9640, tanh(4) = 0.9993
+  const float expected[] = {-0.9640f, 0.4621f, 0.9640f, 0.9993f};
+
+  TfLiteTensor tensors[] = {
+      CreateTensor(input, IntArrayFromInts(dims_data), false, kTfLiteFloat16),
+      CreateTensor(output, IntArrayFromInts(dims_data), false, kTfLiteFloat16),
+  };
+  int inputs_array_data[] = {1, 0};
+  int outputs_array_data[] = {1, 1};
+  micro::KernelRunner runner(Register_TANH(), tensors, 2,
+                             IntArrayFromInts(inputs_array_data),
+                             IntArrayFromInts(outputs_array_data), nullptr);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  for (int i = 0; i < 4; ++i) {
+    EXPECT_NEAR(expected[i], static_cast<float>(output[i]), 1e-2f);
+  }
+}
+}  // namespace testing
+}  // namespace tflite
+#endif
 
 TF_LITE_MICRO_TESTS_MAIN

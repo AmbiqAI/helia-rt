@@ -101,6 +101,68 @@ option(HELIA_RT_ENABLE_ETHOSU
     "Enable Ethos-U operator support in heliaRT targets" OFF)
 
 # ---------------------------------------------------------------------------
+# Helper: reconcile heliaRT's ARM_NN_ENABLE_F32/F16 definitions with the ones
+# actually exported by the linked ns-cmsis-nn target.
+#
+# The dependency's exported definitions are the ground truth: they reflect
+# which float kernels were compiled into its archive. If heliaRT were to
+# advertise a float API the dependency does not ship, helia kernels would
+# reference symbols that only surface at final link time (and never at all in
+# archive-only builds). Conversely, if the dependency ships float kernels we
+# did not enable, we would silently fall back to the reference paths.
+#
+# We therefore adopt the dependency's values and warn on any mismatch.
+# ---------------------------------------------------------------------------
+function(_helia_rt_sync_float_definitions target dep)
+    get_target_property(_dep_defs ${dep} INTERFACE_COMPILE_DEFINITIONS)
+    if(NOT _dep_defs)
+        set(_dep_defs "")
+    endif()
+
+    foreach(_feature F32 F16)
+        if("ARM_NN_ENABLE_${_feature}=1" IN_LIST _dep_defs)
+            set(_dep_${_feature} ON)
+        else()
+            set(_dep_${_feature} OFF)
+        endif()
+    endforeach()
+
+    foreach(_prop COMPILE_DEFINITIONS INTERFACE_COMPILE_DEFINITIONS)
+        get_target_property(_cur ${target} ${_prop})
+        if(NOT _cur)
+            set(_cur "")
+        endif()
+        set(_next "")
+        foreach(_d IN LISTS _cur)
+            if(NOT _d MATCHES "^ARM_NN_ENABLE_F(32|16)=")
+                list(APPEND _next "${_d}")
+            endif()
+        endforeach()
+        foreach(_feature F32 F16)
+            if(_dep_${_feature})
+                list(APPEND _next "ARM_NN_ENABLE_${_feature}=1")
+            endif()
+        endforeach()
+        set_property(TARGET ${target} PROPERTY ${_prop} "${_next}")
+    endforeach()
+
+    helia_rt_float_feature_flags(_want_F32 _want_F16)
+    foreach(_feature F32 F16)
+        if(NOT _want_${_feature} STREQUAL _dep_${_feature})
+            message(WARNING
+                "helia_rt_helia: requested ARM_NN_ENABLE_${_feature}="
+                "${_want_${_feature}} but the linked target '${dep}' exports "
+                "${_dep_${_feature}}. Using the dependency's value. Configure "
+                "NSX_CMSIS_NN_ENABLE_${_feature} (NSX module), "
+                "ARM_NN_ENABLE_${_feature} (ns-cmsis-nn root CMakeLists), or "
+                "CONFIG_NS_CMSIS_NN_ENABLE_${_feature} (Zephyr) *before* "
+                "ns-cmsis-nn is added — it selects its sources at that point. "
+                "Requires ns-cmsis-nn v7.28.0 or later.")
+        endif()
+    endforeach()
+endfunction()
+
+# ---------------------------------------------------------------------------
 # Helper: add one backend target (reference / cmsis_nn / helia).
 # ---------------------------------------------------------------------------
 function(_helia_rt_add_backend_target backend)
@@ -226,6 +288,7 @@ function(_helia_rt_add_backend_target backend)
         if(_resolved)
             target_link_libraries(${_target} PUBLIC ${_resolved})
             target_include_directories(${_target} PRIVATE "$<TARGET_PROPERTY:${_resolved},SOURCE_DIR>")
+            _helia_rt_sync_float_definitions(${_target} ${_resolved})
         else()
             message(WARNING
                 "helia_rt_helia: no ns-cmsis-nn target found among [${_candidates}]. "

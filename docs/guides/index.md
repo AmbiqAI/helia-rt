@@ -36,6 +36,14 @@ These guides go deeper on specific topics after you've completed a [getting-star
 
     [:octicons-arrow-right-24: Kernel Selection](kernel-selection.md)
 
+- :material-decimal:{ .lg .middle } **FP16 and FP32**
+
+    ---
+
+    Floating-point HELIA dispatch, hardware support, and source or prebuilt builds.
+
+    [:octicons-arrow-right-24: FP16 and FP32](floating-point.md)
+
 - :material-memory:{ .lg .middle } **Memory Placement**
 
     ---

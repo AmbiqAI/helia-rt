@@ -45,8 +45,8 @@ else
 fi
 
 # Set GIT_COMMIT to NS_CMSIS_NN_COMMIT if set, otherwise use default.
-# Default tracks AmbiqAI/ns-cmsis-nn tag v7.24.0.
-GIT_COMMIT=${NS_CMSIS_NN_COMMIT:-8d62c8ce81a3e26d764fdea44f519fb2d4626781}
+# Default tracks AmbiqAI/ns-cmsis-nn tag v7.29.1.
+GIT_COMMIT=${NS_CMSIS_NN_COMMIT:-50ea825abdb97c9b1ed78aff09f3752469e3b00d}
 
 # clone_ns_cmsis_nn: attempt git clone and surface a clear error on failure.
 clone_ns_cmsis_nn() {
@@ -96,12 +96,21 @@ elif [ -d ${DOWNLOADED_NS_CMSIS_NN_PATH} ]; then
     git checkout ${GIT_COMMIT} >&2
     popd > /dev/null
   else
-    # Check that the existing clone is at the right commit
+    # Check that the existing clone is at the right commit. Only trust the
+    # skip when GIT_COMMIT is a full SHA: resolving a branch or tag name
+    # inside the stale local clone would compare against the stale ref and
+    # could keep an outdated tree (branches move; tags can be re-cut).
+    # Non-SHA pins always redownload, matching the historical behavior.
     pushd ${DOWNLOADED_NS_CMSIS_NN_PATH} > /dev/null
     CURRENT_COMMIT=$(git rev-parse HEAD)
+    if [[ "${GIT_COMMIT}" =~ ^[0-9a-f]{40}$ ]]; then
+      EXPECTED_COMMIT=$(git rev-parse --verify "${GIT_COMMIT}^{commit}" 2>/dev/null || true)
+    else
+      EXPECTED_COMMIT=""
+    fi
     popd > /dev/null
 
-    if [ "${CURRENT_COMMIT}" = "${GIT_COMMIT}" ]; then
+    if [ -n "${EXPECTED_COMMIT}" ] && [ "${CURRENT_COMMIT}" = "${EXPECTED_COMMIT}" ]; then
       echo >&2 "ns-cmsis-nn is already at ${GIT_COMMIT}, skipping download."
     else
       echo >&2 "ns-cmsis-nn is at ${CURRENT_COMMIT} but expected ${GIT_COMMIT}, redownloading."

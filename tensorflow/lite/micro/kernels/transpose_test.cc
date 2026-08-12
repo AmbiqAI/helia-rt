@@ -23,6 +23,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
+#if ARM_NN_ENABLE_F16
+#include "arm_nnfunctions_flt.h"
+#endif
+
 namespace tflite {
 namespace testing {
 namespace {
@@ -686,5 +690,41 @@ TEST(TransposeTest, Complex5DTestWithReorder) {
   tflite::testing::TestTranspose(input_dims_data, input_data, output_dims_data,
                                  expected_output_data, output_data, &params);
 }
+
+#if ARM_NN_ENABLE_F16
+namespace tflite {
+namespace testing {
+TEST(TransposeTest, TransposeFloat16ReferenceFallback) {
+  int input_dims_data[] = {5, 1, 1, 1, 2, 2};
+  int output_dims_data[] = {5, 1, 1, 1, 2, 2};
+  int perm_dims_data[] = {1, 5};
+  int perm[] = {0, 1, 2, 4, 3};
+  float16_t input[] = {static_cast<float16_t>(1), static_cast<float16_t>(2),
+                       static_cast<float16_t>(3), static_cast<float16_t>(4)};
+  float16_t output[4] = {};
+  const float expected[] = {1.0f, 3.0f, 2.0f, 4.0f};
+
+  TfLiteTensor tensors[] = {
+      CreateTensor(input, IntArrayFromInts(input_dims_data), false,
+                   kTfLiteFloat16),
+      CreateTensor(perm, IntArrayFromInts(perm_dims_data), true, kTfLiteInt32),
+      CreateTensor(output, IntArrayFromInts(output_dims_data), false,
+                   kTfLiteFloat16),
+  };
+  tensors[1].allocation_type = kTfLiteMmapRo;
+  int inputs_array_data[] = {2, 0, 1};
+  int outputs_array_data[] = {1, 2};
+  micro::KernelRunner runner(Register_TRANSPOSE(), tensors, 3,
+                             IntArrayFromInts(inputs_array_data),
+                             IntArrayFromInts(outputs_array_data), nullptr);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  for (int i = 0; i < 4; ++i) {
+    EXPECT_EQ(expected[i], static_cast<float>(output[i]));
+  }
+}
+}  // namespace testing
+}  // namespace tflite
+#endif
 
 TF_LITE_MICRO_TESTS_MAIN

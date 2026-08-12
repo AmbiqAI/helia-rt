@@ -212,7 +212,29 @@ TfLiteStatus TanhEval(TfLiteContext* context, TfLiteNode* node) {
   const OpData& data = *(static_cast<const OpData*>(node->user_data));
 
   switch (input->type) {
+    case kTfLiteFloat16:
+#if ARM_NN_ENABLE_F16
+      return arm_nn_activation_f16(
+                 tflite::micro::GetTensorData<float16_t>(input),
+                 tflite::micro::GetTensorData<float16_t>(output),
+                 tflite::micro::GetTensorShape(input).FlatSize(), ARM_NN_FLT_ACT_TANH, 0.0f) ==
+                 ARM_CMSIS_NN_SUCCESS
+                 ? kTfLiteOk
+                 : kTfLiteError;
+#else
+      MicroPrintf("Float16 TANH requires ARM_NN_ENABLE_F16.");
+      return kTfLiteError;
+#endif
     case kTfLiteFloat32: {
+#if ARM_NN_ENABLE_F32
+      if (arm_nn_activation_f32(
+              tflite::micro::GetTensorData<float>(input),
+              tflite::micro::GetTensorData<float>(output),
+              tflite::micro::GetTensorShape(input).FlatSize(),
+              ARM_NN_FLT_ACT_TANH, 0.0f) == ARM_CMSIS_NN_SUCCESS) {
+        return kTfLiteOk;
+      }
+#endif
       reference_ops::Tanh(tflite::micro::GetTensorShape(input),
                           tflite::micro::GetTensorData<float>(input),
                           tflite::micro::GetTensorShape(output),

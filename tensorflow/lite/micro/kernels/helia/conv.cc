@@ -24,6 +24,7 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/padding.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_log.h"
 
@@ -72,12 +73,15 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, input->type, output->type);
   TF_LITE_ENSURE_MSG(context,
                      input->type == kTfLiteFloat32 ||
+                         (kHeliaFloat16Enabled &&
+                          input->type == kTfLiteFloat16) ||
                          input->type == kTfLiteInt16 ||
                          input->type == kTfLiteInt8,
                      "Input data type not supported");
   TF_LITE_ENSURE_MSG(
       context,
       (input->type == kTfLiteFloat32 && filter->type == kTfLiteFloat32) ||
+          (input->type == kTfLiteFloat16 && filter->type == kTfLiteFloat16) ||
           (input->type == kTfLiteInt16 && filter->type == kTfLiteInt8) ||
           (input->type == kTfLiteInt8 &&
            (filter->type == kTfLiteInt4 || filter->type == kTfLiteInt8)),
@@ -96,6 +100,15 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   // Output channels should be an even multiple of the number of groups
   const int groups = input->dims->data[3] / filter->dims->data[3];
   TFLITE_DCHECK_EQ(output->dims->data[3] % groups, 0);
+
+  // heliaCore's float convolution kernels do not implement grouped
+  // convolution: they stride the filter by the full input channel count, so
+  // groups > 1 would read out of bounds and return success. Float32 falls
+  // back to the reference kernel at Eval; float16 has no reference path, so
+  // reject grouped float16 here.
+  TF_LITE_ENSURE_MSG(
+      context, input->type != kTfLiteFloat16 || groups == 1,
+      "Float16 CONV_2D does not support grouped convolution.");
 
   //reset weight buffer idx
   data->weight_buffer_idx = -1;
@@ -198,6 +211,46 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
       data->activation_buffer_idx = -1;
     }
   }
+#if ARM_NN_ENABLE_F32
+  // groups > 1 is served by the reference kernel, which needs no scratch.
+  if (input->type == kTfLiteFloat32 &&
+      input->dims->data[3] == filter->dims->data[3]) {
+    data->activation_buffer_idx = -1;
+    const cmsis_nn_conv_params_f32 conv_params = {
+        .stride = {params.stride_width, params.stride_height},
+        .padding = {data->reference_op_data.padding.width,
+                    data->reference_op_data.padding.height},
+        .dilation = {params.dilation_width_factor,
+                     params.dilation_height_factor},
+        .activation = {0.0f, 0.0f},
+        .weight_format = ARM_NN_WEIGHT_FORMAT_STANDARD};
+    const int32_t size = arm_convolve_wrapper_f32_get_buffer_size(
+        &conv_params, &input_dims, &filter_dims, &output_dims);
+    if (size > 0) {
+      TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
+          context, size, &data->activation_buffer_idx));
+    }
+  }
+#endif
+#if ARM_NN_ENABLE_F16
+  if (input->type == kTfLiteFloat16) {
+    data->activation_buffer_idx = -1;
+    const cmsis_nn_conv_params_f16 conv_params = {
+        .stride = {params.stride_width, params.stride_height},
+        .padding = {data->reference_op_data.padding.width,
+                    data->reference_op_data.padding.height},
+        .dilation = {params.dilation_width_factor,
+                     params.dilation_height_factor},
+        .activation = {0.0f, 0.0f},
+        .weight_format = ARM_NN_WEIGHT_FORMAT_STANDARD};
+    const int32_t size = arm_convolve_wrapper_f16_get_buffer_size(
+        &conv_params, &input_dims, &filter_dims, &output_dims);
+    if (size > 0) {
+      TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
+          context, size, &data->activation_buffer_idx));
+    }
+  }
+#endif
 
   micro_context->DeallocateTempTfLiteTensor(output);
   micro_context->DeallocateTempTfLiteTensor(input);
@@ -484,7 +537,91 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
       "Hybrid models are not supported on TFLite Micro.");
 
   switch (input->type) {  // Already know in/out types are same.
+    case kTfLiteFloat16: {
+#if ARM_NN_ENABLE_F16
+      cmsis_nn_dims input_dims = {input->dims->data[0], input->dims->data[1],
+                                  input->dims->data[2], input->dims->data[3]};
+      cmsis_nn_dims filter_dims = {filter->dims->data[0], filter->dims->data[1],
+                                   filter->dims->data[2], filter->dims->data[3]};
+      cmsis_nn_dims output_dims = {output->dims->data[0], output->dims->data[1],
+                                   output->dims->data[2], output->dims->data[3]};
+      cmsis_nn_dims bias_dims = {1, 1, 1, output_dims.c};
+      float activation_min, activation_max;
+      CalculateActivationRange(params.activation, &activation_min,
+                               &activation_max);
+      cmsis_nn_conv_params_f16 conv_params = {
+          .stride = {params.stride_width, params.stride_height},
+          .padding = {data.reference_op_data.padding.width,
+                      data.reference_op_data.padding.height},
+          .dilation = {params.dilation_width_factor,
+                       params.dilation_height_factor},
+          .activation = {HeliaFloat16ActivationBound(activation_min),
+                         HeliaFloat16ActivationBound(activation_max)},
+          .weight_format = ARM_NN_WEIGHT_FORMAT_STANDARD};
+      cmsis_nn_context ctx = {nullptr, 0};
+      if (data.activation_buffer_idx >= 0) {
+        ctx.buf = context->GetScratchBuffer(context, data.activation_buffer_idx);
+        ctx.size = arm_convolve_wrapper_f16_get_buffer_size(
+            &conv_params, &input_dims, &filter_dims, &output_dims);
+      }
+      // Grouped convolution is rejected at Prepare; keep the guard here so
+      // the heliaCore kernel can never see a filter with fewer channels than
+      // the input (it would read the filter out of bounds).
+      if (input_dims.c == filter_dims.c &&
+          arm_convolve_wrapper_f16(
+              &ctx, &conv_params, &input_dims,
+              tflite::micro::GetTensorData<float16_t>(input), &filter_dims,
+              tflite::micro::GetTensorData<float16_t>(filter), &bias_dims,
+              tflite::micro::GetOptionalTensorData<float16_t>(bias),
+              &output_dims, tflite::micro::GetTensorData<float16_t>(output)) ==
+          ARM_CMSIS_NN_SUCCESS) {
+        break;
+      }
+#endif
+      MicroPrintf(
+          "Float16 CONV_2D: optimized kernel rejected the configuration.");
+      return kTfLiteError;
+    }
     case kTfLiteFloat32: {
+#if ARM_NN_ENABLE_F32
+      cmsis_nn_dims input_dims = {input->dims->data[0], input->dims->data[1],
+                                  input->dims->data[2], input->dims->data[3]};
+      cmsis_nn_dims filter_dims = {filter->dims->data[0], filter->dims->data[1],
+                                   filter->dims->data[2], filter->dims->data[3]};
+      cmsis_nn_dims output_dims = {output->dims->data[0], output->dims->data[1],
+                                   output->dims->data[2], output->dims->data[3]};
+      cmsis_nn_dims bias_dims = {1, 1, 1, output_dims.c};
+      float activation_min;
+      float activation_max;
+      CalculateActivationRange(params.activation, &activation_min,
+                               &activation_max);
+      cmsis_nn_conv_params_f32 conv_params = {
+          .stride = {params.stride_width, params.stride_height},
+          .padding = {data.reference_op_data.padding.width,
+                      data.reference_op_data.padding.height},
+          .dilation = {params.dilation_width_factor,
+                       params.dilation_height_factor},
+          .activation = {activation_min, activation_max},
+          .weight_format = ARM_NN_WEIGHT_FORMAT_STANDARD};
+      cmsis_nn_context ctx = {nullptr, 0};
+      if (data.activation_buffer_idx >= 0) {
+        ctx.buf = context->GetScratchBuffer(context, data.activation_buffer_idx);
+        ctx.size = arm_convolve_wrapper_f32_get_buffer_size(
+            &conv_params, &input_dims, &filter_dims, &output_dims);
+      }
+      // Grouped convolution (input_c != filter_c) is not implemented by the
+      // heliaCore float kernels; use the reference fallback for it.
+      if (input_dims.c == filter_dims.c &&
+          arm_convolve_wrapper_f32(
+              &ctx, &conv_params, &input_dims,
+              tflite::micro::GetTensorData<float>(input), &filter_dims,
+              tflite::micro::GetTensorData<float>(filter), &bias_dims,
+              tflite::micro::GetOptionalTensorData<float>(bias), &output_dims,
+              tflite::micro::GetTensorData<float>(output)) ==
+          ARM_CMSIS_NN_SUCCESS) {
+        break;
+      }
+#endif
       tflite::reference_ops::Conv(
           ConvParamsFloat(params, data.reference_op_data),
           tflite::micro::GetTensorShape(input),

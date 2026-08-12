@@ -144,7 +144,7 @@ Known-good versions:
 
     - name: ns-cmsis-nn
       url: https://github.com/AmbiqAI/ns-cmsis-nn
-      revision: <ns-cmsis-nn-version>  # e.g. v7.25.0
+      revision: <ns-cmsis-nn-version>  # e.g. v7.28.0 (min for fp32/fp16)
       path: modules/ns-cmsis-nn
     ```
 
@@ -192,11 +192,16 @@ Known-good versions:
     CONFIG_UART_CONSOLE=y
 
     CONFIG_HELIA_RT=y
+    CONFIG_NS_CMSIS_NN_ENABLE_F32=y
+    CONFIG_NS_CMSIS_NN_ENABLE_F16=y
     ```
 
     Required heliaRT-specific settings:
 
     - `CONFIG_HELIA_RT=y`
+    - `CONFIG_NS_CMSIS_NN_ENABLE_F32=y`
+    - `CONFIG_NS_CMSIS_NN_ENABLE_F16=y` on Armv8.1-M targets with MVE
+      floating point, such as Cortex-M55. Omit it on targets without MVEF.
 
     Optional HELIA kernel profile:
 
@@ -507,6 +512,8 @@ Source modules + HELIA:
 - `modules/helia-rt` exists (via `west update helia-rt`)
 - `modules/ns-cmsis-nn` exists (via `west update ns-cmsis-nn`)
 - `CONFIG_HELIA_RT=y` is enabled
+- `CONFIG_NS_CMSIS_NN_ENABLE_F32=y` is enabled
+- `CONFIG_NS_CMSIS_NN_ENABLE_F16=y` is enabled for MVEF targets
 - backend, CPP, FPU, and ns-cmsis-nn auto-configure
 
 Prebuilt release module:

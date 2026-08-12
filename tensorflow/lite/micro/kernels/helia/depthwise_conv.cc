@@ -26,6 +26,7 @@ limitations under the License.
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/padding.h"
 #include "tensorflow/lite/micro/kernels/conv.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_log.h"
 
@@ -82,12 +83,15 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, input->type, output->type);
   TF_LITE_ENSURE_MSG(context,
                      input->type == kTfLiteFloat32 ||
+                         (kHeliaFloat16Enabled &&
+                          input->type == kTfLiteFloat16) ||
                          input->type == kTfLiteInt16 ||
                          input->type == kTfLiteInt8,
                      "Input data type not supported");
   TF_LITE_ENSURE_MSG(
       context,
       (input->type == kTfLiteFloat32 && filter->type == kTfLiteFloat32) ||
+          (input->type == kTfLiteFloat16 && filter->type == kTfLiteFloat16) ||
           (input->type == kTfLiteInt16 && filter->type == kTfLiteInt8) ||
           (input->type == kTfLiteInt8 &&
            (filter->type == kTfLiteInt4 || filter->type == kTfLiteInt8)),
@@ -231,6 +235,57 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     }
 
   }
+
+#if ARM_NN_ENABLE_F32
+  if (input->type == kTfLiteFloat32) {
+    data->activation_buffer_idx = -1;
+    cmsis_nn_dims input_dims = {1, input_height, input_width,
+                                input->dims->data[3]};
+    cmsis_nn_dims filter_dims = {filter->dims->data[0], filter_height,
+                                 filter_width, filter->dims->data[3]};
+    cmsis_nn_dims output_dims = {1, output_height, output_width,
+                                 output->dims->data[3]};
+    cmsis_nn_dw_conv_params_f32 dw_params = {
+        .ch_mult = params.depth_multiplier,
+        .stride = {params.stride_width, params.stride_height},
+        .padding = {data->reference_op_data.padding.width,
+                    data->reference_op_data.padding.height},
+        .dilation = {params.dilation_width_factor,
+                     params.dilation_height_factor},
+        .activation = {0.0f, 0.0f}};
+    const int32_t size = arm_depthwise_conv_wrapper_f32_get_buffer_size(
+        &dw_params, &input_dims, &filter_dims, &output_dims);
+    if (size > 0) {
+      TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
+          context, size, &data->activation_buffer_idx));
+    }
+  }
+#endif
+#if ARM_NN_ENABLE_F16
+  if (input->type == kTfLiteFloat16) {
+    data->activation_buffer_idx = -1;
+    cmsis_nn_dims f16_input_dims = {1, input_height, input_width,
+                                    input->dims->data[3]};
+    cmsis_nn_dims f16_filter_dims = {filter->dims->data[0], filter_height,
+                                     filter_width, filter->dims->data[3]};
+    cmsis_nn_dims f16_output_dims = {1, output_height, output_width,
+                                     output->dims->data[3]};
+    cmsis_nn_dw_conv_params_f16 dw_params = {
+        .ch_mult = params.depth_multiplier,
+        .stride = {params.stride_width, params.stride_height},
+        .padding = {data->reference_op_data.padding.width,
+                    data->reference_op_data.padding.height},
+        .dilation = {params.dilation_width_factor,
+                     params.dilation_height_factor},
+        .activation = {0.0f, 0.0f}};
+    const int32_t size = arm_depthwise_conv_wrapper_f16_get_buffer_size(
+        &dw_params, &f16_input_dims, &f16_filter_dims, &f16_output_dims);
+    if (size > 0) {
+      TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
+          context, size, &data->activation_buffer_idx));
+    }
+  }
+#endif
 
   micro_context->DeallocateTempTfLiteTensor(output);
   micro_context->DeallocateTempTfLiteTensor(input);
@@ -446,7 +501,85 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
           : nullptr;
 
   switch (input->type) {  // Already know in/out types are same.
+    case kTfLiteFloat16: {
+#if ARM_NN_ENABLE_F16
+      cmsis_nn_dims input_dims = {input->dims->data[0], input->dims->data[1],
+                                  input->dims->data[2], input->dims->data[3]};
+      cmsis_nn_dims filter_dims = {filter->dims->data[0], filter->dims->data[1],
+                                   filter->dims->data[2], filter->dims->data[3]};
+      cmsis_nn_dims output_dims = {output->dims->data[0], output->dims->data[1],
+                                   output->dims->data[2], output->dims->data[3]};
+      cmsis_nn_dims bias_dims = {1, 1, 1, output_dims.c};
+      float activation_min;
+      float activation_max;
+      CalculateActivationRange(params.activation, &activation_min,
+                               &activation_max);
+      cmsis_nn_dw_conv_params_f16 dw_params = {
+          .ch_mult = params.depth_multiplier,
+          .stride = {params.stride_width, params.stride_height},
+          .padding = {data.reference_op_data.padding.width,
+                      data.reference_op_data.padding.height},
+          .dilation = {params.dilation_width_factor,
+                       params.dilation_height_factor},
+          .activation = {HeliaFloat16ActivationBound(activation_min),
+                         HeliaFloat16ActivationBound(activation_max)}};
+      cmsis_nn_context ctx = {nullptr, 0};
+      if (data.activation_buffer_idx >= 0) {
+        ctx.buf = context->GetScratchBuffer(context, data.activation_buffer_idx);
+        ctx.size = arm_depthwise_conv_wrapper_f16_get_buffer_size(
+            &dw_params, &input_dims, &filter_dims, &output_dims);
+      }
+      if (arm_depthwise_conv_wrapper_f16(
+              &ctx, &dw_params, &input_dims, tflite::micro::GetTensorData<float16_t>(input),
+              &filter_dims, tflite::micro::GetTensorData<float16_t>(filter), &bias_dims,
+              tflite::micro::GetOptionalTensorData<float16_t>(bias),
+              &output_dims, tflite::micro::GetTensorData<float16_t>(output)) ==
+          ARM_CMSIS_NN_SUCCESS) {
+        break;
+      }
+#endif
+      MicroPrintf(
+          "Float16 DEPTHWISE_CONV_2D: optimized kernel rejected the "
+          "configuration.");
+      return kTfLiteError;
+    }
     case kTfLiteFloat32: {
+#if ARM_NN_ENABLE_F32
+      cmsis_nn_dims input_dims = {input->dims->data[0], input->dims->data[1],
+                                  input->dims->data[2], input->dims->data[3]};
+      cmsis_nn_dims filter_dims = {filter->dims->data[0], filter->dims->data[1],
+                                   filter->dims->data[2], filter->dims->data[3]};
+      cmsis_nn_dims output_dims = {output->dims->data[0], output->dims->data[1],
+                                   output->dims->data[2], output->dims->data[3]};
+      cmsis_nn_dims bias_dims = {1, 1, 1, output_dims.c};
+      float activation_min;
+      float activation_max;
+      CalculateActivationRange(params.activation, &activation_min,
+                               &activation_max);
+      cmsis_nn_dw_conv_params_f32 dw_params = {
+          .ch_mult = params.depth_multiplier,
+          .stride = {params.stride_width, params.stride_height},
+          .padding = {data.reference_op_data.padding.width,
+                      data.reference_op_data.padding.height},
+          .dilation = {params.dilation_width_factor,
+                       params.dilation_height_factor},
+          .activation = {activation_min, activation_max}};
+      cmsis_nn_context ctx = {nullptr, 0};
+      if (data.activation_buffer_idx >= 0) {
+        ctx.buf = context->GetScratchBuffer(context, data.activation_buffer_idx);
+        ctx.size = arm_depthwise_conv_wrapper_f32_get_buffer_size(
+            &dw_params, &input_dims, &filter_dims, &output_dims);
+      }
+      if (arm_depthwise_conv_wrapper_f32(
+              &ctx, &dw_params, &input_dims,
+              tflite::micro::GetTensorData<float>(input), &filter_dims,
+              tflite::micro::GetTensorData<float>(filter), &bias_dims,
+              tflite::micro::GetOptionalTensorData<float>(bias), &output_dims,
+              tflite::micro::GetTensorData<float>(output)) ==
+          ARM_CMSIS_NN_SUCCESS) {
+        break;
+      }
+#endif
       tflite::reference_ops::DepthwiseConv(
           DepthwiseConvParamsFloat(params, data.reference_op_data),
           tflite::micro::GetTensorShape(input),

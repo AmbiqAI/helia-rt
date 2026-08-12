@@ -3,9 +3,9 @@ ifneq (,$(filter $(TARGET_ARCH), x86_64))
   # NS-CMSIS-NN optimizations not supported
 endif
 
-# Tracks AmbiqAI/ns-cmsis-nn tag v7.24.0. Consumed by ns_cmsis_nn_download.sh
+# Tracks AmbiqAI/ns-cmsis-nn tag v7.29.1. Consumed by ns_cmsis_nn_download.sh
 # via the environment.
-NS_CMSIS_NN_COMMIT ?= 8d62c8ce81a3e26d764fdea44f519fb2d4626781
+NS_CMSIS_NN_COMMIT ?= 50ea825abdb97c9b1ed78aff09f3752469e3b00d
 export NS_CMSIS_NN_COMMIT
 
 ifneq (,$(NS_CMSIS_NN_LIBS))
@@ -28,7 +28,7 @@ ifeq ($(CMSIS_PATH), $(CMSIS_DEFAULT_DOWNLOAD_PATH))
   endif
 endif
 NS_CMSIS_NN_DEFAULT_DOWNLOAD_PATH := $(DOWNLOADS_DIR)/ns_cmsis_nn
-NS_CMSIS_NN_PATH := $(NS_CMSIS_NN_DEFAULT_DOWNLOAD_PATH)
+NS_CMSIS_NN_PATH ?= $(NS_CMSIS_NN_DEFAULT_DOWNLOAD_PATH)
 ifeq ($(NS_CMSIS_NN_PATH), $(NS_CMSIS_NN_DEFAULT_DOWNLOAD_PATH))
   DOWNLOAD_RESULT := $(shell $(MAKEFILE_DIR)/ext_libs/ns_cmsis_nn_download.sh ${DOWNLOADS_DIR} ${TENSORFLOW_ROOT})
   ifneq ($(DOWNLOAD_RESULT), SUCCESS)
@@ -37,7 +37,12 @@ ifeq ($(NS_CMSIS_NN_PATH), $(NS_CMSIS_NN_DEFAULT_DOWNLOAD_PATH))
 endif
 
 ifeq (,$(NS_CMSIS_NN_LIBS))
-  THIRD_PARTY_KERNEL_CC_SRCS += $(shell find $(NS_CMSIS_NN_PATH)/Source -name "*.c")
+  NS_CMSIS_NN_SOURCE_FILES := $(shell find $(NS_CMSIS_NN_PATH)/Source -name "*.c")
+  ifneq (,$(filter cortex-m55,$(TARGET_ARCH)))
+    THIRD_PARTY_KERNEL_CC_SRCS += $(NS_CMSIS_NN_SOURCE_FILES)
+  else
+    THIRD_PARTY_KERNEL_CC_SRCS += $(filter-out %_f16.c %_fp16.c,$(NS_CMSIS_NN_SOURCE_FILES))
+  endif
 else
   MICROLITE_LIBS += $(NS_CMSIS_NN_LIBS)
 endif
@@ -90,6 +95,48 @@ INCLUDES += \
 # $(...) expansion in the compile recipes).
 CCFLAGS  += -DCMSIS_NN
 CXXFLAGS += -DCMSIS_NN
+CCFLAGS  += -DARM_NN_ENABLE_F32=1
+CXXFLAGS += -DARM_NN_ENABLE_F32=1
+
+# The fp16 API requires ARMv8.1-M MVEF toolchain support. Keep it disabled for
+# other targets because heliaCore rejects ARM_NN_ENABLE_F16 without float16_t.
+ifneq (,$(filter cortex-m55,$(TARGET_ARCH)))
+  CCFLAGS  += -DARM_NN_ENABLE_F16=1
+  CXXFLAGS += -DARM_NN_ENABLE_F16=1
+
+  # GCC ICE workaround for GCC PR target/118460 ("[14 Regression] ICE on
+  # armv8.1-m.main with -mfloat-abi=hard"):
+  #   error: unrecognizable insn:
+  #   (set (reg:HF ...) (if_then_else:HF (lt (reg:CCFPE cc) 0) ...))
+  #   during RTL pass: vregs
+  # Scalar _Float16 conditional selects (`x < y ? x : y`, MIN/MAX/CLAMP)
+  # on Armv8.1-M+MVE.FP hard-float hit a broken `movhfcc` expander: it
+  # emits a vsel-style if_then_else:HF with a comparison the backend's
+  # arm_vsel_comparison_operator then rejects, so recognition fails. The
+  # trigger is ssa-phiopt turning if-diamonds into COND_EXPR/MIN/MAX
+  # which expand routes through emit_conditional_move (regression from
+  # GCC commit r14-2699). Disabling phiopt avoids the broken expander
+  # while keeping all other optimizations. Verified against Arm GNU
+  # Toolchain 14.3.Rel1: all 37 FP16 TUs ICE-free at -O2/-O3 with
+  # -fno-ssa-phiopt (6 of them ICE without it).
+  #
+  # Fix status upstream: fixed on master (r16-4445, r16-5119) and
+  # backported to releases/gcc-15 (r15-10491, r15-10492) — Arm GNU
+  # Toolchain 15.2.Rel1+ is clean (verified). NOT backported to the
+  # gcc-14 branch (14.4 shipped without it; retargeted to 14.5), so this
+  # stays until the pinned toolchain in arm_gcc_download.sh moves to
+  # >= 15.2.Rel1, at which point this block can be removed.
+  #
+  # Only TOOLCHAIN=gcc is affected; armclang/ATfE are clang-based and
+  # neither have the bug nor accept -fno-ssa-phiopt.
+  ifeq ($(TOOLCHAIN), gcc)
+    NS_CMSIS_NN_FP16_OBJS := \
+        $(patsubst %.c,$(THIRD_PARTY_KERNEL_OBJDIR)%.o, \
+          $(filter %_f16.c %_fp16.c,$(NS_CMSIS_NN_SOURCE_FILES)))
+    NS_CMSIS_NN_FP16_OPT_LEVEL ?= $(THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL) -fno-ssa-phiopt
+    $(NS_CMSIS_NN_FP16_OBJS): THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := $(NS_CMSIS_NN_FP16_OPT_LEVEL)
+  endif
+endif
 
 # helia per-kernel optimization knobs.
 #

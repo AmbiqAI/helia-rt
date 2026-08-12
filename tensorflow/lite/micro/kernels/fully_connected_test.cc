@@ -24,6 +24,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
+#if ARM_NN_ENABLE_F16
+#include "arm_nnfunctions_flt.h"
+#endif
+
 namespace tflite {
 namespace testing {
 namespace {
@@ -995,5 +999,54 @@ TEST(FullyConnectedTest, SimpleTestQuantizedInt4Weights) {
       kTfLiteActNone, output_data, kTfLiteInt4);
 }
 #endif  // !defined(HEXAGON)
+
+#if ARM_NN_ENABLE_F16
+namespace tflite {
+namespace testing {
+TEST(FullyConnectedTest, SimpleFloat16MultiBatchGolden) {
+  int input_dims_data[] = {2, 2, 3};
+  int weights_dims_data[] = {2, 4, 3};
+  int bias_dims_data[] = {1, 4};
+  int output_dims_data[] = {2, 2, 4};
+
+  float16_t input[] = {1, 2, 3, 4, 5, 6};
+  float16_t weights[] = {
+      1, 0, 0,
+      0, 1, 0,
+      0, 0, 1,
+      1, 1, 1,
+  };
+  float16_t bias[] = {0, 0, 0, 1};
+  float16_t output[8] = {};
+  const float expected[] = {1, 2, 3, 7, 4, 5, 6, 16};
+
+  TfLiteTensor tensors[] = {
+      CreateTensor(input, IntArrayFromInts(input_dims_data), false,
+                   kTfLiteFloat16),
+      CreateTensor(weights, IntArrayFromInts(weights_dims_data), true,
+                   kTfLiteFloat16),
+      CreateTensor(bias, IntArrayFromInts(bias_dims_data), true,
+                   kTfLiteFloat16),
+      CreateTensor(output, IntArrayFromInts(output_dims_data), false,
+                   kTfLiteFloat16),
+  };
+  int inputs_array_data[] = {3, 0, 1, 2};
+  int outputs_array_data[] = {1, 3};
+  TfLiteFullyConnectedParams params = {
+      kTfLiteActNone, kTfLiteFullyConnectedWeightsFormatDefault, false, false,
+      kTfLiteNoType};
+
+  micro::KernelRunner runner(Register_FULLY_CONNECTED(), tensors, 4,
+                             IntArrayFromInts(inputs_array_data),
+                             IntArrayFromInts(outputs_array_data), &params);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  for (int i = 0; i < 8; ++i) {
+    EXPECT_NEAR(expected[i], static_cast<float>(output[i]), 2e-2f);
+  }
+}
+}  // namespace testing
+}  // namespace tflite
+#endif
 
 TF_LITE_MICRO_TESTS_MAIN

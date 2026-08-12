@@ -21,6 +21,7 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/reference/process_broadcast_shapes.h"
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/mul.h"
 #include "tensorflow/lite/micro/memory_helpers.h"
@@ -175,7 +176,37 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
     case kTfLiteInt32:
       EvalMulQuantizedReference(context, node, data, input1, input2, output);
       break;
+    case kTfLiteFloat16:
+#if ARM_NN_ENABLE_F16
+      if (tflite::micro::HaveSameShapes(input1, input2) &&
+          arm_elementwise_mul_f16(
+              tflite::micro::GetTensorData<float16_t>(input1),
+              tflite::micro::GetTensorData<float16_t>(input2),
+              tflite::micro::GetTensorData<float16_t>(output),
+              HeliaFloat16ActivationBound(data->output_activation_min_f32),
+              HeliaFloat16ActivationBound(data->output_activation_max_f32),
+              tflite::micro::GetTensorShape(output).FlatSize()) ==
+          ARM_CMSIS_NN_SUCCESS) {
+        break;
+      }
+#endif
+      MicroPrintf("Float16 MUL: optimized kernel rejected the configuration.");
+      return kTfLiteError;
     case kTfLiteFloat32:
+#if ARM_NN_ENABLE_F32
+      if (tflite::micro::HaveSameShapes(input1, input2)) {
+        const int size = tflite::micro::GetTensorShape(output).FlatSize();
+        if (arm_elementwise_mul_f32(
+                tflite::micro::GetTensorData<float>(input1),
+                tflite::micro::GetTensorData<float>(input2),
+                tflite::micro::GetTensorData<float>(output),
+                data->output_activation_min_f32,
+                data->output_activation_max_f32, size) ==
+            ARM_CMSIS_NN_SUCCESS) {
+          break;
+        }
+      }
+#endif
       EvalMulFloatReference(context, node, params, data, input1, input2,
                             output);
       break;
@@ -224,8 +255,36 @@ TfLiteStatus EvalInt16(TfLiteContext* context, TfLiteNode* node) {
   return kTfLiteOk;
 }
 
+// Wraps the shared MulPrepare with the float16 constraints of the helia
+// backend: the optimized kernel is the only float16 implementation (no
+// reference fallback) and does not broadcast, so surface both limitations at
+// Prepare time instead of failing mid-inference.
+TfLiteStatus PrepareMul(TfLiteContext* context, TfLiteNode* node) {
+  TF_LITE_ENSURE_OK(context, MulPrepare(context, node));
+
+  MicroContext* micro_context = GetMicroContext(context);
+  TfLiteTensor* input1 =
+      micro_context->AllocateTempInputTensor(node, kMulInput1Tensor);
+  TF_LITE_ENSURE(context, input1 != nullptr);
+  TfLiteTensor* input2 =
+      micro_context->AllocateTempInputTensor(node, kMulInput2Tensor);
+  TF_LITE_ENSURE(context, input2 != nullptr);
+
+  if (input1->type == kTfLiteFloat16) {
+    TF_LITE_ENSURE_MSG(context, kHeliaFloat16Enabled,
+                       "Float16 MUL requires ARM_NN_ENABLE_F16.");
+    TF_LITE_ENSURE_MSG(
+        context, HaveSameShapes(input1, input2),
+        "Float16 MUL does not support broadcasting between input shapes.");
+  }
+
+  micro_context->DeallocateTempTfLiteTensor(input1);
+  micro_context->DeallocateTempTfLiteTensor(input2);
+  return kTfLiteOk;
+}
+
 TFLMRegistration Register_MUL() {
-  return tflite::micro::RegisterOp(MulInit, MulPrepare, Eval);
+  return tflite::micro::RegisterOp(MulInit, PrepareMul, Eval);
 }
 
 TFLMRegistration Register_MUL_INT8() {

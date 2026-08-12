@@ -197,6 +197,29 @@ if [[ ! -f "${LIB_PATH}" ]]; then
   exit 4
 fi
 
+if [[ "${OPTIMIZED_KERNEL_DIR}" == "helia" ]]; then
+  echo "== Verifying HELIA floating-point kernels =="
+  ARCHIVE_MEMBERS="$(ar t "${LIB_PATH}")"
+  require_archive_member() {
+    local member="$1"
+    if ! grep -Fxq "${member}" <<<"${ARCHIVE_MEMBERS}"; then
+      echo "ERROR: ${LIB_PATH} is missing required archive member ${member}" >&2
+      exit 5
+    fi
+  }
+
+  require_archive_member arm_convolve_f32.o
+  require_archive_member arm_softmax_f32.o
+
+  if [[ "${ARCH}" == "cortex-m55" ]]; then
+    require_archive_member arm_convolve_f16.o
+    require_archive_member arm_softmax_f16.o
+  elif grep -Eq '_(f16|fp16)\.o$' <<<"${ARCHIVE_MEMBERS}"; then
+    echo "ERROR: ${LIB_PATH} contains FP16 kernels for unsupported ${ARCH}" >&2
+    exit 5
+  fi
+fi
+
 cp "${LIB_PATH}" "${OUTDIR}/lib/libhelia-rt-${TARGET_SHORT}-${TOOLCHAIN}-${BUILD_NAME}.a"
 echo "Copied lib -> ${OUTDIR}/lib/libhelia-rt-${TARGET_SHORT}-${TOOLCHAIN}-${BUILD_NAME}.a"
 

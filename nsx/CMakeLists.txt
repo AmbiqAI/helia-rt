@@ -24,6 +24,14 @@
 # Backend-specific upstream targets:
 #   helia:    nsx::cmsis_nn (or alias) — ns-cmsis-nn kernels, with Ambiq's
 #             additive weight-sum / fast-path symbols actively referenced.
+#             Requires ns-cmsis-nn v7.28.0 or later, and the parent build MUST
+#             set the float options *before* it adds the ns-cmsis-nn module:
+#                 set(NSX_CMSIS_NN_ENABLE_F32 ON CACHE BOOL "" FORCE)
+#                 set(NSX_CMSIS_NN_ENABLE_F16 ON CACHE BOOL "" FORCE)  # MVE-F
+#                 add_subdirectory(<ns-cmsis-nn>/nsx ...)
+#                 add_subdirectory(<helia-rt>/nsx ...)
+#             ns-cmsis-nn reads those options while its own CMakeLists runs, so
+#             this module can only validate them — see the check below.
 #   cmsis_nn: User-supplied upstream CMSIS-NN target. ns-cmsis-nn is NOT
 #             compatible (modified API signatures). Supply the target via
 #             -DHELIA_RT_CMSISNN_TARGET=<name> (e.g. CMSIS::NN from an
@@ -134,6 +142,38 @@ set(HELIA_RT_PROVIDE_DEBUG_LOG  OFF CACHE BOOL "" FORCE)
 # NSX_HELIA_RT_BACKEND in the same build dir) by unsetting the inactive one
 # rather than leaving a stale FORCE entry behind.
 if(NSX_HELIA_RT_BACKEND STREQUAL "helia")
+    # The helia backend consumes the experimental float API from ns-cmsis-nn.
+    #
+    # These options control *ns-cmsis-nn's own* source selection and the
+    # ARM_NN_ENABLE_F32/F16 compile definitions it exports. ns-cmsis-nn reads
+    # them while its own CMakeLists is processed, which a consumer does
+    # *before* adding this module (nsx::cmsis_nn must exist by the time
+    # helia_rt::helia links it). Assigning them here would therefore be a
+    # no-op: the dependency's target and source list are already fixed.
+    #
+    # So we validate rather than assign. The parent NSX build must set them
+    # before add_subdirectory(<ns-cmsis-nn>/nsx), e.g.
+    #     set(NSX_CMSIS_NN_ENABLE_F32 ON CACHE BOOL "" FORCE)
+    #     set(NSX_CMSIS_NN_ENABLE_F16 ON CACHE BOOL "" FORCE)  # MVE-F cores
+    if(NOT NSX_CMSIS_NN_ENABLE_F32)
+        message(FATAL_ERROR
+            "nsx-helia-rt: NSX_HELIA_RT_BACKEND=helia requires the fp32 "
+            "kernels from ns-cmsis-nn, but NSX_CMSIS_NN_ENABLE_F32 is not "
+            "enabled. Set -DNSX_CMSIS_NN_ENABLE_F32=ON (or set it in the "
+            "parent CMakeLists) *before* the ns-cmsis-nn module is added; "
+            "setting it afterwards has no effect. Requires ns-cmsis-nn "
+            "v7.28.0 or later, which bridges NSX_CMSIS_NN_ENABLE_F32/F16 to "
+            "source selection and to the exported ARM_NN_ENABLE_F32/F16 "
+            "definitions.")
+    endif()
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "cortex-m55" AND NOT NSX_CMSIS_NN_ENABLE_F16)
+        message(WARNING
+            "nsx-helia-rt: NSX_CMSIS_NN_ENABLE_F16 is not enabled, so the "
+            "fp16 helia kernels are unavailable on this MVE-F capable core "
+            "and float16 operators without a reference path will fail. Set "
+            "-DNSX_CMSIS_NN_ENABLE_F16=ON before the ns-cmsis-nn module is "
+            "added to enable them.")
+    endif()
     if(NOT HELIA_RT_NSCMSISNN_TARGET)
         set(HELIA_RT_NSCMSISNN_TARGET "nsx::cmsis_nn" CACHE STRING
             "ns-cmsis-nn target to link from helia_rt::helia (nsx-helia-rt default)" FORCE)
@@ -205,6 +245,7 @@ if(NSX_HELIA_RT_BACKEND STREQUAL "helia")
         set(_nsx_helia_rt_cmsis_nn_target nsx_cmsis_nn)
     endif()
     target_include_directories(helia_rt_helia PRIVATE
+        "$<TARGET_PROPERTY:${_nsx_helia_rt_cmsis_nn_target},SOURCE_DIR>"
         "$<TARGET_PROPERTY:${_nsx_helia_rt_cmsis_nn_target},SOURCE_DIR>/..")
 endif()
 

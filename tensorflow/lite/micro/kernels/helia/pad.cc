@@ -10,6 +10,7 @@
 #include "tensorflow/lite/kernels/internal/types.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/op_macros.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_log.h"
 
@@ -78,6 +79,17 @@ TfLiteStatus Prepare(TfLiteContext *context, TfLiteNode *node)
 
   // Current implementations rely on the inputs being <= 4D.
   TF_LITE_ENSURE(context, NumDimensions(input) <= reference_ops::PadKernelMaxDimensionCount());
+
+  // The float16 pad path is optimized-only (no reference fallback) and
+  // handles exactly 4-D tensors; reject anything else here rather than
+  // failing at Invoke time.
+  if (input->type == kTfLiteFloat16)
+  {
+    TF_LITE_ENSURE_MSG(context, kHeliaFloat16Enabled,
+                       "Float16 PAD requires ARM_NN_ENABLE_F16.");
+    TF_LITE_ENSURE_MSG(context, NumDimensions(input) == 4,
+                       "Float16 PAD supports only 4-D tensors.");
+  }
 
   if (constant_values != nullptr)
   {
@@ -164,9 +176,48 @@ TfLiteStatus Eval(TfLiteContext *context, TfLiteNode *node)
   switch (input->type)
   {
 
+  case kTfLiteFloat16:
+  {
+#if ARM_NN_ENABLE_F16
+    const float16_t pad_value =
+        constant_values == nullptr
+            ? static_cast<float16_t>(0)
+            : *tflite::micro::GetTensorData<float16_t>(constant_values);
+    if (tflite::micro::GetTensorShape(input).DimensionsCount() == 4) {
+      cmsis_nn_dims input_size;
+      cmsis_nn_dims pre_pad;
+      cmsis_nn_dims post_pad;
+      PopulateCommonParams(&input_size, &pre_pad, &post_pad, data,
+                           tflite::micro::GetTensorShape(input));
+      if (arm_pad_f16(tflite::micro::GetTensorData<float16_t>(input),
+                      tflite::micro::GetTensorData<float16_t>(output), pad_value,
+                      &input_size, &pre_pad, &post_pad) ==
+          ARM_CMSIS_NN_SUCCESS) {
+        break;
+      }
+    }
+#endif
+    MicroPrintf("Float16 PAD: optimized kernel rejected the configuration.");
+    return kTfLiteError;
+  }
   case kTfLiteFloat32:
   {
     float pad_value = constant_values == nullptr ? 0.f : *tflite::micro::GetTensorData<float>(constant_values);
+#if ARM_NN_ENABLE_F32
+    if (tflite::micro::GetTensorShape(input).DimensionsCount() == 4) {
+      cmsis_nn_dims input_size;
+      cmsis_nn_dims pre_pad;
+      cmsis_nn_dims post_pad;
+      PopulateCommonParams(&input_size, &pre_pad, &post_pad, data,
+                           tflite::micro::GetTensorShape(input));
+      if (arm_pad_f32(tflite::micro::GetTensorData<float>(input),
+                      tflite::micro::GetTensorData<float>(output), pad_value,
+                      &input_size, &pre_pad, &post_pad) ==
+          ARM_CMSIS_NN_SUCCESS) {
+        break;
+      }
+    }
+#endif
     if (data->params.resizing_category == ResizingCategory::kImageStyle)
     {
       reference_ops::PadImageStyle(

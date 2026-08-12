@@ -21,6 +21,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
+#if ARM_NN_ENABLE_F16
+#include "arm_nnfunctions_flt.h"
+#endif
+
 namespace tflite {
 namespace testing {
 namespace {
@@ -577,5 +581,42 @@ TEST(ConcatenationTest, TwoInputsQuantizedInt8FiveDimensions) {
       input_zero_point, axis, output_shape, output_value, output_scale,
       output_zero_point, output_data);
 }
+
+#if ARM_NN_ENABLE_F16
+namespace tflite {
+namespace testing {
+TEST(ConcatenationTest, ConcatenationFloat16Golden) {
+  int input_dims_data[] = {1, 2};
+  int output_dims_data[] = {1, 4};
+  float16_t input1[] = {static_cast<float16_t>(1.0f),
+                        static_cast<float16_t>(2.0f)};
+  float16_t input2[] = {static_cast<float16_t>(3.0f),
+                        static_cast<float16_t>(4.0f)};
+  float16_t output[4] = {};
+  const float expected[] = {1.0f, 2.0f, 3.0f, 4.0f};
+
+  TfLiteTensor tensors[] = {
+      CreateTensor(input1, IntArrayFromInts(input_dims_data), false,
+                   kTfLiteFloat16),
+      CreateTensor(input2, IntArrayFromInts(input_dims_data), false,
+                   kTfLiteFloat16),
+      CreateTensor(output, IntArrayFromInts(output_dims_data), false,
+                   kTfLiteFloat16),
+  };
+  int inputs_array_data[] = {2, 0, 1};
+  int outputs_array_data[] = {1, 2};
+  TfLiteConcatenationParams params = {0, kTfLiteActNone};
+  micro::KernelRunner runner(Register_CONCATENATION(), tensors, 3,
+                             IntArrayFromInts(inputs_array_data),
+                             IntArrayFromInts(outputs_array_data), &params);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  for (int i = 0; i < 4; ++i) {
+    EXPECT_EQ(expected[i], static_cast<float>(output[i]));
+  }
+}
+}  // namespace testing
+}  // namespace tflite
+#endif
 
 TF_LITE_MICRO_TESTS_MAIN
