@@ -65,7 +65,7 @@ else
   fi
 
   TEMPFILE=$(mktemp -d)/temp_file
-  wget ${CORSTONE_URL} -O ${TEMPFILE} >&2
+  wget_with_retries ${CORSTONE_URL} ${TEMPFILE}
   check_md5 ${TEMPFILE} ${EXPECTED_MD5}
 
   TEMPDIR=$(mktemp -d)

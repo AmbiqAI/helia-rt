@@ -102,6 +102,30 @@ function apply_patch_to_folder() {
   popd > /dev/null
 }
 
+# Download a URL to a file, retrying on transient server errors.
+#
+# GitHub's archive/release endpoints intermittently return 5xx responses or
+# drop connections mid-header. wget treats HTTP errors as fatal by default,
+# so a single 503 fails the whole build even though an immediate retry would
+# succeed. Retry both connection failures and retryable HTTP status codes,
+# with wget's built-in linear backoff (--waitretry) between attempts.
+#
+# Parameter(s):
+#   ${1} - download URL
+#   ${2} - path to the output file
+#   remaining arguments are passed through to wget (e.g. -4)
+function wget_with_retries() {
+  local url="${1}"
+  local output="${2}"
+  shift 2
+  # 15 tries with linear backoff capped at 15s waits ~105s in total before
+  # giving up — GitHub's 503 spells have been observed to outlast a ~30s
+  # window, so a minute-scale ceiling is deliberate.
+  wget --tries=15 --waitretry=15 --retry-connrefused \
+      --retry-on-http-error=429,500,502,503,504 \
+      "$@" "${url}" -O "${output}" >&2
+}
+
 # ---------------------------------------------------------------------------
 # Seed-file helpers for reproducible third-party downloads.
 #
