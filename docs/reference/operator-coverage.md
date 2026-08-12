@@ -85,16 +85,21 @@ heliaRT provides three kernel backends. Every operator has a **Reference** imple
 ## Floating-Point Coverage
 
 The HELIA backend also dispatches FP32 and FP16 operators to heliaCORE. These
-paths are opt-in at build time via `ARM_NN_ENABLE_F32` / `ARM_NN_ENABLE_F16`;
-see the [FP16 and FP32 guide](../guides/floating-point.md) for how each build
-system selects them.
+paths are gated at build time by `ARM_NN_ENABLE_F32` / `ARM_NN_ENABLE_F16`.
+The Make build and the published static libraries always enable FP32 (plus
+FP16 on Cortex-M55), NSX requires FP32, and Zephyr implies both from the
+target; only standalone CMake is fully opt-in. See the
+[FP16 and FP32 guide](../guides/floating-point.md) for how each build system
+resolves them.
 
 !!! warning "FP32 and FP16 degrade differently"
     **FP32** falls back to the Reference kernel whenever the optimized kernel
     is disabled or rejects a configuration — results stay correct, only slower.
-    **FP16 has no TFLM Reference implementation.** Where a limitation is known
-    at graph preparation the operator fails `AllocateTensors()`; otherwise it
-    returns `kTfLiteError` from `Invoke()`. Both log a diagnostic.
+    **Most FP16 operators have no TFLM Reference implementation** (pure data
+    movement such as `TRANSPOSE` and `RESHAPE` is the exception). Where a
+    limitation is known at graph preparation the operator fails
+    `AllocateTensors()`; otherwise it returns `kTfLiteError` from `Invoke()`,
+    in most cases with a logged diagnostic.
 
     FP16 additionally requires Armv8.1-M with MVE floating point (Cortex-M55).
     It is not available on Cortex-M4+FP.
@@ -111,19 +116,21 @@ system selects them.
 | `AVERAGE_POOL_2D` / `MAX_POOL_2D` | :white_check_mark: | :white_check_mark: | 4-D tensors only |
 | `SOFTMAX` | :white_check_mark: | :white_check_mark: | `beta == 1.0` only; other values use Reference (FP32) or are rejected at prepare (FP16) |
 | `PAD` / `PADV2` | :white_check_mark: | :white_check_mark: | FP16 requires 4-D tensors, enforced at prepare |
-| `TRANSPOSE` | :white_check_mark: | :white_check_mark: | Optimized for rank ≤ 4; higher ranks use the bitwise 16-bit Reference path |
+| `TRANSPOSE` | :white_check_mark: | :white_check_mark: | Optimized for rank ≤ 4; higher ranks use Reference (float path for FP32, bitwise 16-bit path for FP16). FP16 works even without `ARM_NN_ENABLE_F16` |
 | `MAXIMUM` / `MINIMUM` | :white_check_mark: | :white_check_mark: | Optimized for rank ≤ 4; higher ranks use Reference (FP32) |
 | `ADD` | :white_check_mark: | :white_check_mark: | FP16 requires matching input shapes; broadcasting is rejected at prepare |
 | `MUL` | :white_check_mark: | :white_check_mark: | FP16 requires matching input shapes; broadcasting is rejected at prepare |
-| `CONCATENATION` | :white_check_mark: | :white_check_mark: | Optimized for rank ≤ 4 |
+| `CONCATENATION` | :white_check_mark: | :white_check_mark: | Optimized for rank ≤ 4; higher ranks use the Reference path (FP32 and FP16) |
 | `RESHAPE` | :white_check_mark: | :white_check_mark: | Pure data movement; FP16 works even without `ARM_NN_ENABLE_F16` via a bitwise copy |
 | `RELU` / `RELU6` | :white_check_mark: | :white_check_mark: | |
 | `LOGISTIC` (sigmoid) | :white_check_mark: | :white_check_mark: | |
 | `TANH` | :white_check_mark: | :white_check_mark: | |
 
-Operators not listed above have no optimized floating-point path and use the
-Reference implementation for FP32. The published static libraries ship FP32
-kernels for Cortex-M4+FP and both FP32 and FP16 for Cortex-M55.
+Other operators use the Reference implementation for FP32, with one
+exception: `QUANTIZE` and `DEQUANTIZE` always convert through optimized
+heliaCORE kernels on their float32 side, independent of `ARM_NN_ENABLE_F32`.
+The published static libraries ship FP32 kernels for Cortex-M4+FP and both
+FP32 and FP16 for Cortex-M55.
 
 ## Summary
 

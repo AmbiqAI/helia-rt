@@ -33,6 +33,11 @@ jobs:
     name: Validate docs build (strict)
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    # This job builds pull-request-controlled code (mkdocs config can execute
+    # arbitrary Python), so do not inherit the workflow-level pages/id-token
+    # write grants — it only needs to read the repository.
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout 🛎️
@@ -45,7 +50,7 @@ jobs:
         env:
           CI: ""
         run: |
-          uv sync
+          uv sync --locked
           uv run mkdocs build --strict
 
   # Build job
