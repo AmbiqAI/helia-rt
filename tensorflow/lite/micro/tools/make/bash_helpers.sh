@@ -118,7 +118,10 @@ function wget_with_retries() {
   local url="${1}"
   local output="${2}"
   shift 2
-  wget --tries=8 --waitretry=10 --retry-connrefused \
+  # 15 tries with linear backoff capped at 15s waits ~105s in total before
+  # giving up — GitHub's 503 spells have been observed to outlast a ~30s
+  # window, so a minute-scale ceiling is deliberate.
+  wget --tries=15 --waitretry=15 --retry-connrefused \
       --retry-on-http-error=429,500,502,503,504 \
       "$@" "${url}" -O "${output}" >&2
 }
