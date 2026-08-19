@@ -171,11 +171,14 @@ make -f "${MAKE_DIR}/Makefile" clean
 
 # ---------------------------- Build library -----------------------------------
 JOBS="$(command -v nproc >/dev/null 2>&1 && nproc || echo 4)"
+# Pass the license identifier through the environment, not the command line:
+# make reads it either way, but a command-line argument shows up in process
+# listings and in any caller that logs the make invocation.
+export ARM_UBL_LICENSE_IDENTIFIER
 make -j"${JOBS}" -f "${MAKE_DIR}/Makefile" \
   TARGET="${TARGET}" \
   TARGET_ARCH="${ARCH}" \
   TOOLCHAIN="${TOOLCHAIN}" \
-  ARM_UBL_LICENSE_IDENTIFIER="${ARM_UBL_LICENSE_IDENTIFIER}" \
   OPTIMIZED_KERNEL_DIR="${OPTIMIZED_KERNEL_DIR}" \
   ${CMSIS_FLAG} \
   BUILD_TYPE="${BUILD}" \
