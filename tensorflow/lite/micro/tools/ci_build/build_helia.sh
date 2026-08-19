@@ -64,7 +64,10 @@ Other:
   -h, --help        Show this help
 
 Environment:
-  ARM_UBL_LICENSE_IDENTIFIER   Required when --toolchain armclang
+  ARM_UBL_LICENSE_IDENTIFIER   Required when --toolchain armclang. Prefer the
+                               environment variable over the -L flag below:
+                               command-line values land in shell history and
+                               in process listings.
   (ns-cmsis-nn is public and clones with no credential)
 EOF
 }

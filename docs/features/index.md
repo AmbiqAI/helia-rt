@@ -17,7 +17,7 @@ That means existing LiteRT knowledge transfers directly to heliaRT, while Ambiq-
 ## What heliaRT Adds
 
 - public source integration with `Reference` and open `CMSIS-NN` backends
-- optional HELIA acceleration through Ambiq's private backend module
+- optional HELIA acceleration through Ambiq's `ns-cmsis-nn` backend module
 - build and packaging flows aligned with Ambiq silicon targets
 - prebuilt release bundles for faster bring-up
 - Zephyr module support alongside source-based integration

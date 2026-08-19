@@ -7,17 +7,29 @@ Common build, link, and runtime issues — and how to fix them.
 ### Missing HELIA backend module
 
 ```
-FATAL_ERROR: CONFIG_HELIA_RT_BACKEND_HELIA requires Ambiq's HELIA
-acceleration module, currently distributed as ns-cmsis-nn.
+FATAL_ERROR: CONFIG_HELIA_RT_BACKEND_HELIA requires the ns-cmsis-nn Zephyr
+module (ZEPHYR_NS_CMSIS_NN_MODULE_DIR). Add it to your west manifest or
+select REFERENCE / CMSIS-NN.
 ```
 
-**Cause:** The HELIA backend needs the `ns-cmsis-nn` module, which is not bundled in the public repo.
+**Cause:** The HELIA backend builds against the `ns-cmsis-nn` module, and Zephyr
+cannot find it in your workspace. `ns-cmsis-nn` is a public repository — no
+credential or access request is required — but it is a separate module that
+your west manifest has to pull in.
 
-**Fix:** Either:
+**Fix:** Add it to your `west.yml`:
 
-- Switch to the open CMSIS-NN backend: `CONFIG_HELIA_RT_BACKEND_CMSIS_NN=y`
-- Switch to Reference: `CONFIG_HELIA_RT_BACKEND_REFERENCE=y`
-- Contact [support.aitg@ambiq.com](mailto:support.aitg@ambiq.com) for access to ns-cmsis-nn
+```yaml
+- name: ns-cmsis-nn
+  url: https://github.com/AmbiqAI/ns-cmsis-nn
+  revision: v7.29.2
+  path: modules/ns-cmsis-nn
+```
+
+Then run `west update ns-cmsis-nn`. Alternatively, switch backends:
+
+- Open CMSIS-NN backend: `CONFIG_HELIA_RT_BACKEND_CMSIS_NN=y`
+- Reference kernels: `CONFIG_HELIA_RT_BACKEND_REFERENCE=y`
 
 ### Missing CMSIS-NN module (Zephyr)
 
