@@ -23,8 +23,6 @@ jobs:
     uses: ./.github/workflows/helia_test.yml
     with:
       trigger-sha: ${{ github.event.pull_request.head.sha }}
-    secrets:
-      NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
 
   cortex_m_ci_full:
     uses: ./.github/workflows/cortex_m.yml

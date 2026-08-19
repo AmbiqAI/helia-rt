@@ -38,15 +38,17 @@ source ${TENSORFLOW_ROOT}tensorflow/lite/micro/tools/make/bash_helpers.sh
 DOWNLOADS_DIR=${1}
 DOWNLOADED_NS_CMSIS_NN_PATH=${DOWNLOADS_DIR}/ns_cmsis_nn
 
-if [ -n "${NS_CMSIS_NN_SSH_KEY}" ]; then
-  NS_CMSIS_NN_URL="https://${NS_CMSIS_NN_SSH_KEY}@github.com/AmbiqAI/ns-cmsis-nn.git"
-else
-  NS_CMSIS_NN_URL="git@github.com:AmbiqAI/ns-cmsis-nn.git"
-fi
+# AmbiqAI/ns-cmsis-nn is a public repository, so it clones anonymously over
+# https and needs no credential. Never put a token in this URL: git echoes the
+# remote in "fatal: unable to access '<url>'" errors, so any network failure
+# would print the credential into the build log.
+NS_CMSIS_NN_URL="https://github.com/AmbiqAI/ns-cmsis-nn.git"
 
 # Set GIT_COMMIT to NS_CMSIS_NN_COMMIT if set, otherwise use default.
-# Default tracks AmbiqAI/ns-cmsis-nn tag v7.29.1.
-GIT_COMMIT=${NS_CMSIS_NN_COMMIT:-50ea825abdb97c9b1ed78aff09f3752469e3b00d}
+# Default tracks AmbiqAI/ns-cmsis-nn tag v7.29.2. Keep in sync with
+# NS_CMSIS_NN_COMMIT in ext_libs/helia.inc, which is what make actually passes;
+# this fallback only applies when the script is run directly.
+GIT_COMMIT=${NS_CMSIS_NN_COMMIT:-631726420b04860a5c4236956a3741ff5a96bd7f}
 
 # clone_ns_cmsis_nn: attempt git clone and surface a clear error on failure.
 clone_ns_cmsis_nn() {
@@ -59,11 +61,13 @@ clone_ns_cmsis_nn() {
 ================================================================================
 ERROR: Failed to clone the ns-cmsis-nn repository.
 
-The HELIA optimized-kernel backend (OPTIMIZED_KERNEL_DIR=helia) requires the
-private AmbiqAI/ns-cmsis-nn module. Access is provided to Ambiq licensees.
+The HELIA optimized-kernel backend (OPTIMIZED_KERNEL_DIR=helia) builds against
+the public AmbiqAI/ns-cmsis-nn repository, cloned over https with no
+credential. This failure is therefore usually network related: check
+connectivity and any proxy or firewall that filters github.com.
 
-If you do not have access, you can build with the open-source CMSIS-NN backend
-or the reference kernels instead:
+You can also build with the open-source CMSIS-NN backend or the reference
+kernels instead:
 
   make ... OPTIMIZED_KERNEL_DIR=cmsis_nn   # Arm CMSIS-NN (open source)
   make ... OPTIMIZED_KERNEL_DIR=           # Reference kernels only
@@ -73,7 +77,7 @@ For Zephyr builds, select the backend in prj.conf:
   CONFIG_HELIA_RT_BACKEND_CMSIS_NN=y       # Arm CMSIS-NN (open source)
   CONFIG_HELIA_RT_BACKEND_REFERENCE=y      # Reference kernels only
 
-For access to ns-cmsis-nn, contact support.aitg@ambiq.com.
+For help with the HELIA backend, contact support.aitg@ambiq.com.
 ================================================================================
 
 EOF

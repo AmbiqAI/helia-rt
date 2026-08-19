@@ -11,7 +11,6 @@ jobs:
     with:
       trigger-sha: ${{ github.sha }}
     secrets:
-      NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
 
   call-helia-test:
@@ -20,7 +19,6 @@ jobs:
     with:
       trigger-sha: ${{ github.sha }}
     secrets:
-      NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
 
   issue-on-error:

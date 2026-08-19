@@ -248,16 +248,13 @@ jobs:
         with:
           path: helia-rt
       - name: Checkout ns-cmsis-nn (pinned ref)
-        env:
-          NS_CMSIS_NN_TOKEN: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
         run: |
           set -euo pipefail
-          if [ -z "${NS_CMSIS_NN_TOKEN:-}" ]; then
-            echo "::error::secrets.NS_CMSIS_NN_SSH_KEY is empty; cannot clone ns-cmsis-nn"
-            exit 1
-          fi
+          # AmbiqAI/ns-cmsis-nn is public: clone anonymously. Keeping a token
+          # out of the URL also keeps it out of git's "unable to access '<url>'"
+          # error output when the network misbehaves.
           git clone --depth 1 --branch "${NS_CMSIS_NN_REF}" \
-              "https://${NS_CMSIS_NN_TOKEN}@github.com/AmbiqAI/ns-cmsis-nn.git" \
+              "https://github.com/AmbiqAI/ns-cmsis-nn.git" \
               ns-cmsis-nn
           (cd ns-cmsis-nn && git rev-parse HEAD)
       - name: Install cross toolchain + ninja

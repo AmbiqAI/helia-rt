@@ -65,7 +65,7 @@ Other:
 
 Environment:
   ARM_UBL_LICENSE_IDENTIFIER   Required when --toolchain armclang
-  NS_CMSIS_NN_SSH_KEY          Optional; forwarded to make if present
+  (ns-cmsis-nn is public and clones with no credential)
 EOF
 }
 

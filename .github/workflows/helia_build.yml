@@ -8,8 +8,6 @@ on:
         required: true
         type: string
     secrets:
-      NS_CMSIS_NN_SSH_KEY:
-        required: true
       ARM_UBL_LICENSE_IDENTIFIER:
         required: false
 
@@ -56,7 +54,6 @@ jobs:
             toolchain: "atfe"
 
     env:
-      NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
 
     steps:
