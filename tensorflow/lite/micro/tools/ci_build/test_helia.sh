@@ -90,6 +90,19 @@ case "${TARGET_ARCH}" in
   *)                                 enable_requantize_inline_asm=false ;;
 esac
 
+# ------------------------- License credential ---------------------------------
+# Hand the Arm user-based license identifier to make through the environment
+# rather than the command line: readable_run echoes every make invocation, so
+# a command-line argument put the credential straight into the log. make reads
+# environment variables as make variables and no makefile assigns this one, so
+# the value still reaches the activation check.
+#
+# One deliberate difference from passing it per-invocation: the export also
+# reaches the `third_party_downloads` make call below, so with --toolchain
+# armclang `armlm activate` now runs there too. Activation is idempotent, so
+# this costs one extra call and changes nothing else.
+export ARM_UBL_LICENSE_IDENTIFIER
+
 # ------------------------- Make args ------------------------------------------
 MAKEFILE=tensorflow/lite/micro/tools/make/Makefile
 common_args=(
@@ -164,9 +177,10 @@ build_args_with_opts() {
   if [[ "${enable_requantize_inline_asm}" == "true" ]]; then
     args+=( CMSIS_NN_USE_REQUANTIZE_INLINE_ASSEMBLY=1 )
   fi
-  if [[ -n "${ARM_UBL_LICENSE_IDENTIFIER}" ]]; then
-    args+=( ARM_UBL_LICENSE_IDENTIFIER="${ARM_UBL_LICENSE_IDENTIFIER}" )
-  fi
+  # ARM_UBL_LICENSE_IDENTIFIER is deliberately NOT added here. These args are
+  # echoed by readable_run (and by any caller that logs the make command), and
+  # the identifier is a credential. It is exported instead, which make picks up
+  # as a regular variable — see the export near the top of this script.
   printf '%q\n' "${args[@]}"
 }
 

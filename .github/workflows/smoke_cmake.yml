@@ -133,7 +133,7 @@ jobs:
                       tensorflow/lite/micro/tools/make/ \
                     | grep -Ev '^tensorflow/lite/micro/(helia_rt_version|heliart_version)\.h$' \
                     | grep -Ev '^tensorflow/lite/micro/tools/ci_build/(package_helia_bundle|release_asset_helpers)\.sh$' \
-                    | grep -Ev '^tensorflow/lite/micro/tools/ci_build/build_helia\.sh$' \
+                    | grep -Ev '^tensorflow/lite/micro/tools/ci_build/(build|test)_helia\.sh$' \
                     | grep -Ev '^tensorflow/lite/micro/tools/make/ext_libs/(helia\.inc|ns_cmsis_nn_download\.sh)$' \
                     | grep -Ev '^tensorflow/lite/micro/tools/make/ext_libs/(cmsis|cmsis_nn|xtensa)_download\.sh$' \
                     | grep -Ev '^tensorflow/lite/micro/kernels/helia/' \
