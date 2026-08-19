@@ -28,8 +28,6 @@ jobs:
     uses: ./.github/workflows/helia_test.yml
     with:
       trigger-sha: ${{ github.event.pull_request.head.sha }}
-    secrets:
-      NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
 
   ci-run:
     if: ${{ contains(github.event.pull_request.labels.*.name, 'ci:run_full') }}
