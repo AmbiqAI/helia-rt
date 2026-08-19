@@ -92,10 +92,15 @@ esac
 
 # ------------------------- License credential ---------------------------------
 # Hand the Arm user-based license identifier to make through the environment
-# rather than the command line. make reads environment variables as make
-# variables, and the target makefiles only ever test/expand this one, so the
-# behavior is identical — but it keeps the credential out of every logged
-# make invocation.
+# rather than the command line: readable_run echoes every make invocation, so
+# a command-line argument put the credential straight into the log. make reads
+# environment variables as make variables and no makefile assigns this one, so
+# the value still reaches the activation check.
+#
+# One deliberate difference from passing it per-invocation: the export also
+# reaches the `third_party_downloads` make call below, so with --toolchain
+# armclang `armlm activate` now runs there too. Activation is idempotent, so
+# this costs one extra call and changes nothing else.
 export ARM_UBL_LICENSE_IDENTIFIER
 
 # ------------------------- Make args ------------------------------------------

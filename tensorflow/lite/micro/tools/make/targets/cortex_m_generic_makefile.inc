@@ -148,7 +148,12 @@ ifeq ($(TOOLCHAIN), armclang)
       # Never print the identifier: it is a credential, and make output ends
       # up in CI logs, uploaded artifacts, and developer terminals.
       $(info Activating the Arm user-based license (identifier redacted).)
-      ACTIVATE_LICENSE := $(shell $(TARGET_TOOLCHAIN_ROOT)armlm activate --code $(ARM_UBL_LICENSE_IDENTIFIER))
+      # 2>&1 folds stderr into the captured (never-printed) variable. make does
+      # NOT capture $(shell) stderr, so without this an armlm error message
+      # would go straight to the log — and it may quote the supplied code.
+      # The code is still visible in armlm's argv via `ps` for the duration of
+      # the call; armlm offers no env-var or stdin alternative.
+      ACTIVATE_LICENSE := $(shell $(TARGET_TOOLCHAIN_ROOT)armlm activate --code $(ARM_UBL_LICENSE_IDENTIFIER) 2>&1)
     endif
   endif
 
