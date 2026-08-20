@@ -80,11 +80,25 @@ constexpr float kExpectedSecondCell[] = {0.94111480f, 0.94111480f, 0.88564131f,
 // back into the model, so its quantization error is amplified compared to a
 // single invocation. The batch-two output of the very first time step is the
 // most sensitive element: it sits in the steep region of the gate
-// nonlinearities, where the reference and the optimized quantized kernels
-// legitimately disagree by a few output LSBs. A stateless kernel would instead
-// repeat the first-invocation output, which deviates from these goldens by
-// more than 0.3, so the check still detects lost state.
+// nonlinearities. Measured maximum deviations from the goldens above
+// (host build, 2x3x2x2 model):
+//
+//   backend            int8      int16
+//   HELIA              0.0027    0.0004
+//   reference          0.0504    0.0538
+//
+// The loose bound is therefore driven by the reference kernel, not by HELIA,
+// so the two backends get separate tolerances instead of sharing the widest
+// one. For reference, a stateless kernel repeats the first-invocation output;
+// its smallest violating element deviates by 0.0686 and its largest by 0.94,
+// so 6e-2 still detects lost state, but only by ~14%. HELIA's 1e-2 keeps a
+// ~3.7x margin over the measured error while catching much subtler state
+// corruption.
+#if defined(HELIA)
+constexpr float kQuantizedSecondInvokeTolerance = 1e-2;
+#else
 constexpr float kQuantizedSecondInvokeTolerance = 6e-2;
+#endif
 
 // Reorder a [batch, time, depth] buffer into [time, batch, depth].
 template <int batch_size, int time_steps, int depth>
