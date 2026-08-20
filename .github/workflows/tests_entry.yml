@@ -51,6 +51,25 @@ jobs:
   # `main` branch ruleset. Renaming it makes `main` unmergeable until the
   # ruleset is updated to match.
   helia-test:
+    # `labeled` is in this workflow's trigger list so that adding `ci:run_full`
+    # can start the ci-run job below. Without this guard the ten-job matrix also
+    # restarts for every *other* label, which costs a full CI pass and buys
+    # nothing:
+    #
+    #   - release-please labels a merged release PR `autorelease: tagged` after
+    #     cutting a release, which would re-run the whole matrix against a
+    #     commit that is already on `main`.
+    #   - it labels a freshly opened release PR `autorelease: pending` moments
+    #     after `opened`, so the label run would cancel the opened run (see the
+    #     concurrency group above) and the required contexts would briefly read
+    #     "cancelled" — easy to misread as a failure.
+    #
+    # Skipping here is safe for the required status checks: a label event does
+    # not change the head SHA, so the contexts already reported for that SHA by
+    # the opened/synchronize run stay the latest result for their names.
+    if: >-
+      github.event.action != 'labeled' ||
+      github.event.label.name == 'ci:run_full'
     uses: ./.github/workflows/helia_test.yml
     with:
       trigger-sha: ${{ github.event.pull_request.head.sha }}
