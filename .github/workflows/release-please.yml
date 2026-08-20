@@ -5,6 +5,10 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+# Scopes the automatic GITHUB_TOKEN, which is now used only by the called
+# helia_release.yml (`contents: write`, to attach the bundle to the release).
+# release-please itself authenticates with the App token minted below, whose
+# permissions are requested at mint time and are independent of this block.
 permissions:
   contents: write
   pull-requests: write
@@ -16,11 +20,51 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
+      # Why not secrets.GITHUB_TOKEN?
+      #
+      # GitHub does not start new workflow runs for events raised by the default
+      # GITHUB_TOKEN (its recursion guard). The release PR that release-please
+      # opens and force-pushes therefore never fires `pull_request` or
+      # `pull_request_target`, so it collects zero check runs and can never
+      # satisfy the required status checks on `main` — it is structurally
+      # unmergeable. A GitHub App installation token is a separate actor and is
+      # exempt from that guard, so the release PR is checked like any human PR
+      # and passes through the same gate, unweakened.
+      #
+      # Setup (one-time, org admin): docs/contributing/release-process.md
+      # -> "Release automation credentials".
+      - name: Check release automation credentials
+        env:
+          APP_CLIENT_ID: ${{ secrets.RELEASE_PLEASE_APP_CLIENT_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -n "${APP_CLIENT_ID:-}" ] || missing="${missing} RELEASE_PLEASE_APP_CLIENT_ID"
+          [ -n "${APP_PRIVATE_KEY:-}" ] || missing="${missing} RELEASE_PLEASE_APP_PRIVATE_KEY"
+          if [ -n "${missing}" ]; then
+            echo "::error ::Release automation is not configured. Missing repository secret(s):${missing}. See docs/contributing/release-process.md -> 'Release automation credentials'. Until these exist no release PR can be opened or updated."
+            exit 1
+          fi
+
+      # Mints a short-lived (1 h) installation token scoped to this repository
+      # only. The requested permissions are narrowed here to exactly what
+      # release-please uses, so an over-granted App installation cannot leak
+      # extra authority into this job.
+      - name: Mint release-please token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.RELEASE_PLEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
       - name: Release Please (manifest)
         id: release
         uses: googleapis/release-please-action@v5
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
   helia-release:
