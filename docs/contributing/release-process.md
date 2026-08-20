@@ -81,14 +81,35 @@ helia-rt-v1.16.0.zip
 release-please authenticates as a **GitHub App**, not as the built-in
 `GITHUB_TOKEN`.
 
-**Why this matters.** GitHub deliberately does not start new workflow runs for
-events raised by the default `GITHUB_TOKEN`. A release PR opened or force-pushed
-by that token never fires `pull_request` or `pull_request_target`, so it collects
-**zero check runs** — and the `main` branch ruleset requires 11 passing contexts
-with no bypass actors. The release PR is then permanently `BLOCKED`: not slow,
-not flaky, but structurally unmergeable. A GitHub App installation token is a
-distinct actor exempt from that rule, so the release PR is checked exactly like a
-human PR and merges through the same gate. Nothing about the gate is weakened.
+**Why this matters.** Events raised by the default `GITHUB_TOKEN` do not start
+workflow runs the way a human's do — and the two triggers this repo depends on
+fail in *different* ways:
+
+- **`pull_request_target` is never raised at all.** This is the one that
+  matters. `tests_entry.yml` produces the ten required `helia-test / test-*`
+  contexts, and under that token they simply never appear.
+- **`pull_request` *is* raised**, but the run is created in an approval-required
+  state (`conclusion: action_required`) and publishes no check runs until a
+  maintainer clicks **Approve workflows to run** on the PR.
+
+So a release PR opened by that token cannot satisfy the 11 required contexts on
+its own: ten never appear, and `Validate docs build (strict)` would need a manual
+click after every single push. The `main` ruleset requires all 11 and has no
+bypass actors, so the release PR is permanently `BLOCKED` — not slow, not flaky,
+but structurally unmergeable.
+
+A GitHub App installation token is a distinct actor, exempt from both behaviours,
+so the release PR is checked exactly like a human PR and merges through the same
+gate. Nothing about the gate is weakened.
+
+!!! note "What this costs in CI"
+    Once the release PR actually runs checks, it runs them on **every push to
+    `main`**, not once per release — release-please force-pushes the release
+    branch each time, and that branch edits `nsx/**` and
+    `tensorflow/lite/micro/**`, which `smoke_cmake.yml` is path-filtered on. For
+    scale: the 68-day window that prompted this change contained 36 such pushes.
+    `release-please.yml` therefore serialises itself with a `concurrency` group
+    so two closely-spaced pushes cannot both force-push the branch.
 
 The token is minted per run by
 [`actions/create-github-app-token`](https://github.com/actions/create-github-app-token),
@@ -117,7 +138,7 @@ actions; nothing here can be done from a workflow.
      |---|---|---|
      | Metadata | Read-only | Mandatory; auto-selected by GitHub |
      | Contents | Read and write | Read commit history, force-push the release branch, create the tag and the GitHub Release |
-     | Pull requests | Read and write | Open and update the release PR, and apply the `autorelease: pending` / `autorelease: tagged` labels |
+     | Pull requests | Read and write | Open and update the release PR, comment on it when a release is cut, and apply the `autorelease: pending` / `autorelease: tagged` labels |
 
      Do **not** grant Workflows, Actions, Administration, Secrets, Members, or
      any Organization permission. release-please only rewrites `CHANGELOG.md`,
@@ -127,12 +148,28 @@ actions; nothing here can be done from a workflow.
 
      !!! note "About `Issues: write`"
          The upstream release-please README lists `issues: write` in its
-         workflow-permissions snippet. That is only needed to *create*
-         repository labels that do not exist yet. Both `autorelease: pending`
-         and `autorelease: tagged` already exist here, and the previous
-         `GITHUB_TOKEN` — which had no issues scope — cut 24 releases without
-         it. Grant it only if one of those labels is ever deleted, and add a
-         matching `permission-issues: write` to the mint step at the same time.
+         workflow-permissions snippet, and release-please really does call
+         issues-scoped endpoints on every tagged release: it posts the
+         "🤖 Created releases" comment on the release PR, removes
+         `autorelease: pending`, and adds `autorelease: tagged`.
+
+         It is still not required here. GitHub documents each of those
+         endpoints as satisfied by **Issues (write) _or_ Pull requests
+         (write)**, and we have direct proof: the previous `GITHUB_TOKEN` ran
+         with `contents: write` + `pull-requests: write` and no issues scope at
+         all, and cut 24 of this repo's 26 releases — comment and label swap
+         included.
+
+         **If that ever turns out to be wrong, the symptom is specific.** The
+         comment is posted *after* the tag and GitHub Release are created but
+         *before* the label swap, so a `403` there would leave the release and
+         tag in place, skip the bundle build (`release_created` never
+         surfaces), and leave the merged PR stuck on `autorelease: pending`.
+         Every later run then logs `There are untagged, merged release PRs
+         outstanding - aborting` and opens no further release PRs — a warning,
+         not an error. If you see that, grant **Issues: read and write** and add
+         a matching `permission-issues: write` to the mint step in
+         `release-please.yml`.
 
 3. **Generate a private key** on the App's settings page (*Private keys* →
    *Generate a private key*). A `.pem` file downloads.
@@ -165,10 +202,20 @@ RELEASE_PLEASE_APP_CLIENT_ID RELEASE_PLEASE_APP_PRIVATE_KEY.
 ```
 
 Every push to `main` shows a failed `release-please` run until the secrets
-exist, and **no release PR is opened or updated** in the meantime. Builds,
-tests, and docs deploys are separate workflows and are unaffected. The check is
-deliberately loud: the failure it replaces was silent, and a release pipeline
-that quietly stops is far more expensive than a red workflow.
+exist, and **no release PR is opened or updated** in the meantime. It cannot
+block any pull request: `release-please` is not one of the 11 required contexts
+and runs only on `push` to `main`. Builds, tests, and docs deploys are separate
+workflows and are unaffected. The job is guarded on
+`github.repository == 'AmbiqAI/helia-rt'`, so forks are not affected at all.
+
+The check is deliberately loud: the failure it replaces was silent, and a
+release pipeline that quietly stops is far more expensive than a red workflow.
+
+Note that this only stops the release PR being *opened or updated*. An existing
+release PR is untouched, and a maintainer can still populate its
+`Validate docs build (strict)` context by clicking **Approve workflows to run**
+on the PR — that is one of the 11 contexts, so it does not make the PR
+mergeable, but it is worth knowing the button exists.
 
 ### Rotating the Private Key
 

@@ -13,8 +13,26 @@ permissions:
   contents: write
   pull-requests: write
 
+# release-please force-pushes the release branch on every run, and each of those
+# pushes now starts a full CI pass on the release PR (it edits nsx/** and
+# tensorflow/lite/micro/**, which smoke_cmake.yml is path-filtered on). Two
+# pushes to `main` landing close together already raced once, on 2026-08-19,
+# with both runs force-pushing the branch. That was free when the release PR ran
+# no CI; it is not free now.
+#
+# Serialise rather than cancel: code-suggester re-parents the release branch
+# onto `main`'s current HEAD on every run, so cancelling a run mid-flight can
+# leave the branch computed from an older `main`.
+concurrency:
+  group: release-please-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release:
+    # Only the canonical repo has the App installed, so on a fork every push to
+    # `main` would otherwise hard-fail on the credential preflight below. Same
+    # guard style as cortex_m.yml / run_ci.yml.
+    if: github.repository == 'AmbiqAI/helia-rt'
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
@@ -22,14 +40,26 @@ jobs:
     steps:
       # Why not secrets.GITHUB_TOKEN?
       #
-      # GitHub does not start new workflow runs for events raised by the default
-      # GITHUB_TOKEN (its recursion guard). The release PR that release-please
-      # opens and force-pushes therefore never fires `pull_request` or
-      # `pull_request_target`, so it collects zero check runs and can never
-      # satisfy the required status checks on `main` — it is structurally
-      # unmergeable. A GitHub App installation token is a separate actor and is
-      # exempt from that guard, so the release PR is checked like any human PR
-      # and passes through the same gate, unweakened.
+      # Events raised by the default GITHUB_TOKEN do not start workflow runs the
+      # way a human's do, and the two triggers this repo depends on fail in
+      # *different* ways:
+      #
+      #   - `pull_request_target` — never raised at all. This is the one that
+      #     matters: tests_entry.yml produces the ten required
+      #     `helia-test / test-*` contexts, and they simply never appear.
+      #   - `pull_request` — IS raised, but the run is created in an
+      #     approval-required state (`conclusion: action_required`) and
+      #     publishes no check runs until a maintainer clicks "Approve workflows
+      #     to run". Verifiable on #177 today: two such runs exist on its head
+      #     commit, while its check-run count is still zero.
+      #
+      # So the release PR can never satisfy the 11 required contexts on its own:
+      # ten never appear, and `Validate docs build (strict)` would need a manual
+      # click after every single push. It is structurally unmergeable.
+      #
+      # A GitHub App installation token is a separate actor, exempt from both
+      # behaviours, so the release PR is checked like any human PR and passes
+      # through the same gate, unweakened.
       #
       # Setup (one-time, org admin): docs/contributing/release-process.md
       # -> "Release automation credentials".
