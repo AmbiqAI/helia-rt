@@ -7,6 +7,11 @@ on:
         required: true
         type: string
 
+# Same reasoning as helia_test.yml: every job here checks out a
+# caller-supplied commit and builds it, so cap the token at read access.
+permissions:
+  contents: read
+
 # The CI image is resolved by the `ci-image` setup job below and consumed via
 # `needs.ci-image.outputs.image`. `container.image` does not support the `env`
 # context, so a tiny setup job is the cleanest way to keep a single pin point.

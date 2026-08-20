@@ -7,12 +7,33 @@
 # run_<scriptname>.yml as the entry point.
 
 name: Tests Entry Point
+
+# Trigger note: this MUST stay `pull_request`, not `pull_request_target`.
+#
+# Everything reachable from here checks out the pull request head commit and
+# builds it with make (see helia_test.yml / ci.yml). Under
+# `pull_request_target` that untrusted build would run in the context of the
+# base repository, i.e. with a GITHUB_TOKEN carrying the repository's default
+# workflow permissions (currently `write`), which hands any fork contributor
+# who edits a Makefile or a ci_build script a write-scoped token for this
+# repository. Under `pull_request` a fork's run gets a read-only token and no
+# access to repository secrets, which is the correct model for a path that
+# only builds and tests.
+#
+# This path needs neither: the PR matrix is gcc/atfe only, no secrets are
+# passed to the called workflows, and nothing here writes to the repository.
 on:
-  pull_request_target:
+  pull_request:
     types:
       - opened
       - synchronize
       - labeled
+
+# Least privilege. Checkout is the only thing on this path that needs the
+# token at all, and it only needs to read. This also propagates to the called
+# reusable workflows, which can reduce it further but never widen it.
+permissions:
+  contents: read
 
 # Cancel an in-flight run for this PR when a newer commit is pushed.
 # Keyed on the PR number (or branch ref for non-PR triggers) so each PR
@@ -24,6 +45,11 @@ concurrency:
 
 jobs:
 
+  # Do not rename this job id. GitHub names the resulting check runs
+  # "<caller job id> / <called job name>", so this id is the literal
+  # "helia-test / ..." prefix of the ten required status check contexts in the
+  # `main` branch ruleset. Renaming it makes `main` unmergeable until the
+  # ruleset is updated to match.
   helia-test:
     uses: ./.github/workflows/helia_test.yml
     with:

@@ -3,15 +3,38 @@ name: Post Tests
 # for exceptionally long running test processes. Errors will still generate an
 # issue against the PR/commit so will be caught.
 
+# Trigger note: unlike tests_entry.yml this one legitimately stays on
+# `pull_request_target`, and must not be switched to `pull_request`.
+#
+#   - The two jobs that actually build the head commit (build_docker_image,
+#     helia_test) are gated on `github.event.pull_request.merged == true`, so
+#     the commit they build has already been reviewed and merged into the
+#     default branch. It is inside the trust boundary, not attacker input.
+#     (cortex_m_ci_full is not gated here, but every job inside cortex_m.yml
+#     requires workflow_dispatch/schedule/labeled, none of which can hold for
+#     a `closed` event, so it always skips on this path.)
+#   - It needs write-scoped credentials that a fork `pull_request` run cannot
+#     have: `packages: write` to push the CI image to GHCR, and `issues: write`
+#     to open/append the failure issue.
+#   - For a merged fork PR the `refs/pull/N/merge` ref a `pull_request` run
+#     would resolve is gone by the time `closed` fires.
 on:
   pull_request_target:
     types:
       - closed
 
+# No workflow-level default: each job declares exactly what it needs below,
+# so nothing silently inherits the repository's `write` default.
+
 jobs:
 
   build_docker_image:
     if: github.event.pull_request.merged == true
+    # helia_build_docker_image.yml pushes to ghcr.io/ambiqai/helia-rt-ci via
+    # docker/login-action, so this call must carry `packages: write`.
+    permissions:
+      contents: read
+      packages: write
     uses: ./.github/workflows/helia_build_docker_image.yml
     with:
       trigger-sha: ${{ github.event.pull_request.head.sha }}
@@ -20,11 +43,18 @@ jobs:
     if: always() && github.event.pull_request.merged == true ||
         (github.event.action == 'labeled' &&
          github.event.label.name == 'ci:run_full')
+    permissions:
+      contents: read
     uses: ./.github/workflows/helia_test.yml
     with:
       trigger-sha: ${{ github.event.pull_request.head.sha }}
 
   cortex_m_ci_full:
+    # cortex_m.yml forwards to issue_on_error.yml on failure, which opens or
+    # comments on an issue, hence `issues: write`.
+    permissions:
+      contents: read
+      issues: write
     uses: ./.github/workflows/cortex_m.yml
     with:
       trigger-sha: ${{ github.event.pull_request.head.sha }}
@@ -33,6 +63,12 @@ jobs:
 
   issue_on_error:
     needs: [helia_test, cortex_m_ci_full]
+    # ci/issue_on_error.py runs `gh issue list/create/comment` against this
+    # repository. It never comments on the pull request itself, so
+    # `pull-requests: write` is not needed.
+    permissions:
+      contents: read
+      issues: write
     if: ${{ always() && contains(needs.*.result, 'failure') &&
             github.event.pull_request.merged == true }}
     uses: ./.github/workflows/issue_on_error.yml
