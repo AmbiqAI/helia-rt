@@ -81,26 +81,30 @@ helia-rt-v1.16.0.zip
 release-please authenticates as a **GitHub App**, not as the built-in
 `GITHUB_TOKEN`.
 
-**Why this matters.** Events raised by the default `GITHUB_TOKEN` do not start
-workflow runs the way a human's do — and the two triggers this repo depends on
-fail in *different* ways:
+**Why this matters.** A `pull_request` workflow run whose triggering event was
+raised by the default `GITHUB_TOKEN` is created in an approval-required state:
+GitHub marks it `conclusion: action_required` and publishes **no check runs at
+all** until a maintainer clicks **Approve workflows to run** on the PR.
 
-- **`pull_request_target` is never raised at all.** This is the one that
-  matters. `tests_entry.yml` produces the ten required `helia-test / test-*`
-  contexts, and under that token they simply never appear.
-- **`pull_request` *is* raised**, but the run is created in an approval-required
-  state (`conclusion: action_required`) and publishes no check runs until a
-  maintainer clicks **Approve workflows to run** on the PR.
+All 11 required contexts come from `pull_request` workflows — the ten
+`helia-test / test-*` from `tests_entry.yml`, and `Validate docs build (strict)`
+from `docs.yml` — so a release PR opened by that token reports none of them. The
+`main` ruleset requires all 11 and has no bypass actors, so the PR sits at
+`BLOCKED`, and every force-push of the release branch resets it. Not slow, not
+flaky: unmergeable without a manual click on every single push.
 
-So a release PR opened by that token cannot satisfy the 11 required contexts on
-its own: ten never appear, and `Validate docs build (strict)` would need a manual
-click after every single push. The `main` ruleset requires all 11 and has no
-bypass actors, so the release PR is permanently `BLOCKED` — not slow, not flaky,
-but structurally unmergeable.
+??? example "#177, the worked example"
+    PR #177 was opened while `tests_entry.yml` still used `pull_request_target`,
+    a trigger the default token does not raise *at all* — so on top of the
+    approval gate, the ten test contexts had no run behind them to approve.
 
-A GitHub App installation token is a distinct actor, exempt from both behaviours,
-so the release PR is checked exactly like a human PR and merges through the same
-gate. Nothing about the gate is weakened.
+    Its two `pull_request` runs were approved by hand on 2026-08-20 and went
+    green, `Validate docs build (strict)` included. The PR is still `BLOCKED`.
+    Approving bought 1 of the 11 required contexts; the other 10 never existed.
+
+A GitHub App installation token is a distinct actor, exempt from the approval
+gate, so the release PR is checked exactly like a human PR and merges through
+the same ruleset. Nothing about the gate is weakened.
 
 !!! note "What this costs in CI"
     Once the release PR actually runs checks, it runs them on **every push to

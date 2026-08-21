@@ -23,8 +23,14 @@ permissions:
 # Serialise rather than cancel: code-suggester re-parents the release branch
 # onto `main`'s current HEAD on every run, so cancelling a run mid-flight can
 # leave the branch computed from an older `main`.
+#
+# One repository-wide lane, not one per ref. `target-branch` is unset, so
+# release-please resolves the repository's default branch itself and force-pushes
+# the same release branch no matter which ref the run started from. Keying on
+# `github.ref` would put a `workflow_dispatch` from any other ref in its own
+# lane, free to race the very `main` pushes this block exists to serialise.
 concurrency:
-  group: release-please-${{ github.ref }}
+  group: release-please
   cancel-in-progress: false
 
 jobs:
@@ -40,26 +46,32 @@ jobs:
     steps:
       # Why not secrets.GITHUB_TOKEN?
       #
-      # Events raised by the default GITHUB_TOKEN do not start workflow runs the
-      # way a human's do, and the two triggers this repo depends on fail in
-      # *different* ways:
+      # A `pull_request` run whose triggering event was raised by the default
+      # GITHUB_TOKEN is created in an approval-required state: GitHub marks it
+      # `conclusion: action_required` and publishes no check runs at all until a
+      # maintainer clicks "Approve workflows to run" on the PR.
       #
-      #   - `pull_request_target` — never raised at all. This is the one that
-      #     matters: tests_entry.yml produces the ten required
-      #     `helia-test / test-*` contexts, and they simply never appear.
-      #   - `pull_request` — IS raised, but the run is created in an
-      #     approval-required state (`conclusion: action_required`) and
-      #     publishes no check runs until a maintainer clicks "Approve workflows
-      #     to run". Verifiable on #177 today: two such runs exist on its head
-      #     commit, while its check-run count is still zero.
+      # Every one of the 11 required contexts comes from a `pull_request`
+      # workflow -- the ten `helia-test / test-*` from tests_entry.yml, and
+      # `Validate docs build (strict)` from docs.yml -- so a release PR opened by
+      # that token reports none of them. release-please force-pushes the release
+      # branch on every push to `main` (36 of them in the 68-day window that
+      # prompted this change) and each force-push would need the click again. The
+      # PR is not slow or flaky; it is unmergeable without manual intervention on
+      # every single push.
       #
-      # So the release PR can never satisfy the 11 required contexts on its own:
-      # ten never appear, and `Validate docs build (strict)` would need a manual
-      # click after every single push. It is structurally unmergeable.
+      # #177 is the worked example, and preserves the older, harsher failure mode
+      # too. It was opened while tests_entry.yml still used
+      # `pull_request_target`, which the default token does not raise *at all*.
+      # Its two `pull_request` runs were approved by hand on 2026-08-20 and went
+      # green, `Validate docs build (strict)` included -- and it is still
+      # BLOCKED, because no run ever existed to produce the ten
+      # `helia-test / test-*` contexts. Approving bought 1 of 11; the other 10
+      # had nothing to approve.
       #
-      # A GitHub App installation token is a separate actor, exempt from both
-      # behaviours, so the release PR is checked like any human PR and passes
-      # through the same gate, unweakened.
+      # A GitHub App installation token is a separate actor, exempt from the
+      # approval gate, so the release PR is checked like any human PR and passes
+      # through the same ruleset, unweakened.
       #
       # Setup (one-time, org admin): docs/contributing/release-process.md
       # -> "Release automation credentials".
