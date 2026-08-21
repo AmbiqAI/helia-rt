@@ -5,31 +5,22 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-# Scopes the automatic GITHUB_TOKEN, which is now used only by the called
-# helia_release.yml (`contents: write`, to attach the bundle to the release).
-# release-please itself authenticates with the App token minted below, whose
-# permissions are requested at mint time and are independent of this block.
+# release-please writes the release branch, the tag and the GitHub Release
+# (contents), and opens and updates the release PR (pull-requests). The called
+# helia_release.yml reuses `contents: write` to attach the bundle to the release.
 permissions:
   contents: write
   pull-requests: write
 
-# A run that changes the generated PR body force-pushes the release branch, and
-# that push now starts a full CI pass on the release PR: the branch edits nsx/**
-# and tensorflow/lite/micro/**, which smoke_cmake.yml is path-filtered on.
+# release-please force-pushes the release branch whenever the generated PR body
+# changes, and two runs doing that at once is a real race: code-suggester
+# re-parents the branch onto `main`'s current HEAD on every run, so the loser can
+# leave the branch computed from an older `main`. It has already happened -- on
+# 2026-08-19 the runs for two `main` pushes overlapped (22:08:15-22:08:44 and
+# 22:08:31-22:09:05) and both force-pushed, at 22:08:42 and 22:09:02.
 #
-# Not every run does. `always-update` defaults to false and this repo hides
-# docs/test/chore from the changelog, so a push carrying only those regenerates
-# a byte-identical body and release-please returns without pushing. Since
-# helia-rt-v1.17.0 that is 7 force-pushes across 17 runs, not one per push.
-#
-# Two of those seven collided. On 2026-08-19 the runs for two `main` pushes
-# overlapped (22:08:15-22:08:44 and 22:08:31-22:09:05) and both force-pushed the
-# branch, at 22:08:42 and 22:09:02. That was free when the release PR ran no CI;
-# it is not free now.
-#
-# Serialise rather than cancel: code-suggester re-parents the release branch
-# onto `main`'s current HEAD on every run, so cancelling a run mid-flight can
-# leave the branch computed from an older `main`.
+# Serialise rather than cancel, for the same reason: cancelling a run mid-flight
+# can leave the branch half-computed.
 #
 # One repository-wide lane, not one per ref. `target-branch` is unset, so
 # release-please resolves the repository's default branch itself and force-pushes
@@ -42,79 +33,47 @@ concurrency:
 
 jobs:
   release:
-    # Only the canonical repo has the App installed, so on a fork every push to
-    # `main` would otherwise hard-fail on the credential preflight below. Same
-    # guard style as cortex_m.yml / run_ci.yml.
+    # A fork has no business opening release PRs against its upstream, and this
+    # job writes tags and Releases. Same guard style as cortex_m.yml / run_ci.yml.
     if: github.repository == 'AmbiqAI/helia-rt'
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
-      # Why not secrets.GITHUB_TOKEN?
+      # The release PR is authored by the default GITHUB_TOKEN, and that is a
+      # deliberate choice. See docs/contributing/release-process.md ->
+      # "Why the release PR starts with no checks".
       #
-      # A `pull_request` run whose triggering event was raised by the default
-      # GITHUB_TOKEN is created in an approval-required state: GitHub marks it
-      # `conclusion: action_required` and publishes no check runs at all until a
-      # maintainer clicks "Approve workflows to run" on the PR.
+      # GitHub parks CI for anything a bot set in motion: a `pull_request` run
+      # whose triggering event came from GITHUB_TOKEN is created as
+      # `conclusion: action_required` and publishes no check runs until someone
+      # clicks "Approve workflows to run" on the PR. All 11 required contexts
+      # come from `pull_request` workflows, so the release PR starts with none of
+      # them reported.
       #
-      # Every one of the 11 required contexts comes from a `pull_request`
-      # workflow -- the ten `helia-test / test-*` from tests_entry.yml, and
-      # `Validate docs build (strict)` from docs.yml -- so a release PR opened by
-      # that token reports none of them. And every release-please run that
-      # updates the PR force-pushes the branch, resetting whatever was approved
-      # -- 7 times since helia-rt-v1.17.0. The PR is not slow or flaky; it is
-      # unmergeable without a human clicking through, again after every update.
+      # That is the intended flow, not a defect to route around. Releasing is a
+      # deliberate act: review the changelog, click the button, watch the eleven
+      # checks go green, merge. Two properties fall out of it -- the click is
+      # needed only at merge time (the force-pushes release-please makes as
+      # `main` moves reset the checks, but nobody is merging then, so it costs
+      # one click per release rather than one per push), and the ten-job matrix
+      # stays off every intermediate force-push.
       #
-      # #177 is the worked example, and preserves the older, harsher failure mode
-      # too. It was opened while tests_entry.yml still used
-      # `pull_request_target`, which the default token does not raise *at all*.
-      # Its two `pull_request` runs were approved by hand on 2026-08-20 and went
-      # green, `Validate docs build (strict)` included -- and it is still
-      # BLOCKED, because no run ever existed to produce the ten
-      # `helia-test / test-*` contexts. Approving bought 1 of 11; the other 10
-      # had nothing to approve.
-      #
-      # A GitHub App installation token is a separate actor, exempt from the
-      # approval gate, so the release PR is checked like any human PR and passes
-      # through the same ruleset, unweakened.
-      #
-      # Setup (one-time, org admin): docs/contributing/release-process.md
-      # -> "Release automation credentials".
-      - name: Check release automation credentials
-        env:
-          APP_CLIENT_ID: ${{ secrets.RELEASE_PLEASE_APP_CLIENT_ID }}
-          APP_PRIVATE_KEY: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
-        run: |
-          set -euo pipefail
-          missing=""
-          [ -n "${APP_CLIENT_ID:-}" ] || missing="${missing} RELEASE_PLEASE_APP_CLIENT_ID"
-          [ -n "${APP_PRIVATE_KEY:-}" ] || missing="${missing} RELEASE_PLEASE_APP_PRIVATE_KEY"
-          if [ -n "${missing}" ]; then
-            echo "::error ::Release automation is not configured. Missing repository secret(s):${missing}. See docs/contributing/release-process.md -> 'Release automation credentials'. Until these exist no release PR can be opened or updated."
-            exit 1
-          fi
-
-      # Mints a short-lived (1 h) installation token scoped to this repository
-      # only. The requested permissions are narrowed here to exactly what
-      # release-please uses, so an over-granted App installation cannot leak
-      # extra authority into this job.
-      - name: Mint release-please token
-        id: app-token
-        uses: actions/create-github-app-token@v3
-        with:
-          client-id: ${{ secrets.RELEASE_PLEASE_APP_CLIENT_ID }}
-          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-pull-requests: write
-
+      # A GitHub App installation token would remove the click, because a
+      # separate actor is exempt from the gate. That was implemented in #199 and
+      # deliberately reverted: it trades a recurring click for a private key that
+      # never expires. Note that granting this workflow more permissions does not
+      # help -- the gate keys on who raised the event, not on what the token may
+      # do.
       - name: Release Please (manifest)
         id: release
         uses: googleapis/release-please-action@v5
         with:
-          token: ${{ steps.app-token.outputs.token }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
   helia-release:
     needs: release
     if: ${{ needs.release.outputs.release_created == 'true' }}
