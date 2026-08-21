@@ -44,10 +44,12 @@ permissions:
 # Concurrency is resolved when a run is queued, before any job-level `if:` is
 # evaluated, so an ignored `labeled` run would first cancel whatever is in
 # flight and only then skip its own jobs, leaving the ten required contexts
-# reading "cancelled" with no run left to re-report them. release-please adds
-# `autorelease: pending` seconds after `opened`, well inside the matrix's ~5min
-# runtime, so that race is live rather than theoretical. `github.run_id` is
-# unique per run, so those runs get a lane to themselves and cancel nothing.
+# reading "cancelled" with no run left to re-report them. Any label a human
+# applies while the matrix is running does this today. release-please joins it
+# only once #199 lands: its `autorelease: pending` arrives seconds after
+# `opened`, well inside the matrix's ~5min runtime, but label events raised by
+# the default GITHUB_TOKEN start no runs at all, so today they cancel nothing.
+# `github.run_id` is unique per run, so these runs get a lane to themselves.
 concurrency:
   group: >-
     tests-entry-${{ github.event.pull_request.number || github.ref

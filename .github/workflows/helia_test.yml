@@ -19,9 +19,10 @@ on:
         default: ""
 
 # This workflow builds a caller-supplied commit with make, so it must never
-# hold more than read access. Callers may hand it less, but this cap means it
-# cannot inherit a write-scoped token by accident. Note that the container
-# image below is a public GHCR package, so no `packages` grant is needed.
+# hold more than read access. Declaring the cap here is what stops it inheriting
+# a write-scoped token from a caller running under the repository's `write`
+# default. Note that the container image below is a public GHCR package, so no
+# `packages` grant is needed.
 permissions:
   contents: read
 
