@@ -91,7 +91,7 @@ All 11 required contexts come from `pull_request` workflows — the ten
 from `docs.yml` — so a release PR opened by that token reports none of them. The
 `main` ruleset requires all 11 and has no bypass actors, so the PR sits at
 `BLOCKED`, and every force-push of the release branch resets it. Not slow, not
-flaky: unmergeable without a manual click on every single push.
+flaky: unmergeable without a human clicking through, again after every update.
 
 ??? example "#177, the worked example"
     PR #177 was opened while `tests_entry.yml` still used `pull_request_target`,
@@ -107,13 +107,19 @@ gate, so the release PR is checked exactly like a human PR and merges through
 the same ruleset. Nothing about the gate is weakened.
 
 !!! note "What this costs in CI"
-    Once the release PR actually runs checks, it runs them on **every push to
-    `main`**, not once per release — release-please force-pushes the release
-    branch each time, and that branch edits `nsx/**` and
-    `tensorflow/lite/micro/**`, which `smoke_cmake.yml` is path-filtered on. For
-    scale: the 68-day window that prompted this change contained 36 such pushes.
-    `release-please.yml` therefore serialises itself with a `concurrency` group
-    so two closely-spaced pushes cannot both force-push the branch.
+    Once the release PR runs checks, it runs them **per release-branch update**,
+    not once per release — the branch edits `nsx/**` and
+    `tensorflow/lite/micro/**`, which `smoke_cmake.yml` is path-filtered on.
+
+    Not every push to `main` causes one. `always-update` defaults to false, and
+    this repo hides `docs`/`test`/`chore` from the changelog, so a push carrying
+    only those regenerates a byte-identical PR body and release-please returns
+    without pushing. Since `helia-rt-v1.17.0`: **7 force-pushes across 17 runs**
+    in roughly ten weeks.
+
+    `release-please.yml` serialises itself with a repository-wide `concurrency`
+    group because two of those seven collided — on 2026-08-19 two overlapping
+    runs both force-pushed the branch, twenty seconds apart.
 
 The token is minted per run by
 [`actions/create-github-app-token`](https://github.com/actions/create-github-app-token),
