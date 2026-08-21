@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.18.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.17.0...helia-rt-v1.18.0) (2026-08-21)
+
+
+### Features
+
+* add HELIA FP16 and FP32 kernels ([9086191](https://github.com/AmbiqAI/helia-rt/commit/908619138426c9dcc519223141bbfd3377fb6140))
+* **nsx:** Make heliaRT SoC compatibility wildcard ([#180](https://github.com/AmbiqAI/helia-rt/issues/180)) ([6bb086e](https://github.com/AmbiqAI/helia-rt/commit/6bb086e29bbbc90178eb07d532cbb09f8a3f357d))
+
+
+### Bug Fixes
+
+* align HELIA float fallback metadata ([4eea778](https://github.com/AmbiqAI/helia-rt/commit/4eea778dfe268db70aeeb28304432f195b3c35e6))
+* **ci:** clone the now-public ns-cmsis-nn without a credential ([fbdf635](https://github.com/AmbiqAI/helia-rt/commit/fbdf63534a5cb4a03e38bda0b001c4ec8d77126e))
+* **ci:** clone the now-public ns-cmsis-nn without a credential ([8c63de9](https://github.com/AmbiqAI/helia-rt/commit/8c63de94ffb8495db7efa1d8ab0eae5520677e63))
+* **ci:** close pull_request_target trust boundary on the PR test path ([#198](https://github.com/AmbiqAI/helia-rt/issues/198)) ([74cab1b](https://github.com/AmbiqAI/helia-rt/commit/74cab1b6805ee6ec4216ef8422a191649c140827))
+* **ci:** contain armlm stderr, correct comment, narrow invariant exemption ([6c65dd3](https://github.com/AmbiqAI/helia-rt/commit/6c65dd30766a82910d158b3672cdbb7da8e72e08))
+* **ci:** run release-please as a GitHub App so its release PR gets checks ([#199](https://github.com/AmbiqAI/helia-rt/issues/199)) ([28525d6](https://github.com/AmbiqAI/helia-rt/commit/28525d6c3c546dbb90a3ad73f3149e6fde875a76))
+* **ci:** stop printing the Arm license identifier into build logs ([8d132d8](https://github.com/AmbiqAI/helia-rt/commit/8d132d858bbb58df94fc268bcac51320f80c3933))
+* **ci:** stop printing the Arm license identifier into build logs ([d6a5bf7](https://github.com/AmbiqAI/helia-rt/commit/d6a5bf787960291144b87b6fd598d6be42fd5f01))
+* download third-party archives over https ([4acbce2](https://github.com/AmbiqAI/helia-rt/commit/4acbce2861ddd77b5b5da39333a7a966fcacf8c7))
+* download third-party archives over https ([83d67f4](https://github.com/AmbiqAI/helia-rt/commit/83d67f4278d946e58ef7040c84bd8a251d4eda6c))
+* rank-5 MAXIMUM/MINIMUM int8/int16 fell back to a single element ([0f9b660](https://github.com/AmbiqAI/helia-rt/commit/0f9b6604e8171b7ef7ae83df21443c5ce9ae35d9))
+* Remove python ops resolver from runtime sources ([#176](https://github.com/AmbiqAI/helia-rt/issues/176)) ([595b892](https://github.com/AmbiqAI/helia-rt/commit/595b89276d450b4abc9a2851f74efbe8ce3b338b))
+
 ## [1.17.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.16.0...helia-rt-v1.17.0) (2026-06-11)
 
 
