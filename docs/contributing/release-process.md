@@ -121,11 +121,22 @@ the same ruleset. Nothing about the gate is weakened.
     group because two of those seven collided — on 2026-08-19 two overlapping
     runs both force-pushed the branch, twenty seconds apart.
 
-The token is minted per run by
-[`actions/create-github-app-token`](https://github.com/actions/create-github-app-token),
-expires after one hour, is scoped to this repository only, and is revoked when
-the job ends. There is no long-lived credential and no personal access token
-tied to an individual's account.
+The token release-please authenticates with is minted per run by
+[`actions/create-github-app-token`](https://github.com/actions/create-github-app-token):
+it expires after one hour, is scoped to this repository alone, carries only the
+two permissions above, and is revoked when the job ends.
+
+The **App private key behind it is not short-lived.** GitHub App private keys do
+not expire, and anyone holding one can keep minting installation tokens until
+that key is deleted on the App — so `RELEASE_PLEASE_APP_PRIVATE_KEY` warrants the
+same handling as any other high-value secret. See
+[Rotating the private key](#rotating-the-private-key).
+
+What the App buys over a personal access token is blast radius, not lifetime.
+The key belongs to the App rather than to a person, so it carries none of that
+person's other access and does not follow them out of the org; and its reach is
+capped twice over, by the installation (this repository) and by the permission
+set (Contents + Pull requests).
 
 ### One-Time Setup (org admin)
 
@@ -231,7 +242,14 @@ mergeable, but it is worth knowing the button exists.
 
 Generate a new private key on the App, replace
 `RELEASE_PLEASE_APP_PRIVATE_KEY`, then delete the old key from the App. The
-Client ID does not change.
+Client ID does not change. Both keys mint valid tokens until the old one is
+deleted, so that last step is the one that actually rotates the credential.
+
+Rotate on the usual triggers for a secret that never expires on its own: on a
+schedule, whenever someone with access to the `.pem` or to this repository's
+Actions secrets leaves, and immediately if the key may have been exposed.
+Installation tokens already minted live at most an hour, so deleting the old key
+bounds any misuse to that window.
 
 ## Next Steps
 
