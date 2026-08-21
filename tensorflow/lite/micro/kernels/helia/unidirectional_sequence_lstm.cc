@@ -96,15 +96,26 @@ bool IsZeroInitialState(const TfLiteEvalTensor* hidden,
 #endif
 #endif
 
+// Number of state-sized scratch buffers required by the optimized quantized
+// LSTM path. From ns-cmsis-nn v7.29.0 onwards the cell state lives in the
+// TFLite variable tensor, so only the two temporary gate buffers are needed.
+#if NS_CMSIS_NN_VERSION >= 7029000
+constexpr size_t kCmsisNnQuantizedScratchBuffers = 2;
+#else
+constexpr size_t kCmsisNnQuantizedScratchBuffers = 3;
+#endif
+
 LSTMBuffers<int16_t> CMSIS_NN_CreateLSTMBuffers(TfLiteContext* context,
                                                 const int* buffer_indices) {
-  LSTMBuffers<int16_t> buffers;
+  LSTMBuffers<int16_t> buffers = {};
   buffers.buffer0 = reinterpret_cast<int16_t*>(
       context->GetScratchBuffer(context, buffer_indices[0]));
   buffers.buffer1 = reinterpret_cast<int16_t*>(
       context->GetScratchBuffer(context, buffer_indices[1]));
+#if NS_CMSIS_NN_VERSION < 7029000
   buffers.buffer2 = reinterpret_cast<int16_t*>(
       context->GetScratchBuffer(context, buffer_indices[2]));
+#endif
 
   return buffers;
 }
@@ -329,7 +340,7 @@ TfLiteStatus CMSIS_NN_PortOpData(TfLiteContext* context, OpDataLSTM* params_ref,
 }
 
 TfLiteStatus CMSIS_NN_EvalInteger8x8_16Lstm(
-    const OpData& op_data, const LSTMKernelContents& kernel_content,
+    const OpData& op_data, LSTMKernelContents& kernel_content,
     const LSTMBuffers<int16_t>& buffers) {
   TFLITE_DCHECK(
       kernel_content.GetInternalTensor(tflite::kLstmInputTensor)->dims->size >=
@@ -342,24 +353,34 @@ TfLiteStatus CMSIS_NN_EvalInteger8x8_16Lstm(
   int8_t* output =
       tflite::micro::GetTensorData<int8_t>(kernel_content.output_tensor);
 
-  // Create lstm buffer struct. Zero-initialize so that the optional
-  // hidden_state pointer is NULL; arm_lstm_unidirectional_s8 uses that as the
-  // "no persistent hidden state" signal and will zero the cell_state buffer.
-  // Leaving the field uninitialized causes the kernel to skip cell-state
-  // clearing and dereference garbage as the initial hidden state.
+  // Create lstm buffer struct.
   cmsis_nn_lstm_context cmsis_buffers = {};
   cmsis_buffers.temp1 = reinterpret_cast<int16_t*>(buffers.buffer0);
   cmsis_buffers.temp2 = reinterpret_cast<int16_t*>(buffers.buffer1);
+#if NS_CMSIS_NN_VERSION >= 7029000
+  // A non-NULL hidden_state makes arm_lstm_unidirectional_s8 stateful: it
+  // consumes the incoming hidden/cell state from the TFLite variable tensors
+  // and writes the final state back into them.
+  cmsis_buffers.cell_state =
+      tflite::micro::GetTensorData<int16_t>(kernel_content.CellStateTensor());
+  cmsis_buffers.hidden_state =
+      tflite::micro::GetTensorData<int8_t>(kernel_content.HiddenStateTensor());
+#else
+  // Older ns-cmsis-nn revisions do not persist the final hidden state, so run
+  // the kernel stateless (NULL hidden_state) with a scratch cell state.
   cmsis_buffers.cell_state = reinterpret_cast<int16_t*>(buffers.buffer2);
+#endif
 
-  arm_lstm_unidirectional_s8(input, output, &op_data.params_cmsis_nn,
-                             &cmsis_buffers);
+  if (arm_lstm_unidirectional_s8(input, output, &op_data.params_cmsis_nn,
+                                 &cmsis_buffers) != ARM_CMSIS_NN_SUCCESS) {
+    return kTfLiteError;
+  }
 
   return kTfLiteOk;
 }
 
 TfLiteStatus CMSIS_NN_EvalInteger16x8_16Lstm(
-    const OpData& op_data, const LSTMKernelContents& kernel_content,
+    const OpData& op_data, LSTMKernelContents& kernel_content,
     const LSTMBuffers<int16_t>& buffers) {
   TFLITE_DCHECK(
       kernel_content.GetInternalTensor(tflite::kLstmInputTensor)->dims->size >=
@@ -372,18 +393,28 @@ TfLiteStatus CMSIS_NN_EvalInteger16x8_16Lstm(
   int16_t* output =
       tflite::micro::GetTensorData<int16_t>(kernel_content.output_tensor);
 
-  // Create lstm buffer struct. Zero-initialize so that the optional
-  // hidden_state pointer is NULL; arm_lstm_unidirectional_s16 uses that as
-  // the "no persistent hidden state" signal and will zero the cell_state
-  // buffer. Leaving the field uninitialized causes the kernel to skip
-  // cell-state clearing and dereference garbage as the initial hidden state.
+  // Create lstm buffer struct.
   cmsis_nn_lstm_context cmsis_buffers = {};
   cmsis_buffers.temp1 = reinterpret_cast<int16_t*>(buffers.buffer0);
   cmsis_buffers.temp2 = reinterpret_cast<int16_t*>(buffers.buffer1);
+#if NS_CMSIS_NN_VERSION >= 7029000
+  // A non-NULL hidden_state makes arm_lstm_unidirectional_s16 stateful: it
+  // consumes the incoming hidden/cell state from the TFLite variable tensors
+  // and writes the final state back into them.
+  cmsis_buffers.cell_state =
+      tflite::micro::GetTensorData<int16_t>(kernel_content.CellStateTensor());
+  cmsis_buffers.hidden_state =
+      tflite::micro::GetTensorData<int16_t>(kernel_content.HiddenStateTensor());
+#else
+  // Older ns-cmsis-nn revisions do not persist the final hidden state, so run
+  // the kernel stateless (NULL hidden_state) with a scratch cell state.
   cmsis_buffers.cell_state = reinterpret_cast<int16_t*>(buffers.buffer2);
+#endif
 
-  arm_lstm_unidirectional_s16(input, output, &op_data.params_cmsis_nn,
-                              &cmsis_buffers);
+  if (arm_lstm_unidirectional_s16(input, output, &op_data.params_cmsis_nn,
+                                  &cmsis_buffers) != ARM_CMSIS_NN_SUCCESS) {
+    return kTfLiteError;
+  }
 
   return kTfLiteOk;
 }
@@ -619,13 +650,13 @@ TfLiteStatus UnidirectionalSequenceLstmPrepare(TfLiteContext* context,
   size_t number_of_buffers;
   if (activation_type == kTfLiteInt8 && cell_state_type == kTfLiteInt16) {
     auto kernel_content = CreateLSTMKernelContent(context, node);
-    number_of_buffers = 3;
+    number_of_buffers = kCmsisNnQuantizedScratchBuffers;
     CMSIS_NN_PortOpData<int32_t>(context, op_data_lstm, kernel_content,
                                  &op_data->params_cmsis_nn);
   } else if (activation_type == kTfLiteInt16 &&
              cell_state_type == kTfLiteInt16) {
     auto kernel_content = CreateLSTMKernelContent(context, node);
-    number_of_buffers = 3;
+    number_of_buffers = kCmsisNnQuantizedScratchBuffers;
     CMSIS_NN_PortOpData<int64_t>(context, op_data_lstm, kernel_content,
                                  &op_data->params_cmsis_nn);
   } else {
@@ -697,7 +728,8 @@ TfLiteStatus UnidirectionalSequenceLstmEval(TfLiteContext* context,
           // 8(activation)x8(weight)->16(cell) LSTM with 32 bits bias
           LSTMBuffers<int16_t> buffers =
               CMSIS_NN_CreateLSTMBuffers(context, op_data_lstm.buffer_indices);
-          CMSIS_NN_EvalInteger8x8_16Lstm(op_data, kernel_content, buffers);
+          TF_LITE_ENSURE_OK(context, CMSIS_NN_EvalInteger8x8_16Lstm(
+                                         op_data, kernel_content, buffers));
           break;
         }
         default: {
@@ -714,7 +746,8 @@ TfLiteStatus UnidirectionalSequenceLstmEval(TfLiteContext* context,
           // 16(activation)x8(weight)->16(cell) LSTM with 64 bits bias
           LSTMBuffers<int16_t> buffers =
               CMSIS_NN_CreateLSTMBuffers(context, op_data_lstm.buffer_indices);
-          CMSIS_NN_EvalInteger16x8_16Lstm(op_data, kernel_content, buffers);
+          TF_LITE_ENSURE_OK(context, CMSIS_NN_EvalInteger16x8_16Lstm(
+                                         op_data, kernel_content, buffers));
           break;
         }
         default: {

@@ -27,6 +27,17 @@ limitations under the License.
 #include "arm_nnfunctions_flt.h"
 #endif
 
+// The reference kernels and the heliaCORE kernels
+// (OPTIMIZED_KERNEL_DIR=helia, backed by ns-cmsis-nn) keep the quantized
+// hidden and cell state in the TFLite variable tensors, so a second invocation
+// continues from the state of the first one. The upstream CMSIS-NN release
+// pinned by this repository still evaluates the quantized LSTM statelessly
+// (arm_lstm_unidirectional_s8/s16 force a NULL initial hidden state and clear
+// the cell state), so the state assertions are skipped for those builds.
+#if !defined(CMSIS_NN) || defined(HELIA)
+#define TFLM_LSTM_QUANTIZED_STATEFUL 1
+#endif
+
 namespace tflite {
 namespace testing {
 namespace {
@@ -54,6 +65,98 @@ void ValidateResultGoldens(const T* golden, const T* output_data,
   }
 }
 
+// Golden values for a second invocation of the 2x3x2x2 model, i.e. the model
+// continuing from the hidden/cell state left behind by the first invocation.
+constexpr float kExpectedSecondOutput[] = {
+    0.61399786f, 0.61399787f, 0.62385699f, 0.62385699f,
+    0.62659836f, 0.62659836f, 0.33596584f, 0.33545765f,
+    0.61567060f, 0.61567062f, 0.56908714f, 0.56908710f};
+constexpr float kExpectedSecondHidden[] = {0.62659836f, 0.62659836f,
+                                           0.56908714f, 0.56908710f};
+constexpr float kExpectedSecondCell[] = {0.94111480f, 0.94111480f, 0.88564131f,
+                                         0.88564121f};
+
+// The second invocation feeds the (quantized) state of the first invocation
+// back into the model, so its quantization error is amplified compared to a
+// single invocation. The batch-two output of the very first time step is the
+// most sensitive element: it sits in the steep region of the gate
+// nonlinearities. Measured maximum deviations from the goldens above
+// (host build, 2x3x2x2 model):
+//
+//   backend            int8      int16
+//   HELIA              0.0027    0.0004
+//   reference          0.0504    0.0538
+//
+// The loose bound is therefore driven by the reference kernel, not by HELIA,
+// so the two backends get separate tolerances instead of sharing the widest
+// one. For reference, a stateless kernel repeats the first-invocation output;
+// its smallest violating element deviates by 0.0686 and its largest by 0.94,
+// so 6e-2 still detects lost state, but only by ~14%. HELIA's 1e-2 keeps a
+// ~3.7x margin over the measured error while catching much subtler state
+// corruption.
+#if defined(HELIA)
+constexpr float kQuantizedSecondInvokeTolerance = 1e-2;
+#else
+constexpr float kQuantizedSecondInvokeTolerance = 6e-2;
+#endif
+
+// Reorder a [batch, time, depth] buffer into [time, batch, depth].
+template <int batch_size, int time_steps, int depth>
+void ToTimeMajor(const float* batch_major, float* time_major) {
+  for (int b = 0; b < batch_size; ++b) {
+    for (int t = 0; t < time_steps; ++t) {
+      for (int d = 0; d < depth; ++d) {
+        time_major[(t * batch_size + b) * depth + d] =
+            batch_major[(b * time_steps + t) * depth + d];
+      }
+    }
+  }
+}
+
+template <typename ActivationType, typename WeightType, typename BiasType,
+          typename CellType, int batch_size, int time_steps,
+          int input_dimension, int state_dimension>
+void ValidateInvokeResult(
+    LstmNodeContent<ActivationType, WeightType, BiasType, CellType, batch_size,
+                    time_steps, input_dimension, state_dimension>&
+        node_contents,
+    const float* expected_output, const float* expected_hidden_state,
+    const float* expected_cell_state, const float hidden_state_tolerance,
+    const float cell_state_tolerance) {
+  const auto& quantization_settings = node_contents.QuantizationSettings();
+
+#ifdef TFLM_LSTM_QUANTIZED_STATEFUL
+  float dequantized_hidden_state[batch_size * state_dimension] = {};
+  Dequantize(node_contents.GetHiddenStateData(), batch_size * state_dimension,
+             quantization_settings.hidden_state.scale,
+             quantization_settings.hidden_state.zero_point,
+             dequantized_hidden_state);
+  ValidateResultGoldens(expected_hidden_state, dequantized_hidden_state,
+                        batch_size * state_dimension, hidden_state_tolerance);
+
+  float dequantized_cell_state[batch_size * state_dimension] = {};
+  Dequantize(node_contents.GetCellStateData(), batch_size * state_dimension,
+             quantization_settings.cell_state.scale,
+             quantization_settings.cell_state.zero_point,
+             dequantized_cell_state);
+  ValidateResultGoldens(expected_cell_state, dequantized_cell_state,
+                        batch_size * state_dimension, cell_state_tolerance);
+#else
+  (void)expected_hidden_state;
+  (void)expected_cell_state;
+  (void)cell_state_tolerance;
+#endif
+
+  float dequantized_output[batch_size * state_dimension * time_steps] = {};
+  Dequantize(node_contents.GetOutputData(),
+             batch_size * state_dimension * time_steps,
+             quantization_settings.output.scale,
+             quantization_settings.output.zero_point, dequantized_output);
+  ValidateResultGoldens(expected_output, dequantized_output,
+                        batch_size * state_dimension * time_steps,
+                        hidden_state_tolerance);
+}
+
 template <typename ActivationType, typename WeightType, typename BiasType,
           typename CellType, int batch_size, int time_steps,
           int input_dimension, int state_dimension>
@@ -75,39 +178,64 @@ void TestUnidirectionalLSTMInteger(
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
   EXPECT_EQ(kTfLiteOk, runner.Invoke());
 
-  const auto& quantization_settings = node_contents.QuantizationSettings();
+  ValidateInvokeResult(node_contents, eval_check_data.expected_output,
+                       eval_check_data.expected_hidden_state,
+                       eval_check_data.expected_cell_state,
+                       hidden_state_tolerance, cell_state_tolerance);
 
-// CMSIS-NN does not use the hidden state and cell state tensors so these tests
-// fail.
-#if !defined(CMSIS_NN)
-  float dequantized_hidden_state[batch_size * state_dimension] = {};
-  Dequantize(node_contents.GetHiddenStateData(), batch_size * state_dimension,
-             quantization_settings.hidden_state.scale,
-             quantization_settings.hidden_state.zero_point,
-             dequantized_hidden_state);
-
-  ValidateResultGoldens(eval_check_data.expected_hidden_state,
-                        dequantized_hidden_state, batch_size * state_dimension,
-                        hidden_state_tolerance);
-
-  float dequantized_cell_state[batch_size * state_dimension] = {};
-  Dequantize(node_contents.GetCellStateData(), batch_size * state_dimension,
-             quantization_settings.cell_state.scale,
-             quantization_settings.cell_state.zero_point,
-             dequantized_cell_state);
-  ValidateResultGoldens(eval_check_data.expected_cell_state,
-                        dequantized_cell_state, batch_size * state_dimension,
-                        cell_state_tolerance);
+#ifdef TFLM_LSTM_QUANTIZED_STATEFUL
+  // The hidden and cell state tensors are variable tensors, so a second
+  // invocation must continue from the state left behind by the first one.
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  ValidateInvokeResult(node_contents, kExpectedSecondOutput,
+                       kExpectedSecondHidden, kExpectedSecondCell,
+                       kQuantizedSecondInvokeTolerance,
+                       kQuantizedSecondInvokeTolerance);
 #endif
-
-  float dequantized_output[batch_size * state_dimension * time_steps] = {};
-  Dequantize(node_contents.GetOutputData(),
-             batch_size * state_dimension * time_steps,
-             quantization_settings.output.scale,
-             quantization_settings.output.zero_point, dequantized_output);
-  ValidateResultGoldens(eval_check_data.expected_output, dequantized_output,
-                        batch_size * state_dimension, hidden_state_tolerance);
 }
+
+#ifdef TFLM_LSTM_QUANTIZED_STATEFUL
+// Same model, but with the input/output tensors laid out as
+// [time, batch, depth] and time_major enabled in the builtin data.
+template <typename ActivationType, typename WeightType, typename BiasType,
+          typename CellType, int batch_size, int time_steps,
+          int input_dimension, int state_dimension>
+void TestUnidirectionalLSTMIntegerTimeMajor(
+    const float* expected_output, const float* expected_hidden_state,
+    const float* expected_cell_state, const float* expected_second_output,
+    const float hidden_state_tolerance, const float cell_state_tolerance,
+    LstmNodeContent<ActivationType, WeightType, BiasType, CellType, batch_size,
+                    time_steps, input_dimension, state_dimension>&
+        node_contents) {
+  SetConstTensors(node_contents.GetTensors());
+  TfLiteTensor* tensors = node_contents.GetTensors();
+  // [time, batch, depth] shapes for the input and the output tensor.
+  int input_dims[4] = {3, time_steps, batch_size, input_dimension};
+  int output_dims[4] = {3, time_steps, batch_size, state_dimension};
+  tensors[kLstmInputTensor].dims = IntArrayFromInts(input_dims);
+  tensors[24].dims = IntArrayFromInts(output_dims);
+
+  const TFLMRegistration registration = Register_UNIDIRECTIONAL_SEQUENCE_LSTM();
+  auto buildin_data = node_contents.BuiltinData();
+  buildin_data.time_major = true;
+  micro::KernelRunner runner(
+      registration, tensors, kLstmMaxNumInputOutputTensors,
+      node_contents.KernelInputs(), node_contents.KernelOutputs(),
+      reinterpret_cast<void*>(&buildin_data));
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+
+  ValidateInvokeResult(node_contents, expected_output, expected_hidden_state,
+                       expected_cell_state, hidden_state_tolerance,
+                       cell_state_tolerance);
+
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  ValidateInvokeResult(node_contents, expected_second_output,
+                       kExpectedSecondHidden, kExpectedSecondCell,
+                       kQuantizedSecondInvokeTolerance,
+                       kQuantizedSecondInvokeTolerance);
+}
+#endif  // TFLM_LSTM_QUANTIZED_STATEFUL
 
 template <int batch_size, int time_steps, int input_dimension,
           int state_dimension>
@@ -170,17 +298,11 @@ TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMFloat) {
   // reference and optimized (e.g. CMSIS-NN) LSTM implementations. The
   // reference kernel still matches golden well within this bound.
   const float tolerance = 1e-4;
-  constexpr float kExpectedSecondOutput[] = {
-      0.61399786f, 0.61399787f, 0.62385699f, 0.62385699f,
-      0.62659836f, 0.62659836f, 0.33596584f, 0.33545765f,
-      0.61567060f, 0.61567062f, 0.56908714f, 0.56908710f};
-  constexpr float kExpectedSecondHidden[] = {
-      0.62659836f, 0.62659836f, 0.56908714f, 0.56908710f};
-  constexpr float kExpectedSecondCell[] = {
-      0.94111480f, 0.94111480f, 0.88564131f, 0.88564121f};
   tflite::testing::TestUnidirectionalLSTMFloat(
-      kernel_eval_data, kExpectedSecondOutput, kExpectedSecondHidden,
-      kExpectedSecondCell, tolerance, tolerance, float_node_contents);
+      kernel_eval_data, tflite::testing::kExpectedSecondOutput,
+      tflite::testing::kExpectedSecondHidden,
+      tflite::testing::kExpectedSecondCell, tolerance, tolerance,
+      float_node_contents);
 }
 
 TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMInt8) {
@@ -213,6 +335,115 @@ TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMInt16) {
       kernel_eval_data, hidden_state_tolerance, cell_state_tolerance,
       int16_node_contents);
 }
+
+#ifdef TFLM_LSTM_QUANTIZED_STATEFUL
+// A model seeded with the state left behind by a first invocation must produce
+// the second-invocation goldens on its very first invocation, i.e. the kernel
+// consumes the incoming (non-zero) hidden and cell state.
+TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMInt8InitialState) {
+  const tflite::testing::LstmEvalCheckData<12, 4, 12> kernel_eval_data =
+      tflite::testing::Get2X2LstmEvalCheckData();
+  tflite::testing::LstmNodeContent<int8_t, int8_t, int32_t, int16_t, 2, 3, 2, 2>
+      int8_node_contents = tflite::testing::Create2x3x2X2Int8NodeContents(
+          kernel_eval_data.input_data, kernel_eval_data.expected_hidden_state,
+          kernel_eval_data.expected_cell_state);
+
+  tflite::testing::SetConstTensors(int8_node_contents.GetTensors());
+  const TFLMRegistration registration =
+      tflite::Register_UNIDIRECTIONAL_SEQUENCE_LSTM();
+  auto buildin_data = int8_node_contents.BuiltinData();
+  tflite::micro::KernelRunner runner(
+      registration, int8_node_contents.GetTensors(),
+      tflite::testing::kLstmMaxNumInputOutputTensors,
+      int8_node_contents.KernelInputs(), int8_node_contents.KernelOutputs(),
+      reinterpret_cast<void*>(&buildin_data));
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+
+  tflite::testing::ValidateInvokeResult(
+      int8_node_contents, tflite::testing::kExpectedSecondOutput,
+      tflite::testing::kExpectedSecondHidden,
+      tflite::testing::kExpectedSecondCell,
+      tflite::testing::kQuantizedSecondInvokeTolerance,
+      tflite::testing::kQuantizedSecondInvokeTolerance);
+}
+
+TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMInt16InitialState) {
+  const tflite::testing::LstmEvalCheckData<12, 4, 12> kernel_eval_data =
+      tflite::testing::Get2X2LstmEvalCheckData();
+  tflite::testing::LstmNodeContent<int16_t, int8_t, int64_t, int16_t, 2, 3, 2,
+                                   2>
+      int16_node_contents = tflite::testing::Create2x3x2X2Int16NodeContents(
+          kernel_eval_data.input_data, kernel_eval_data.expected_hidden_state,
+          kernel_eval_data.expected_cell_state);
+
+  tflite::testing::SetConstTensors(int16_node_contents.GetTensors());
+  const TFLMRegistration registration =
+      tflite::Register_UNIDIRECTIONAL_SEQUENCE_LSTM();
+  auto buildin_data = int16_node_contents.BuiltinData();
+  tflite::micro::KernelRunner runner(
+      registration, int16_node_contents.GetTensors(),
+      tflite::testing::kLstmMaxNumInputOutputTensors,
+      int16_node_contents.KernelInputs(), int16_node_contents.KernelOutputs(),
+      reinterpret_cast<void*>(&buildin_data));
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+
+  tflite::testing::ValidateInvokeResult(
+      int16_node_contents, tflite::testing::kExpectedSecondOutput,
+      tflite::testing::kExpectedSecondHidden,
+      tflite::testing::kExpectedSecondCell,
+      tflite::testing::kQuantizedSecondInvokeTolerance,
+      tflite::testing::kQuantizedSecondInvokeTolerance);
+}
+
+TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMInt8TimeMajor) {
+  const tflite::testing::LstmEvalCheckData<12, 4, 12> kernel_eval_data =
+      tflite::testing::Get2X2LstmEvalCheckData();
+  float time_major_input[12] = {};
+  float time_major_output[12] = {};
+  float time_major_second_output[12] = {};
+  tflite::testing::ToTimeMajor<2, 3, 2>(kernel_eval_data.input_data,
+                                        time_major_input);
+  tflite::testing::ToTimeMajor<2, 3, 2>(kernel_eval_data.expected_output,
+                                        time_major_output);
+  tflite::testing::ToTimeMajor<2, 3, 2>(tflite::testing::kExpectedSecondOutput,
+                                        time_major_second_output);
+
+  tflite::testing::LstmNodeContent<int8_t, int8_t, int32_t, int16_t, 2, 3, 2, 2>
+      int8_node_contents = tflite::testing::Create2x3x2X2Int8NodeContents(
+          time_major_input, kernel_eval_data.hidden_state);
+
+  tflite::testing::TestUnidirectionalLSTMIntegerTimeMajor(
+      time_major_output, kernel_eval_data.expected_hidden_state,
+      kernel_eval_data.expected_cell_state, time_major_second_output, 1e-2,
+      1e-2, int8_node_contents);
+}
+
+TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMInt16TimeMajor) {
+  const tflite::testing::LstmEvalCheckData<12, 4, 12> kernel_eval_data =
+      tflite::testing::Get2X2LstmEvalCheckData();
+  float time_major_input[12] = {};
+  float time_major_output[12] = {};
+  float time_major_second_output[12] = {};
+  tflite::testing::ToTimeMajor<2, 3, 2>(kernel_eval_data.input_data,
+                                        time_major_input);
+  tflite::testing::ToTimeMajor<2, 3, 2>(kernel_eval_data.expected_output,
+                                        time_major_output);
+  tflite::testing::ToTimeMajor<2, 3, 2>(tflite::testing::kExpectedSecondOutput,
+                                        time_major_second_output);
+
+  tflite::testing::LstmNodeContent<int16_t, int8_t, int64_t, int16_t, 2, 3, 2,
+                                   2>
+      int16_node_contents = tflite::testing::Create2x3x2X2Int16NodeContents(
+          time_major_input, kernel_eval_data.hidden_state);
+
+  tflite::testing::TestUnidirectionalLSTMIntegerTimeMajor(
+      time_major_output, kernel_eval_data.expected_hidden_state,
+      kernel_eval_data.expected_cell_state, time_major_second_output, 1e-2,
+      1e-2, int16_node_contents);
+}
+#endif  // TFLM_LSTM_QUANTIZED_STATEFUL
 
 #if ARM_NN_ENABLE_F16
 namespace tflite {
