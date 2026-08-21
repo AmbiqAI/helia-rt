@@ -178,8 +178,9 @@ actions; nothing here can be done from a workflow.
          endpoints as satisfied by **Issues (write) _or_ Pull requests
          (write)**, and we have direct proof: the previous `GITHUB_TOKEN` ran
          with `contents: write` + `pull-requests: write` and no issues scope at
-         all, and cut 24 of this repo's 26 releases — comment and label swap
-         included.
+         all — it has never had one — and on that it cut every release this repo
+         has made since adopting release-please, 17 of them, comment and label
+         swap included.
 
          **If that ever turns out to be wrong, the symptom is specific.** The
          comment is posted *after* the tag and GitHub Release are created but
