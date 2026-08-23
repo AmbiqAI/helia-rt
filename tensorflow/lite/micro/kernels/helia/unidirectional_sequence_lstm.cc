@@ -97,11 +97,16 @@ bool IsZeroInitialState(const TfLiteEvalTensor* hidden,
 #endif
 
 // Number of state-sized scratch buffers required by the optimized quantized
-// LSTM path. From ns-cmsis-nn v7.29.0 onwards the cell state lives in the
+// LSTM path. From ns-cmsis-nn v7.28.0 onwards the cell state lives in the
 // TFLite variable tensor, so only the two temporary gate buffers are needed.
-#if NS_CMSIS_NN_VERSION >= 7029000
+// (v7.28.0 is the release that added cmsis_nn_lstm_context::hidden_state and
+// the persistent-state contract for the quantized s8/s16 kernels; v7.29.0 only
+// extended stateful operation to the *float* f16/f32 kernels.)
+#if NS_CMSIS_NN_VERSION >= 7028000
 constexpr size_t kCmsisNnQuantizedScratchBuffers = 2;
 #else
+#warning \
+    "ns-cmsis-nn < v7.28.0: quantized LSTM state is NOT persisted across invocations; the stateless fallback path is being compiled."
 constexpr size_t kCmsisNnQuantizedScratchBuffers = 3;
 #endif
 
@@ -112,7 +117,7 @@ LSTMBuffers<int16_t> CMSIS_NN_CreateLSTMBuffers(TfLiteContext* context,
       context->GetScratchBuffer(context, buffer_indices[0]));
   buffers.buffer1 = reinterpret_cast<int16_t*>(
       context->GetScratchBuffer(context, buffer_indices[1]));
-#if NS_CMSIS_NN_VERSION < 7029000
+#if NS_CMSIS_NN_VERSION < 7028000
   buffers.buffer2 = reinterpret_cast<int16_t*>(
       context->GetScratchBuffer(context, buffer_indices[2]));
 #endif
@@ -357,17 +362,18 @@ TfLiteStatus CMSIS_NN_EvalInteger8x8_16Lstm(
   cmsis_nn_lstm_context cmsis_buffers = {};
   cmsis_buffers.temp1 = reinterpret_cast<int16_t*>(buffers.buffer0);
   cmsis_buffers.temp2 = reinterpret_cast<int16_t*>(buffers.buffer1);
-#if NS_CMSIS_NN_VERSION >= 7029000
+#if NS_CMSIS_NN_VERSION >= 7028000
   // A non-NULL hidden_state makes arm_lstm_unidirectional_s8 stateful: it
   // consumes the incoming hidden/cell state from the TFLite variable tensors
-  // and writes the final state back into them.
+  // and writes the final state back into them.  This contract landed in
+  // ns-cmsis-nn v7.28.0.
   cmsis_buffers.cell_state =
       tflite::micro::GetTensorData<int16_t>(kernel_content.CellStateTensor());
   cmsis_buffers.hidden_state =
       tflite::micro::GetTensorData<int8_t>(kernel_content.HiddenStateTensor());
 #else
-  // Older ns-cmsis-nn revisions do not persist the final hidden state, so run
-  // the kernel stateless (NULL hidden_state) with a scratch cell state.
+  // ns-cmsis-nn older than v7.28.0 does not persist the final hidden state, so
+  // run the kernel stateless (NULL hidden_state) with a scratch cell state.
   cmsis_buffers.cell_state = reinterpret_cast<int16_t*>(buffers.buffer2);
 #endif
 
@@ -397,17 +403,18 @@ TfLiteStatus CMSIS_NN_EvalInteger16x8_16Lstm(
   cmsis_nn_lstm_context cmsis_buffers = {};
   cmsis_buffers.temp1 = reinterpret_cast<int16_t*>(buffers.buffer0);
   cmsis_buffers.temp2 = reinterpret_cast<int16_t*>(buffers.buffer1);
-#if NS_CMSIS_NN_VERSION >= 7029000
+#if NS_CMSIS_NN_VERSION >= 7028000
   // A non-NULL hidden_state makes arm_lstm_unidirectional_s16 stateful: it
   // consumes the incoming hidden/cell state from the TFLite variable tensors
-  // and writes the final state back into them.
+  // and writes the final state back into them.  This contract landed in
+  // ns-cmsis-nn v7.28.0.
   cmsis_buffers.cell_state =
       tflite::micro::GetTensorData<int16_t>(kernel_content.CellStateTensor());
   cmsis_buffers.hidden_state =
       tflite::micro::GetTensorData<int16_t>(kernel_content.HiddenStateTensor());
 #else
-  // Older ns-cmsis-nn revisions do not persist the final hidden state, so run
-  // the kernel stateless (NULL hidden_state) with a scratch cell state.
+  // ns-cmsis-nn older than v7.28.0 does not persist the final hidden state, so
+  // run the kernel stateless (NULL hidden_state) with a scratch cell state.
   cmsis_buffers.cell_state = reinterpret_cast<int16_t*>(buffers.buffer2);
 #endif
 

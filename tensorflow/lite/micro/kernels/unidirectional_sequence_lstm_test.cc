@@ -34,7 +34,21 @@ limitations under the License.
 // pinned by this repository still evaluates the quantized LSTM statelessly
 // (arm_lstm_unidirectional_s8/s16 force a NULL initial hidden state and clear
 // the cell state), so the state assertions are skipped for those builds.
-#if !defined(CMSIS_NN) || defined(HELIA)
+//
+// The persistent-state contract for the *quantized* kernels
+// (cmsis_nn_lstm_context::hidden_state) landed in ns-cmsis-nn v7.28.0.  A HELIA
+// build against anything older compiles the stateless fallback in
+// kernels/helia/unidirectional_sequence_lstm.cc, so the version has to be part
+// of the gate -- otherwise the stateless kernel would be run against stateful
+// assertions and fail by construction.  Keep this threshold in sync with the
+// quantized NS_CMSIS_NN_VERSION fences in that kernel.
+#if defined(HELIA)
+#include "Include/arm_nn_types.h"  // NS_CMSIS_NN_VERSION
+#endif
+
+#if !defined(CMSIS_NN) ||                                  \
+    (defined(HELIA) && defined(NS_CMSIS_NN_VERSION) &&     \
+     NS_CMSIS_NN_VERSION >= 7028000)
 #define TFLM_LSTM_QUANTIZED_STATEFUL 1
 #endif
 
@@ -94,6 +108,24 @@ constexpr float kExpectedSecondCell[] = {0.94111480f, 0.94111480f, 0.88564131f,
 // so 6e-2 still detects lost state, but only by ~14%. HELIA's 1e-2 keeps a
 // ~3.7x margin over the measured error while catching much subtler state
 // corruption.
+//
+// Which elements actually carry the discriminating signal matters here, because
+// 6e-2 is close enough to the reset deltas that most of the vector is silent.
+// Under a *total* state reset (i.e. a stateless kernel that just repeats the
+// first-invocation result) the per-element deviation from the goldens above is:
+//
+//   output  b1:  t0 0.3494 / 0.3453   t1 0.1445 / 0.1445   t2 0.0465 / 0.0465
+//           b2:  t0 0.3374 / 0.3355   t1 0.1468 / 0.1468   t2 0.0685 / 0.0685
+//   hidden  b1:  0.0465 / 0.0465      b2:  0.0685 / 0.0685
+//   cell    b1:  0.0437 / 0.0437      b2:  0.0824 / 0.0824
+//
+// So at 6e-2 the check is carried by the t0/t1 output elements of both batches
+// (>= 0.1445), plus batch 2's t2 output and hidden state (0.0685) and batch 2's
+// cell state (0.0824).  Batch 1's entire hidden state, batch 1's entire cell
+// state and batch 1's final-timestep output all sit INSIDE 6e-2 and stay silent
+// even under a complete state reset.  If the goldens or the model inputs are
+// ever retuned, re-measure this table: shrinking the t0/t1 deltas would hollow
+// the reference-backend check out without any test turning red.
 #if defined(HELIA)
 constexpr float kQuantizedSecondInvokeTolerance = 1e-2;
 #else
@@ -210,10 +242,16 @@ void TestUnidirectionalLSTMIntegerTimeMajor(
   SetConstTensors(node_contents.GetTensors());
   TfLiteTensor* tensors = node_contents.GetTensors();
   // [time, batch, depth] shapes for the input and the output tensor.
-  int input_dims[4] = {3, time_steps, batch_size, input_dimension};
-  int output_dims[4] = {3, time_steps, batch_size, state_dimension};
+  // IntArrayFromInts aliases these buffers rather than copying them, and the
+  // tensors keep pointing at them after this function returns, so they need
+  // static storage duration -- function locals would dangle.  The values are
+  // template constants, so one instance per instantiation is correct.
+  static int input_dims[4] = {3, time_steps, batch_size, input_dimension};
+  static int output_dims[4] = {3, time_steps, batch_size, state_dimension};
+  // Ask the node for its output tensor index instead of hard-coding 24.
+  const int output_tensor_index = node_contents.KernelOutputs()->data[0];
   tensors[kLstmInputTensor].dims = IntArrayFromInts(input_dims);
-  tensors[24].dims = IntArrayFromInts(output_dims);
+  tensors[output_tensor_index].dims = IntArrayFromInts(output_dims);
 
   const TFLMRegistration registration = Register_UNIDIRECTIONAL_SEQUENCE_LSTM();
   auto buildin_data = node_contents.BuiltinData();
@@ -416,8 +454,11 @@ TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMInt8TimeMajor) {
 
   tflite::testing::TestUnidirectionalLSTMIntegerTimeMajor(
       time_major_output, kernel_eval_data.expected_hidden_state,
-      kernel_eval_data.expected_cell_state, time_major_second_output, 1e-2,
-      1e-2, int8_node_contents);
+      kernel_eval_data.expected_cell_state, time_major_second_output,
+      // Measured max deviation for int8 time-major is 0.005175, so 1e-2 leaves
+      // only a ~1.93x margin.  That is deliberate: the int8 path genuinely
+      // needs the looser bound, unlike int16 below.
+      1e-2, 1e-2, int8_node_contents);
 }
 
 TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMInt16TimeMajor) {
@@ -440,8 +481,10 @@ TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMInt16TimeMajor) {
 
   tflite::testing::TestUnidirectionalLSTMIntegerTimeMajor(
       time_major_output, kernel_eval_data.expected_hidden_state,
-      kernel_eval_data.expected_cell_state, time_major_second_output, 1e-2,
-      1e-2, int16_node_contents);
+      kernel_eval_data.expected_cell_state, time_major_second_output,
+      // Measured max deviation for int16 time-major is 0.000149, so 1e-3 still
+      // leaves a ~6.7x margin while being 10x tighter than the int8 bound.
+      1e-3, 1e-3, int16_node_contents);
 }
 #endif  // TFLM_LSTM_QUANTIZED_STATEFUL
 
