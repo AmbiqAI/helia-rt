@@ -90,6 +90,51 @@ constexpr float kExpectedSecondHidden[] = {0.62659836f, 0.62659836f,
 constexpr float kExpectedSecondCell[] = {0.94111480f, 0.94111480f, 0.88564131f,
                                          0.88564121f};
 
+#ifdef TFLM_LSTM_QUANTIZED_STATEFUL
+// Goldens for an invocation seeded with a NON-ZERO cell state and a ZERO hidden
+// state, i.e. hidden_state = {0,0,0,0} and
+// cell_state = Get2X2LstmEvalCheckData().expected_cell_state.
+//
+// Why this case exists: every other test in this file leaves the incoming cell
+// state effectively unobservable.  The 2x2 fixture deliberately uses "negative
+// large weights for forget gate to make it really forget"
+// ({-10,-10,-20,-20} in lstm_test_data.cc), and every other test enters the
+// kernel with a non-zero hidden state.  With that hidden state the t=0 forget
+// gate collapses to ~1.7e-7, so the incoming cell state can shift any asserted
+// element by at most 1.73e-3 -- 5.8x INSIDE the 1e-2 tolerance.  A kernel that
+// reads garbage for the incoming cell state, or ignores it entirely, still
+// passes.  (Verified by mutation: zeroing the incoming cell state while leaving
+// the write-back intact passes every other test in this file.)
+//
+// Seeding hidden = 0 instead pushes the t=0 forget gate to ~0.99 for batch 2
+// (exactly [0.99005, 0.99990]), so the incoming cell state propagates rather
+// than being annihilated.  Measured deviation of these goldens from the
+// zero-cell result, i.e. how far a kernel that ignores the incoming cell state
+// would land off:
+//
+//   output  b2: t0 0.2724 / 0.2736   t1 0.1266 / 0.1265   t2 0.0603 / 0.0603
+//   hidden  b2: 0.0603 / 0.0603
+//   cell    b2: 0.0733 / 0.0733
+//
+// i.e. 6x to 27x outside the 1e-2 tolerance.  Batch 1 still forgets hard (its
+// deltas are <= 0.0082), so batch 2 is what carries the signal here.
+//
+// These are float goldens, derived by evaluating the float LSTM recurrence with
+// this seeding -- the same way the goldens above were derived, NOT by recording
+// what the quantized kernel under test happens to produce.  The same derivation
+// reproduces kExpectedSecondOutput/Hidden/Cell and the first-invocation goldens
+// in lstm_test_data.cc to within 4.5e-9.
+constexpr float kExpectedSeededCellOutput[] = {
+    0.27273426f, 0.26885695f, 0.48181164f, 0.48182232f,
+    0.58104594f, 0.58104600f, 0.27100885f, 0.27361716f,
+    0.59545371f, 0.59545373f, 0.56088665f, 0.56088660f};
+constexpr float kExpectedSeededCellHidden[] = {0.58104594f, 0.58104600f,
+                                               0.56088665f, 0.56088660f};
+constexpr float kExpectedSeededCellCell[] = {0.89835594f, 0.89835609f,
+                                             0.87660349f, 0.87660337f};
+constexpr float kZeroHiddenState[] = {0.0f, 0.0f, 0.0f, 0.0f};
+#endif  // TFLM_LSTM_QUANTIZED_STATEFUL
+
 // The second invocation feeds the (quantized) state of the first invocation
 // back into the model, so its quantization error is amplified compared to a
 // single invocation. The batch-two output of the very first time step is the
@@ -273,6 +318,34 @@ void TestUnidirectionalLSTMIntegerTimeMajor(
                        kQuantizedSecondInvokeTolerance,
                        kQuantizedSecondInvokeTolerance);
 }
+
+// Run a single invocation on an already-seeded node and check output/hidden/cell
+// against the supplied goldens.  Used by the seeded-initial-state tests, which
+// assert on what the kernel READS rather than on what it writes back.
+template <typename ActivationType, typename WeightType, typename BiasType,
+          typename CellType, int batch_size, int time_steps,
+          int input_dimension, int state_dimension>
+void TestUnidirectionalLSTMSeededState(
+    const float* expected_output, const float* expected_hidden_state,
+    const float* expected_cell_state, const float hidden_state_tolerance,
+    const float cell_state_tolerance,
+    LstmNodeContent<ActivationType, WeightType, BiasType, CellType, batch_size,
+                    time_steps, input_dimension, state_dimension>&
+        node_contents) {
+  SetConstTensors(node_contents.GetTensors());
+  const TFLMRegistration registration = Register_UNIDIRECTIONAL_SEQUENCE_LSTM();
+  auto buildin_data = node_contents.BuiltinData();
+  micro::KernelRunner runner(
+      registration, node_contents.GetTensors(), kLstmMaxNumInputOutputTensors,
+      node_contents.KernelInputs(), node_contents.KernelOutputs(),
+      reinterpret_cast<void*>(&buildin_data));
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+
+  ValidateInvokeResult(node_contents, expected_output, expected_hidden_state,
+                       expected_cell_state, hidden_state_tolerance,
+                       cell_state_tolerance);
+}
 #endif  // TFLM_LSTM_QUANTIZED_STATEFUL
 
 template <int batch_size, int time_steps, int input_dimension,
@@ -433,6 +506,42 @@ TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMInt16InitialState) {
       tflite::testing::kExpectedSecondCell,
       tflite::testing::kQuantizedSecondInvokeTolerance,
       tflite::testing::kQuantizedSecondInvokeTolerance);
+}
+
+// Seed a NON-ZERO cell state with a ZERO hidden state, so that the incoming
+// cell state actually reaches the assertions (see kExpectedSeededCellOutput for
+// why the other tests cannot see it).  These tests fail if the kernel drops,
+// zeroes or misreads the incoming cell state, even when the write-back path is
+// perfectly correct.
+TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMInt8SeededCellState) {
+  const tflite::testing::LstmEvalCheckData<12, 4, 12> kernel_eval_data =
+      tflite::testing::Get2X2LstmEvalCheckData();
+  tflite::testing::LstmNodeContent<int8_t, int8_t, int32_t, int16_t, 2, 3, 2, 2>
+      int8_node_contents = tflite::testing::Create2x3x2X2Int8NodeContents(
+          kernel_eval_data.input_data, tflite::testing::kZeroHiddenState,
+          kernel_eval_data.expected_cell_state);
+
+  tflite::testing::TestUnidirectionalLSTMSeededState(
+      tflite::testing::kExpectedSeededCellOutput,
+      tflite::testing::kExpectedSeededCellHidden,
+      tflite::testing::kExpectedSeededCellCell, 1e-2, 1e-2, int8_node_contents);
+}
+
+TEST(UnidirectionalSequenceLstmTest,
+     TestUnidirectionalLSTMInt16SeededCellState) {
+  const tflite::testing::LstmEvalCheckData<12, 4, 12> kernel_eval_data =
+      tflite::testing::Get2X2LstmEvalCheckData();
+  tflite::testing::LstmNodeContent<int16_t, int8_t, int64_t, int16_t, 2, 3, 2,
+                                   2>
+      int16_node_contents = tflite::testing::Create2x3x2X2Int16NodeContents(
+          kernel_eval_data.input_data, tflite::testing::kZeroHiddenState,
+          kernel_eval_data.expected_cell_state);
+
+  tflite::testing::TestUnidirectionalLSTMSeededState(
+      tflite::testing::kExpectedSeededCellOutput,
+      tflite::testing::kExpectedSeededCellHidden,
+      tflite::testing::kExpectedSeededCellCell, 1e-2, 1e-2,
+      int16_node_contents);
 }
 
 TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMInt8TimeMajor) {
