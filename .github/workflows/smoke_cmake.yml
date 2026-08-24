@@ -415,6 +415,15 @@ jobs:
           file smoke/build/nsx_helia_rt/helia-rt-src/libhelia_rt_helia.a | head -1
           arm-none-eabi-objdump -a smoke/build/nsx_helia_rt/helia-rt-src/libhelia_rt_helia.a \
               | head -5
+          # This build dir is the default (Ethos-U OFF). Assert the archive
+          # carries NO core-driver reference: every consumer that does not opt
+          # in relies on not inheriting an unresolved ethosu_* symbol at link.
+          if arm-none-eabi-nm smoke/build/nsx_helia_rt/helia-rt-src/libhelia_rt_helia.a \
+               | grep " U ethosu_reserve_driver" >/dev/null; then
+            echo "::error::ethosu_reserve_driver referenced in a default (Ethos-U OFF) build"
+            exit 1
+          fi
+          echo "OK: default build carries no Ethos-U core-driver reference"
 
       # Cover the reference backend in a separate build dir. The cmsis_nn
       # backend requires upstream CMSIS-NN headers (ns-cmsis-nn has modified
@@ -451,7 +460,10 @@ jobs:
           test -f "${ARCHIVE}"
           # The Ethos-U kernel externs the core-driver entry points, so an
           # enabled build must leave them undefined in the archive.
-          if ! arm-none-eabi-nm "${ARCHIVE}" | grep -q " U ethosu_reserve_driver"; then
+          # No grep -q here: it exits at the first match, the still-writing nm
+          # takes SIGPIPE, and `set -o pipefail` turns that 141 into a failure
+          # that `!` then inverts into a spurious pass. Let grep drain nm.
+          if ! arm-none-eabi-nm "${ARCHIVE}" | grep " U ethosu_reserve_driver" >/dev/null; then
             echo "::error::ethosu_reserve_driver not referenced; Ethos-U dispatch did not build in"
             exit 1
           fi
