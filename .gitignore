@@ -50,3 +50,6 @@ tensorflow/lite/micro/models/**/*_model_data.h
 
 # Local scratch dir for cloned reference repos
 .scratch/
+
+# Local NSX-module packaging test extractions
+heliaRT-test-*/
