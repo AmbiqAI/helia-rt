@@ -149,19 +149,41 @@ set(HELIA_RT_PROVIDE_DEBUG_LOG  OFF CACHE BOOL "" FORCE)
 # Map NSX_HELIA_RT_ENABLE_ETHOSU -> repo-root HELIA_RT_ENABLE_ETHOSU toggle.
 #
 # The repo-root option is owned by this module while the nsx wrapper is in
-# use: we FORCE it below, so a consumer setting it directly would have their
-# value silently discarded. Reject that combination explicitly rather than
-# leaving the user to discover it by disassembling the archive.
-if(HELIA_RT_ENABLE_ETHOSU AND NOT NSX_HELIA_RT_ENABLE_ETHOSU)
+# use: we FORCE the cache entry below, so a consumer who sets that entry
+# directly (-DHELIA_RT_ENABLE_ETHOSU=ON) has their value overwritten. Reject
+# that up front rather than leaving them to discover it by disassembling the
+# archive.
+#
+# Two wrinkles the naive check gets wrong:
+#
+#  * Our own FORCE write persists. On a reconfigure of an existing build dir
+#    the cache entry is ON only because we put it there, so a plain
+#    "inner ON + wrapper OFF" test would fire when the user toggles the
+#    wrapper back OFF -- telling them to enable the thing they just disabled.
+#    _NSX_HELIA_RT_OWNS_ETHOSU records that provenance so we only reject
+#    values we did not write. It also keeps per-app re-forcing safe in a
+#    shared build dir.
+#
+#  * A normal (non-cache) variable of the same name in an enclosing scope
+#    shadows the cache entry and SURVIVES a FORCE cache write -- FORCE
+#    updates the cache, not the shadow. Left alone, the build would compile
+#    with the parent's value while we report ours. Drop the shadow before
+#    writing so the cache entry is what actually takes effect. The guard runs
+#    first, so a shadowing ON with the wrapper OFF is still reported.
+if(HELIA_RT_ENABLE_ETHOSU AND NOT NSX_HELIA_RT_ENABLE_ETHOSU
+        AND NOT _NSX_HELIA_RT_OWNS_ETHOSU)
     message(FATAL_ERROR
         "nsx-helia-rt: HELIA_RT_ENABLE_ETHOSU is owned by this module; "
         "set -DNSX_HELIA_RT_ENABLE_ETHOSU=ON instead")
 endif()
+unset(HELIA_RT_ENABLE_ETHOSU)
 if(NSX_HELIA_RT_ENABLE_ETHOSU)
     set(HELIA_RT_ENABLE_ETHOSU ON  CACHE BOOL "" FORCE)
 else()
     set(HELIA_RT_ENABLE_ETHOSU OFF CACHE BOOL "" FORCE)
 endif()
+set(_NSX_HELIA_RT_OWNS_ETHOSU ON CACHE INTERNAL
+    "nsx-helia-rt owns the HELIA_RT_ENABLE_ETHOSU cache entry in this build dir")
 
 # Wire the kernel-library target for the selected backend. The helia
 # backend uses nsx::cmsis_nn (ns-cmsis-nn). The cmsis_nn backend requires
@@ -240,7 +262,9 @@ endif()
 
 message(STATUS "nsx-helia-rt: source build, "
                "backend=${NSX_HELIA_RT_BACKEND}, "
-               "ethos-u=${NSX_HELIA_RT_ENABLE_ETHOSU}, "
+               # Effective post-mapping value, not the requested wrapper
+               # value, so the log reflects what actually compiles.
+               "ethos-u=${HELIA_RT_ENABLE_ETHOSU}, "
                "variant=${HELIA_RT_VARIANT} (HELIA_RT_BUILD_TYPE=${HELIA_RT_BUILD_TYPE}), "
                "target=${_nsx_helia_rt_alias_target}"
                "${_nsx_helia_rt_kernel_diag}, "
