@@ -440,6 +440,31 @@ jobs:
               --target helia_rt_reference nsx_helia_rt_glue -j
           test -f smoke/build-reference/nsx_helia_rt/helia-rt-src/libhelia_rt_reference.a
 
+      # Cover the Ethos-U opt-in path. The archive is expected to carry
+      # unresolved core-driver references (a provider module supplies them at
+      # final app link), so assert on the undefined symbol rather than on a
+      # link. This is what catches a silently-disabled toggle: with the flag
+      # OFF, Register_ETHOSU() returns nullptr and no such reference exists.
+      - name: Configure + build (Ethos-U enabled)
+        run: |
+          set -euo pipefail
+          cmake -S smoke -B smoke/build-ethosu -G Ninja \
+              -DCMAKE_TOOLCHAIN_FILE="$(pwd)/smoke/toolchain.cmake" \
+              -DHELIA_RT_DIR="$(pwd)/helia-rt" \
+              -DNS_CMSIS_NN_DIR="$(pwd)/ns-cmsis-nn" \
+              -DNSX_HELIA_RT_ENABLE_ETHOSU=ON \
+              -DHELIA_RT_VARIANT=release-with-logs
+          cmake --build smoke/build-ethosu --target helia_rt_helia -j
+          ARCHIVE=smoke/build-ethosu/nsx_helia_rt/helia-rt-src/libhelia_rt_helia.a
+          test -f "${ARCHIVE}"
+          # The Ethos-U kernel externs the core-driver entry points, so an
+          # enabled build must leave them undefined in the archive.
+          if ! arm-none-eabi-nm "${ARCHIVE}" | grep -q " U ethosu_reserve_driver"; then
+            echo "::error::ethosu_reserve_driver not referenced; Ethos-U dispatch did not build in"
+            exit 1
+          fi
+          echo "OK: Ethos-U dispatch compiled in (core-driver refs undefined as expected)"
+
   zephyr-build:
     name: Zephyr module build (qemu_cortex_m3, REFERENCE)
     runs-on: ubuntu-latest
