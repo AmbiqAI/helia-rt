@@ -85,10 +85,10 @@ set_property(CACHE HELIA_RT_VARIANT PROPERTY STRINGS
 # Enables the real ethos-u kernel implementation in the heliaRT build
 # (HELIA_RT_ENABLE_ETHOSU). The kernel externs the Ethos-U core-driver entry
 # points (ethosu_reserve_driver / ethosu_invoke_v3 / ...), so the final app
-# must link a core-driver provider such as the nsx-npu module and initialize
-# it (nsx_npu_init) before invoking a Vela-compiled model.
+# must link an Ethos-U core-driver provider module and initialize the driver
+# before invoking a Vela-compiled model.
 option(NSX_HELIA_RT_ENABLE_ETHOSU
-    "Enable Ethos-U custom-op dispatch (requires an Ethos-U core driver, e.g. nsx-npu)" OFF)
+    "Enable Ethos-U custom-op dispatch (requires an Ethos-U core-driver provider module)" OFF)
 
 # Map HELIA_RT_VARIANT (dash form) -> HELIA_RT_BUILD_TYPE (underscore form
 # expected by helia_rt_sources.cmake).
@@ -147,6 +147,16 @@ set(HELIA_RT_DISABLE_X86_NEON   OFF CACHE BOOL "" FORCE)
 set(HELIA_RT_PROVIDE_DEBUG_LOG  OFF CACHE BOOL "" FORCE)
 
 # Map NSX_HELIA_RT_ENABLE_ETHOSU -> repo-root HELIA_RT_ENABLE_ETHOSU toggle.
+#
+# The repo-root option is owned by this module while the nsx wrapper is in
+# use: we FORCE it below, so a consumer setting it directly would have their
+# value silently discarded. Reject that combination explicitly rather than
+# leaving the user to discover it by disassembling the archive.
+if(HELIA_RT_ENABLE_ETHOSU AND NOT NSX_HELIA_RT_ENABLE_ETHOSU)
+    message(FATAL_ERROR
+        "nsx-helia-rt: HELIA_RT_ENABLE_ETHOSU is owned by this module; "
+        "set -DNSX_HELIA_RT_ENABLE_ETHOSU=ON instead")
+endif()
 if(NSX_HELIA_RT_ENABLE_ETHOSU)
     set(HELIA_RT_ENABLE_ETHOSU ON  CACHE BOOL "" FORCE)
 else()
@@ -230,6 +240,7 @@ endif()
 
 message(STATUS "nsx-helia-rt: source build, "
                "backend=${NSX_HELIA_RT_BACKEND}, "
+               "ethos-u=${NSX_HELIA_RT_ENABLE_ETHOSU}, "
                "variant=${HELIA_RT_VARIANT} (HELIA_RT_BUILD_TYPE=${HELIA_RT_BUILD_TYPE}), "
                "target=${_nsx_helia_rt_alias_target}"
                "${_nsx_helia_rt_kernel_diag}, "
