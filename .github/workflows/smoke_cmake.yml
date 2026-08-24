@@ -397,9 +397,14 @@ jobs:
           test -n "${PROBE}"
           file "${PROBE}"
           # Assert the optimized float kernels are really in the image.
+          # Capture the symbol table once instead of piping nm into grep per
+          # symbol: `grep -q` exits at the first match, the still-writing nm
+          # takes SIGPIPE, and `set -o pipefail` turns that 141 into a failure
+          # that `!` inverts into a spurious "symbol missing" error.
+          probe_syms=$(arm-none-eabi-nm -C "${PROBE}")
           for sym in arm_convolve_wrapper_f32 arm_avg_pool_f32 arm_softmax_f32 \
                      arm_convolve_wrapper_f16 arm_avg_pool_f16 arm_softmax_f16; do
-            if ! arm-none-eabi-nm -C "${PROBE}" | grep -qE " (T|t|W|w) ${sym}$"; then
+            if ! grep -qE " (T|t|W|w) ${sym}$" <<<"${probe_syms}"; then
               echo "::error::${sym} missing from link probe image"
               exit 1
             fi
@@ -409,17 +414,29 @@ jobs:
         run: |
           set -euo pipefail
           find smoke/build -name 'lib*.a' | sort
-          test -f smoke/build/nsx_helia_rt/helia-rt-src/libhelia_rt_helia.a
+          ARCHIVE=smoke/build/nsx_helia_rt/helia-rt-src/libhelia_rt_helia.a
+          test -f "${ARCHIVE}"
           test -f smoke/build/ns_cmsis_nn/libnsx_cmsis_nn.a
-          # Confirm objects are Cortex-M (Thumb) ELF.
-          file smoke/build/nsx_helia_rt/helia-rt-src/libhelia_rt_helia.a | head -1
-          arm-none-eabi-objdump -a smoke/build/nsx_helia_rt/helia-rt-src/libhelia_rt_helia.a \
-              | head -5
+          # Confirm objects are Cortex-M (Thumb) ELF. `head` exits after N
+          # lines, so piping a long-running producer into it makes the producer
+          # take SIGPIPE and `set -o pipefail` fail this step -- inside the very
+          # step that asserts on Ethos-U, where it would read as a regression.
+          # Capture first, then trim.
+          file_out=$(file "${ARCHIVE}")
+          head -1 <<<"${file_out}"
+          objdump_out=$(arm-none-eabi-objdump -a "${ARCHIVE}")
+          head -5 <<<"${objdump_out}"
           # This build dir is the default (Ethos-U OFF). Assert the archive
           # carries NO core-driver reference: every consumer that does not opt
           # in relies on not inheriting an unresolved ethosu_* symbol at link.
-          if arm-none-eabi-nm smoke/build/nsx_helia_rt/helia-rt-src/libhelia_rt_helia.a \
-               | grep " U ethosu_reserve_driver" >/dev/null; then
+          #
+          # Capture nm's output before grepping it. In the `if nm | grep` shape
+          # an nm failure (archive gone, nm missing) leaves grep nothing to
+          # match, grep exits 1, the `if` is false and the step prints OK -- a
+          # spurious PASS that hides a broken assert. As a variable, any nm
+          # error trips `set -e` and fails the step loudly.
+          syms=$(arm-none-eabi-nm "${ARCHIVE}")
+          if grep -q " U ethosu_reserve_driver" <<<"${syms}"; then
             echo "::error::ethosu_reserve_driver referenced in a default (Ethos-U OFF) build"
             exit 1
           fi
@@ -460,14 +477,82 @@ jobs:
           test -f "${ARCHIVE}"
           # The Ethos-U kernel externs the core-driver entry points, so an
           # enabled build must leave them undefined in the archive.
-          # No grep -q here: it exits at the first match, the still-writing nm
-          # takes SIGPIPE, and `set -o pipefail` turns that 141 into a failure
-          # that `!` then inverts into a spurious pass. Let grep drain nm.
-          if ! arm-none-eabi-nm "${ARCHIVE}" | grep " U ethosu_reserve_driver" >/dev/null; then
+          #
+          # Capture nm's output instead of piping it into grep. The two pipe
+          # shapes fail in opposite directions, and neither is safe:
+          #   `if ! nm | grep -q`  -- grep exits at the first match, nm takes
+          #        SIGPIPE, `set -o pipefail` reports 141, `!` inverts it into
+          #        a spurious FAILURE.
+          #   `if nm | grep`       -- an nm failure yields no output, grep
+          #        exits 1, and the step reads that as "symbol absent, all
+          #        good": a spurious PASS (this is the OFF assert's shape).
+          # With the symbols in a variable, `set -e` fails on any nm error and
+          # grep sees the whole table.
+          syms=$(arm-none-eabi-nm "${ARCHIVE}")
+          if ! grep -q " U ethosu_reserve_driver" <<<"${syms}"; then
             echo "::error::ethosu_reserve_driver not referenced; Ethos-U dispatch did not build in"
             exit 1
           fi
           echo "OK: Ethos-U dispatch compiled in (core-driver refs undefined as expected)"
+
+      # Cover the ownership guard in nsx/CMakeLists.txt. Without these two
+      # steps, deleting the guard block outright leaves every check in this
+      # job green.
+      - name: Toggle the wrapper OFF in the existing Ethos-U build dir
+        run: |
+          set -euo pipefail
+          # Reconfiguring a build dir whose HELIA_RT_ENABLE_ETHOSU entry we
+          # FORCEd ON must be accepted: the guard has to recognize its own
+          # previous write as ours rather than as a consumer override. This is
+          # the provenance path, and a guard that latches or over-rejects fails
+          # here.
+          cmake -S smoke -B smoke/build-ethosu -G Ninja \
+              -DCMAKE_TOOLCHAIN_FILE="$(pwd)/smoke/toolchain.cmake" \
+              -DHELIA_RT_DIR="$(pwd)/helia-rt" \
+              -DNS_CMSIS_NN_DIR="$(pwd)/ns-cmsis-nn" \
+              -DNSX_HELIA_RT_ENABLE_ETHOSU=OFF \
+              -DHELIA_RT_VARIANT=release-with-logs
+          # Configure alone does not re-archive; rebuild (incremental, cheap)
+          # and assert the core-driver reference is gone again.
+          cmake --build smoke/build-ethosu --target helia_rt_helia -j
+          ARCHIVE=smoke/build-ethosu/nsx_helia_rt/helia-rt-src/libhelia_rt_helia.a
+          test -f "${ARCHIVE}"
+          syms=$(arm-none-eabi-nm "${ARCHIVE}")
+          if grep -q " U ethosu_reserve_driver" <<<"${syms}"; then
+            echo "::error::ethosu_reserve_driver still referenced after toggling the wrapper OFF"
+            exit 1
+          fi
+          echo "OK: wrapper toggle accepted; Ethos-U dispatch dropped from the archive"
+
+      - name: Reject a direct HELIA_RT_ENABLE_ETHOSU override (configure only)
+        run: |
+          set -euo pipefail
+          # The repo-root toggle is owned by the nsx wrapper, which FORCEs it.
+          # A consumer setting it directly must be told, not silently
+          # overridden. Configure-only: this is expected to fail.
+          set +e
+          out=$(cmake -S smoke -B smoke/build-ethosu-reject -G Ninja \
+              -DCMAKE_TOOLCHAIN_FILE="$(pwd)/smoke/toolchain.cmake" \
+              -DHELIA_RT_DIR="$(pwd)/helia-rt" \
+              -DNS_CMSIS_NN_DIR="$(pwd)/ns-cmsis-nn" \
+              -DHELIA_RT_ENABLE_ETHOSU=ON \
+              -DHELIA_RT_VARIANT=release-with-logs 2>&1)
+          rc=$?
+          set -e
+          echo "${out}"
+          if [ "${rc}" -eq 0 ]; then
+            echo "::error::configure succeeded; the HELIA_RT_ENABLE_ETHOSU ownership guard did not fire"
+            exit 1
+          fi
+          # Match the guard's own wording so that some *other* configure
+          # failure cannot pass for a rejection. CMake hard-wraps message()
+          # text, so collapse newlines before matching.
+          flat=$(tr '\n' ' ' <<<"${out}")
+          if ! grep -q "owned by this module" <<<"${flat}"; then
+            echo "::error::configure failed, but not with the ownership-guard message (rc=${rc})"
+            exit 1
+          fi
+          echo "OK: direct HELIA_RT_ENABLE_ETHOSU override rejected by the guard"
 
   zephyr-build:
     name: Zephyr module build (qemu_cortex_m3, REFERENCE)
