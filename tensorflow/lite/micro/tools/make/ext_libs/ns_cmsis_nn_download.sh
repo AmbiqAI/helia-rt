@@ -44,6 +44,43 @@ DOWNLOADED_NS_CMSIS_NN_PATH=${DOWNLOADS_DIR}/ns_cmsis_nn
 # would print the credential into the build log.
 NS_CMSIS_NN_URL="https://github.com/AmbiqAI/ns-cmsis-nn.git"
 
+# Some environments carry a global or system git rewrite such as
+#
+#     [url "git@github.com:"]
+#         insteadOf = https://github.com/
+#
+# which silently converts the anonymous https URL above into an ssh one. A
+# machine with no ssh key or known_hosts entry then fails with "Host key
+# verification failed" / "Could not read from remote repository" even though
+# the repository is public and https connectivity is fine. Other downloads in
+# the same build keep working because they use wget, which no git config can
+# rewrite -- so the failure looks specific to ns-cmsis-nn and reads like an
+# access problem rather than a local config one.
+#
+# Pin the URL to itself for this clone. git applies at most one insteadOf
+# rewrite -- remote.c:alias_url makes a single pass and never re-scans -- and
+# keeps the entry with the longest matching prefix, so pinning the full URL to
+# itself outranks a shorter rule such as "https://github.com/".
+#
+# Two properties bound what this can do, worth stating so the protection is not
+# assumed to be broader than it is:
+#
+#   - Displacement requires a *strictly* longer prefix, and command-line -c is
+#     parsed last, so a rule in a config file exactly as long as this pin still
+#     wins. Anything shorter loses wherever it lives. Defeating this therefore
+#     takes a rule written against this specific repository -- deliberate
+#     configuration, not the accidental host-wide rewrite described above.
+#   - The pin is ${NS_CMSIS_NN_URL} itself rather than a hand-copied
+#     substring, so the two cannot drift apart on a repository rename and the
+#     prefix is as long as it can be. A shorter literal would silently stop
+#     matching, leaving this comment claiming a protection that no longer
+#     exists.
+#
+# Passing it with -c (rather than blanking GIT_CONFIG_GLOBAL/GIT_CONFIG_SYSTEM)
+# leaves legitimate proxy, TLS, and credential settings untouched. Note that
+# git clone does not read the enclosing repository's local config, so
+# local-scope rules are not part of the threat model either way.
+
 # Set GIT_COMMIT to NS_CMSIS_NN_COMMIT if set, otherwise use default.
 # Default tracks AmbiqAI/ns-cmsis-nn tag v7.29.2. Keep in sync with
 # NS_CMSIS_NN_COMMIT in ext_libs/helia.inc, which is what make actually passes;
@@ -53,7 +90,8 @@ GIT_COMMIT=${NS_CMSIS_NN_COMMIT:-631726420b04860a5c4236956a3741ff5a96bd7f}
 # clone_ns_cmsis_nn: attempt git clone and surface a clear error on failure.
 clone_ns_cmsis_nn() {
   local dest="${1}"
-  if git clone ${NS_CMSIS_NN_URL} "${dest}" >&2 2>&1; then
+  if git -c url."${NS_CMSIS_NN_URL}".insteadOf="${NS_CMSIS_NN_URL}" \
+         clone ${NS_CMSIS_NN_URL} "${dest}" >&2 2>&1; then
     return 0
   fi
   cat >&2 <<'EOF'
@@ -63,8 +101,20 @@ ERROR: Failed to clone the ns-cmsis-nn repository.
 
 The HELIA optimized-kernel backend (OPTIMIZED_KERNEL_DIR=helia) builds against
 the public AmbiqAI/ns-cmsis-nn repository, cloned over https with no
-credential. This failure is therefore usually network related: check
+credential. This failure is therefore usually environmental: check
 connectivity and any proxy or firewall that filters github.com.
+
+If the error above mentions ssh, "Host key verification failed", "Could not
+read from remote repository", or a host you did not expect, the clone URL was
+rewritten by a git "insteadOf" rule. Inspect it with:
+
+  git config --show-origin --get-regexp '^url\..*\.insteadof$'
+
+This script pins its own URL to outrank host-wide rules of that kind. If you
+deliberately redirect github.com to an internal mirror, the pin overrides it;
+point the build at a local checkout instead:
+
+  make ... NS_CMSIS_NN_PATH=/path/to/ns-cmsis-nn
 
 You can also build with the open-source CMSIS-NN backend or the reference
 kernels instead:
