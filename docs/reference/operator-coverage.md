@@ -24,7 +24,7 @@ heliaRT provides three kernel backends. Every operator has a **Reference** imple
 | `TRANSPOSE_CONV` | :white_check_mark: | :white_check_mark: | :white_check_mark: | |
 | `BATCH_MATMUL` | :white_check_mark: | :white_check_mark: | :white_check_mark: | |
 | `SVDF` | :white_check_mark: | :white_check_mark: | :white_check_mark: | |
-| `UNIDIRECTIONAL_SEQUENCE_LSTM` | :white_check_mark: | :white_check_mark: | :white_check_mark: | |
+| `UNIDIRECTIONAL_SEQUENCE_LSTM` | :white_check_mark: | :white_check_mark: | :white_check_mark: | HELIA int8/int16 kernels are stateful: they consume the variable hidden/cell state tensors and write the final state back, so consecutive invocations continue the sequence. The CMSIS backend restarts from zero state on every invocation: its `kernels/cmsis_nn` wrapper never sets `hidden_state`, so this holds regardless of the pinned CMSIS-NN version |
 
 ## Pooling & Padding
 
