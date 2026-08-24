@@ -37,12 +37,14 @@ for BUILD in "${BUILDS[@]}"; do
 
       cd "$TFLM_SRC_DIR"
 
+      # Exported rather than passed on the command line so the credential does
+      # not appear in process listings or in logged make invocations.
+      export ARM_UBL_LICENSE_IDENTIFIER
       make -f "$TFLM_SRC_DIR/tensorflow/lite/micro/tools/make/Makefile" \
         TARGET="$TARGET" \
         TARGET_ARCH="$TARGET_ARCH" \
         TOOLCHAIN="$TOOLCHAIN" \
         OPTIMIZED_KERNEL_DIR="$OPTIM_KERNEL" \
-        ARM_UBL_LICENSE_IDENTIFIER="$ARM_UBL_LICENSE_IDENTIFIER" \
         CMSIS_NN_USE_REQUANTIZE_INLINE_ASSEMBLY=1 \
         BUILD_TYPE="$BUILD" \
         microlite -j8

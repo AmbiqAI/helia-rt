@@ -133,7 +133,7 @@ jobs:
                       tensorflow/lite/micro/tools/make/ \
                     | grep -Ev '^tensorflow/lite/micro/(helia_rt_version|heliart_version)\.h$' \
                     | grep -Ev '^tensorflow/lite/micro/tools/ci_build/(package_helia_bundle|release_asset_helpers)\.sh$' \
-                    | grep -Ev '^tensorflow/lite/micro/tools/ci_build/build_helia\.sh$' \
+                    | grep -Ev '^tensorflow/lite/micro/tools/ci_build/(build|test)_helia\.sh$' \
                     | grep -Ev '^tensorflow/lite/micro/tools/make/ext_libs/(helia\.inc|ns_cmsis_nn_download\.sh)$' \
                     | grep -Ev '^tensorflow/lite/micro/tools/make/ext_libs/(cmsis|cmsis_nn|xtensa)_download\.sh$' \
                     | grep -Ev '^tensorflow/lite/micro/kernels/helia/' \
@@ -229,15 +229,10 @@ jobs:
   nsx-cross-build:
     name: nsx::helia_rt cross-compile (Cortex-M55, gcc)
     runs-on: ubuntu-latest
-    # ns-cmsis-nn is a private repo. PRs from forks and Dependabot PRs won't
-    # have access to the repo secret used for cloning it; skip cleanly there
-    # to avoid spurious failures unrelated to the checked-in code.
-    if: >
-      github.event_name == 'push' ||
-      (
-        github.actor != 'dependabot[bot]' &&
-        github.event.pull_request.head.repo.full_name == github.repository
-      )
+    # ns-cmsis-nn is public and clones with no credential, so this job no
+    # longer needs a repo secret and runs for fork and Dependabot PRs too.
+    # (It previously skipped for those, silently dropping the only Cortex-M55
+    # cross-compile coverage from exactly the PRs that change CI actions.)
     env:
       # Pin CI to the tested ns-cmsis-nn release. This may be newer than the
       # minimum compatible version declared by the CMSIS-Pack metadata.
@@ -248,16 +243,13 @@ jobs:
         with:
           path: helia-rt
       - name: Checkout ns-cmsis-nn (pinned ref)
-        env:
-          NS_CMSIS_NN_TOKEN: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
         run: |
           set -euo pipefail
-          if [ -z "${NS_CMSIS_NN_TOKEN:-}" ]; then
-            echo "::error::secrets.NS_CMSIS_NN_SSH_KEY is empty; cannot clone ns-cmsis-nn"
-            exit 1
-          fi
+          # AmbiqAI/ns-cmsis-nn is public: clone anonymously. Keeping a token
+          # out of the URL also keeps it out of git's "unable to access '<url>'"
+          # error output when the network misbehaves.
           git clone --depth 1 --branch "${NS_CMSIS_NN_REF}" \
-              "https://${NS_CMSIS_NN_TOKEN}@github.com/AmbiqAI/ns-cmsis-nn.git" \
+              "https://github.com/AmbiqAI/ns-cmsis-nn.git" \
               ns-cmsis-nn
           (cd ns-cmsis-nn && git rev-parse HEAD)
       - name: Install cross toolchain + ninja

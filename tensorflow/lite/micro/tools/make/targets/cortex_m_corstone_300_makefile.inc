@@ -105,9 +105,13 @@ ifeq ($(TOOLCHAIN), armclang)
 
     # If ARM_UBL_LICENSE_IDENTIFIER is set, activate the license.
     ifneq ($(ARM_UBL_LICENSE_IDENTIFIER),)
-      # print the license identifier
-      $(info "Activating the license with the identifier: $(ARM_UBL_LICENSE_IDENTIFIER)")
-      ACTIVATE_LICENSE := $(shell $(TARGET_TOOLCHAIN_ROOT)armlm activate --code $(ARM_UBL_LICENSE_IDENTIFIER))
+      # Never print the identifier: it is a credential, and make output ends
+      # up in CI logs, uploaded artifacts, and developer terminals.
+      $(info Activating the Arm user-based license (identifier redacted).)
+      # See cortex_m_generic_makefile.inc: 2>&1 keeps an armlm error message
+      # (which may quote the code) out of the build log, since make does not
+      # capture $(shell) stderr.
+      ACTIVATE_LICENSE := $(shell $(TARGET_TOOLCHAIN_ROOT)armlm activate --code $(ARM_UBL_LICENSE_IDENTIFIER) 2>&1)
     endif
   endif
 

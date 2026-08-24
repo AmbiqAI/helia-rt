@@ -5,17 +5,67 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+# release-please writes the release branch, the tag and the GitHub Release
+# (contents), and opens and updates the release PR (pull-requests). The called
+# helia_release.yml reuses `contents: write` to attach the bundle to the release.
 permissions:
   contents: write
   pull-requests: write
 
+# release-please force-pushes the release branch whenever the generated PR body
+# changes, and two runs doing that at once is a real race: code-suggester
+# re-parents the branch onto `main`'s current HEAD on every run, so the loser can
+# leave the branch computed from an older `main`. It has already happened -- on
+# 2026-08-19 the runs for two `main` pushes overlapped (22:08:15-22:08:44 and
+# 22:08:31-22:09:05) and both force-pushed, at 22:08:42 and 22:09:02.
+#
+# Serialise rather than cancel, for the same reason: cancelling a run mid-flight
+# can leave the branch half-computed.
+#
+# One repository-wide lane, not one per ref. `target-branch` is unset, so
+# release-please resolves the repository's default branch itself and force-pushes
+# the same release branch no matter which ref the run started from. Keying on
+# `github.ref` would put a `workflow_dispatch` from any other ref in its own
+# lane, free to race the very `main` pushes this block exists to serialise.
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
 jobs:
   release:
+    # A fork has no business opening release PRs against its upstream, and this
+    # job writes tags and Releases. Same guard style as cortex_m.yml / run_ci.yml.
+    if: github.repository == 'AmbiqAI/helia-rt'
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
+      # The release PR is authored by the default GITHUB_TOKEN, and that is a
+      # deliberate choice. See docs/contributing/release-process.md ->
+      # "Why the release PR starts with no checks".
+      #
+      # GitHub parks CI for anything a bot set in motion: a `pull_request` run
+      # whose triggering event came from GITHUB_TOKEN is created as
+      # `conclusion: action_required` and publishes no check runs until someone
+      # clicks "Approve workflows to run" on the PR. All 11 required contexts
+      # come from `pull_request` workflows, so the release PR starts with none of
+      # them reported.
+      #
+      # That is the intended flow, not a defect to route around. Releasing is a
+      # deliberate act: review the changelog, click the button, watch the eleven
+      # checks go green, merge. Two properties fall out of it -- the click is
+      # needed only at merge time (the force-pushes release-please makes as
+      # `main` moves reset the checks, but nobody is merging then, so it costs
+      # one click per release rather than one per push), and the ten-job matrix
+      # stays off every intermediate force-push.
+      #
+      # A GitHub App installation token would remove the click, because a
+      # separate actor is exempt from the gate. That was implemented in #199 and
+      # deliberately reverted: it trades a recurring click for a private key that
+      # never expires. Note that granting this workflow more permissions does not
+      # help -- the gate keys on who raised the event, not on what the token may
+      # do.
       - name: Release Please (manifest)
         id: release
         uses: googleapis/release-please-action@v5
@@ -23,6 +73,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
   helia-release:
     needs: release
     if: ${{ needs.release.outputs.release_created == 'true' }}

@@ -7,32 +7,101 @@
 # run_<scriptname>.yml as the entry point.
 
 name: Tests Entry Point
+
+# Trigger note: this MUST stay `pull_request`, not `pull_request_target`.
+#
+# Everything reachable from here checks out the pull request head commit and
+# builds it with make (see helia_test.yml / ci.yml). Under
+# `pull_request_target` that untrusted build would run in the context of the
+# base repository, i.e. with a GITHUB_TOKEN carrying the repository's default
+# workflow permissions (currently `write`), which hands any fork contributor
+# who edits a Makefile or a ci_build script a write-scoped token for this
+# repository. Under `pull_request` a fork's run gets a read-only token and no
+# access to repository secrets, which is the correct model for a path that
+# only builds and tests.
+#
+# This path needs neither: the PR matrix is gcc/atfe only, no secrets are
+# passed to the called workflows, and nothing here writes to the repository.
 on:
-  pull_request_target:
+  pull_request:
     types:
       - opened
       - synchronize
       - labeled
 
+# Least privilege. Checkout is the only thing on this path that needs the
+# token at all, and it only needs to read. This also propagates to the called
+# reusable workflows, which can reduce it further but never widen it.
+permissions:
+  contents: read
+
 # Cancel an in-flight run for this PR when a newer commit is pushed.
 # Keyed on the PR number (or branch ref for non-PR triggers) so each PR
 # has its own concurrency lane and unrelated PRs don't block each other.
 # Saves ~25min x 10 matrix jobs every fixup push.
+#
+# The suffix keeps the label events this workflow ignores *out* of that lane.
+# Concurrency is resolved when a run is queued, before any job-level `if:` is
+# evaluated, so an ignored `labeled` run would first cancel whatever is in
+# flight and only then skip its own jobs, leaving the ten required contexts
+# reading "cancelled" with no run left to re-report them. Any label a human
+# applies while the matrix is running does this today. release-please joins it
+# only once #199 lands: its `autorelease: pending` arrives seconds after
+# `opened`, well inside the matrix's ~5min runtime, but label events raised by
+# the default GITHUB_TOKEN start no runs at all, so today they cancel nothing.
+# `github.run_id` is unique per run, so these runs get a lane to themselves.
 concurrency:
-  group: tests-entry-${{ github.event.pull_request.number || github.ref }}
+  group: >-
+    tests-entry-${{ github.event.pull_request.number || github.ref
+    }}${{ (github.event.action == 'labeled' &&
+    github.event.label.name != 'ci:run_full') &&
+    format('-ignored-label-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 jobs:
 
+  # Do not rename this job id. GitHub names the resulting check runs
+  # "<caller job id> / <called job name>", so this id is the literal
+  # "helia-test / ..." prefix of the ten required status check contexts in the
+  # `main` branch ruleset. Renaming it makes `main` unmergeable until the
+  # ruleset is updated to match.
   helia-test:
+    # `labeled` is in this workflow's trigger list so that adding `ci:run_full`
+    # can start the ci-run job below. Every *other* label would otherwise
+    # restart the ten-job matrix and buy nothing:
+    #
+    #   - release-please labels a merged release PR `autorelease: tagged` after
+    #     cutting a release, which would re-run the whole matrix against a
+    #     commit that is already on `main`.
+    #   - it labels a freshly opened release PR `autorelease: pending` moments
+    #     after `opened`.
+    #
+    # Note it is the concurrency suffix above, not this `if:`, that stops those
+    # events cancelling an in-flight run: a skipped job is decided long after
+    # the run has already joined its lane.
+    #
+    # Skipping is safe for the required status checks: a label event does not
+    # change the head SHA, so the contexts already reported for that SHA by the
+    # opened/synchronize run stay the latest result for their names.
+    if: >-
+      github.event.action != 'labeled' ||
+      github.event.label.name == 'ci:run_full'
     uses: ./.github/workflows/helia_test.yml
     with:
       trigger-sha: ${{ github.event.pull_request.head.sha }}
-    secrets:
-      NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
 
   ci-run:
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'ci:run_full') }}
+    # Mirror of the helia-test guard. On a `labeled` event only the label that
+    # was just added may start the full CI pass; asking the PR's whole label
+    # set here would restart it for every unrelated label once `ci:run_full` is
+    # present, and the concurrency suffix above means nothing would cancel it.
+    # On opened/synchronize there is no single label to inspect, so the label
+    # set is the right question.
+    if: >-
+      (github.event.action == 'labeled' &&
+      github.event.label.name == 'ci:run_full') ||
+      (github.event.action != 'labeled' &&
+      contains(github.event.pull_request.labels.*.name, 'ci:run_full'))
     uses: ./.github/workflows/ci.yml
     with:
       trigger-sha: ${{ github.event.pull_request.head.sha }}

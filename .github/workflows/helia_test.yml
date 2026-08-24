@@ -8,8 +8,6 @@ on:
         required: true
         type: string
     secrets:
-      NS_CMSIS_NN_SSH_KEY:
-        required: true
       ARM_UBL_LICENSE_IDENTIFIER:
         required: false
 
@@ -19,6 +17,14 @@ on:
         description: "Git ref to build (branch, tag, or SHA). Leave empty to use the current commit."
         required: false
         default: ""
+
+# This workflow builds a caller-supplied commit with make, so it must never
+# hold more than read access. Declaring the cap here is what stops it inheriting
+# a write-scoped token from a caller running under the repository's `write`
+# default. Note that the container image below is a public GHCR package, so no
+# `packages` grant is needed.
+permissions:
+  contents: read
 
 # The CI image is resolved by the `ci-image` setup job below and consumed via
 # `needs.ci-image.outputs.image`. `container.image` does not support the `env`
@@ -52,7 +58,6 @@ jobs:
             toolchain: "atfe"
 
     env:
-      NS_CMSIS_NN_SSH_KEY: ${{ secrets.NS_CMSIS_NN_SSH_KEY }}
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
 
     name: test-${{ matrix.arch }}-${{ matrix.toolchain }}-${{ matrix.opt }}
