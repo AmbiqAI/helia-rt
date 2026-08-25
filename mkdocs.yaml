@@ -55,6 +55,7 @@ nav:
       - Python Development: reference/python-development.md
       - Generated Files: reference/generated-files.md
       - Attribution and Trademarks: reference/attribution.md
+      - Support Policy: reference/support-policy.md
   - Contributing:
       - Overview: contributing/index.md
       - Architecture: contributing/architecture.md

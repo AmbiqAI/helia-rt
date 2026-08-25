@@ -3,7 +3,41 @@
 heliaRT can be packaged as a source-only CMSIS-Pack for teams that use Keil MDK, CMSIS-Toolbox, CMSIS-Pack Manager, or Arm ecosystem IDEs. The pack is generated from the same CMake source manifest used by the source, Zephyr, and NSX builds.
 
 !!! note "Current scope"
-    The repository builds and validates a local source pack. Checked-in `csolution` examples and published pack-index distribution are still tracked by [#124](https://github.com/AmbiqAI/helia-rt/issues/124).
+    The repository builds and validates a local source pack. Checked-in `csolution` examples are still tracked by [#124](https://github.com/AmbiqAI/helia-rt/issues/124); pack-index publication is out of scope there — see below.
+
+## Local Pack vs Published Distribution
+
+heliaRT's CMSIS-Pack is **generated and validated, not distributed**. There is no
+published pack you can `cpackget add` by name — you build it from a checkout of
+this repository, as described below.
+
+| Aspect | Status |
+|---|---|
+| Pack generated from the CMake source manifest | Yes — `tools/cmsis_pack/build_pack.py` |
+| Pack built and validated on every relevant change | Yes — the `Build CMSIS-Pack from SSoT manifest` job in `.github/workflows/smoke_cmake.yml` |
+| Pack available as a CI build artifact | Yes — uploaded as `helia-rt-cmsis-pack` |
+| Pack attached to GitHub Releases | No |
+| Pack published to a public pack index (`.pidx`) or the Keil index | No |
+
+What CI checks on each run, in order: it builds the pack, runs
+`packchk --disable-validation` against the staged PDSC, asserts the archive's
+size and structure and that every `source` file referenced by the PDSC resolves
+inside the archive, asserts the three component variants (`Reference`,
+`CMSIS-NN`, `HELIA`) are present, and runs the repository PDSC contract check
+(`tools/cmsis_pack/check_pdsc.py`) for pack identity and the `ns-cmsis-nn` pin.
+
+Publishing to the public Keil pack index and hosting a `.pidx` pack index are
+explicitly **out of scope** for [#124](https://github.com/AmbiqAI/helia-rt/issues/124),
+which tracks the remaining consumer-validation work. Index publication is **not
+currently tracked** — it has not been declined, but no issue or milestone plans
+it. Build the pack locally and expect to keep doing so.
+
+!!! tip "What this means for you"
+    Pin the repository (tag or commit) rather than a pack version, build the
+    pack as part of your own setup or CI step, and install it with
+    `cpackget add` from the file you built. Treat the generated pack as
+    reproducible output of a known revision, not as a released artifact with an
+    independent lifecycle.
 
 ## Build A Local Pack
 

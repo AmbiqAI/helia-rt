@@ -64,8 +64,16 @@ Detailed reference material for heliaRT internals, configuration, and infrastruc
 
     ---
 
-    License scope, upstream attribution, and Google/LiteRT non-affiliation notes.
+    License scope and boundaries, upstream attribution, and Google/LiteRT non-affiliation notes.
 
     [:octicons-arrow-right-24: Attribution](attribution.md)
+
+- :material-calendar-clock:{ .lg .middle } **Support Policy**
+
+    ---
+
+    Supported releases, critical-fix window, and deprecation notice period.
+
+    [:octicons-arrow-right-24: Support Policy](support-policy.md)
 
 </div>
