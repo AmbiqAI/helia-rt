@@ -495,7 +495,7 @@ jobs:
           fi
           echo "OK: Ethos-U dispatch compiled in (core-driver refs undefined as expected)"
 
-      # Cover the ownership guard in nsx/CMakeLists.txt. Without these two
+      # Cover the ownership guard in nsx/CMakeLists.txt. Without these
       # steps, deleting the guard block outright leaves every check in this
       # job green.
       - name: Toggle the wrapper OFF in the existing Ethos-U build dir
@@ -553,6 +553,71 @@ jobs:
             exit 1
           fi
           echo "OK: direct HELIA_RT_ENABLE_ETHOSU override rejected by the guard"
+
+      - name: Reject a reverse-polarity HELIA_RT_ENABLE_ETHOSU override (configure only)
+        run: |
+          set -euo pipefail
+          # The guard has to reject disagreement in BOTH directions. The step
+          # above only proves the ON-against-OFF direction, which a
+          # truthiness-only check ("entry set but wrapper off") also passes —
+          # while silently compiling Ethos-U in for a consumer who explicitly
+          # passed -DHELIA_RT_ENABLE_ETHOSU=OFF. Configure-only: this is
+          # expected to fail.
+          set +e
+          out=$(cmake -S smoke -B smoke/build-ethosu-reject-off -G Ninja \
+              -DCMAKE_TOOLCHAIN_FILE="$(pwd)/smoke/toolchain.cmake" \
+              -DHELIA_RT_DIR="$(pwd)/helia-rt" \
+              -DNS_CMSIS_NN_DIR="$(pwd)/ns-cmsis-nn" \
+              -DNSX_HELIA_RT_ENABLE_ETHOSU=ON \
+              -DHELIA_RT_ENABLE_ETHOSU=OFF \
+              -DHELIA_RT_VARIANT=release-with-logs 2>&1)
+          rc=$?
+          set -e
+          echo "${out}"
+          if [ "${rc}" -eq 0 ]; then
+            echo "::error::configure succeeded; an explicit -DHELIA_RT_ENABLE_ETHOSU=OFF was silently overridden"
+            exit 1
+          fi
+          # CMake hard-wraps message() text, so collapse newlines before
+          # matching (same reason as the step above).
+          flat=$(tr '\n' ' ' <<<"${out}")
+          if ! grep -q "owned by this module" <<<"${flat}"; then
+            echo "::error::configure failed, but not with the ownership-guard message (rc=${rc})"
+            exit 1
+          fi
+          # The remedy must echo the consumer's own intent (OFF), not invert it
+          # into the wrapper's value.
+          if ! grep -q "NSX_HELIA_RT_ENABLE_ETHOSU=OFF" <<<"${flat}"; then
+            echo "::error::guard fired but did not name the wrapper option to set, or named the wrong value"
+            exit 1
+          fi
+          echo "OK: explicit -DHELIA_RT_ENABLE_ETHOSU=OFF rejected instead of overridden"
+
+      - name: Accept an agreeing HELIA_RT_ENABLE_ETHOSU value (configure only)
+        run: |
+          set -euo pipefail
+          # The guard rejects *disagreement*, not the mere presence of the
+          # repo-root entry: a consumer passing the old spelling with the value
+          # the wrapper already dictates must still configure, and the value
+          # must actually take effect. Without this step a guard that rejected
+          # any -DHELIA_RT_ENABLE_ETHOSU at all — turning the silent override
+          # into a hard stop for consumers who agree with us — would pass every
+          # other check in this job.
+          out=$(cmake -S smoke -B smoke/build-ethosu-agree -G Ninja \
+              -DCMAKE_TOOLCHAIN_FILE="$(pwd)/smoke/toolchain.cmake" \
+              -DHELIA_RT_DIR="$(pwd)/helia-rt" \
+              -DNS_CMSIS_NN_DIR="$(pwd)/ns-cmsis-nn" \
+              -DNSX_HELIA_RT_ENABLE_ETHOSU=ON \
+              -DHELIA_RT_ENABLE_ETHOSU=ON \
+              -DHELIA_RT_VARIANT=release-with-logs 2>&1)
+          echo "${out}"
+          # The module's status line reports the toggle it resolved to; assert
+          # on it so an accepted-but-dropped value cannot pass as success.
+          if ! grep -q "ethos-u=ON" <<<"${out}"; then
+            echo "::error::configure accepted the agreeing value but did not enable Ethos-U dispatch"
+            exit 1
+          fi
+          echo "OK: agreeing HELIA_RT_ENABLE_ETHOSU accepted and applied"
 
   zephyr-build:
     name: Zephyr module build (qemu_cortex_m3, REFERENCE)
