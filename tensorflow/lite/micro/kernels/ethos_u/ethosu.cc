@@ -23,9 +23,10 @@ limitations under the License.
 // the real Ethos-U dispatch, and without it the file compiles a nullptr
 // Register_ETHOSU() stub. Upstream had no such macro: compiling this file at
 // all *was* the enablement, driven by the make co-processor flow
-// (CO_PROCESSOR=ethos_u), which uppercases the co-processor name into -DETHOS_U
-// (tensorflow/lite/micro/tools/make/Makefile) and adds kernels/ethos_u/ to the kernel sources.
-// Honour that upstream signal so the make path does not silently build the stub.
+// (CO_PROCESSOR=ethos_u), which uppercases the co-processor name into
+// -DETHOS_U (tensorflow/lite/micro/tools/make/Makefile) and adds
+// kernels/ethos_u/ to the kernel sources. Honour that upstream signal so the
+// make path does not silently build the stub.
 //
 // HELIA_RT_DISABLE_ETHOSU suppresses only this implication. The CMake build
 // defines it when its HELIA_RT_ENABLE_ETHOSU option is OFF, so an explicit
