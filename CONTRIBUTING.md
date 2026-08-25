@@ -36,8 +36,10 @@ just a few small guidelines you need to follow.
 ## License
 
 heliaRT is released under the [Ambiq Apollo SDK License](LICENSE), which permits
-use, modification, and redistribution solely for execution on Ambiq-manufactured
-CPUs. By submitting a contribution you agree that your changes will be licensed
+use, modification, and redistribution for Ambiq-manufactured CPUs; production or
+commercial deployment on non-Ambiq CPUs is not licensed, while development,
+testing, validation, benchmarking, CI, emulation, and simulation may run on any
+CPU. By submitting a contribution you agree that your changes will be licensed
 under the same terms. Please review the full [LICENSE](LICENSE) before
 contributing.
 

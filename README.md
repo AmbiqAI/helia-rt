@@ -83,7 +83,7 @@ The full operator coverage matrix is in the [docs](https://ambiqai.github.io/hel
 
 ## License
 
-heliaRT is released under the [Ambiq Apollo SDK License](LICENSE). Free use, modification, and redistribution **solely for execution on Ambiq-manufactured CPUs**. See [LICENSE](LICENSE) for details.
+heliaRT is released under the [Ambiq Apollo SDK License](LICENSE). Free use, modification, and redistribution for Ambiq-manufactured CPUs; **production or commercial deployment on non-Ambiq CPUs is not licensed**, while development, testing, validation, benchmarking, CI, emulation, and simulation may run on any CPU. See [LICENSE](LICENSE) for details.
 
 This repository also contains code derived from or compatible with upstream TensorFlow Lite for Microcontrollers / LiteRT for Micro and other third-party projects. Those files retain their original copyright and license notices. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution and trademark notes.
 

@@ -14,11 +14,9 @@ copy, modify, and distribute the Software solely for incorporation into,
 
 and execution on, computing platforms that include an Ambiq-manufactured CPU
 
-(including but not limited to the Apollo series). Use, reproduction,
+(including but not limited to the Apollo series), except as expressly
 
-modification, or distribution of the Software on any CPU not manufactured by
-
-Ambiq is strictly prohibited, subject to the following conditions:
+permitted below, subject to the following conditions:
 
 Redistributions of source code must retain the above copyright notice,
 
@@ -36,13 +34,41 @@ endorse or promote products derived from this Software without specific
 
 prior written permission.
 
-Field-of-Use Restriction. The Software and any derivative works
+Field-of-Use Restriction. The Software and any derivative works thereof
 
-thereof (in source or binary form) may only be executed on a CPU
+(in source or binary form) may only be deployed or executed in a production
 
-manufactured by Ambiq. Execution on any non-Ambiq CPU, even as part of a
+or commercial environment on a CPU manufactured by Ambiq. Use,
 
-multi-CPU system, is expressly forbidden.
+reproduction, modification, or distribution of the Software or any
+
+derivative work for deployment or execution in a production or commercial
+
+environment on any CPU not manufactured by Ambiq is strictly prohibited,
+
+even as part of a multi-CPU system. Use, reproduction, modification, and
+
+distribution of the Software and derivative works as reasonably necessary
+
+for development, testing, validation, benchmarking, continuous integration,
+
+emulation, and simulation on non-Ambiq CPUs (including desktop and server
+
+CPUs, instruction-set simulators, and virtual or emulated hardware) are
+
+permitted, subject to the conditions above.
+
+For purposes of this License, a “production or commercial environment”
+
+means any deployment of the Software to, or operation of the Software for,
+
+third parties or end users, or any use of the Software in the delivery of a
+
+product or service for which consideration is received; internal
+
+development, evaluation, and demonstration by the licensee is not a
+
+production or commercial environment.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS”
 
