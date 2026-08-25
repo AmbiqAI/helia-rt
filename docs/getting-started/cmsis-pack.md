@@ -3,7 +3,7 @@
 heliaRT can be packaged as a source-only CMSIS-Pack for teams that use Keil MDK, CMSIS-Toolbox, CMSIS-Pack Manager, or Arm ecosystem IDEs. The pack is generated from the same CMake source manifest used by the source, Zephyr, and NSX builds.
 
 !!! note "Current scope"
-    The repository builds and validates a local source pack. Checked-in `csolution` examples and published pack-index distribution are still tracked by [#124](https://github.com/AmbiqAI/helia-rt/issues/124).
+    The repository builds and validates a local source pack. Checked-in `csolution` examples are still tracked by [#124](https://github.com/AmbiqAI/helia-rt/issues/124); pack-index publication is out of scope there — see below.
 
 ## Local Pack vs Published Distribution
 
