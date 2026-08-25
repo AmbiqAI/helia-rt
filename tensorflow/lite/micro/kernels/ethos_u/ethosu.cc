@@ -19,6 +19,17 @@ limitations under the License.
 #include "tensorflow/lite/micro/micro_context.h"
 #include "tensorflow/lite/micro/micro_log.h"
 
+// heliaRT: this file carries an internal gate -- HELIA_RT_ENABLE_ETHOSU selects
+// the real Ethos-U dispatch, and without it the file compiles a nullptr
+// Register_ETHOSU() stub. Upstream had no such macro: compiling this file at
+// all *was* the enablement, driven by the make co-processor flow
+// (CO_PROCESSOR=ethos_u), which uppercases the co-processor name into -DETHOS_U
+// (tools/make/Makefile) and adds kernels/ethos_u/ to the kernel sources.
+// Honour that upstream signal so the make path does not silently build the stub.
+#if defined(ETHOS_U) && !defined(HELIA_RT_ENABLE_ETHOSU)
+#define HELIA_RT_ENABLE_ETHOSU 1
+#endif
+
 #if defined(HELIA_RT_ENABLE_ETHOSU)
 extern "C" {
 struct ethosu_driver;

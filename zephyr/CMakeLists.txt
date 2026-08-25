@@ -115,13 +115,22 @@ endforeach()
 # --- Zephyr-specific extras the SSoT does not own ---
 # Ethos-U op kernel (Zephyr-only conditional). The SSoT deliberately omits
 # this kernel because its inclusion is gated on a board feature.
-# When CONFIG_ETHOS_U is set we ship the real implementation; otherwise we
+# When CONFIG_ETHOS_U is set we ship kernels/ethos_u/ethosu.cc; otherwise we
 # ship the no-op stub at kernels/ethosu.cc so that consumers calling
 # Register_ETHOSU() / MicroMutableOpResolver::AddEthosU() still link.
+#
+# Selecting kernels/ethos_u/ethosu.cc is NOT sufficient on its own: that file
+# carries an internal gate (#if defined(HELIA_RT_ENABLE_ETHOSU)) and compiles a
+# nullptr Register_ETHOSU() stub when the macro is absent, so both branches
+# would produce a stub. CONFIG_ETHOS_U therefore also defines the macro on the
+# helia_rt library, mirroring the root CMake option (-DHELIA_RT_ENABLE_ETHOSU=ON
+# -> HELIA_RT_ENABLE_ETHOSU=1). Library scope is enough: AddEthosU() is not
+# macro-gated in micro_mutable_op_resolver.h, it null-checks Register_ETHOSU().
 set(_HELIA_RT_EXTRA_SOURCES "")
 if(CONFIG_ETHOS_U)
     list(APPEND _HELIA_RT_EXTRA_SOURCES
         ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/ethos_u/ethosu.cc)
+    zephyr_library_compile_definitions(HELIA_RT_ENABLE_ETHOSU=1)
 else()
     list(APPEND _HELIA_RT_EXTRA_SOURCES
         ${HELIA_RT_DIR}/tensorflow/lite/micro/kernels/ethosu.cc)
