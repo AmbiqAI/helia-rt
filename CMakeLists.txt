@@ -202,6 +202,19 @@ function(_helia_rt_add_backend_target backend)
     target_include_directories(${_target} PUBLIC ${HELIA_RT_INCLUDE_DIRS})
     if(HELIA_RT_ENABLE_ETHOSU)
         target_compile_definitions(${_target} PUBLIC HELIA_RT_ENABLE_ETHOSU=1)
+    else()
+        # Suppress the ETHOS_U -> HELIA_RT_ENABLE_ETHOSU implication inside
+        # kernels/ethos_u/ethosu.cc, so an explicit OFF on this option (or one
+        # forced by the nsx wrapper) wins over an ambient -DETHOS_U from a BSP
+        # or toolchain file.
+        #
+        # PRIVATE, unlike the ENABLE define above: ENABLE is a capability
+        # signal consumers may legitimately test with #ifdef before calling
+        # AddEthosU(); DISABLE is an internal build-control knob read only by
+        # this library's ethosu.cc, and propagating it would suppress the
+        # implication in downstream translation units that are none of our
+        # business.
+        target_compile_definitions(${_target} PRIVATE HELIA_RT_DISABLE_ETHOSU=1)
     endif()
 
     set_target_properties(${_target} PROPERTIES
