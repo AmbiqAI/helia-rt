@@ -60,11 +60,18 @@ CURRENT_BINARY=${__BINARY_TARGET_PATH}
 size ${CURRENT_BINARY} >${ROOT_DIR}/ci/size_log.txt
 
 # Get a clone of the main repo as the reference.
-REF_ROOT_DIR="$(mktemp -d ${ROOT_DIR}/../main_ref.XXXXXX)"
-git clone https://github.com/AmbiqAI/helia-rt.git ${REF_ROOT_DIR}
+# AmbiqAI/helia-rt is public: clone anonymously over https, never with a token
+# in the URL (git echoes the remote in "unable to access '<url>'" errors).
+HELIA_RT_URL="https://github.com/AmbiqAI/helia-rt.git"
+REF_ROOT_DIR="$(mktemp -d "${ROOT_DIR}/../main_ref.XXXXXX")"
+# Pin the URL to itself so a host-wide `insteadOf` rewrite cannot convert this
+# https clone into an ssh one on a machine with no key. Same idiom, and the
+# same reasoning, as ext_libs/ns_cmsis_nn_download.sh -- see the comment there.
+git -c url."${HELIA_RT_URL}".insteadOf="${HELIA_RT_URL}" \
+    clone "${HELIA_RT_URL}" "${REF_ROOT_DIR}"
 
 # Build a binary for the main repo.
-cd ${REF_ROOT_DIR}
+cd "${REF_ROOT_DIR}"
 build_target ${BENCHMARK_TARGET} default linux x86_64
 REF_BINARY=${__BINARY_TARGET_PATH}
 size ${REF_BINARY} >${REF_ROOT_DIR}/ci/size_log.txt

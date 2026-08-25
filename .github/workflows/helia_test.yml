@@ -29,7 +29,30 @@ permissions:
 # The CI image is resolved by the `ci-image` setup job below and consumed via
 # `needs.ci-image.outputs.image`. `container.image` does not support the `env`
 # context, so a tiny setup job is the cleanest way to keep a single pin point.
-# Bump the image tag in that one job. See .github/workflows/README.md.
+#
+# The image is pinned by DIGEST, not by tag. `:latest` is rebuilt by manual
+# dispatch of helia_build_docker_image.yml and is not a `needs:` of this
+# workflow, so a tag reference lets the image drift from the repo's Dockerfile
+# with no commit recording the change -- and no run records which image it
+# actually used. A digest makes the image a reviewable part of the diff.
+#
+# Five workflows pin this image and they must all carry the SAME digest, or
+# the test matrix and the release build silently run on different images.
+# .github/workflows/README.md is authoritative: it lists the pin points and
+# carries this same recipe. To re-pin after a rebuild, resolve the tag's
+# current digest anonymously (public package, no `read:packages`, no pull):
+#
+#   TOKEN=$(curl -sSL \
+#     "https://ghcr.io/token?scope=repository:ambiqai/helia-rt-ci:pull&service=ghcr.io" \
+#     | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
+#   curl -sSI -H "Authorization: Bearer ${TOKEN}" \
+#     -H "Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json" \
+#     https://ghcr.io/v2/ambiqai/helia-rt-ci/manifests/latest \
+#     | grep -i docker-content-digest
+#
+# Both media types are offered so the multi-arch manifest still resolves if
+# the image is ever republished in Docker rather than OCI format. Update every
+# pin point, keeping each trailing tag comment in step.
 
 jobs:
   ci-image:
@@ -38,7 +61,7 @@ jobs:
       image: ${{ steps.image.outputs.image }}
     steps:
       - id: image
-        run: echo "image=ghcr.io/ambiqai/helia-rt-ci:latest" >> "$GITHUB_OUTPUT"
+        run: echo "image=ghcr.io/ambiqai/helia-rt-ci@sha256:55372f29023cd1be1887af5761c8e6c18765b4e68ac28e02510d519e461692c9" >> "$GITHUB_OUTPUT"  # ghcr.io/ambiqai/helia-rt-ci:latest as of 2026-08-25
 
   helia_test:
     needs: ci-image
@@ -77,15 +100,24 @@ jobs:
           key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc','tensorflow/lite/micro/tools/make/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/helia.inc') }}
 
       # ccache is baked into the CI image (.devcontainer/Dockerfile), but
-      # keep an apt-get fallback so this workflow still works when running
-      # against an older :latest image (e.g. during image rollout, since the
-      # image build job is not a `needs:` dependency of this workflow).
+      # keep an apt-get fallback so this workflow still works when the pinned
+      # digest predates that change (e.g. mid-rollout, since the image build
+      # job is not a `needs:` dependency of this workflow).
       - name: Ensure ccache
         run: |
           if ! command -v ccache >/dev/null 2>&1; then
             apt-get update && apt-get install -y --no-install-recommends ccache
           fi
-          ccache --version | head -1
+          # Capture, then trim. This step does not set `pipefail` today, so
+          # `ccache --version | head -1` is currently harmless -- but adding
+          # `set -o pipefail` later would quietly arm it. Heredoc rather than
+          # a `<<<` herestring: nothing else in this workflow requires bash,
+          # and it runs in a container where the shell is whatever the image
+          # provides.
+          ccache_version=$(ccache --version)
+          head -1 <<EOF
+          ${ccache_version}
+          EOF
 
       - name: Cache ccache
         uses: actions/cache@v6

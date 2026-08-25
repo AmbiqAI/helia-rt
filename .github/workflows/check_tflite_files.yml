@@ -16,10 +16,13 @@ on:
       tflm-bot-token:
         required: true
 
-# Pinned CI image. Bump this on Dockerfile changes.
-# See .github/workflows/README.md for the bump procedure.
+# Pinned CI image, by DIGEST rather than tag: `:latest` is rebuilt by manual
+# dispatch and can drift from the repo's Dockerfile with no commit recording
+# it. Five workflows pin this image and they must all carry the SAME digest,
+# or the test matrix and the release build run on different images. See
+# .github/workflows/README.md for the pin-point list and the re-pin recipe.
 env:
-  CI_IMAGE: ghcr.io/ambiqai/helia-rt-ci:latest
+  CI_IMAGE: ghcr.io/ambiqai/helia-rt-ci@sha256:55372f29023cd1be1887af5761c8e6c18765b4e68ac28e02510d519e461692c9  # ghcr.io/ambiqai/helia-rt-ci:latest as of 2026-08-25
 
 jobs:
   check_tflite_files:
