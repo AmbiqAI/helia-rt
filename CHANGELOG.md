@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.18.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.17.0...helia-rt-v1.18.0) (2026-08-25)
+
+
+### Features
+
+* add HELIA FP16 and FP32 kernels ([9086191](https://github.com/AmbiqAI/helia-rt/commit/908619138426c9dcc519223141bbfd3377fb6140))
+* **nsx:** Make heliaRT SoC compatibility wildcard ([#180](https://github.com/AmbiqAI/helia-rt/issues/180)) ([6bb086e](https://github.com/AmbiqAI/helia-rt/commit/6bb086e29bbbc90178eb07d532cbb09f8a3f357d))
+* **nsx:** plumb Ethos-U dispatch option through the nsx module ([#191](https://github.com/AmbiqAI/helia-rt/issues/191)) ([958e4d7](https://github.com/AmbiqAI/helia-rt/commit/958e4d7209ebf8d7bb0fb1316bfa652b5d13f3a5))
+
+
+### Bug Fixes
+
+* align HELIA float fallback metadata ([4eea778](https://github.com/AmbiqAI/helia-rt/commit/4eea778dfe268db70aeeb28304432f195b3c35e6))
+* **build:** align root CMake project version with release-please ([#214](https://github.com/AmbiqAI/helia-rt/issues/214)) ([e90e29a](https://github.com/AmbiqAI/helia-rt/commit/e90e29a0fab103fdff962d2c8693eae98c3f048e)), closes [#200](https://github.com/AmbiqAI/helia-rt/issues/200)
+* **build:** define the Ethos-U gate macro on the Zephyr and make paths ([#213](https://github.com/AmbiqAI/helia-rt/issues/213)) ([b65ceae](https://github.com/AmbiqAI/helia-rt/commit/b65ceaea5c2260892a123edd3c412966de59206e)), closes [#210](https://github.com/AmbiqAI/helia-rt/issues/210)
+* **ci:** clone the now-public ns-cmsis-nn without a credential ([fbdf635](https://github.com/AmbiqAI/helia-rt/commit/fbdf63534a5cb4a03e38bda0b001c4ec8d77126e))
+* **ci:** clone the now-public ns-cmsis-nn without a credential ([8c63de9](https://github.com/AmbiqAI/helia-rt/commit/8c63de94ffb8495db7efa1d8ab0eae5520677e63))
+* **ci:** close pull_request_target trust boundary on the PR test path ([#198](https://github.com/AmbiqAI/helia-rt/issues/198)) ([74cab1b](https://github.com/AmbiqAI/helia-rt/commit/74cab1b6805ee6ec4216ef8422a191649c140827))
+* **ci:** contain armlm stderr, correct comment, narrow invariant exemption ([6c65dd3](https://github.com/AmbiqAI/helia-rt/commit/6c65dd30766a82910d158b3672cdbb7da8e72e08))
+* **ci:** run release-please as a GitHub App so its release PR gets checks ([#199](https://github.com/AmbiqAI/helia-rt/issues/199)) ([28525d6](https://github.com/AmbiqAI/helia-rt/commit/28525d6c3c546dbb90a3ad73f3149e6fde875a76))
+* **ci:** stop printing the Arm license identifier into build logs ([8d132d8](https://github.com/AmbiqAI/helia-rt/commit/8d132d858bbb58df94fc268bcac51320f80c3933))
+* **ci:** stop printing the Arm license identifier into build logs ([d6a5bf7](https://github.com/AmbiqAI/helia-rt/commit/d6a5bf787960291144b87b6fd598d6be42fd5f01))
+* download third-party archives over https ([4acbce2](https://github.com/AmbiqAI/helia-rt/commit/4acbce2861ddd77b5b5da39333a7a966fcacf8c7))
+* download third-party archives over https ([83d67f4](https://github.com/AmbiqAI/helia-rt/commit/83d67f4278d946e58ef7040c84bd8a251d4eda6c))
+* **helia:** fetch TRANSPOSE_CONV bias as an input, not an output ([#208](https://github.com/AmbiqAI/helia-rt/issues/208)) ([6e2761b](https://github.com/AmbiqAI/helia-rt/commit/6e2761be9f89651302e9fec2bd5a3b90de9f09e5)), closes [#207](https://github.com/AmbiqAI/helia-rt/issues/207)
+* **helia:** persist quantized LSTM hidden/cell state across invocations ([#197](https://github.com/AmbiqAI/helia-rt/issues/197)) ([31d627c](https://github.com/AmbiqAI/helia-rt/commit/31d627cf33cf1853e1765ea198cda63b7baf7973)), closes [#194](https://github.com/AmbiqAI/helia-rt/issues/194)
+* **make:** pin ns-cmsis-nn clone URL against git insteadOf rewrites ([#205](https://github.com/AmbiqAI/helia-rt/issues/205)) ([39b29de](https://github.com/AmbiqAI/helia-rt/commit/39b29de51373ccba59a62a4b5da53af30d886a71))
+* rank-5 MAXIMUM/MINIMUM int8/int16 fell back to a single element ([0f9b660](https://github.com/AmbiqAI/helia-rt/commit/0f9b6604e8171b7ef7ae83df21443c5ce9ae35d9))
+* Remove python ops resolver from runtime sources ([#176](https://github.com/AmbiqAI/helia-rt/issues/176)) ([595b892](https://github.com/AmbiqAI/helia-rt/commit/595b89276d450b4abc9a2851f74efbe8ce3b338b))
+
 ## [1.17.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.16.0...helia-rt-v1.17.0) (2026-06-11)
 
 
