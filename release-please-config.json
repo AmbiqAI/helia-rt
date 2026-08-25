@@ -18,6 +18,14 @@
         {
           "type": "generic",
           "path": "nsx/nsx-module.yaml"
+        },
+        {
+          "type": "generic",
+          "path": "CMakeLists.txt"
+        },
+        {
+          "type": "generic",
+          "path": "cmake/README.md"
         }
       ],
 
