@@ -115,8 +115,12 @@ jobs:
           # should be split.
           # Use the PR merge-base diff so branches cut from older tags do not
           # inherit unrelated main-branch churn into this invariant check.
-          if git diff --name-only "$range" -- cmake/ CMakeLists.txt \
-                | grep -q .; then
+          # Capture, then test. `grep -q` exits at its first match while git is
+          # still writing, so the pipe form makes git take SIGPIPE and
+          # `set -o pipefail` turn 141 into a failure of the invariant check
+          # itself -- for a PR that merely touches enough SSoT files.
+          ssot_touched=$(git diff --name-only "$range" -- cmake/ CMakeLists.txt)
+          if [ -n "${ssot_touched}" ]; then
               echo "PR touches SSoT files — verifying upstream paths are untouched..."
               # Allow the small set of upstream-owned paths that currently need
               # heliaRT-local divergence for generic CMake integration. Keep
@@ -177,7 +181,11 @@ jobs:
       - name: Validate pack with packchk
         run: |
           set -euo pipefail
-          PACK=$(ls dist/Ambiq.helia-rt.*.pack | head -1)
+          # Glob, not `ls ... | head -1`: no pipe, so no producer left writing
+          # into a closed `head` and taking SIGPIPE under `set -o pipefail`.
+          packs=(dist/Ambiq.helia-rt.*.pack)
+          PACK="${packs[0]}"
+          test -f "${PACK}"
           STAGE="${PACK%.pack}.stage"
           packchk --disable-validation "${STAGE}/Ambiq.helia-rt.pdsc"
       - name: Validate pack archive + pdsc
@@ -217,7 +225,11 @@ jobs:
       - name: Validate pdsc contract (identity + ns-cmsis-nn pin)
         run: |
           set -euo pipefail
-          PACK=$(ls dist/Ambiq.helia-rt.*.pack | head -1)
+          # Glob, not `ls ... | head -1`: no pipe, so no producer left writing
+          # into a closed `head` and taking SIGPIPE under `set -o pipefail`.
+          packs=(dist/Ambiq.helia-rt.*.pack)
+          PACK="${packs[0]}"
+          test -f "${PACK}"
           python3 tools/cmsis_pack/check_pdsc.py "${PACK}"
       - name: Upload pack artifact
         uses: actions/upload-artifact@v7
@@ -248,8 +260,17 @@ jobs:
           # AmbiqAI/ns-cmsis-nn is public: clone anonymously. Keeping a token
           # out of the URL also keeps it out of git's "unable to access '<url>'"
           # error output when the network misbehaves.
-          git clone --depth 1 --branch "${NS_CMSIS_NN_REF}" \
-              "https://github.com/AmbiqAI/ns-cmsis-nn.git" \
+          NS_CMSIS_NN_URL="https://github.com/AmbiqAI/ns-cmsis-nn.git"
+          # Pin the URL to itself so a host-wide `insteadOf` rewrite (e.g.
+          # https://github.com/ -> git@github.com:) cannot silently turn this
+          # anonymous https clone into an ssh one. Same idiom, and the same
+          # reasoning, as ext_libs/ns_cmsis_nn_download.sh -- see the long
+          # comment there. GitHub-hosted runners carry no such rewrite today,
+          # so this is protection for self-hosted and mirrored runners; keep
+          # the two sites identical so neither drifts into being the odd one.
+          git -c url."${NS_CMSIS_NN_URL}".insteadOf="${NS_CMSIS_NN_URL}" \
+              clone --depth 1 --branch "${NS_CMSIS_NN_REF}" \
+              "${NS_CMSIS_NN_URL}" \
               ns-cmsis-nn
           (cd ns-cmsis-nn && git rev-parse HEAD)
       - name: Install cross toolchain + ninja
@@ -259,7 +280,10 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
               cmake ninja-build gcc-arm-none-eabi \
               libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib
-          arm-none-eabi-gcc --version | head -1
+          # Capture first, then trim: `x | head -1` leaves the producer writing
+          # into a closed pipe, and `set -o pipefail` turns that into failure.
+          gcc_version=$(arm-none-eabi-gcc --version)
+          head -1 <<<"${gcc_version}"
           # Confirm libc headers (string.h etc.) and libgcc are reachable.
           arm-none-eabi-gcc -print-sysroot
           arm-none-eabi-gcc -E -x c -include string.h /dev/null > /dev/null
@@ -393,7 +417,10 @@ jobs:
           # Archives alone never resolve references, so a missing fp32/fp16
           # source selection in ns-cmsis-nn would go unnoticed. Force a link.
           cmake --build smoke/build --target nsx_helia_rt_link_probe -j
-          PROBE=$(find smoke/build -name 'nsx_helia_rt_link_probe.elf' | head -1)
+          # `find` keeps walking after `head -1` exits, so the pipe form makes
+          # it take SIGPIPE and `set -o pipefail` fail the step. Capture, trim.
+          probe_paths=$(find smoke/build -name 'nsx_helia_rt_link_probe.elf')
+          PROBE=$(head -1 <<<"${probe_paths}")
           test -n "${PROBE}"
           file "${PROBE}"
           # Assert the optimized float kernels are really in the image.
@@ -758,6 +785,11 @@ jobs:
           # but aren't on PATH by default in CI. Add them.
           export PATH="${ZEPHYR_SDK_INSTALL_DIR}/arm-zephyr-eabi/bin:$PATH"
           # Confirm the heliaRT TFLM runtime actually linked in (not GC'd).
-          arm-zephyr-eabi-nm -C build/zephyr/zephyr.elf \
-              | grep -E ' T .*(MicroPrintf|MicroAllocator|MicroInterpreter)' \
-              | head -5
+          # Capture the symbol table once rather than piping nm into head: nm
+          # is still writing when `head -5` exits, so the pipe form takes
+          # SIGPIPE and `set -o pipefail` reports 141 as a link regression.
+          # The grep keeps its assertion role -- no match still fails the step.
+          zephyr_syms=$(arm-zephyr-eabi-nm -C build/zephyr/zephyr.elf)
+          matched_syms=$(grep -E ' T .*(MicroPrintf|MicroAllocator|MicroInterpreter)' \
+              <<<"${zephyr_syms}")
+          head -5 <<<"${matched_syms}"
