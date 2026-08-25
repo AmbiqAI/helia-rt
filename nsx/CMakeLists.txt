@@ -15,6 +15,10 @@
 #                        Selects which helia_rt::* backend nsx::helia_rt wraps.
 #   HELIA_RT_VARIANT      debug | release-with-logs | release   (default: release-with-logs)
 #                        Mapped onto HELIA_RT_BUILD_TYPE (- replaced with _).
+#   NSX_HELIA_RT_ENABLE_ETHOSU  ON | OFF  (default: OFF)
+#                        Enables Ethos-U custom-op dispatch in the runtime.
+#                        The app must link an Ethos-U core-driver provider
+#                        (e.g. the nsx-npu module) and initialize it.
 #   HELIA_RT_TFLM_ROOT    Override repo root. Defaults to the parent dir of nsx/.
 #
 # Required upstream targets (provided by NSX board package):
@@ -77,6 +81,15 @@ set(HELIA_RT_VARIANT "release-with-logs" CACHE STRING
 set_property(CACHE HELIA_RT_VARIANT PROPERTY STRINGS
     "debug" "release-with-logs" "release")
 
+# --- Ethos-U custom-op dispatch (opt-in) ---
+# Enables the real ethos-u kernel implementation in the heliaRT build
+# (HELIA_RT_ENABLE_ETHOSU). The kernel externs the Ethos-U core-driver entry
+# points (ethosu_reserve_driver / ethosu_invoke_v3 / ...), so the final app
+# must link an Ethos-U core-driver provider module and initialize the driver
+# before invoking a Vela-compiled model.
+option(NSX_HELIA_RT_ENABLE_ETHOSU
+    "Enable Ethos-U custom-op dispatch (requires an Ethos-U core-driver provider module)" OFF)
+
 # Map HELIA_RT_VARIANT (dash form) -> HELIA_RT_BUILD_TYPE (underscore form
 # expected by helia_rt_sources.cmake).
 string(REPLACE "-" "_" _helia_rt_build_type "${HELIA_RT_VARIANT}")
@@ -132,6 +145,80 @@ set(HELIA_RT_DISABLE_X86_NEON   OFF CACHE BOOL "" FORCE)
 # We provide our own Cortex-M debug_log.cc below; suppress the default stub
 # so we don't get duplicate-symbol link errors.
 set(HELIA_RT_PROVIDE_DEBUG_LOG  OFF CACHE BOOL "" FORCE)
+
+# Map NSX_HELIA_RT_ENABLE_ETHOSU -> repo-root HELIA_RT_ENABLE_ETHOSU toggle.
+#
+# The repo-root option is owned by this module while the nsx wrapper is in
+# use: we FORCE the cache entry below, so a consumer who sets that entry
+# directly (-DHELIA_RT_ENABLE_ETHOSU=ON/OFF) has their value overwritten.
+# Reject that up front rather than leaving them to discover it by
+# disassembling the archive.
+#
+# The guard compares normalized ON/OFF *values*, and rejects disagreement in
+# either direction with anything we did not write ourselves:
+#
+#  * Our own FORCE write persists, so on a reconfigure of an existing build
+#    dir the entry holds our value rather than the consumer's.
+#    _NSX_HELIA_RT_OWNS_ETHOSU records the exact value we last wrote, and an
+#    entry equal to it is treated as ours -- so toggling the wrapper back and
+#    forth in one build dir is accepted instead of telling the user to enable
+#    the thing they just disabled. Recording only a boolean "we wrote
+#    something" would latch: after the first configure the guard would be
+#    disarmed for the life of the build dir, and a later
+#    -DHELIA_RT_ENABLE_ETHOSU=ON with the wrapper OFF would be silently
+#    clobbered -- the exact override the guard exists to prevent.
+#
+#  * Both polarities are checked. A truthiness-only test ("entry set but
+#    wrapper off") cannot see an explicit -DHELIA_RT_ENABLE_ETHOSU=OFF
+#    against a wrapper ON, and would silently compile Ethos-U in for a
+#    consumer who explicitly opted out.
+#
+#  * A normal (non-cache) variable of the same name in an enclosing scope
+#    shadows the cache entry and SURVIVES a FORCE cache write -- FORCE
+#    updates the cache, not the shadow. Left alone, the build would compile
+#    with the parent's value while we report ours. Drop the shadow before
+#    writing so the cache entry is what actually takes effect. The guard runs
+#    first and reads the shadow (a plain reference sees it ahead of the cache
+#    entry), so a shadowed value that disagrees is still reported.
+#
+# Not detectable: a consumer -D value identical to the one we wrote on the
+# previous configure of the same build dir leaves no trace in the cache to
+# distinguish it from our own write. That case is accepted and clobbered.
+if(NSX_HELIA_RT_ENABLE_ETHOSU)
+    set(_nsx_ethosu_want ON)
+else()
+    set(_nsx_ethosu_want OFF)
+endif()
+set(_nsx_ethosu_have "")
+if(DEFINED HELIA_RT_ENABLE_ETHOSU OR DEFINED CACHE{HELIA_RT_ENABLE_ETHOSU})
+    if(HELIA_RT_ENABLE_ETHOSU)
+        set(_nsx_ethosu_have ON)
+    else()
+        set(_nsx_ethosu_have OFF)
+    endif()
+endif()
+set(_nsx_ethosu_wrote "")
+if(DEFINED CACHE{_NSX_HELIA_RT_OWNS_ETHOSU})
+    if(_NSX_HELIA_RT_OWNS_ETHOSU)
+        set(_nsx_ethosu_wrote ON)
+    else()
+        set(_nsx_ethosu_wrote OFF)
+    endif()
+endif()
+if(NOT "${_nsx_ethosu_have}" STREQUAL ""
+        AND NOT "${_nsx_ethosu_have}" STREQUAL "${_nsx_ethosu_want}"
+        AND NOT "${_nsx_ethosu_have}" STREQUAL "${_nsx_ethosu_wrote}")
+    message(FATAL_ERROR
+        "nsx-helia-rt: HELIA_RT_ENABLE_ETHOSU is owned by this module; "
+        "set -DNSX_HELIA_RT_ENABLE_ETHOSU=${_nsx_ethosu_have} instead")
+endif()
+unset(HELIA_RT_ENABLE_ETHOSU)
+set(HELIA_RT_ENABLE_ETHOSU ${_nsx_ethosu_want} CACHE BOOL "" FORCE)
+set(_NSX_HELIA_RT_OWNS_ETHOSU "${_nsx_ethosu_want}" CACHE INTERNAL
+    "HELIA_RT_ENABLE_ETHOSU value last written by nsx-helia-rt in this build dir")
+unset(_nsx_ethosu_want)
+unset(_nsx_ethosu_have)
+unset(_nsx_ethosu_wrote)
 
 # Wire the kernel-library target for the selected backend. The helia
 # backend uses nsx::cmsis_nn (ns-cmsis-nn). The cmsis_nn backend requires
@@ -210,6 +297,9 @@ endif()
 
 message(STATUS "nsx-helia-rt: source build, "
                "backend=${NSX_HELIA_RT_BACKEND}, "
+               # Effective post-mapping value, not the requested wrapper
+               # value, so the log reflects what actually compiles.
+               "ethos-u=${HELIA_RT_ENABLE_ETHOSU}, "
                "variant=${HELIA_RT_VARIANT} (HELIA_RT_BUILD_TYPE=${HELIA_RT_BUILD_TYPE}), "
                "target=${_nsx_helia_rt_alias_target}"
                "${_nsx_helia_rt_kernel_diag}, "
