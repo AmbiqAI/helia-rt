@@ -24,7 +24,7 @@ limitations under the License.
 // Register_ETHOSU() stub. Upstream had no such macro: compiling this file at
 // all *was* the enablement, driven by the make co-processor flow
 // (CO_PROCESSOR=ethos_u), which uppercases the co-processor name into -DETHOS_U
-// (tools/make/Makefile) and adds kernels/ethos_u/ to the kernel sources.
+// (tensorflow/lite/micro/tools/make/Makefile) and adds kernels/ethos_u/ to the kernel sources.
 // Honour that upstream signal so the make path does not silently build the stub.
 #if defined(ETHOS_U) && !defined(HELIA_RT_ENABLE_ETHOSU)
 #define HELIA_RT_ENABLE_ETHOSU 1
