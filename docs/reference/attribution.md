@@ -3,8 +3,9 @@
 
   The "License Boundaries" section quotes LICENSE as amended by
   https://github.com/AmbiqAI/helia-rt/pull/220, which must merge before this
-  page. The block quote is verbatim from that branch at 12dbac41, not a
-  paraphrase — if #220 changes again before merge, re-quote it here.
+  page. The LICENSE lines in the block quote are verbatim excerpts from that
+  branch at 12dbac41, with omissions explicitly marked — if #220 changes again
+  before merge, re-quote it here.
 -->
 
 # Attribution and Trademarks

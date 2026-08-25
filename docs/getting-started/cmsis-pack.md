@@ -11,7 +11,7 @@ heliaRT's CMSIS-Pack is **generated and validated, not distributed**. There is n
 published pack you can `cpackget add` by name — you build it from a checkout of
 this repository, as described below.
 
-| | Status |
+| Aspect | Status |
 |---|---|
 | Pack generated from the CMake source manifest | Yes — `tools/cmsis_pack/build_pack.py` |
 | Pack built and validated on every relevant change | Yes — the `Build CMSIS-Pack from SSoT manifest` job in `.github/workflows/smoke_cmake.yml` |
