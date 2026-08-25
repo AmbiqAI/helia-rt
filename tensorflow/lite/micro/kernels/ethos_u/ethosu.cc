@@ -26,11 +26,22 @@ limitations under the License.
 // (CO_PROCESSOR=ethos_u), which uppercases the co-processor name into -DETHOS_U
 // (tensorflow/lite/micro/tools/make/Makefile) and adds kernels/ethos_u/ to the kernel sources.
 // Honour that upstream signal so the make path does not silently build the stub.
-#if defined(ETHOS_U) && !defined(HELIA_RT_ENABLE_ETHOSU)
+//
+// HELIA_RT_DISABLE_ETHOSU suppresses only this implication. The CMake build
+// defines it when its HELIA_RT_ENABLE_ETHOSU option is OFF, so an explicit
+// OFF -- including one forced by the nsx wrapper's ownership guard -- cannot
+// be overridden by an ambient -DETHOS_U from a BSP or toolchain file. It does
+// not force the gate closed when HELIA_RT_ENABLE_ETHOSU is defined directly.
+#if defined(ETHOS_U) && !defined(HELIA_RT_ENABLE_ETHOSU) && \
+    !defined(HELIA_RT_DISABLE_ETHOSU)
 #define HELIA_RT_ENABLE_ETHOSU 1
 #endif
 
 #if defined(HELIA_RT_ENABLE_ETHOSU)
+// Keep these declarations in sync with ethosu_driver.h in the Ethos-U core
+// driver (the v3 invoke API). extern "C" means no name mangling, so a
+// signature drift downstream links cleanly and misbehaves at runtime instead
+// of failing the build.
 extern "C" {
 struct ethosu_driver;
 
