@@ -1,8 +1,8 @@
 <!--
-  DRAFT — awaiting approval. Every statement on this page is drawn from the
-  agreed product decisions recorded in
-  https://github.com/AmbiqAI/helia-rt/issues/200. Do not extend it with support
-  commitments that are not in that issue.
+  Wording approved by the portfolio authority (Dr. Adam Page) on 2026-08-25.
+  The commitments here come from the agreed product decisions in
+  https://github.com/AmbiqAI/helia-rt/issues/200 and the sign-off recorded on
+  PR #215. Do not add support commitments that appear in neither source.
 -->
 
 # Support Policy
@@ -23,21 +23,19 @@ bug fixes and are the versions Ambiq expects to reproduce reports against.
 | Previous minor | `v1.16.x` | Supported |
 | Older minors | `v1.15.x` and earlier | Not supported |
 
-<!-- TODO(adam): does the 12-month critical-fix window extend to minors outside
-     current/previous, or only apply within them? #200 does not say. -->
+Being supported means running the **latest patch release** of a supported minor.
+A defect that is already fixed in a later patch of your minor is addressed by
+upgrading to that patch.
 
-<!-- TODO(adam): the version column publishes only after #214 ("align root CMake
+<!-- Maintenance: this table is hand-maintained. Update it at each release, as
+     part of the release checklist. -->
+
+<!-- Note: how the supported window interacts with major versions is recorded as
+     "revisit at 2.0". Nothing about it is stated on this page today. -->
+
+<!-- Sequencing: the version column should publish after #214 ("align root CMake
      project version with release-please") lands, so the release header, root
-     CMake, and pack manifest all report the same version. Sequence accordingly. -->
-
-<!-- TODO(adam): confirm this table should be maintained by hand here, or
-     generated from the release list at release time. As written it goes stale
-     the moment a release lands. -->
-
-<!-- TODO(adam): #200 says "current and previous minor releases" but does not
-     say whether being supported requires running the latest patch of that
-     minor, nor whether the window is scoped to the current major. Confirm the
-     intent before publishing. -->
+     CMake, and pack manifest all report the same version. -->
 
 !!! note "Release tag naming"
     Releases from `v1.16.0` onward are tagged `helia-rt-v<version>`.
@@ -50,36 +48,45 @@ bug fixes and are the versions Ambiq expects to reproduce reports against.
 
 ## Critical And Security Fixes
 
-Ambiq provides **critical/security fixes for 12 months**.
+Ambiq provides **critical/security fixes for 12 months**. The 12 months run from
+the **release date of the minor**, not from the date it was superseded.
 
-<!-- TODO(adam): #200 does not define when the 12 months starts — release date
-     of the affected version, or the date it was superseded — nor what
-     qualifies a fix as critical/security. Both need to be settled before this
-     is a policy anyone can rely on. -->
+A fix is *critical* if it addresses either of:
+
+- a security vulnerability, or
+- a wrong-inference or data-corruption defect with no workaround.
+
+This window applies within the current and previous minors only. Minors older
+than that are not eligible for critical fixes, whatever their release date.
+
+### Reporting A Security Issue
 
 Report anything you believe is a security issue to
 [support.aitg@ambiq.com](mailto:support.aitg@ambiq.com) rather than opening a
-public issue.
+public issue. GitHub private vulnerability reporting is planned — see
+[#219](https://github.com/AmbiqAI/helia-rt/issues/219) — but is not yet the
+intake channel.
 
-<!-- TODO(adam): the repository's SECURITY.md is a one-line redirect to Google's
-     TensorFlow security policy, inherited from upstream. Routing reporters
-     there sends Ambiq's security intake to another company. Deliberately not
-     linked above. Decide who rewrites SECURITY.md with a real Ambiq channel,
-     and confirm support.aitg@ambiq.com (README.md:97, pyproject.toml) is the
-     right intake address for security specifically. -->
+<!-- TODO(adam): SECURITY.md is still the inherited one-line redirect to
+     Google's TensorFlow policy, so it is deliberately not linked above. Its
+     rewrite is tracked in #219; drop this comment when that lands. -->
 
-<!-- TODO(adam): confirm whether Ambiq commits to an acknowledgement or triage
-     time for security reports. #200 does not say, so none is stated here. -->
+<!-- TODO(adam): no acknowledgement or triage time is committed here, because
+     none was decided. Add one if that changes. -->
 
 ## Deprecation Notice
 
 When a supported capability is scheduled for removal, Ambiq gives **at least 90
 days deprecation notice**.
 
-<!-- TODO(adam): #200 does not say where notice is published (release notes,
-     CHANGELOG, docs banner, direct customer notice) or what counts as a
-     deprecable surface — API, backend, toolchain, board, package format.
-     Name the channel here so the commitment is checkable. -->
+Notices are published in three places, so no single channel has to be watched:
+
+- the release notes for the release that announces the deprecation,
+- `CHANGELOG.md`, and
+- a banner on this documentation site.
+
+The surfaces covered by this commitment are the public API, build options, and
+supported toolchains and targets.
 
 ## Known Unsupported Behavior
 
@@ -91,6 +98,9 @@ Check the release notes of any release after `v1.17.0` before relying on
 stateful behavior. Until then, treat quantized
 `UNIDIRECTIONAL_SEQUENCE_LSTM` as single-shot.
 
+This statement is quantized-only. It says nothing about the FP16 and FP32 LSTM
+paths — see [FP16 and FP32](../guides/floating-point.md) for those.
+
 <!-- TODO(adam): docs/reference/operator-coverage.md carries TWO state claims
      that a corrective pass must decide about explicitly:
        - :27 describes the HELIA int8/int16 LSTM kernels as stateful across
@@ -100,14 +110,12 @@ stateful behavior. Until then, treat quantized
          so it is neither confirmed nor contradicted by the product decision.
      Deliberately not edited here; both are coverage claims. -->
 
-<!-- TODO(adam): confirm whether "stateful/streaming" in #200 also covers the
-     FP16/FP32 paths documented in docs/guides/floating-point.md, or is
-     quantized-only as its wording suggests. -->
-
 ## Where heliaRT May Run
 
-Support scope and license scope are different things. Development, test, and CI
-use is broad; production deployment is not. See
+Support scope and license scope are different things. Development, testing,
+validation, benchmarking, CI, emulation, and simulation are permitted on
+non-Ambiq CPUs; production or commercial deployment is licensed for
+Ambiq-manufactured CPUs only. See
 [Attribution and Trademarks](attribution.md#license-boundaries) for the license
 boundary, and the repository
 [LICENSE](https://github.com/AmbiqAI/helia-rt/blob/main/LICENSE) for the

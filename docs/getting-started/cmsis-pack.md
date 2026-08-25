@@ -28,12 +28,9 @@ inside the archive, asserts the three component variants (`Reference`,
 
 Publishing to the public Keil pack index and hosting a `.pidx` pack index are
 explicitly **out of scope** for [#124](https://github.com/AmbiqAI/helia-rt/issues/124),
-which tracks the remaining consumer-validation work.
-
-<!-- TODO(adam): #124 records publication as out of scope but not as declined —
-     there is no issue or milestone tracking whether heliaRT will ever publish
-     to a pack index. If that is a decision rather than an omission, say so
-     here; if it is planned, link the tracking issue. -->
+which tracks the remaining consumer-validation work. Index publication is **not
+currently tracked** — it has not been declined, but no issue or milestone plans
+it. Build the pack locally and expect to keep doing so.
 
 !!! tip "What this means for you"
     Pin the repository (tag or commit) rather than a pack version, build the
