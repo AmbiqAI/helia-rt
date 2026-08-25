@@ -3,8 +3,8 @@
 
   The "License Boundaries" section quotes LICENSE as amended by
   https://github.com/AmbiqAI/helia-rt/pull/220, which must merge before this
-  page. The block quote is verbatim from that branch, not a paraphrase — if
-  #220's wording changes in review, re-quote it here before merging.
+  page. The block quote is verbatim from that branch at 12dbac41, not a
+  paraphrase — if #220 changes again before merge, re-quote it here.
 -->
 
 # Attribution and Trademarks
@@ -13,7 +13,7 @@ heliaRT is developed and maintained by Ambiq. It is designed to be compatible wi
 
 ## License Scope
 
-heliaRT is released under the [Ambiq Apollo SDK License](https://github.com/AmbiqAI/helia-rt/blob/main/LICENSE). Use, modification, and redistribution are free; production or commercial deployment is licensed solely for Ambiq-manufactured CPUs, while development, testing, and simulation may run on any CPU. See the repository license for the full terms, and [License Boundaries](#license-boundaries) below for what that means in practice.
+heliaRT is released under the [Ambiq Apollo SDK License](https://github.com/AmbiqAI/helia-rt/blob/main/LICENSE). Free use, modification, and redistribution for Ambiq-manufactured CPUs; production or commercial deployment on non-Ambiq CPUs is not licensed, while development, testing, validation, benchmarking, CI, emulation, and simulation may run on any CPU. See the repository license for the full terms, and [License Boundaries](#license-boundaries) below for what that means in practice.
 
 Some files in this repository are derived from upstream TensorFlow Lite for Microcontrollers / LiteRT for Micro or other third-party projects. Those files retain their original copyright and license notices in source headers or adjacent license files. Review the repository [third-party notices](https://github.com/AmbiqAI/helia-rt/blob/main/THIRD_PARTY_NOTICES.md) before redistributing source or binary artifacts.
 
@@ -22,9 +22,10 @@ Some files in this repository are derived from upstream TensorFlow Lite for Micr
 A common question is whether the Ambiq field-of-use restriction blocks everyday
 engineering work on a laptop, an x86 CI runner, or a non-Ambiq evaluation board.
 It does not. The license restricts **production or commercial** deployment to
-Ambiq-manufactured CPUs, and expressly permits development, testing, validation,
-benchmarking, continuous integration, emulation, and simulation on non-Ambiq
-CPUs.
+Ambiq-manufactured CPUs, and permits use, reproduction, modification, and
+distribution of the Software and derivative works as reasonably necessary for
+development, testing, validation, benchmarking, continuous integration,
+emulation, and simulation on non-Ambiq CPUs.
 
 | Activity on non-Ambiq CPUs | Status |
 |---|:---:|
@@ -34,7 +35,22 @@ CPUs.
 | Benchmarking | ✓ Permitted |
 | Continuous integration | ✓ Permitted |
 | Emulation and simulation — desktop and server CPUs, instruction-set simulators, virtual or emulated hardware | ✓ Permitted |
+| Internal development, evaluation, and demonstration by the licensee | ✓ Permitted |
 | Deployment or execution in a production or commercial environment | — Not permitted |
+
+Three consequences worth spelling out:
+
+- **Derivative works are covered.** The permission reaches the Software *and
+  derivative works*, so a modified or ported build for a development or CI
+  target is inside it, not outside.
+- **Build and artifact flow is licensed, not just execution.** Use,
+  reproduction, modification, and distribution are permitted as reasonably
+  necessary for those activities, which is what moving a host-built binary
+  between developers and CI runners requires.
+- **Internal evaluation and demonstration are not production.** The license
+  defines "production or commercial environment" and expressly excludes
+  internal development, evaluation, and demonstration by the licensee, so an
+  internal demo on a laptop is not a production deployment.
 
 Running heliaRT under an instruction-set simulator, an FVP, or virtual hardware
 on a desktop or server CPU is development and simulation, and is permitted.
@@ -55,21 +71,25 @@ The governing text is the
 >
 > *[redistribution and endorsement conditions omitted — see LICENSE]*
 >
-> Deployment or execution of the Software in a production or commercial
-> environment on any CPU not manufactured by Ambiq is prohibited.
+> Field-of-Use Restriction. The Software and any derivative works thereof
+> (in source or binary form) may only be deployed or executed in a production
+> or commercial environment on a CPU manufactured by Ambiq. Use,
+> reproduction, modification, or distribution of the Software or any
+> derivative work for deployment or execution in a production or commercial
+> environment on any CPU not manufactured by Ambiq is strictly prohibited,
+> even as part of a multi-CPU system. Use, reproduction, modification, and
+> distribution of the Software and derivative works as reasonably necessary
+> for development, testing, validation, benchmarking, continuous integration,
+> emulation, and simulation on non-Ambiq CPUs (including desktop and server
+> CPUs, instruction-set simulators, and virtual or emulated hardware) are
+> permitted, subject to the conditions above.
 >
-> Development, testing, validation, benchmarking, continuous integration,
-> emulation, and simulation of the Software on non-Ambiq CPUs — including
-> desktop and server CPUs, instruction-set simulators, and virtual or emulated
-> hardware — are permitted.
->
-> Field-of-Use Restriction. The Software and any derivative works
-> thereof (in source or binary form) may only be deployed or executed in a
-> production or commercial environment on a CPU manufactured by Ambiq.
-> Production or commercial execution on any non-Ambiq CPU, even as part of a
-> multi-CPU system, is expressly forbidden. Development, testing, validation,
-> benchmarking, continuous integration, emulation, and simulation on non-Ambiq
-> CPUs remain permitted as set out above.
+> For purposes of this License, a “production or commercial environment”
+> means any deployment of the Software to, or operation of the Software for,
+> third parties or end users, or any use of the Software in the delivery of a
+> product or service for which consideration is received; internal
+> development, evaluation, and demonstration by the licensee is not a
+> production or commercial environment.
 
 !!! warning "LICENSE governs"
     The table above summarizes the license for planning purposes. It is not a
@@ -77,10 +97,9 @@ The governing text is the
     summary and the LICENSE text differ, the LICENSE text controls —
     [contact Ambiq AITG](mailto:support.aitg@ambiq.com).
 
-<!-- TODO(adam): the LICENSE does not define "production or commercial
-     environment", and this page deliberately does not either — it uses the
-     license's own words. If a customer asks for a boundary test, that
-     definition belongs in LICENSE first, not here. -->
+<!-- The LICENSE now defines "production or commercial environment" itself, so
+     this page quotes that definition rather than offering one of its own. Keep
+     it that way: any refinement of the boundary belongs in LICENSE first. -->
 
 For which *releases* Ambiq supports and for how long, see the
 [Support Policy](support-policy.md).
