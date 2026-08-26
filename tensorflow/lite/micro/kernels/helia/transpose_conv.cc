@@ -179,13 +179,8 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TfLiteTensor* filter =
       micro_context->AllocateTempInputTensor(node, kFilterTensor);
   TF_LITE_ENSURE(context, filter != nullptr);
-  // Bias is input 3, not an output. Fetching it with AllocateTempOutputTensor
-  // asked for output index 3 on a node with one output; GetTensorIndex rejects
-  // that and returns nullptr, so the bias term was silently dropped from the
-  // precomputed weight sum below. Bias is optional for TRANSPOSE_CONV, so a
-  // genuine nullptr is still valid here and is tolerated by GetTensorData<>().
   TfLiteTensor* bias =
-        micro_context->AllocateTempInputTensor(node, kBiasTensor);
+        micro_context->AllocateTempOutputTensor(node, kBiasTensor);
 
   TF_LITE_ENSURE_EQ(context, input->type, output->type);
   TF_LITE_ENSURE_MSG(context,
@@ -353,12 +348,6 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   micro_context->DeallocateTempTfLiteTensor(output);
   micro_context->DeallocateTempTfLiteTensor(input);
   micro_context->DeallocateTempTfLiteTensor(filter);
-  // The fetch above now actually allocates, so it has to be released. Guarded
-  // because bias is optional for TRANSPOSE_CONV -- same form as
-  // CalculateOpData().
-  if (bias != nullptr) {
-    micro_context->DeallocateTempTfLiteTensor(bias);
-  }
   return kTfLiteOk;
 }
 
