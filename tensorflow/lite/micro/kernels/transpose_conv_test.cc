@@ -54,6 +54,47 @@ static const float kGoldenData[kOutputElements] = {
     184,  412,  568,  528,  678,  1347, 1689, 1434,
     1494, 2715, 3057, 2442, 1968, 3352, 3652, 2760};
 
+// Common inputs and outputs (quantized int8, non-zero per-channel bias).
+// kBiasData above is all zeros, so no ungated int8 fixture exercised the bias
+// term; the shapes here are chosen so the bias reaches the output through the
+// optimized path rather than the scalar one:
+//   * 17 input channels -- arm_transpose_conv_wrapper_s8() only routes to
+//     arm_convolve_s8() (the route that consumes the precomputed weight-sum
+//     buffer that the bias seeds) when input channels exceed
+//     REVERSE_TCOL_EFFICIENT_THRESHOLD, which is 16.
+//   * stride 2, 1x1 filter, VALID -- the same route requires stride <= 2, and
+//     the scatter leaves five of the nine output pixels with no input
+//     contribution at all, so those pixels are exactly the bias.
+// All scales are 1.0 and every filter channel peaks at 127, so quantization is
+// exact and the goldens below are integers: golden[y][x][c] is the input/filter
+// dot product for the source pixel (zero where the stride-2 scatter skips)
+// plus kBiasDataNZ[c].
+static int kInputShapeNZ[] = {4, 1, 2, 2, 17};
+static const float kInputDataNZ[] = {
+    0, 1, 2, 3, 4, 5, 6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 0,
+    1, 2, 3, 4, 5, 6, 7,  8,  9,  10, 11, 12, 13, 14, 15, 16, 0,
+    2, 3, 4, 5, 6, 7, 8,  9,  10, 11, 12, 13, 14, 15, 16, 17, 0,
+    3, 4, 5, 6, 7, 8, 9,  10, 11, 12, 13, 14, 15, 16, 17, 18, 0};
+constexpr size_t kInputElementsNZ = std::extent<decltype(kInputDataNZ)>::value;
+
+static int kFilterShapeNZ[] = {4, 2, 1, 1, 17};
+static const float kFilterDataNZ[] = {
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1,  1,  127,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, -1, -1, -1, -1, 127};
+constexpr size_t kFilterElementsNZ =
+    std::extent<decltype(kFilterDataNZ)>::value;
+
+static int kBiasShapeNZ[] = {1, 2};
+static const float kBiasDataNZ[] = {-80, 40};
+constexpr size_t kBiasElementsNZ = std::extent<decltype(kBiasDataNZ)>::value;
+
+static int kOutputShapeNZ[] = {4, 1, 3, 3, 2};
+static const float kGoldenDataNZ[] = {40,  52, -80, 40, 56,  60,   //
+                                      -80, 40, -80, 40, -80, 40,   //
+                                      72,  68, -80, 40, 88,  76};  //
+constexpr size_t kOutputElementsNZ =
+    std::extent<decltype(kGoldenDataNZ)>::value;
+
 #ifdef USE_TFLM_COMPRESSION
 
 constexpr size_t kTransposeConvMaxTensors = 5;
@@ -620,6 +661,41 @@ TEST(TransposeConvTest, SimpleTestQuantizedPerChannel) {
       tflite::testing::kOutputShape, tflite::testing::kGoldenData,
       golden_quantized, output_scale, output_zero_point,
       &tflite::testing::common_conv_params, output_data);
+}
+
+TEST(TransposeConvTest, SimpleBiasTestQuantizedPerChannelNonZeroBias) {
+  int8_t output_data[tflite::testing::kOutputElementsNZ];
+
+  const float input_scale = 1.0f;
+  const float output_scale = 1.0f;
+  const float filter_scale = 1.0f;
+  const int input_zero_point = 0;
+  const int output_zero_point = 0;
+
+  int8_t input_quantized[tflite::testing::kInputElementsNZ];
+  int8_t filter_quantized[tflite::testing::kFilterElementsNZ];
+  int32_t bias_quantized[tflite::testing::kBiasElementsNZ];
+  int8_t golden_quantized[tflite::testing::kOutputElementsNZ];
+  int zero_points[tflite::testing::kBiasElementsNZ + 1];
+  float scales[tflite::testing::kBiasElementsNZ + 1];
+
+  TfLiteConvParams conv_params = {kTfLitePaddingValid,  // padding
+                                  2,                    // stride_width
+                                  2,                    // stride_height
+                                  kTfLiteActNone,
+                                  1,
+                                  1,
+                                  kTfLiteNoType};
+
+  tflite::testing::TestTransposeConvQuantized(
+      tflite::testing::kInputShapeNZ, tflite::testing::kInputDataNZ,
+      input_quantized, input_scale, input_zero_point,
+      tflite::testing::kFilterShapeNZ, tflite::testing::kFilterDataNZ,
+      filter_quantized, filter_scale, tflite::testing::kBiasShapeNZ,
+      tflite::testing::kBiasDataNZ, bias_quantized, scales, zero_points,
+      tflite::testing::kOutputShapeNZ, tflite::testing::kGoldenDataNZ,
+      golden_quantized, output_scale, output_zero_point, &conv_params,
+      output_data);
 }
 
 TEST(TransposeConvTest, SimpleTestQuantized16x8PerChannel) {
