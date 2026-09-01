@@ -10,6 +10,9 @@ name: ns-cmsis-nn RC Canary
 #     without editing ext_libs/helia.inc on a throwaway branch.
 #
 # How the override reaches the build:
+#   helia_test.yml validates the ref (^[A-Za-z0-9._/-]+$, no leading `-`) before
+#   anything consumes it -- it lands in a cache key and in a `git checkout`
+#   argument, so it is validated there rather than here, covering every caller.
 #   ext_libs/helia.inc declares `NS_CMSIS_NN_COMMIT ?= <pin>` and exports it;
 #   ext_libs/ns_cmsis_nn_download.sh clones AmbiqAI/ns-cmsis-nn and checks out
 #   that value. `?=` yields to an environment variable, so helia_test.yml only

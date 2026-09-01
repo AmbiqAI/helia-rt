@@ -106,6 +106,28 @@ jobs:
       - name: Mark workspace as safe for Git
         run: git config --global --add safe.directory "*"
 
+      # Validate the ns-cmsis-nn override BEFORE anything consumes it. This
+      # runs here rather than in ns_cmsis_nn_canary.yml so every caller of this
+      # reusable workflow is covered, and it runs before the cache step because
+      # the value is part of the cache key -- a comma or newline would corrupt
+      # the key before a later check could reject it. The value also reaches
+      # `git checkout` inside ext_libs/ns_cmsis_nn_download.sh, so restrict it
+      # to the characters a SHA, tag, or branch name actually needs and
+      # exclude anything that could start an option.
+      - name: Validate ns-cmsis-nn ref
+        if: ${{ inputs.ns-cmsis-nn-ref != '' }}
+        env:
+          NS_CMSIS_NN_REF: ${{ inputs.ns-cmsis-nn-ref }}
+        run: |
+          case "${NS_CMSIS_NN_REF}" in
+            -*) echo "::error ::ns-cmsis-nn-ref must not begin with '-'"; exit 1 ;;
+          esac
+          if ! printf '%s' "${NS_CMSIS_NN_REF}" | grep -qE '^[A-Za-z0-9._/-]+$'; then
+            echo "::error ::ns-cmsis-nn-ref must match ^[A-Za-z0-9._/-]+$"
+            exit 1
+          fi
+          echo "ns-cmsis-nn ref accepted: ${NS_CMSIS_NN_REF}"
+
       - name: Cache third-party downloads
         uses: actions/cache@v6
         with:

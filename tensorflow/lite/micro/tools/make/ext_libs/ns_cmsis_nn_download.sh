@@ -36,7 +36,7 @@ TENSORFLOW_ROOT=${2}
 source ${TENSORFLOW_ROOT}tensorflow/lite/micro/tools/make/bash_helpers.sh
 
 DOWNLOADS_DIR=${1}
-DOWNLOADED_NS_CMSIS_NN_PATH=${DOWNLOADS_DIR}/ns_cmsis_nn
+DOWNLOADED_NS_CMSIS_NN_PATH="${DOWNLOADS_DIR}/ns_cmsis_nn"
 
 # AmbiqAI/ns-cmsis-nn is a public repository, so it clones anonymously over
 # https and needs no credential. Never put a token in this URL: git echoes the
@@ -85,13 +85,20 @@ NS_CMSIS_NN_URL="https://github.com/AmbiqAI/ns-cmsis-nn.git"
 # Default tracks AmbiqAI/ns-cmsis-nn tag v7.29.2. Keep in sync with
 # NS_CMSIS_NN_COMMIT in ext_libs/helia.inc, which is what make actually passes;
 # this fallback only applies when the script is run directly.
+#
+# Quote every use of GIT_COMMIT below. It is no longer only a literal from
+# helia.inc: ns_cmsis_nn_canary.yml routes a workflow_dispatch string into
+# NS_CMSIS_NN_COMMIT, so an unquoted expansion would let a crafted ref split
+# into extra argv words for `git checkout` (option injection, not shell
+# injection -- there is no eval here). The canary also validates the input
+# against ^[A-Za-z0-9._/-]+$ before it gets this far; this is the second layer.
 GIT_COMMIT=${NS_CMSIS_NN_COMMIT:-631726420b04860a5c4236956a3741ff5a96bd7f}
 
 # clone_ns_cmsis_nn: attempt git clone and surface a clear error on failure.
 clone_ns_cmsis_nn() {
   local dest="${1}"
   if git -c url."${NS_CMSIS_NN_URL}".insteadOf="${NS_CMSIS_NN_URL}" \
-         clone ${NS_CMSIS_NN_URL} "${dest}" >&2 2>&1; then
+         clone "${NS_CMSIS_NN_URL}" "${dest}" >&2 2>&1; then
     return 0
   fi
   cat >&2 <<'EOF'
@@ -134,20 +141,20 @@ EOF
   exit 1
 }
 
-should_download=$(check_should_download ${DOWNLOADS_DIR})
+should_download=$(check_should_download "${DOWNLOADS_DIR}")
 
 if [[ ${should_download} == "no" ]]; then
-  show_download_url_md5 ${NS_CMSIS_NN_URL} ${GIT_COMMIT}
-elif [ ! -d ${DOWNLOADS_DIR} ]; then
+  show_download_url_md5 "${NS_CMSIS_NN_URL}" "${GIT_COMMIT}"
+elif [ ! -d "${DOWNLOADS_DIR}" ]; then
   echo "The top-level downloads directory: ${DOWNLOADS_DIR} does not exist."
   exit 1
-elif [ -d ${DOWNLOADED_NS_CMSIS_NN_PATH} ]; then
+elif [ -d "${DOWNLOADED_NS_CMSIS_NN_PATH}" ]; then
   if [[ "${TFLM_FORCE_REDOWNLOAD:-0}" == "1" ]]; then
     echo >&2 "TFLM_FORCE_REDOWNLOAD set, re-downloading ns-cmsis-nn."
-    rm -rf ${DOWNLOADED_NS_CMSIS_NN_PATH}
-    clone_ns_cmsis_nn ${DOWNLOADED_NS_CMSIS_NN_PATH}
-    pushd ${DOWNLOADED_NS_CMSIS_NN_PATH} > /dev/null
-    git checkout ${GIT_COMMIT} >&2
+    rm -rf "${DOWNLOADED_NS_CMSIS_NN_PATH}"
+    clone_ns_cmsis_nn "${DOWNLOADED_NS_CMSIS_NN_PATH}"
+    pushd "${DOWNLOADED_NS_CMSIS_NN_PATH}" > /dev/null
+    git checkout "${GIT_COMMIT}" >&2
     popd > /dev/null
   else
     # Check that the existing clone is at the right commit. Only trust the
@@ -155,7 +162,7 @@ elif [ -d ${DOWNLOADED_NS_CMSIS_NN_PATH} ]; then
     # inside the stale local clone would compare against the stale ref and
     # could keep an outdated tree (branches move; tags can be re-cut).
     # Non-SHA pins always redownload, matching the historical behavior.
-    pushd ${DOWNLOADED_NS_CMSIS_NN_PATH} > /dev/null
+    pushd "${DOWNLOADED_NS_CMSIS_NN_PATH}" > /dev/null
     CURRENT_COMMIT=$(git rev-parse HEAD)
     if [[ "${GIT_COMMIT}" =~ ^[0-9a-f]{40}$ ]]; then
       EXPECTED_COMMIT=$(git rev-parse --verify "${GIT_COMMIT}^{commit}" 2>/dev/null || true)
@@ -168,18 +175,18 @@ elif [ -d ${DOWNLOADED_NS_CMSIS_NN_PATH} ]; then
       echo >&2 "ns-cmsis-nn is already at ${GIT_COMMIT}, skipping download."
     else
       echo >&2 "ns-cmsis-nn is at ${CURRENT_COMMIT} but expected ${GIT_COMMIT}, redownloading."
-      rm -rf ${DOWNLOADED_NS_CMSIS_NN_PATH}
-      clone_ns_cmsis_nn ${DOWNLOADED_NS_CMSIS_NN_PATH}
-      pushd ${DOWNLOADED_NS_CMSIS_NN_PATH} > /dev/null
-      git checkout ${GIT_COMMIT} >&2
+      rm -rf "${DOWNLOADED_NS_CMSIS_NN_PATH}"
+      clone_ns_cmsis_nn "${DOWNLOADED_NS_CMSIS_NN_PATH}"
+      pushd "${DOWNLOADED_NS_CMSIS_NN_PATH}" > /dev/null
+      git checkout "${GIT_COMMIT}" >&2
       popd > /dev/null
     fi
   fi
 
 else
-  clone_ns_cmsis_nn ${DOWNLOADED_NS_CMSIS_NN_PATH}
-  pushd ${DOWNLOADED_NS_CMSIS_NN_PATH} > /dev/null
-  git checkout ${GIT_COMMIT} >&2
+  clone_ns_cmsis_nn "${DOWNLOADED_NS_CMSIS_NN_PATH}"
+  pushd "${DOWNLOADED_NS_CMSIS_NN_PATH}" > /dev/null
+  git checkout "${GIT_COMMIT}" >&2
   popd > /dev/null
 fi
 
