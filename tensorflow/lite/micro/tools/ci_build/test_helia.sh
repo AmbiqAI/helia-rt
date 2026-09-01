@@ -228,9 +228,19 @@ for OPTIMIZE_KERNELS_FOR in "${variants[@]}"; do
     readable_run make -j"${JOBS}" "${ARGS[@]}" test_integration_tests_nnaed_leaky_relu_test
     readable_run make -j"${JOBS}" "${ARGS[@]}" test_integration_tests_nnaed_fully_connected_test
 
-    # Full suite
+    # Full suite.
+    #
+    # -k (keep-going): report every failing test binary instead of stopping at
+    # the first one. Without it make aborts the whole stream at the first
+    # non-zero exit, so a known-failing test silently prevents every later test
+    # binary from running at all -- in run 33515504619 a red activation test
+    # stopped the suite before the LSTM and elementwise tests were ever
+    # invoked, and their results were indistinguishable from "passed" in the
+    # log. -k does not change the leg's verdict: make still exits non-zero if
+    # anything failed, so the job is still red. It only makes the failure set
+    # complete.
     mapfile -t ARGS2 < <(build_args_with_opts "${OPTIMIZE_KERNELS_FOR}")
-    readable_run make "${ARGS2[@]}" test
+    readable_run make -k "${ARGS2[@]}" test
   else
     echo ">>> Skipping tests for ${OPTIMIZE_KERNELS_FOR} (build-only mode)."
   fi

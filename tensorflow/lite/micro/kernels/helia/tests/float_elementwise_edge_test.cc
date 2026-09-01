@@ -36,12 +36,23 @@ limitations under the License.
 // clamps a raw infinity to the finite bound. Only the NaN-producing cases are
 // implementation-independent.
 //
-// Expected result on the gcc and ATfE CI legs: these can PASS on ns-cmsis-nn
-// v7.29.2, because those libraries are compiled -O3 without fast-math and NaN
-// semantics survive. That is the intended outcome. They are the standing guard
-// for the armclang path, where fast-math on the float C translation units
-// (helia-rt#228) is what makes ns#333 observable, and for any future backend
-// or flag change.
+// Expected result on the current pin: the float32 cases FAIL on every gcc leg,
+// and the failure has nothing to do with fast-math. At ns-cmsis-nn 631726420b
+// the activation clamp drops NaN by compare-select ordering, on both paths:
+//   * MVE: arm_elementwise_add_f32.c / _mul_f32.c clamp via arm_nn_clamp_mve_f32
+//     = vmaxnmq then vminnmq. Those implement IEEE-754 maxNum/minNum, which
+//     return the NON-NaN operand, so NaN becomes out_activation_min (-FLT_MAX).
+//   * Scalar: the same files' `#else` path uses CLAMP(v, max, min), and
+//     CLAMP(x,h,l) is MAX(MIN(x,h),l) with MIN(A,B) = ((A)<(B)?(A):(B)). Since
+//     `NaN < h` is false, MIN returns h, so NaN becomes +FLT_MAX.
+// With kTfLiteActNone the bounds are +/-FLT_MAX, so a NaN operand comes back as
+// a finite +/-FLT_MAX rather than NaN. This is plain compare ordering, present
+// in every shipped library on every toolchain -- not the armclang-only
+// exposure that helia-rt#228 describes.
+//
+// The float16 path is asymmetric: the float16 scalar clamp orders its compares
+// correctly and DOES preserve NaN, so Add/MulFloat16PropagatesNan is expected
+// to pass on a scalar float16 build.
 //
 // SUB is not covered: kernels/helia/sub.cc has no float dispatch into
 // heliaCORE (float32 SUB runs the TFLM reference and there is no float16 SUB),

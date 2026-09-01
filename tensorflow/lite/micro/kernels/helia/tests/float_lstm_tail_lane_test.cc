@@ -36,11 +36,27 @@ limitations under the License.
 // tolerance comparison. Every gate row (input, recurrent and bias) is
 // identical across the 10 hidden lanes and the initial state is zero, so all
 // 10 lanes are mathematically the same number. A conforming kernel must
-// therefore emit 10 bit-identical values per (batch, time step). No tolerance
-// has to be chosen, and no legitimate rounding, FMA-contraction or
-// reduction-order difference can break the invariant: a failure means two
-// different approximations were applied inside one tensor, which is exactly
-// the ns#315 signature.
+// therefore emit 10 numerically equal values per (batch, time step), and no
+// tolerance has to be chosen.
+//
+// The strength of that claim differs by precision, so read the two cases
+// differently:
+//
+//   * float16 (the ns#315 detector). The body and the tail run genuinely
+//     different math -- LUT256 vs a Pade rational -- so the divergence is a
+//     property of the implementation, not of the input. It cannot be explained
+//     away by rounding or fusion.
+//
+//   * float32 (a weaker consistency check). arm_nn_lstm_step_f32 has the same
+//     MVE-body/scalar-tail split, but both halves interpolate the SAME LUT.
+//     The body uses explicit vfmaq while the tail writes `y0 + (y1-y0)*frac`,
+//     whose fusion is an -ffp-contract decision, so a 1-ULP body-vs-tail
+//     difference is permitted in principle. The specific operating points this
+//     test drives were checked to give identical results with and without
+//     fusion, so exact equality holds here -- but it holds by numerical
+//     circumstance at these inputs, not by construction. If this test ever goes
+//     red on float32 after a weight or shape change, suspect FMA contraction
+//     before concluding ns#315.
 //
 // A second, deliberately loose golden comparison against a double-precision
 // reference LSTM guards against the degenerate case where every lane is
@@ -84,6 +100,16 @@ constexpr int kNumTensors = 24 + 1;
 // Largest tensor in the node is the recurrent weight matrix (10 x 10). Only
 // the float16 case needs side storage for the converted payload.
 constexpr int kMaxTensorElements = kStateDimension * kStateDimension;
+// The output tensor is the other candidate for largest, and it grows with
+// batch and time while kMaxTensorElements does not. Without this guard,
+// raising kTimeSteps or kBatchSize would silently overflow one row of the
+// float16 conversion buffer into the next.
+static_assert(kBatchSize * kTimeSteps * kStateDimension <= kMaxTensorElements,
+              "float16 conversion storage row is too small for the output "
+              "tensor; raise kMaxTensorElements");
+static_assert(kInputElements <= kMaxTensorElements,
+              "float16 conversion storage row is too small for the input "
+              "tensor; raise kMaxTensorElements");
 #endif  // ARM_NN_ENABLE_F16
 
 constexpr double kCellClip = 6.0;
@@ -284,8 +310,9 @@ TEST(HeliaFloatLstmTailLaneTest, Float32TailLanesMatchVectorLanes) {
   const float* output = contents.GetOutputData();
 
   // Invariant: the kStateDimension lanes of one (batch, time step) are the
-  // same number, so they must be bit-identical. Lanes 8..9 are the scalar
-  // tail; lanes 0..7 are the vector body.
+  // same number, so they must compare equal. Lanes 8..9 are the scalar tail;
+  // lanes 0..7 are the vector body. (== rather than a bit comparison: +0.0 and
+  // -0.0 compare equal, which is the behavior we want here.)
   for (int b = 0; b < tflite::testing::kBatchSize; ++b) {
     for (int t = 0; t < tflite::testing::kTimeSteps; ++t) {
       const float* lane =
@@ -378,7 +405,9 @@ TEST(HeliaFloatLstmTailLaneTest, Float16TailLanesMatchVectorLanes) {
   // ns#315: lanes 0..7 (MVE body) and lanes 8..9 (scalar tail) of the same
   // gate tensor must not be computed by different tanh approximations. All
   // lanes are mathematically identical here, so any difference at all is the
-  // defect. No tolerance is involved.
+  // defect. No tolerance is involved. Unlike the float32 case above, this is
+  // not sensitive to FMA contraction: the two halves evaluate different
+  // functions (LUT256 vs the Pade rational), not the same function two ways.
   for (int b = 0; b < tflite::testing::kBatchSize; ++b) {
     for (int t = 0; t < tflite::testing::kTimeSteps; ++t) {
       const float16_t* lane =
