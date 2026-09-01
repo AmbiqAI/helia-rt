@@ -171,19 +171,28 @@ ifeq ($(TOOLCHAIN), armclang)
   #
   # POSITION IS THE WHOLE POINT -- do not move these to CCFLAGS/CXXFLAGS.
   # armclang resolves conflicting floating-point options last-flag-wins, and
-  # every compile recipe emits `$(CC) $(CCFLAGS) $(<X>_OPTIMIZATION_LEVEL)`
-  # (Makefile:574-618), so anything in CCFLAGS/CXXFLAGS is overridden by the
-  # `-Ofast` that follows it. Measured on armclang 6.24, cortex-m55:
+  # the object-file pattern rules in this Makefile all emit
+  #
+  #   $(CC/CXX) $(CC/CXXFLAGS) $(<X>_OPTIMIZATION_LEVEL) $(INCLUDES) -c
+  #
+  # (`grep -F '_OPTIMIZATION_LEVEL) $(INCLUDES)'` finds all 12 of them -- -F
+  # because the pattern contains `$(`; no absolute line numbers here on
+  # purpose, an earlier revision of this comment cited a range and it had
+  # already rotted by the end of the same change). So anything
+  # in CCFLAGS/CXXFLAGS is overridden by the `-Ofast` that follows it.
+  # `$(INCLUDES)` trails the optimization level but is `-I` search paths only,
+  # so it cannot affect floating-point option resolution. Measured on armclang
+  # 6.24, cortex-m55:
   #
   #   -ffp-mode=full -Ofast  ->  __FINITE_MATH_ONLY__ 1, `x != x` folds to
   #                              `movs r0, #0`   (fast-math WINS)
   #   -Ofast -ffp-mode=full  ->  __FINITE_MATH_ONLY__ 0, real `vcmp.f32`
   #
-  # These variables are the last flags on every C and C++ compile line, which
-  # is why the fix belongs here and covers both languages at once (issue #228;
-  # the earlier CXXFLAGS-only attempt was inert for the same ordering reason).
-  # The `-Werror=nan-infinity-disabled` assertion further down is what stops
-  # this silently regressing.
+  # These variables carry the last optimization / floating-point-mode flags on
+  # every C and C++ compile line, which is why the fix belongs here and covers
+  # both languages at once (issue #228; the earlier CXXFLAGS-only attempt was
+  # inert for the same ordering reason). The `-Werror=nan-infinity-disabled`
+  # assertion further down is what stops this silently regressing.
   CORE_OPTIMIZATION_LEVEL := -Ofast -ffp-mode=full
   KERNEL_OPTIMIZATION_LEVEL := -Ofast -ffp-mode=full
   THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := -Ofast -ffp-mode=full
