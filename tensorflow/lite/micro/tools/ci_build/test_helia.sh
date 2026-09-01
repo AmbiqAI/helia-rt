@@ -206,6 +206,21 @@ for OPTIMIZE_KERNELS_FOR in "${variants[@]}"; do
   mapfile -t ARGS < <(build_args_with_opts "${OPTIMIZE_KERNELS_FOR}")
   readable_run make -j"${JOBS}" "${ARGS[@]}" build
 
+  # ---- FP symbol link-probe (issue #227) -------------------------------------
+  # Runs on every leg, right after the library exists and before the test
+  # binaries. It links a generated program against the archive that references
+  # every ns-cmsis-nn float entry point the helia kernels call, so a missing,
+  # renamed, or itself-unresolvable FP symbol fails here even on the legs whose
+  # executed FP coverage is still thin. Cheap (one compile + one link) and
+  # needs no FVP, which is why it can be unconditional.
+  GENDIR="$(make "${ARGS[@]}" list_gendir 2>/dev/null | tail -1)"
+  readable_run tensorflow/lite/micro/tools/ci_build/fp_symbol_link_probe.sh \
+    --lib "${GENDIR}lib/libtensorflow-microlite.a" \
+    --arch "${TARGET_ARCH}" \
+    --toolchain "${TOOLCHAIN}" \
+    --target "${TARGET}" \
+    --label "${TARGET_ARCH}-${TOOLCHAIN}-${OPTIMIZE_KERNELS_FOR}"
+
   if [[ "${RUN_TESTS}" -eq 1 ]]; then
     # Individual tests (keep as-is; fast failures, clearer logs)
     readable_run make -j"${JOBS}" "${ARGS[@]}" test_integration_tests_nnaed_conv_test

@@ -1,0 +1,69 @@
+name: ns-cmsis-nn RC Canary
+
+# Runs the full heliaRT test matrix against an arbitrary ns-cmsis-nn ref
+# instead of the repository pin (issue #227 item 4).
+#
+# What it is for:
+#   - Validating a heliaCORE / ns-cmsis-nn release candidate BEFORE the pin
+#     bump lands, so the bump PR arrives with evidence rather than hope.
+#   - Reproducing a suspected upstream regression against a specific commit
+#     without editing ext_libs/helia.inc on a throwaway branch.
+#
+# What a GREEN run proves -- and, until #229 merges, what it does NOT:
+#   This matrix builds every leg against the RC ref, runs the FP symbol
+#   link-probe, and runs the existing test suite. Today that suite is
+#   integer-only (the FP kernels compile but no test executes them), so a green
+#   canary proves the RC's FP entry points RESOLVE and its integer kernels
+#   COMPUTE -- it does NOT prove FP16/FP32 kernels compute correctly. Executed
+#   FP coverage arrives with #229 (the FP kernel tests); this matrix picks it up
+#   automatically once it lands. Until then, do not read a green canary as
+#   "FP validated" when clearing a v7.30.x bump -- it is necessary, not
+#   sufficient.
+#
+# How the override reaches the build:
+#   helia_test.yml validates the ref (^[A-Za-z0-9._/-]+$, no leading `-`) before
+#   anything consumes it -- it lands in a cache key and in a `git checkout`
+#   argument, so it is validated there rather than here, covering every caller.
+#   ext_libs/helia.inc declares `NS_CMSIS_NN_COMMIT ?= <pin>` and exports it;
+#   ext_libs/ns_cmsis_nn_download.sh clones AmbiqAI/ns-cmsis-nn and checks out
+#   that value. `?=` yields to an environment variable, so helia_test.yml only
+#   has to export NS_CMSIS_NN_COMMIT for the whole matrix to move. The download
+#   script accepts a full SHA, a tag, or a branch; anything that is not a full
+#   40-hex SHA is always re-cloned rather than trusted against a stale local
+#   checkout, so tags and branches resolve correctly here.
+#
+# Deliberately `workflow_dispatch` only. A scheduled canary is a reasonable
+# follow-up -- it would catch heliaCORE main regressions between RCs -- but
+# recurring CI work needs explicit owner sign-off before it is added, so it is
+# noted here rather than enabled.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ns_cmsis_nn_ref:
+        description: "ns-cmsis-nn commit SHA, tag (e.g. v7.30.1) or branch to build against"
+        required: true
+        # Current repository pin: AmbiqAI/ns-cmsis-nn v7.29.2. Dispatching with
+        # the default is a no-op control run that should match the normal
+        # matrix; keep this in step with ext_libs/helia.inc.
+        default: "631726420b04860a5c4236956a3741ff5a96bd7f"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ns-cmsis-nn-canary-${{ inputs.ns_cmsis_nn_ref }}
+  cancel-in-progress: false
+
+jobs:
+  canary:
+    # Forks do not have the Arm license secret and do not gate our releases.
+    if: ${{ github.repository == 'AmbiqAI/helia-rt' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/helia_test.yml
+    with:
+      trigger-sha: ${{ github.sha }}
+      ns-cmsis-nn-ref: ${{ inputs.ns_cmsis_nn_ref }}
+    secrets:
+      ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
