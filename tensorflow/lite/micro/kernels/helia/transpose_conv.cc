@@ -137,11 +137,22 @@ TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteNode* node,
     if (input->type == kTfLiteInt16) {
       TFLITE_DCHECK(filter->type == kTfLiteInt8);
       TFLITE_DCHECK(output->type == kTfLiteInt16);
-      if (bias->type == kTfLiteInt16) {
-        TFLITE_DCHECK(
+      // bias is optional for TRANSPOSE_CONV: a legal 3-input int16 model
+      // omits it and AllocateTempInputTensor() returns nullptr for it, so the
+      // type read below has to be guarded. Eval and the dealloc path below
+      // already guard it; only Prepare did not.
+      if (bias != nullptr && bias->type == kTfLiteInt16) {
+        // Checked outside TFLITE_DCHECK: the request is made either way (the
+        // macro only elides the assert, not the condition it wraps), but in
+        // release builds its failure status is dropped. A failed request
+        // returns before writing the index, leaving
+        // bias_converted_buffer_index unwritten for Eval to index the scratch
+        // handle array with.
+        TF_LITE_ENSURE_OK(
+            context,
             context->RequestScratchBufferInArena(
                 context, GetTensorShape(bias).FlatSize() * sizeof(std::int64_t),
-                &(data->bias_converted_buffer_index)) == kTfLiteOk);
+                &(data->bias_converted_buffer_index)));
       }
     }
 
@@ -205,6 +216,10 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
 
   data->weight_buffer_idx = -1;
   data->weight_sum_buf = nullptr;
+  // Sentinels, so that a path that never requests a scratch buffer (e.g. the
+  // float paths) cannot leave an index holding uninitialized memory.
+  data->scratch_buffer_index = -1;
+  data->scratch_buffer_output_index = -1;
 
 
   // Get height and width of the output.
@@ -278,7 +293,16 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
           const int32_t* bias_data = GetTensorData<const int32_t>(bias);
 
           int32_t lhs_offset = conv_params.input_offset;
-          arm_convolve_weight_sum((int32_t*)data->weight_sum_buf, filter_data,&input_dims, &filter_dims, &output_dims, lhs_offset,  bias_data);
+          const arm_cmsis_nn_status weight_sum_status =
+              arm_convolve_weight_sum((int32_t*)data->weight_sum_buf,
+                                      filter_data, &input_dims, &filter_dims,
+                                      &output_dims, lhs_offset, bias_data);
+          if (weight_sum_status != ARM_CMSIS_NN_SUCCESS) {
+            MicroPrintf(
+                "TRANSPOSE_CONV: arm_convolve_weight_sum failed (%d).",
+                static_cast<int>(weight_sum_status));
+            return kTfLiteError;
+          }
         }
 #else
         (void)bias;
@@ -294,28 +318,46 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
 
 
 
-    const size_t buf_size = arm_transpose_conv_s8_get_buffer_size(
+    // Any *_get_buffer_size() may return a negative value (negative dims or an
+    // int32 overflow in the size computation), so keep the result signed and
+    // reject it here -- assigning to size_t would turn -1 into SIZE_MAX. Same
+    // idiom as conv.cc / depthwise_conv.cc / pooling.cc.
+    const int32_t buf_size = arm_transpose_conv_s8_get_buffer_size(
         &conv_params, &input_dims, &filter_dims, &output_dims);
-    TFLITE_DCHECK(context->RequestScratchBufferInArena(
-                      context, buf_size, &(data->scratch_buffer_index)) ==
-                  kTfLiteOk);
+    TF_LITE_ENSURE_MSG(context, buf_size >= 0,
+                       "TRANSPOSE_CONV: invalid scratch buffer size.");
+    // Requested unconditionally, unlike the `if (size > 0)` guard used by
+    // conv.cc / pooling.cc. arm_transpose_conv_wrapper_s8() rejects a NULL
+    // ctx->buf up front, unconditionally, and the reverse-conv sizer below
+    // genuinely returns 0 whenever reverse-conv is unused (stride > 2 or
+    // input_c <= 16, which is the common case), so that buffer would be a
+    // skipped request on most models and the kernel would then reject the
+    // call. Zero-byte requests are safe: the arena records them and the
+    // planner still assigns an offset, so GetScratchBuffer() returns non-NULL.
+    // Kept on both requests so the two stay symmetrical.
+    TF_LITE_ENSURE_OK(context,
+                      context->RequestScratchBufferInArena(
+                          context, buf_size, &(data->scratch_buffer_index)));
 
     // Quantized 8-bit kernels use a second scratch buffer for reversing the
     // filter for certain configurations.
-    const size_t reverse_buf_size =
+    const int32_t reverse_buf_size =
         arm_transpose_conv_s8_get_reverse_conv_buffer_size(
             &conv_params, &input_dims, &filter_dims);
-    TFLITE_DCHECK(context->RequestScratchBufferInArena(
-                      context, reverse_buf_size,
-                      &(data->scratch_buffer_output_index)) == kTfLiteOk);
+    TF_LITE_ENSURE_MSG(context, reverse_buf_size >= 0,
+                       "TRANSPOSE_CONV: invalid reverse scratch buffer size.");
+    TF_LITE_ENSURE_OK(context, context->RequestScratchBufferInArena(
+                                   context, reverse_buf_size,
+                                   &(data->scratch_buffer_output_index)));
   }
   // Quantized 16x8 kernels use an int64 scratch buffer.
   if (input->type == kTfLiteInt16) {
     TFLITE_DCHECK(context->RequestScratchBufferInArena != nullptr);
-    TFLITE_DCHECK(context->RequestScratchBufferInArena(
-                      context,
-                      GetTensorShape(output).FlatSize() * sizeof(std::int64_t),
-                      &(data->scratch_buffer_index)) == kTfLiteOk);
+    TF_LITE_ENSURE_OK(
+        context,
+        context->RequestScratchBufferInArena(
+            context, GetTensorShape(output).FlatSize() * sizeof(std::int64_t),
+            &(data->scratch_buffer_index)));
   }
 
   // All per-channel quantized tensors need valid zero point and scale arrays.
@@ -432,15 +474,20 @@ TfLiteStatus EvalQuantizedPerChannel(TfLiteContext* context, TfLiteNode* node,
   output_dims.w = output_shape.Dims(2);
   output_dims.c = output_depth;
 
-  cmsis_nn_context ctx;
-  ctx.size = 0;  // Note: ctx.size is currently not used in cmsis_nn.
-  ctx.buf = context->GetScratchBuffer(context, data.scratch_buffer_index);
+  // GetScratchBuffer() indexes an array without bounds checking, so it must
+  // never be called with the -1 sentinel. Prepare requests both buffers on the
+  // int8 path, so these guards are belt-and-braces; a NULL buf is reported by
+  // the kernel's own argument check below rather than read out of bounds here.
+  cmsis_nn_context ctx = {nullptr, 0};
+  if (data.scratch_buffer_index >= 0) {
+    ctx.buf = context->GetScratchBuffer(context, data.scratch_buffer_index);
+  }
 
-  cmsis_nn_context scratch_output_ctx;
-  scratch_output_ctx.size =
-      0;  // Note: ctx.size is currently not used in cmsis_nn.
-  scratch_output_ctx.buf =
-      context->GetScratchBuffer(context, data.scratch_buffer_output_index);
+  cmsis_nn_context scratch_output_ctx = {nullptr, 0};
+  if (data.scratch_buffer_output_index >= 0) {
+    scratch_output_ctx.buf =
+        context->GetScratchBuffer(context, data.scratch_buffer_output_index);
+  }
 
 
   cmsis_nn_context weight_sum_ctx;
@@ -454,23 +501,35 @@ TfLiteStatus EvalQuantizedPerChannel(TfLiteContext* context, TfLiteNode* node,
     if (data.weight_buffer_idx > -1) {
       weight_sum_ctx.buf = context->GetScratchBuffer(context, data.weight_buffer_idx);
       //now need to redo the weight sum because we didn't precompute
-      arm_convolve_weight_sum((int32_t*)weight_sum_ctx.buf, 
-                              tflite::micro::GetTensorData<const int8_t>(filter),
-                              &input_dims, &filter_dims,
-                              &output_dims, conv_params.input_offset, 
-                              tflite::micro::GetOptionalTensorData<const int32_t>(bias));
+      // Status checked: on MVE a failure here leaves the weight-sum buffer
+      // unwritten and arm_transpose_conv_wrapper_s8() would then compute over
+      // it and still report success.
+      const arm_cmsis_nn_status weight_sum_status = arm_convolve_weight_sum(
+          (int32_t*)weight_sum_ctx.buf,
+          tflite::micro::GetTensorData<const int8_t>(filter), &input_dims,
+          &filter_dims, &output_dims, conv_params.input_offset,
+          tflite::micro::GetOptionalTensorData<const int32_t>(bias));
+      if (weight_sum_status != ARM_CMSIS_NN_SUCCESS) {
+        MicroPrintf("TRANSPOSE_CONV: arm_convolve_weight_sum failed (%d).",
+                    static_cast<int>(weight_sum_status));
+        return kTfLiteError;
+      }
     }
   }
 
-  TFLITE_DCHECK_EQ(
-      arm_transpose_conv_wrapper_s8(
-          &ctx, &weight_sum_ctx, &scratch_output_ctx, 
-          &conv_params, &quant_params, &input_dims,
-          tflite::micro::GetTensorData<int8_t>(input), &filter_dims,
-          tflite::micro::GetTensorData<int8_t>(filter), &bias_dims,
-          tflite::micro::GetOptionalTensorData<int32_t>(bias), &output_dims,
-          tflite::micro::GetTensorData<int8_t>(output)),
-      ARM_CMSIS_NN_SUCCESS);
+  // TFLITE_DCHECK_EQ() still evaluates the call in release builds but drops
+  // the status, so a kernel rejection used to be silent.
+  const arm_cmsis_nn_status status = arm_transpose_conv_wrapper_s8(
+      &ctx, &weight_sum_ctx, &scratch_output_ctx, &conv_params, &quant_params,
+      &input_dims, tflite::micro::GetTensorData<int8_t>(input), &filter_dims,
+      tflite::micro::GetTensorData<int8_t>(filter), &bias_dims,
+      tflite::micro::GetOptionalTensorData<int32_t>(bias), &output_dims,
+      tflite::micro::GetTensorData<int8_t>(output));
+  if (status != ARM_CMSIS_NN_SUCCESS) {
+    MicroPrintf("TRANSPOSE_CONV: arm_transpose_conv_wrapper_s8 failed (%d).",
+                static_cast<int>(status));
+    return kTfLiteError;
+  }
 
   return kTfLiteOk;
 }

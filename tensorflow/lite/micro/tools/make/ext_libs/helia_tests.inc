@@ -8,4 +8,6 @@
 # not provide). Keeping these tests under kernels/helia/tests/ avoids
 # patching the upstream test files for purely additive coverage.
 MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
-  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/hard_swish_int16_test.cc
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/hard_swish_int16_test.cc \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/quantize_zero_point_test.cc \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/transpose_conv_optional_bias_test.cc

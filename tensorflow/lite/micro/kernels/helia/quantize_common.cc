@@ -85,6 +85,43 @@ TfLiteStatus PrepareQuantizeReference(TfLiteContext* context,
                        &data->requantize_output_shift);
   }
 
+  // heliaCORE's arm_quantize_f32_s8()/arm_quantize_f32_s16() reject an
+  // out-of-range zero_point at run time (ARG_ERROR, and no output written).
+  // The exact range they enforce is not part of the public contract of the
+  // pinned version, so rather than duplicate their validation this checks only
+  // the invariant TFLite itself guarantees: a quantized tensor's zero_point
+  // must be representable in that tensor's element type. That is a superset of
+  // any narrower kernel rule, so it cannot reject a model the kernel would
+  // have accepted, and it surfaces the failure at AllocateTensors() instead of
+  // mid-Invoke. The Eval-side status check stays authoritative.
+  int32_t zero_point_min = std::numeric_limits<int32_t>::min();
+  int32_t zero_point_max = std::numeric_limits<int32_t>::max();
+  switch (output->type) {
+    case kTfLiteInt8:
+      zero_point_min = std::numeric_limits<int8_t>::min();
+      zero_point_max = std::numeric_limits<int8_t>::max();
+      break;
+    case kTfLiteInt16:
+      zero_point_min = std::numeric_limits<int16_t>::min();
+      zero_point_max = std::numeric_limits<int16_t>::max();
+      break;
+    case kTfLiteUInt8:
+      zero_point_min = std::numeric_limits<uint8_t>::min();
+      zero_point_max = std::numeric_limits<uint8_t>::max();
+      break;
+    default:
+      break;
+  }
+  if (output->params.zero_point < zero_point_min ||
+      output->params.zero_point > zero_point_max) {
+    MicroPrintf("Quantize: output zero_point %d is out of range for %s.",
+                static_cast<int>(output->params.zero_point),
+                TfLiteTypeGetName(output->type));
+    micro_context->DeallocateTempTfLiteTensor(input);
+    micro_context->DeallocateTempTfLiteTensor(output);
+    return kTfLiteError;
+  }
+
   data->quantization_params.zero_point = output->params.zero_point;
   data->quantization_params.scale = static_cast<double>(output->params.scale);
 
@@ -104,24 +141,42 @@ TfLiteStatus EvalQuantizeReference(TfLiteContext* context, TfLiteNode* node) {
 
   if (input->type == kTfLiteFloat32) {
     switch (output->type) {
-      case kTfLiteInt8:
-        arm_quantize_f32_s8(
+      case kTfLiteInt8: {
+        // An ARG_ERROR here (out-of-range zero_point) means the kernel wrote
+        // no output at all, so the status must not be discarded.
+        const arm_cmsis_nn_status status = arm_quantize_f32_s8(
           tflite::micro::GetTensorData<float>(input),
           tflite::micro::GetTensorData<int8_t>(output),
           ElementCount(*input->dims),
           data->quantization_params.zero_point,
           data->quantization_params.scale
         );
+        if (status != ARM_CMSIS_NN_SUCCESS) {
+          MicroPrintf(
+              "Quantize: arm_quantize_f32_s8 failed (%d) for zero_point %d.",
+              static_cast<int>(status),
+              static_cast<int>(data->quantization_params.zero_point));
+          return kTfLiteError;
+        }
         break;
-      case kTfLiteInt16:
-        arm_quantize_f32_s16(
+      }
+      case kTfLiteInt16: {
+        const arm_cmsis_nn_status status = arm_quantize_f32_s16(
           tflite::micro::GetTensorData<float>(input),
           tflite::micro::GetTensorData<int16_t>(output),
           ElementCount(*input->dims),
           data->quantization_params.zero_point,
           data->quantization_params.scale
         );
+        if (status != ARM_CMSIS_NN_SUCCESS) {
+          MicroPrintf(
+              "Quantize: arm_quantize_f32_s16 failed (%d) for zero_point %d.",
+              static_cast<int>(status),
+              static_cast<int>(data->quantization_params.zero_point));
+          return kTfLiteError;
+        }
         break;
+      }
       default:
         MicroPrintf("Input %s, output %s not supported.",
                     TfLiteTypeGetName(input->type),
@@ -161,8 +216,8 @@ TfLiteStatus EvalQuantizeReference(TfLiteContext* context, TfLiteNode* node) {
             data->input_zero_point, data->quantization_params.zero_point,
             tflite::micro::GetTensorData<int8_t>(output));
         break;
-      case kTfLiteInt16:
-        arm_requantize_s16_s16(
+      case kTfLiteInt16: {
+        const arm_cmsis_nn_status status = arm_requantize_s16_s16(
           tflite::micro::GetTensorData<int16_t>(input),
           tflite::micro::GetTensorData<int16_t>(output),
           size,
@@ -171,7 +226,15 @@ TfLiteStatus EvalQuantizeReference(TfLiteContext* context, TfLiteNode* node) {
           data->input_zero_point,
           data->quantization_params.zero_point
         );
+        if (status != ARM_CMSIS_NN_SUCCESS) {
+          MicroPrintf(
+              "Quantize: arm_requantize_s16_s16 failed (%d) for zero_point %d.",
+              static_cast<int>(status),
+              static_cast<int>(data->quantization_params.zero_point));
+          return kTfLiteError;
+        }
         break;
+      }
       case kTfLiteInt32:
         reference_ops::Requantize(
             tflite::micro::GetTensorData<int16_t>(input), size,
@@ -190,8 +253,8 @@ TfLiteStatus EvalQuantizeReference(TfLiteContext* context, TfLiteNode* node) {
     // have different scales and/or zero points.
     size_t size = ElementCount(*input->dims);
     switch (output->type) {
-      case kTfLiteInt8:
-        arm_requantize_s8_s8(
+      case kTfLiteInt8: {
+        const arm_cmsis_nn_status status = arm_requantize_s8_s8(
           tflite::micro::GetTensorData<int8_t>(input),
           tflite::micro::GetTensorData<int8_t>(output),
           size,
@@ -200,7 +263,15 @@ TfLiteStatus EvalQuantizeReference(TfLiteContext* context, TfLiteNode* node) {
           data->input_zero_point,
           data->quantization_params.zero_point
         );
+        if (status != ARM_CMSIS_NN_SUCCESS) {
+          MicroPrintf(
+              "Quantize: arm_requantize_s8_s8 failed (%d) for zero_point %d.",
+              static_cast<int>(status),
+              static_cast<int>(data->quantization_params.zero_point));
+          return kTfLiteError;
+        }
         break;
+      }
       case kTfLiteUInt8:
         reference_ops::Requantize(
             tflite::micro::GetTensorData<int8_t>(input), size,
