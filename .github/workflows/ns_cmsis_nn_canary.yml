@@ -9,6 +9,17 @@ name: ns-cmsis-nn RC Canary
 #   - Reproducing a suspected upstream regression against a specific commit
 #     without editing ext_libs/helia.inc on a throwaway branch.
 #
+# What a GREEN run proves -- and, until #229 merges, what it does NOT:
+#   This matrix builds every leg against the RC ref, runs the FP symbol
+#   link-probe, and runs the existing test suite. Today that suite is
+#   integer-only (the FP kernels compile but no test executes them), so a green
+#   canary proves the RC's FP entry points RESOLVE and its integer kernels
+#   COMPUTE -- it does NOT prove FP16/FP32 kernels compute correctly. Executed
+#   FP coverage arrives with #229 (the FP kernel tests); this matrix picks it up
+#   automatically once it lands. Until then, do not read a green canary as
+#   "FP validated" when clearing a v7.30.x bump -- it is necessary, not
+#   sufficient.
+#
 # How the override reaches the build:
 #   helia_test.yml validates the ref (^[A-Za-z0-9._/-]+$, no leading `-`) before
 #   anything consumes it -- it lands in a cache key and in a `git checkout`

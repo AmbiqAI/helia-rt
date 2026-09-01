@@ -12,6 +12,18 @@ name: heliaRT Release
 #     deliberately NOT duplicated here -- the probe is the release-side guard
 #     this workflow adds, chosen because it needs no FVP and so keeps release
 #     wall-clock effectively unchanged.
+#
+# PRE-TAG GATE for the first release that runs this workflow (1.19.0): the
+# armclang legs of the "FP symbol link-probe" step have never executed in CI --
+# the PR test matrix is gcc/ATfE only, so 1.19.0 is the first time armlink runs
+# the probe. It was verified locally on Arm Compiler 6.24 against real armclang
+# archives (link clean, no `-lm` reaches armlink -- MICROLITE_LIBS is empty for
+# armclang; the probe queries it from make rather than hardcoding `-lm`). Before
+# tagging 1.19.0, confirm the 6 armclang legs (cm4+fp/cm55 x debug/release/
+# release_with_logs) go green here on the CI-pinned Arm Compiler, or run the
+# probe manually against one real armclang `.a`. Treat a first-run armclang
+# probe failure as "verify the probe's link environment", not "block the
+# release", until that leg has one green run on record.
 
 on:
   workflow_call:
