@@ -82,13 +82,22 @@ done
 # micro_test_v2.h: "[==========] %d tests ran."
 # Matched with grep -oE rather than an anchored sed so that FVP/UART output
 # that prefixes or wraps the line still parses. Take the last occurrence.
-executed="$(grep -oE '\[==========\] [0-9]+ tests ran' "${LOG_FILE}" \
+#
+# -a (--text) is load-bearing, not defensive. Some tests emit raw bytes into
+# the captured log -- micro_log_test deliberately prints badly-formed format
+# strings -- and GNU grep then classifies the whole file as binary. With -o
+# that suppresses the matched text entirely: grep writes "binary file matches"
+# to stderr, exits 0, and prints NOTHING on stdout. The count would come back
+# empty and this guard would fail a binary that ran its cases perfectly well.
+# The pass-string check in test_with_arm_corstone_300.sh does not hit this
+# because grep -q only needs the exit status.
+executed="$(grep -aoE '\[==========\] [0-9]+ tests ran' "${LOG_FILE}" \
             | tail -n 1 | grep -oE '[0-9]+' || true)"
 
 if [[ -z "${executed}" ]]; then
   # micro_test.h (v1): "%d/%d tests passed" -- passed/total. The total is the
   # executed count.
-  executed="$(grep -oE '[0-9]+/[0-9]+ tests passed' "${LOG_FILE}" \
+  executed="$(grep -aoE '[0-9]+/[0-9]+ tests passed' "${LOG_FILE}" \
               | tail -n 1 | cut -d/ -f2 | grep -oE '[0-9]+' || true)"
 fi
 
