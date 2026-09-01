@@ -1,5 +1,18 @@
 name: heliaRT Release
 
+# Floating-point gating on this workflow, stated plainly so nobody reads more
+# assurance into a green run than it carries (issue #227):
+#
+#   * NOW: every leg links an FP symbol probe against the artifact it is about
+#     to publish (the "FP symbol link-probe" step below). That proves the
+#     floating-point entry points helia calls RESOLVE in the shipped library,
+#     for all three toolchains. It does NOT prove they compute correctly.
+#   * NEXT: executed FP16/FP32 kernel tests on FVP for the gcc legs arrive
+#     with the FP test PR tracked by issue #227 item 1. The test matrix is
+#     deliberately NOT duplicated here -- the probe is the release-side guard
+#     this workflow adds, chosen because it needs no FVP and so keeps release
+#     wall-clock effectively unchanged.
+
 on:
   workflow_call:
     inputs:
@@ -114,6 +127,26 @@ jobs:
             -o "${OUTDIR}"
           echo "Produced files:"
           find "${OUTDIR}" -maxdepth 3 -type f -print
+
+      # Release gate, not a test: this links a generated program against the
+      # artifact that is about to be published, referencing every ns-cmsis-nn
+      # floating-point entry point the helia kernels call. Until now the only
+      # FP check on the release path was build_helia.sh asserting that a few
+      # object files are PRESENT in the archive, which says nothing about
+      # whether their symbols resolve. Runs for every toolchain including
+      # armclang and ATfE, and costs one compile plus one link per leg.
+      - name: FP symbol link-probe (release artifact)
+        run: |
+          set -euo pipefail
+          OUTDIR="${GITHUB_WORKSPACE}/out/${{ matrix.arch }}/${{ matrix.toolchain }}/${{ matrix.build }}"
+          libs=("${OUTDIR}"/lib/*.a)
+          test -f "${libs[0]}"
+          tensorflow/lite/micro/tools/ci_build/fp_symbol_link_probe.sh \
+            --lib "${libs[0]}" \
+            --arch "${{ matrix.arch }}" \
+            --toolchain "${{ matrix.toolchain }}" \
+            --target cortex_m_generic \
+            --label "release-${{ matrix.arch }}-${{ matrix.toolchain }}-${{ matrix.build }}"
 
       - name: Upload build combo
         uses: actions/upload-artifact@v7
