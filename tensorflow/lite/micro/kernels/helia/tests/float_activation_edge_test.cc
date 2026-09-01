@@ -38,10 +38,12 @@ limitations under the License.
 //       used vmaxnmq/vminnmq, which are IEEE maxNum/minNum and return the
 //       non-NaN operand. Both are plain compare ordering, so this happened at
 //       every optimization level on every toolchain, NOT only under fast-math.
-//       That is a real defect (ns#333/#334) and it IS fixed: ns#380/#384
-//       reclassify NaN on the integer bit pattern, which survives -Ofast.
+//       That is a real defect (ns#333/#334) and it IS fixed: ns#380
+//       reclassifies NaN on the integer bit pattern, which survives -Ofast.
 //       Those assertions stay as true contract assertions and go green on the
-//       pin bump.
+//       pin bump. (ns#384 is a follow-up that scopes the NaN promise in the
+//       docs and headers and adds the -Ofast probe test; it is not the
+//       bit-pattern change itself.)
 //
 //   (b) TANH and LOGISTIC do not promise NaN propagation on the vectorized
 //       path, by design. ns-cmsis-nn documents this in
@@ -55,12 +57,13 @@ limitations under the License.
 //       than paid for."
 //
 //       Verified across ns-cmsis-nn 631726420b (our pin, v7.29.2), tag v7.30.0
-//       and origin/main (which carries ns#380 + ns#384): the tanh and sigmoid
-//       helpers are byte-identical between v7.30.0 and main, and ns#380/#384
-//       touch only the elementwise clamp helpers and the f16 RELU/RELU6 legs.
+//       and origin/main: Include/Internal/arm_nn_activation_flt.h is
+//       byte-identical between v7.30.0 and main, so the tanh and sigmoid
+//       helpers did not move. ns#380 touches only the elementwise clamp
+//       helpers and the f16 RELU/RELU6 legs.
 //       ns#382 tracks RELU/RELU6/LEAKY_RELU -- a different function family; it
 //       does not mention TANH or SIGMOID. So this behavior is NOT going to
-//       change in v7.30.1.
+//       change in the release that carries ns#380.
 //
 // The tests below therefore split by path, because the behavior genuinely
 // splits by path. Asserting NaN propagation where upstream declines to provide

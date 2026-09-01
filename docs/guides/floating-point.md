@@ -115,7 +115,7 @@ differs by target, so it is stated here per case rather than as a single rule.
 | `TANH` | ±Inf | ±1 | ±1 |
 | `LOGISTIC` | NaN, all targets | Finite, at the upper saturation bound (1) | NaN |
 | `LOGISTIC` | +Inf / −Inf | 1 / 0 | 1 / 0 |
-| `ADD`, `MUL` | NaN | NaN, from ns-cmsis-nn **v7.30.1** onward; a finite activation bound before that | NaN |
+| `ADD`, `MUL` | NaN | NaN, from the first ns-cmsis-nn release containing PR 380 (not yet cut); a finite activation bound before that | NaN |
 
 Notes and version boundary:
 
@@ -127,11 +127,13 @@ Notes and version boundary:
   body. This is not scheduled to change; ns-cmsis-nn issue 382 tracks NaN
   behavior for `RELU`/`RELU6`/`LEAKY_RELU`, a different function family, and
   does not cover `TANH` or `LOGISTIC`.
-- **`ADD` and `MUL` are a fixed defect.** Before v7.30.1 the output activation
-  clamp discarded NaN through compare-select ordering, returning an activation
-  bound instead. ns-cmsis-nn PRs 380 and 384 reclassify NaN on the integer bit
-  pattern, which holds at every optimization level. heliaRT gains this when its
-  pin moves to v7.30.1; the currently pinned v7.29.2 does not have it.
+- **`ADD` and `MUL` are a fixed defect.** In the currently pinned v7.29.2 the
+  output activation clamp discards NaN through compare-select ordering,
+  returning an activation bound instead. ns-cmsis-nn PR 380 reclassifies NaN on
+  the integer bit pattern, which holds at every optimization level. That fix is
+  merged upstream but **not yet in any tagged release** -- the latest is v7.30.0
+  (2026-08-30), which predates it. heliaRT gains the fixed behavior when its pin
+  moves to the first release that contains PR 380.
 - **The FP32 fallback softens this in practice.** Where an operator has a TFLM
   reference implementation, HELIA falls back to it when the optimized kernel
   declines the configuration, and the reference implementation propagates NaN

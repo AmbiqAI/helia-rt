@@ -21,9 +21,13 @@ limitations under the License.
 // ns-cmsis-nn v7.29.2 the two halves do not use the same tanh approximation:
 // the MVE body uses a lookup-table tanh and the scalar tail uses a rational
 // approximation, so lanes 0..7 and lanes 8..9 of the *same* gate tensor are
-// computed by different math. The divergence observed on that pin is ~2.3e-2
-// in half precision on the same input (0x3B3D == 0.654785 from one path,
-// 0x3B6D == 0.678223 from the other).
+// computed by different math. ns#315 reports a divergence of ~2.3e-2 in half
+// precision on the same input: 0x3B3D == 0.90478515625 from one path against
+// 0x3B6D == 0.92822265625 from the other. That reported figure is not this
+// fixture's own measurement -- the worst divergence this test has observed is
+// 1.10e-3 (CI run 33518826216), because it drives different operating points.
+// Same defect, different magnitude; do not quote 2.3e-2 as something this
+// test measured.
 //
 // The existing shared coverage cannot see this. The float16 case in
 // kernels/unidirectional_sequence_lstm_test.cc uses state_dimension == 2,
@@ -216,10 +220,10 @@ constexpr float kFloat32LaneTolerance = 1e-5f;
 // activations and the heliaCORE tanh/logistic table error accumulate a few
 // ULP, and the shipped shared float16 LSTM test already documents deviations
 // up to 2.7e-2 for its (much more aggressive) weights. 3e-2 therefore stays
-// clear of false failures. It is deliberately LOOSER than the ~2.3e-2 ns#315
-// divergence: the tolerance-free lane-uniformity assertion below is what
-// catches that defect, so this check does not need to, and overloading it
-// would make it flaky.
+// clear of false failures. It is deliberately LOOSER than the ~2.3e-2
+// divergence ns#315 reports: the tolerance-free lane-uniformity assertion
+// below is what catches that defect, so this check does not need to, and
+// overloading it would make it flaky.
 constexpr float kFloat16GoldenTolerance = 3e-2f;
 #endif  // ARM_NN_ENABLE_F16
 
