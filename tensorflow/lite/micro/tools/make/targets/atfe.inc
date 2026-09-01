@@ -34,13 +34,30 @@
 # values for TOOLCHAIN=atfe).
 
 # ATfE clang shares armclang's diagnostic for inf/nan use under fast-math
-# options; demote to a warning to keep -Werror builds green.
+# options.
+#
+# Status of these two lines, stated accurately because the old wording ("keep
+# -Werror builds green") was wrong and the same wrong assumption is what hid
+# issue #228: NO global `-Werror` is set anywhere in this build -- not in
+# tools/make/Makefile, not in any targets/*.inc -- so `-Wno-error=` currently
+# downgrades nothing and these are no-ops. They are kept as forward
+# compatibility for a build that does enable `-Werror`, and because ATfE's
+# optimization levels (CORE=-Os, KERNEL=-O2, THIRD_PARTY_KERNEL=-O2 -- see the
+# note above) carry no `-ffast-math`, so if this diagnostic ever fires under
+# ATfE it means something different than it does under armclang.
+#
+# Contrast with armclang, which DOES use `-Ofast`: tools/make/Makefile
+# deliberately does the opposite there and promotes this exact diagnostic with
+# `-Werror=nan-infinity-disabled`, because under `-Ofast` it is a precise
+# oracle for fast-math having been re-enabled by accident (issue #228).
 CXXFLAGS += -Wno-error=nan-infinity-disabled
 CCFLAGS  += -Wno-error=nan-infinity-disabled
 
 # ns-cmsis-nn (and other GCC-targeted upstream sources) use GCC-only
-# attributes such as __attribute__((optimize(...))). Clang ignores these
-# but -Werror promotes the warning. Keep it a warning under ATfE.
+# attributes such as __attribute__((optimize(...))). Clang ignores these and
+# warns. Same status as the pair above: no global `-Werror` is set today, so
+# this is a no-op kept for forward compatibility rather than something
+# currently holding the build green.
 CXXFLAGS += -Wno-error=unknown-attributes
 CCFLAGS  += -Wno-error=unknown-attributes
 
