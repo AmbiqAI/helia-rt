@@ -243,14 +243,46 @@ esac
 # finding: stop there, because the remaining variants only bury the useful line
 # under their own noise.
 #
-# Both halves of that test matter. Matching "undefined reference" alone is not
-# enough -- variant 1 legitimately reports undefined libc stubs (`_sbrk`,
-# `_exit`, ...) on some toolchain/target pairings, and treating that as
-# conclusive would abort the fallback chain and misreport an environmental
-# problem as a library defect. So the diagnostic must also name a symbol the
-# probe actually asked for.
+# Deciding that requires the UNDEFINED symbol specifically, not "this line
+# mentions one of our names somewhere". Two distinct traps:
+#
+#   * "undefined reference" alone is not enough -- the fallback variants
+#     legitimately report undefined libc stubs (`_sbrk`, `_exit`, ...) on some
+#     toolchain/target pairings. Treating that as conclusive would abort the
+#     fallback chain and misreport an environment problem as a library defect.
+#   * armlink's message also names the REFERRING object, and ns-cmsis-nn
+#     members are named after the very symbols we probe. So
+#         Error: L6218E: Undefined symbol __missing_libc_helper
+#                        (referred from arm_softmax_f32.o).
+#     mentions "arm_softmax_f32" on the wrong half of the line. Matching the
+#     whole message -- by substring or word boundary -- cannot tell the two
+#     halves apart.
+#
+# So: extract the undefined symbol NAME from each diagnostic, then test exact
+# membership in the probe list. `undef_symbols` handles the three linkers we
+# use (GNU ld, LLD, armlink) and stops at the symbol token, which discards
+# armlink's "(referred from ...)" tail.
 UNDEF_RE='undefined (reference|symbol)|L6218E'
-SYMBOL_RE="$(IFS='|'; printf '\\b(%s)\\b' "${SYMBOLS[*]}")"
+
+undef_symbols() {  # $1 = link log -> undefined symbol names, one per line
+  sed -E -n \
+    -e "s/.*undefined reference to \`([A-Za-z0-9_.]+)'.*/\1/p" \
+    -e "s/.*[Uu]ndefined symbol:?[[:space:]]+([A-Za-z0-9_.]+).*/\1/p" \
+    "$1" | sort -u
+}
+
+# Which of the probe's OWN symbols does this log report as undefined?
+missing_probe_symbols() {  # $1 = link log
+  local sym want
+  while IFS= read -r sym; do
+    for want in "${SYMBOLS[@]}"; do
+      if [[ "${sym}" == "${want}" ]]; then
+        printf '%s\n' "${sym}"
+        break
+      fi
+    done
+  done < <(undef_symbols "$1")
+}
 
 PROBE_ELF="${WORKDIR}/fp_link_probe.elf"
 link_ok=0
@@ -267,7 +299,8 @@ for variant in "${LINK_VARIANTS[@]}"; do
     link_ok=1
     break
   fi
-  if grep -E "${UNDEF_RE}" "${log}" | grep -qE "${SYMBOL_RE}"; then
+  mapfile -t MISSING < <(missing_probe_symbols "${log}")
+  if [[ "${#MISSING[@]}" -gt 0 ]]; then
     conclusive="${log}"
     break
   fi
@@ -278,8 +311,10 @@ if [[ "${link_ok}" -ne 1 ]]; then
   if [[ -n "${conclusive}" ]]; then
     echo "fp-probe: the linker could not resolve FP entry points that helia" >&2
     echo "fp-probe: calls -- a real defect in the library, not a probe" >&2
-    echo "fp-probe: configuration issue:" >&2
-    grep -E "${UNDEF_RE}" "${conclusive}" | grep -E "${SYMBOL_RE}" >&2
+    echo "fp-probe: configuration issue. Unresolved probe symbols:" >&2
+    printf 'fp-probe:   %s\n' "${MISSING[@]}" >&2
+    echo "fp-probe: linker diagnostics:" >&2
+    grep -E "${UNDEF_RE}" "${conclusive}" >&2
     echo "fp-probe: full log: ${conclusive}" >&2
   else
     echo "fp-probe: every link variant failed WITHOUT naming any probed FP" >&2
