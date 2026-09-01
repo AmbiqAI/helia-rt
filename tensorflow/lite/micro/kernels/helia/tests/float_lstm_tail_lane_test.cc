@@ -18,11 +18,15 @@ limitations under the License.
 // Why this test exists (AmbiqAI/helia-rt#227, AmbiqAI/ns-cmsis-nn#315):
 // heliaCORE's `arm_nn_lstm_step_f16` vectorises the gate activations over the
 // hidden dimension with MVE and finishes the remainder with a scalar tail. In
-// ns-cmsis-nn v7.29.2 the two halves do not use the same tanh approximation:
-// the MVE body uses a lookup-table tanh and the scalar tail uses a rational
-// approximation, so lanes 0..7 and lanes 8..9 of the *same* gate tensor are
-// computed by different math. ns#315 reports a divergence of ~2.3e-2 in half
-// precision on the same input: 0x3B3D == 0.90478515625 from one path against
+// ns-cmsis-nn v7.29.2 the two halves did not use the same tanh approximation:
+// the MVE body used a lookup-table tanh and the scalar tail a rational
+// approximation, so lanes 0..7 and lanes 8..9 of the *same* gate tensor were
+// computed by different math. ns#324 makes the tail use the same LUT tanh as
+// the body; it first shipped in v7.30.0 and is present in the current v7.31.0
+// pin, so this test is expected GREEN.
+//
+// ns#315 reports a divergence of ~2.3e-2 in half precision on the same
+// input: 0x3B3D == 0.90478515625 from one path against
 // 0x3B6D == 0.92822265625 from the other. That reported figure is not this
 // fixture's own measurement -- the worst divergence this test has observed is
 // 1.10e-3 (CI run 33518826216), because it drives different operating points.

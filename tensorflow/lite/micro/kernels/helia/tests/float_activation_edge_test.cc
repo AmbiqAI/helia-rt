@@ -40,10 +40,11 @@ limitations under the License.
 //       every optimization level on every toolchain, NOT only under fast-math.
 //       That is a real defect (ns#333/#334) and it IS fixed: ns#380
 //       reclassifies NaN on the integer bit pattern, which survives -Ofast.
-//       Those assertions stay as true contract assertions and go green on the
-//       pin bump. (ns#384 is a follow-up that scopes the NaN promise in the
-//       docs and headers and adds the -Ofast probe test; it is not the
-//       bit-pattern change itself.)
+//       ns#380 first shipped in ns-cmsis-nn v7.31.0, which is the pin this
+//       file is now built against, so those assertions are true contract
+//       assertions and are expected GREEN. (ns#384 is a follow-up that scopes
+//       the NaN promise in the docs and headers and adds the -Ofast probe
+//       test; it is not the bit-pattern change itself.)
 //
 //   (b) TANH and LOGISTIC do not promise NaN propagation on the vectorized
 //       path, by design. ns-cmsis-nn documents this in
@@ -56,14 +57,15 @@ limitations under the License.
 //       supported input to these kernels, so the divergence is accepted rather
 //       than paid for."
 //
-//       Verified across ns-cmsis-nn 631726420b (our pin, v7.29.2), tag v7.30.0
-//       and origin/main: Include/Internal/arm_nn_activation_flt.h is
-//       byte-identical between v7.30.0 and main, so the tanh and sigmoid
-//       helpers did not move. ns#380 touches only the elementwise clamp
-//       helpers and the f16 RELU/RELU6 legs.
-//       ns#382 tracks RELU/RELU6/LEAKY_RELU -- a different function family; it
-//       does not mention TANH or SIGMOID. So this behavior is NOT going to
-//       change in the release that carries ns#380.
+//       Re-verified at ns-cmsis-nn v7.31.0 (9884d5fccab8), the current pin.
+//       ns#382 was closed by ns#388, which restored NaN propagation for
+//       RELU/RELU6/LEAKY_RELU/HARDSWISH by adding integer-domain
+//       arm_nn_*_propagate_nan_* helpers. That PR states explicitly that
+//       SIGMOID, TANH and HARDSWISH are outside the contract it establishes,
+//       and it does not touch the TANH or SIGMOID code paths at all. ns#380
+//       touches only the elementwise clamp helpers and the f16 RELU/RELU6
+//       legs. So the tanh/sigmoid behavior below is unchanged at v7.31.0 and
+//       these remain characterization cases, not contract cases.
 //
 // The tests below therefore split by path, because the behavior genuinely
 // splits by path. Asserting NaN propagation where upstream declines to provide
@@ -71,16 +73,20 @@ limitations under the License.
 // be fixed would be an inverted version of the same mistake.
 //
 //   TANH float32, scalar leg (cortex-m3, cortex-m4+fp)   -> NaN propagates.
-//       CONTRACT. Already passes at our pin, and v7.30.0 makes it explicit
-//       with an `if (ax != ax) return x + 0.0f;` guard. Note that guard is
+//       CONTRACT. arm_nn_tanh_scalar_ref_f32 carries an explicit
+//       `if (ax != ax) return x + 0.0f;` guard, still present at v7.31.0
+//       (Include/Internal/arm_nn_activation_flt.h). The NaN is returned before
+//       the table-index conversion is reached. Note that guard is
 //       deleted by -ffinite-math-only; helia builds ns-cmsis-nn at -O3 for gcc
 //       and ATfE (tools/make/Makefile), so it survives on every leg this
 //       repository tests. The armclang legs use -Ofast (helia-rt#228) and are
 //       outside that contract -- they are not part of helia_test.yml.
 //   TANH float32/float16, MVE leg (cortex-m55)           -> saturation bound.
-//       CHARACTERIZATION. Documented, deliberate, unchanged in v7.30.x.
-//   LOGISTIC float32/float16, both legs                  -> saturation bound.
-//       CHARACTERIZATION. The sigmoid helpers route through
+//       CHARACTERIZATION. Documented, deliberate, unchanged at v7.31.0.
+//   LOGISTIC float32/float16                             -> saturation bound.
+//       CHARACTERIZATION. There is no MVE sigmoid helper for either precision
+//       -- LOGISTIC is always the scalar path, which is why this row does not
+//       split by leg the way TANH does. The sigmoid helpers route through
 //       arm_nn_softmax_exp_lut_f32, whose input clamp flushes NaN to +80 on
 //       purpose; at origin/main that flush carries a comment explaining that
 //       the min-then-max order is load-bearing and reproduces the
@@ -88,7 +94,7 @@ limitations under the License.
 //
 // The characterization cases assert the behavior CLASS (finite, correct sign,
 // at the saturation bound) rather than a literal constant, because the literal
-// moved between our pin and v7.30.0: ns#303 widened the float32 tanh table
+// moved between v7.29.2 and v7.30.0: ns#303 widened the float32 tanh table
 // from |x| <= 4 to |x| <= 6, so the float32 MVE NaN result moves from
 // -tanh(4) = -0.99932930 to -tanh(6) = -0.9999877 (0xbf7fff32) with no change
 // in contract. Each case logs the value it observed, so the CI record carries
@@ -339,8 +345,9 @@ TEST(HeliaFloatActivationEdgeTest, LogisticFloat32NanBehavior) {
                                  tflite::testing::kNonFiniteCount);
 
 #if HELIA_TEST_OPTIMIZED_F32
-  // CHARACTERIZATION on both legs: the sigmoid helper's exp input clamp
-  // flushes NaN to +80 on purpose, on scalar and MVE alike.
+  // CHARACTERIZATION: there is no MVE sigmoid helper, so this is the scalar
+  // path on every target. Its exp input clamp flushes NaN to +80 on purpose,
+  // giving sigmoid(80) == 1. Unchanged at v7.31.0 (ns#388 excludes SIGMOID).
   tflite::testing::ExpectLogisticNanCharacterized(output[0], "f32");
 #else
   EXPECT_TRUE(std::isnan(output[0]));
@@ -415,7 +422,7 @@ TEST(HeliaFloatActivationEdgeTest, TanhFloat16NanBehavior) {
 #if HELIA_TEST_MVE_FLOAT
   // CHARACTERIZATION: arm_nn_vtanh_lut_direct_mve_f16 has the same
   // vminnmq/vnegq_m structure as the float32 MVE helper. The float16 table
-  // window stayed at |x| <= 4 in v7.30.0, so the expected magnitude is
+  // window is still |x| <= 4 at v7.31.0, so the expected magnitude is
   // tanh(4) rather than the float32 path's tanh(6).
   tflite::testing::ExpectTanhNanCharacterized(
       static_cast<float>(output[0]), "f16/MVE");
@@ -442,8 +449,9 @@ TEST(HeliaFloatActivationEdgeTest, LogisticFloat16NanBehavior) {
                                  kTfLiteFloat16, input, output,
                                  tflite::testing::kNonFiniteCount);
 
-  // CHARACTERIZATION on both legs, same reason as float32: the float16 sigmoid
-  // routes through arm_nn_softmax_exp_scalar_f16, whose clamp flushes NaN.
+  // CHARACTERIZATION, same reason as float32: there is no MVE float16 sigmoid
+  // either, so this is always arm_nn_sigmoid_scalar_f16, which routes through
+  // arm_nn_softmax_exp_scalar_f16, whose clamp flushes NaN.
   tflite::testing::ExpectLogisticNanCharacterized(
       static_cast<float>(output[0]), "f16");
 

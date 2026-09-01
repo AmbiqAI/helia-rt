@@ -50,12 +50,13 @@ limitations under the License.
 // in every shipped library on every toolchain -- not the armclang-only
 // exposure that helia-rt#228 describes.
 //
-// The float16 path is asymmetric: the float16 scalar clamp orders its compares
-// correctly and DOES preserve NaN, so Add/MulFloat16PropagatesNan is expected
-// to pass on a scalar float16 build. On cortex-m55 gcc the MVE float16 clamp
-// is selected instead (arm_elementwise_add_f16.c:53 picks
-// arm_nn_clamp_mve_f16; only the #else at :70 is scalar), so it fails there
-// too on the current pin.
+// The float16 path was asymmetric before the fix: the float16 scalar clamp
+// orders its compares correctly and DOES preserve NaN, so
+// Add/MulFloat16PropagatesNan passed on a scalar float16 build. On cortex-m55
+// gcc the MVE float16 clamp is selected instead (arm_elementwise_add_f16.c:53
+// picks arm_nn_clamp_mve_f16; only the #else at :70 is scalar), so it failed
+// there on v7.30.0 and earlier. ns#380 fixes the MVE leg too, and first
+// shipped in v7.31.0 -- the current pin -- so both legs are expected green.
 //
 // These stay TRUE CONTRACT assertions, unlike the tanh/logistic NaN cases in
 // float_activation_edge_test.cc. ns#380 (merged) reclassifies NaN on the
