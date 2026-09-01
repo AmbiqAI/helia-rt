@@ -49,6 +49,14 @@ if [[ ${2} != "non_test_binary" ]]
 then
   if grep -q "$PASS_STRING" ${MICRO_LOG_FILENAME}
   then
+    # helia-rt (issue #231): both micro-test frameworks print the pass string
+    # whenever the FAILURE count is zero, which includes the case where the
+    # EXECUTED count is also zero. Require a positive executed-case count
+    # before calling this a pass, so an empty test registry fails the leg
+    # instead of going green.
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    "${SCRIPT_DIR}/assert_tests_executed.sh" \
+      "${MICRO_LOG_FILENAME}" "${BINARY_TO_TEST}"
     echo "$BINARY_TO_TEST: PASS"
     exit 0
   else

@@ -222,6 +222,16 @@ for OPTIMIZE_KERNELS_FOR in "${variants[@]}"; do
     --label "${TARGET_ARCH}-${TOOLCHAIN}-${OPTIMIZE_KERNELS_FOR}"
 
   if [[ "${RUN_TESTS}" -eq 1 ]]; then
+    # ---- executed-case tally (issue #231) ------------------------------------
+    # testing/assert_tests_executed.sh fails any individual binary that
+    # executes 0 test cases. This file collects what each binary actually ran
+    # so the leg can also report -- and optionally floor-check -- its total.
+    # That catches the other half of the failure mode: binaries silently
+    # dropping out of the suite entirely, which no per-binary check can see.
+    HELIA_TEST_TALLY_FILE="$(mktemp)"
+    export HELIA_TEST_TALLY_FILE
+    : > "${HELIA_TEST_TALLY_FILE}"
+
     # Individual tests (keep as-is; fast failures, clearer logs)
     readable_run make -j"${JOBS}" "${ARGS[@]}" test_integration_tests_nnaed_conv_test
     readable_run make -j"${JOBS}" "${ARGS[@]}" test_integration_tests_nnaed_pad_test
@@ -267,6 +277,41 @@ for OPTIMIZE_KERNELS_FOR in "${variants[@]}"; do
       echo "ERROR: helia test suite failed (make exit ${suite_status})" >&2
       exit "${suite_status}"
     fi
+    # ---- per-leg executed-case floor (issue #231) ----------------------------
+    # Zero is always a failure: a leg that ran no test binary, or whose
+    # binaries collectively executed no case, is not a passing leg however
+    # green make looked. HELIA_MIN_TEST_BINARIES / HELIA_MIN_EXECUTED_CASES
+    # are optional and unset by default -- set them in the workflow to pin a
+    # real floor once CI has reported the actual per-leg numbers. They are
+    # deliberately not hard-coded here: a guessed floor is either useless or
+    # a false alarm waiting to happen.
+    tally_binaries="$(wc -l < "${HELIA_TEST_TALLY_FILE}" | tr -d '[:space:]')"
+    tally_cases="$(awk -F'\t' '{s += $2} END {print s + 0}' \
+                   "${HELIA_TEST_TALLY_FILE}")"
+    echo "==> executed-case tally for ${TARGET_ARCH}/${TOOLCHAIN}/${OPTIMIZE_KERNELS_FOR}:" \
+         "${tally_binaries} binaries, ${tally_cases} test cases"
+
+    if [[ "${tally_binaries}" -eq 0 || "${tally_cases}" -eq 0 ]]; then
+      echo "::error ::${TARGET_ARCH}/${TOOLCHAIN}/${OPTIMIZE_KERNELS_FOR}:" \
+           "the suite executed ${tally_cases} test cases across" \
+           "${tally_binaries} binaries. A green leg that ran nothing is a" \
+           "harness failure, not a pass (issue #231)."
+      exit 1
+    fi
+    if [[ -n "${HELIA_MIN_TEST_BINARIES:-}" \
+          && "${tally_binaries}" -lt "${HELIA_MIN_TEST_BINARIES}" ]]; then
+      echo "::error ::only ${tally_binaries} test binaries ran; floor is" \
+           "${HELIA_MIN_TEST_BINARIES} (HELIA_MIN_TEST_BINARIES)."
+      exit 1
+    fi
+    if [[ -n "${HELIA_MIN_EXECUTED_CASES:-}" \
+          && "${tally_cases}" -lt "${HELIA_MIN_EXECUTED_CASES}" ]]; then
+      echo "::error ::only ${tally_cases} test cases executed; floor is" \
+           "${HELIA_MIN_EXECUTED_CASES} (HELIA_MIN_EXECUTED_CASES)."
+      exit 1
+    fi
+    rm -f "${HELIA_TEST_TALLY_FILE}"
+    unset HELIA_TEST_TALLY_FILE
   else
     echo ">>> Skipping tests for ${OPTIMIZE_KERNELS_FOR} (build-only mode)."
   fi
