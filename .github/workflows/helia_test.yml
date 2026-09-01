@@ -119,13 +119,19 @@ jobs:
         env:
           NS_CMSIS_NN_REF: ${{ inputs.ns-cmsis-nn-ref }}
         run: |
+          # Whole-string test, deliberately not `grep -E '^...$'`: grep matches
+          # per LINE, so a value such as "main<newline>--upload-pack=evil"
+          # passes a line-anchored pattern while still carrying the newline
+          # into the cache key -- the exact case this step claims to reject.
+          # `case` globs match the entire word, newlines included.
           case "${NS_CMSIS_NN_REF}" in
-            -*) echo "::error ::ns-cmsis-nn-ref must not begin with '-'"; exit 1 ;;
+            -*)
+              echo "::error ::ns-cmsis-nn-ref must not begin with '-'"
+              exit 1 ;;
+            *[!A-Za-z0-9._/-]*)
+              echo "::error ::ns-cmsis-nn-ref must match ^[A-Za-z0-9._/-]+$ (whole string)"
+              exit 1 ;;
           esac
-          if ! printf '%s' "${NS_CMSIS_NN_REF}" | grep -qE '^[A-Za-z0-9._/-]+$'; then
-            echo "::error ::ns-cmsis-nn-ref must match ^[A-Za-z0-9._/-]+$"
-            exit 1
-          fi
           echo "ns-cmsis-nn ref accepted: ${NS_CMSIS_NN_REF}"
 
       - name: Cache third-party downloads
