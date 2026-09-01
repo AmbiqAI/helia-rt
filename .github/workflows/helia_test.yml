@@ -7,6 +7,15 @@ on:
       trigger-sha:
         required: true
         type: string
+      # Optional ns-cmsis-nn pin override. Empty (the default) means "use the
+      # pin in tensorflow/lite/micro/tools/make/ext_libs/helia.inc", which is
+      # what every normal caller wants. ns_cmsis_nn_canary.yml sets it to run
+      # this whole matrix against a heliaCORE release candidate.
+      ns-cmsis-nn-ref:
+        description: "ns-cmsis-nn commit/tag/branch to build against. Empty = repository pin."
+        required: false
+        type: string
+        default: ""
     secrets:
       ARM_UBL_LICENSE_IDENTIFIER:
         required: false
@@ -15,6 +24,10 @@ on:
     inputs:
       ref:
         description: "Git ref to build (branch, tag, or SHA). Leave empty to use the current commit."
+        required: false
+        default: ""
+      ns-cmsis-nn-ref:
+        description: "ns-cmsis-nn commit/tag/branch to build against. Empty = repository pin."
         required: false
         default: ""
 
@@ -97,7 +110,11 @@ jobs:
         uses: actions/cache@v6
         with:
           path: tensorflow/lite/micro/tools/make/downloads
-          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc','tensorflow/lite/micro/tools/make/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/helia.inc') }}
+          # The ns-cmsis-nn override is part of the key: the hashed files are
+          # identical under an override, so without this a canary run would
+          # restore (and then re-save) the pinned clone under the same key and
+          # churn the cache the normal matrix depends on.
+          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc','tensorflow/lite/micro/tools/make/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/helia.inc') }}${{ inputs.ns-cmsis-nn-ref && format('-nscnn-{0}', inputs.ns-cmsis-nn-ref) || '' }}
 
       # ccache is baked into the CI image (.devcontainer/Dockerfile), but
       # keep an apt-get fallback so this workflow still works when the pinned
@@ -140,11 +157,21 @@ jobs:
           CCACHE_COMPRESS: "true"
           CCACHE_COMPRESSLEVEL: "6"
           CCACHE_MAXSIZE: "2G"
+          NS_CMSIS_NN_REF: ${{ inputs.ns-cmsis-nn-ref }}
         run: |
           # Configure & zero stats before the build so the post-build
           # 'ccache -s' line shows only this run.
           ccache -o max_size=${CCACHE_MAXSIZE} || true
           ccache -z || true
+          # Only export NS_CMSIS_NN_COMMIT when an override was requested.
+          # ext_libs/helia.inc sets it with `?=`, and make treats an
+          # environment variable defined as the empty string as *defined* --
+          # so exporting an empty value would suppress the repository pin
+          # rather than fall back to it.
+          if [ -n "${NS_CMSIS_NN_REF}" ]; then
+            echo "==> ns-cmsis-nn pin OVERRIDDEN to ${NS_CMSIS_NN_REF}"
+            export NS_CMSIS_NN_COMMIT="${NS_CMSIS_NN_REF}"
+          fi
           /bin/sh -c "tensorflow/lite/micro/tools/ci_build/test_helia.sh \
           -a ${{ matrix.arch }} -t ${{ matrix.toolchain }} -O ${{ matrix.opt }}"
 
