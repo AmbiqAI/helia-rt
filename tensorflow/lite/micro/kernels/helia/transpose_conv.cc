@@ -240,9 +240,17 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     output_dims.w = output_shape.Dims(2);
     output_dims.c = output_depth;
 
-    cmsis_nn_transpose_conv_params conv_params;
+    cmsis_nn_transpose_conv_params conv_params = {};
     conv_params.stride.w = params->stride_width;
     conv_params.stride.h = params->stride_height;
+    // The SPEED-path weight-sum precompute below folds
+    // lhs_offset * sum(weights) into the buffer, so it needs the real input
+    // offset. data->params.input_offset is not derived until after
+    // CalculateOpData() runs, well below this point, and it lands in a
+    // different struct -- so reading conv_params.input_offset here without
+    // setting it fed stack garbage to arm_convolve_weight_sum(). Same source
+    // as the assignment further down and as the Eval path.
+    conv_params.input_offset = -input->params.zero_point;
 
     cmsis_nn_dims input_dims;
     input_dims.n = batch_size;
