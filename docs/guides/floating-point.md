@@ -96,6 +96,47 @@ parameters are supported by the optimized kernel.
 See [Operator Coverage](../reference/operator-coverage.md) for the available
 HELIA operator wrappers.
 
+## Non-finite inputs (NaN and infinities)
+
+The optimized floating-point kernels do not all treat NaN the way the TFLM
+reference kernels do. The behavior differs by operator, and for `TANH` it also
+differs by target, so it is stated here per case rather than as a single rule.
+
+!!! warning "NaN is not a supported input to the optimized activation kernels"
+    Feeding NaN to the optimized `TANH` or `LOGISTIC` kernels does not produce
+    NaN. It produces a finite value at the activation's saturation bound. If
+    your model can generate NaN and you rely on it propagating, do not use the
+    optimized float activation path for that operator.
+
+| Operator | Input | Optimized FP32/FP16 result | TFLM reference result |
+|---|---|---|---|
+| `TANH` | NaN, Armv8.1-M MVE targets (Cortex-M55) | Finite, negative, at the saturation bound | NaN |
+| `TANH` | NaN, non-MVE targets (Cortex-M4, Cortex-M3) | NaN | NaN |
+| `TANH` | ±Inf | ±1 | ±1 |
+| `LOGISTIC` | NaN, all targets | Finite, at the upper saturation bound (1) | NaN |
+| `LOGISTIC` | +Inf / −Inf | 1 / 0 | 1 / 0 |
+| `ADD`, `MUL` | NaN | NaN, from ns-cmsis-nn **v7.30.1** onward; a finite activation bound before that | NaN |
+
+Notes and version boundary:
+
+- **`TANH` and `LOGISTIC` are by design.** ns-cmsis-nn documents NaN as
+  unsupported input for these kernels: the vectorized `TANH` path uses
+  `vminnmq`, which is IEEE `minNum` and returns the numeric operand against a
+  quiet NaN, and the `LOGISTIC` path clamps its exponent input before
+  evaluation. Restoring NaN would cost a compare and select in the vector loop
+  body. This is not scheduled to change; ns-cmsis-nn issue 382 tracks NaN
+  behavior for `RELU`/`RELU6`/`LEAKY_RELU`, a different function family, and
+  does not cover `TANH` or `LOGISTIC`.
+- **`ADD` and `MUL` are a fixed defect.** Before v7.30.1 the output activation
+  clamp discarded NaN through compare-select ordering, returning an activation
+  bound instead. ns-cmsis-nn PRs 380 and 384 reclassify NaN on the integer bit
+  pattern, which holds at every optimization level. heliaRT gains this when its
+  pin moves to v7.30.1; the currently pinned v7.29.2 does not have it.
+- **The FP32 fallback softens this in practice.** Where an operator has a TFLM
+  reference implementation, HELIA falls back to it when the optimized kernel
+  declines the configuration, and the reference implementation propagates NaN
+  normally. FP16 has no reference fallback.
+
 ## Make builds
 
 The Make integration pins ns-cmsis-nn v7.29.2 and configures the float features

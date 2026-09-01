@@ -239,8 +239,34 @@ for OPTIMIZE_KERNELS_FOR in "${variants[@]}"; do
     # log. -k does not change the leg's verdict: make still exits non-zero if
     # anything failed, so the job is still red. It only makes the failure set
     # complete.
+    #
+    # The cost of -k is that failures are now scattered through a ~12,700-line
+    # log instead of sitting at the end, which makes it easy to misattribute a
+    # one-off FVP timeout to the same cause as a real assertion failure. Tee
+    # the run and print a consolidated list of failing targets afterwards.
     mapfile -t ARGS2 < <(build_args_with_opts "${OPTIMIZE_KERNELS_FOR}")
-    readable_run make -k "${ARGS2[@]}" test
+    suite_log="$(mktemp -t helia_suite_XXXXXX.log)"
+
+    # errexit is disabled only around the pipeline so a failing suite reaches
+    # the summary below instead of aborting the script. make's own status is
+    # read from PIPESTATUS[0] immediately, before any other command can reset
+    # it -- notably before `set -e`, which would clobber it.
+    set +e
+    readable_run make -k "${ARGS2[@]}" test 2>&1 | tee "${suite_log}"
+    suite_status=${PIPESTATUS[0]}
+    set -e
+
+    echo "==> Failing test targets (${TARGET_ARCH}/${TOOLCHAIN}/${OPTIMIZE_KERNELS_FOR}):"
+    grep -E '^make(\[[0-9]+\])?: \*\*\* \[.*\] Error ' "${suite_log}" \
+      | sed -E 's/^make(\[[0-9]+\])?: \*\*\* \[[^]]*: ([^]]*)\] Error.*/  \2/' \
+      | sort -u \
+      || echo "  (none)"
+    rm -f "${suite_log}"
+
+    if [[ "${suite_status}" -ne 0 ]]; then
+      echo "ERROR: helia test suite failed (make exit ${suite_status})" >&2
+      exit "${suite_status}"
+    fi
   else
     echo ">>> Skipping tests for ${OPTIMIZE_KERNELS_FOR} (build-only mode)."
   fi

@@ -52,7 +52,17 @@ limitations under the License.
 //
 // The float16 path is asymmetric: the float16 scalar clamp orders its compares
 // correctly and DOES preserve NaN, so Add/MulFloat16PropagatesNan is expected
-// to pass on a scalar float16 build.
+// to pass on a scalar float16 build. On cortex-m55 gcc the MVE float16 clamp
+// is selected instead (arm_elementwise_add_f16.c:53 picks
+// arm_nn_clamp_mve_f16; only the #else at :70 is scalar), so it fails there
+// too on the current pin.
+//
+// These stay TRUE CONTRACT assertions, unlike the tanh/logistic NaN cases in
+// float_activation_edge_test.cc. ns#380 (merged) reclassifies NaN on the
+// integer bit pattern in arm_nn_clamp_scalar_f32/f16 and
+// arm_nn_clamp_propagate_nan_mve_f32/f16, which survives -Ofast, so these go
+// green on the pin bump. The bump target is ns-cmsis-nn v7.30.1, which does
+// not exist yet -- v7.30.0 is the latest release and predates ns#380.
 //
 // SUB is not covered: kernels/helia/sub.cc has no float dispatch into
 // heliaCORE (float32 SUB runs the TFLM reference and there is no float16 SUB),
@@ -64,10 +74,11 @@ limitations under the License.
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
 #include "tensorflow/lite/micro/kernels/micro_ops.h"
+#include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
-#if ARM_NN_ENABLE_F16
+#if ARM_NN_ENABLE_F32 || ARM_NN_ENABLE_F16
 #include "arm_nnfunctions_flt.h"
 #endif
 
@@ -103,6 +114,31 @@ void RunBinary(const TFLMRegistration& registration, const T* lhs, const T* rhs,
 }  // namespace
 }  // namespace testing
 }  // namespace tflite
+
+// kernels/helia/add.cc:307 and mul.cc:199 fall back to reference_ops and still
+// return kTfLiteOk when the heliaCORE entry point declines. The reference
+// kernels propagate NaN, so a future version that tightened argument
+// validation would flip the tests below GREEN while the code under test never
+// ran. Assert the dispatch precondition directly. (helia-rt#230's link probe
+// proves the symbol exists at link time; it does not prove dispatch took the
+// optimized branch.)
+TEST(HeliaFloatElementwiseEdgeTest, OptimizedFloat32PathIsReachable) {
+#if ARM_NN_ENABLE_F32
+  const float lhs[tflite::testing::kCount] = {1.0f, 2.0f, 3.0f, 4.0f};
+  const float rhs[tflite::testing::kCount] = {0.5f, 0.5f, 0.5f, 0.5f};
+  float out[tflite::testing::kCount] = {};
+  EXPECT_EQ(ARM_CMSIS_NN_SUCCESS,
+            arm_elementwise_add_f32(lhs, rhs, out, -3.4e38f, 3.4e38f,
+                                    tflite::testing::kCount));
+  EXPECT_EQ(ARM_CMSIS_NN_SUCCESS,
+            arm_elementwise_mul_f32(lhs, rhs, out, -3.4e38f, 3.4e38f,
+                                    tflite::testing::kCount));
+#else
+  MicroPrintf(
+      "ARM_NN_ENABLE_F32 unset: heliaCORE float32 not compiled in; the TFLM "
+      "reference kernels are under test here.");
+#endif
+}
 
 TEST(HeliaFloatElementwiseEdgeTest, AddFloat32PropagatesNan) {
   // lhs/rhs: NaN + 1, 1 + NaN, (+Inf) + (-Inf), 1.5 + 2.5 (finite control).
@@ -178,6 +214,19 @@ TEST(HeliaFloatElementwiseEdgeTest, MulFloat16PropagatesNan) {
   EXPECT_TRUE(std::isnan(static_cast<float>(output[2])));
   EXPECT_NEAR(3.0f, static_cast<float>(output[3]), 1e-3f);
 }
+#elif defined(__ARM_FEATURE_MVE) && ((__ARM_FEATURE_MVE) & 2)
+
+// See the matching guard in float_activation_edge_test.cc: helia.inc defines
+// ARM_NN_ENABLE_F16 for TARGET_ARCH=cortex-m55 only, and a silent compile-out
+// would drop these cases while the leg still reported success
+// (helia-rt#231). Known gap: ATfE builds cortex-m55 with +nomve
+// (helia-rt#225), so this guard cannot fire there.
+TEST(HeliaFloatElementwiseEdgeTest, Float16CoverageMustNotSilentlyDisappear) {
+  FAIL(
+      "ARM_NN_ENABLE_F16 is not defined on a build with MVE floating point. "
+      "The float16 elementwise coverage silently compiled out.");
+}
+
 #endif  // ARM_NN_ENABLE_F16
 
 TF_LITE_MICRO_TESTS_MAIN

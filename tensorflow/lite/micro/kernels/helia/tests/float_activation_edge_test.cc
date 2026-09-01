@@ -14,33 +14,104 @@ limitations under the License.
 ==============================================================================*/
 
 // Edge-of-range coverage for the helia float TANH and LOGISTIC kernels
-// (AmbiqAI/helia-rt#227, ns#314 / ns#303 defect classes).
+// (AmbiqAI/helia-rt#227).
 //
 // What the shared upstream tests already execute, and why it is not enough:
 //   * kernels/tanh_test.cc sweeps float32 tanh over [-8, 8] with goldens, and
 //     has one four-point float16 golden case ({-2, 0.5, 2, 4}).
 //   * kernels/logistic_test.cc has float32 and float16 golden cases.
 //   * Neither file feeds a non-finite value to any float kernel, so nothing in
-//     the tree observes NaN or +/-Inf propagation through the heliaCORE
-//     activation entry points. ns#314 is exactly that class of defect, and it
-//     manifests on the armclang libraries because of the fast-math setting
-//     tracked in helia-rt#228.
+//     the tree observes what the heliaCORE activation entry points do with NaN
+//     or +/-Inf.
 //
-// This file adds:
-//   1. NaN and +/-Inf propagation cases for float32 and float16 TANH and
-//      LOGISTIC. NaN in must give NaN out; tanh(+/-Inf) must be +/-1;
-//      logistic(+Inf) must be 1 and logistic(-Inf) must be 0.
-//   2. A float16 golden sweep over the stable part of the activation table
-//      window, |x| <= 4.
-//   3. Separate large-input cases for |x| in [4, 8] that assert only sign and
-//      saturation, never an exact value. ns#303 widened the heliaCORE table
-//      window in v7.30.0, so the precise values in that band legitimately
-//      change with the pin; sign and saturation do not.
+// ---------------------------------------------------------------------------
+// NaN: two different situations, do not conflate them
+// ---------------------------------------------------------------------------
 //
-// Note on the gcc / ATfE legs: those libraries are built at -O3 without
-// fast-math, so the NaN cases can pass there even on ns-cmsis-nn v7.29.2.
-// They are still the guard for the armclang path (helia-rt#228) and for any
-// future backend change.
+// An earlier revision of this file blamed armclang's fast-math (helia-rt#228)
+// for the NaN behavior here. That was wrong and is retracted. There are two
+// separate mechanisms, and only one of them is a defect:
+//
+//   (a) ELEMENTWISE add/mul (see float_elementwise_edge_test.cc) lost NaN
+//       through compare-select ordering in the output clamp -- CLAMP(x,h,l) is
+//       MAX(MIN(x,h),l) and `NaN < h` is false, so MIN returns h; the MVE form
+//       used vmaxnmq/vminnmq, which are IEEE maxNum/minNum and return the
+//       non-NaN operand. Both are plain compare ordering, so this happened at
+//       every optimization level on every toolchain, NOT only under fast-math.
+//       That is a real defect (ns#333/#334) and it IS fixed: ns#380/#384
+//       reclassify NaN on the integer bit pattern, which survives -Ofast.
+//       Those assertions stay as true contract assertions and go green on the
+//       pin bump.
+//
+//   (b) TANH and LOGISTIC do not promise NaN propagation on the vectorized
+//       path, by design. ns-cmsis-nn documents this in
+//       Include/Internal/arm_nn_activation_flt.h on arm_nn_tanh_scalar_ref_f32:
+//       "MVE (arm_nn_vtanh_lut_direct_mve_f32) does not [propagate NaN].
+//       vminnmq is IEEE minNum, which returns the numeric operand when the
+//       other is a quiet NaN, so a qNaN lane is replaced by xmax and
+//       interpolates to tanh(xmax) ... Restoring NaN in general would cost an
+//       extra compare and select in the vector loop body ... NaN is not a
+//       supported input to these kernels, so the divergence is accepted rather
+//       than paid for."
+//
+//       Verified across ns-cmsis-nn 631726420b (our pin, v7.29.2), tag v7.30.0
+//       and origin/main (which carries ns#380 + ns#384): the tanh and sigmoid
+//       helpers are byte-identical between v7.30.0 and main, and ns#380/#384
+//       touch only the elementwise clamp helpers and the f16 RELU/RELU6 legs.
+//       ns#382 tracks RELU/RELU6/LEAKY_RELU -- a different function family; it
+//       does not mention TANH or SIGMOID. So this behavior is NOT going to
+//       change in v7.30.1.
+//
+// The tests below therefore split by path, because the behavior genuinely
+// splits by path. Asserting NaN propagation where upstream declines to provide
+// it would be a permanently-red test; characterizing behavior that is about to
+// be fixed would be an inverted version of the same mistake.
+//
+//   TANH float32, scalar leg (cortex-m3, cortex-m4+fp)   -> NaN propagates.
+//       CONTRACT. Already passes at our pin, and v7.30.0 makes it explicit
+//       with an `if (ax != ax) return x + 0.0f;` guard. Note that guard is
+//       deleted by -ffinite-math-only; helia builds ns-cmsis-nn at -O3 for gcc
+//       and ATfE (tools/make/Makefile), so it survives on every leg this
+//       repository tests. The armclang legs use -Ofast (helia-rt#228) and are
+//       outside that contract -- they are not part of helia_test.yml.
+//   TANH float32/float16, MVE leg (cortex-m55)           -> saturation bound.
+//       CHARACTERIZATION. Documented, deliberate, unchanged in v7.30.x.
+//   LOGISTIC float32/float16, both legs                  -> saturation bound.
+//       CHARACTERIZATION. The sigmoid helpers route through
+//       arm_nn_softmax_exp_lut_f32, whose input clamp flushes NaN to +80 on
+//       purpose; at origin/main that flush carries a comment explaining that
+//       the min-then-max order is load-bearing and reproduces the
+//       long-standing behavior "bit for bit in every optimisation mode".
+//
+// The characterization cases assert the behavior CLASS (finite, correct sign,
+// at the saturation bound) rather than a literal constant, because the literal
+// moved between our pin and v7.30.0: ns#303 widened the float32 tanh table
+// from |x| <= 4 to |x| <= 6, so the float32 MVE NaN result moves from
+// -tanh(4) = -0.99932930 to -tanh(6) = -0.9999877 (0xbf7fff32) with no change
+// in contract. Each case logs the value it observed, so the CI record carries
+// the concrete number for whichever pin ran. If one of these ever fails,
+// upstream changed a documented behavior: re-read ns#382 and the helper
+// comments before touching the assertion, and convert it back to a contract
+// assertion if NaN propagation has been restored.
+//
+// The +/-Inf assertions are true contract assertions on every path and pass
+// today: tanh(+/-Inf) = +/-1, logistic(+Inf) = 1, logistic(-Inf) = 0.
+//
+// ---------------------------------------------------------------------------
+// Proving the optimized kernel actually ran
+// ---------------------------------------------------------------------------
+//
+// kernels/helia/tanh.cc:230 and logistic.cc:73 fall back to reference_ops::*
+// and still return kTfLiteOk when the heliaCORE entry point reports anything
+// other than ARM_CMSIS_NN_SUCCESS. A kernel test alone therefore cannot tell
+// "heliaCORE computed this" from "heliaCORE declined and the reference kernel
+// computed this" -- and the reference kernel propagates NaN, so a future
+// version that tightened argument validation would flip these tests GREEN
+// while the code under test never executed. The *PathIsReachable tests below
+// call arm_nn_activation_f32/f16 directly and assert ARM_CMSIS_NN_SUCCESS for
+// exactly the element counts the other tests use, which pins that dispatch
+// precondition. (helia-rt#230's link probe is a different guard: it proves the
+// SYMBOL exists at link time, not that dispatch took the optimized branch.)
 
 #include <cmath>
 
@@ -48,11 +119,32 @@ limitations under the License.
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
 #include "tensorflow/lite/micro/kernels/micro_ops.h"
+#include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
-#if ARM_NN_ENABLE_F16
+#if ARM_NN_ENABLE_F32 || ARM_NN_ENABLE_F16
 #include "arm_nnfunctions_flt.h"
+#endif
+
+// Is the heliaCORE optimized float32 path compiled in at all? On a host or
+// reference build it is not, and the TFLM reference kernels run instead --
+// those propagate NaN correctly, so the expectations differ.
+#if ARM_NN_ENABLE_F32
+#define HELIA_TEST_OPTIMIZED_F32 1
+#else
+#define HELIA_TEST_OPTIMIZED_F32 0
+#endif
+
+// Does this build select the MVE (vector) activation helpers? heliaCORE gates
+// them on ARM_MATH_MVEF / ARM_MATH_MVE_FLOAT16, which track the compiler's
+// __ARM_FEATURE_MVE; bit 1 is MVE floating point. cortex-m55 gcc reports 3;
+// cortex-m55+nomve (the ATfE legs, helia-rt#225), cortex-m4+fp and cortex-m3
+// report nothing.
+#if defined(__ARM_FEATURE_MVE) && ((__ARM_FEATURE_MVE) & 2)
+#define HELIA_TEST_MVE_FLOAT 1
+#else
+#define HELIA_TEST_MVE_FLOAT 0
 #endif
 
 namespace tflite {
@@ -96,6 +188,49 @@ constexpr int kNonFiniteCount = 4;
 
 double ReferenceLogistic(double x) { return 1.0 / (1.0 + std::exp(-x)); }
 
+// Shared saturation-magnitude floor. tanh(5) == 0.99991 and
+// logistic(5) == 0.99331, so 0.99 is a safe floor for both.
+constexpr float kSaturationFloor = 0.99f;
+
+// Upper slack differs by precision (helia-rt#229 review). float32 resolves
+// ~6e-8 near 1.0, so anything meaningfully above 1.0 is a real overshoot and
+// must fail; a few ULP of slack is all that is warranted. float16 resolves
+// ~4.9e-4 near 1.0, so it genuinely needs more room.
+constexpr float kSaturationCeilF32 = 1.0000005f;  // ~8 float32 ULP
+constexpr float kLogisticFloorF32 = -2e-7f;       // ~3 float32 ULP below 0
+
+// Asserts the "NaN was mapped to the saturation bound" behavior class without
+// pinning a literal, because the literal moved between our pin and v7.30.0.
+// Logs the observed value so the CI record carries the concrete number.
+void ExpectTanhNanCharacterized(float observed, const char* label) {
+  MicroPrintf("%s: tanh(NaN) observed = %f", label,
+              static_cast<double>(observed));
+  EXPECT_FALSE(std::isnan(observed));
+  EXPECT_TRUE(std::isfinite(observed));
+  // Documented as NEGATIVE: Armv8.1-M defines VCMP `lt` as the logical inverse
+  // of `ge`, so it is true for unordered operands and the vnegq_m negation
+  // predicate fires on every NaN lane.
+  EXPECT_LT(observed, 0.0f);
+  EXPECT_GE(-observed, kSaturationFloor);
+  EXPECT_LE(-observed, kSaturationCeilF32);
+}
+
+void ExpectLogisticNanCharacterized(float observed, const char* label) {
+  MicroPrintf("%s: logistic(NaN) observed = %f", label,
+              static_cast<double>(observed));
+  EXPECT_FALSE(std::isnan(observed));
+  EXPECT_TRUE(std::isfinite(observed));
+  // The sigmoid helpers route NaN through arm_nn_softmax_exp_lut_f32, whose
+  // input clamp deliberately flushes NaN to +80, giving sigmoid(80) == 1.
+  EXPECT_GE(observed, kSaturationFloor);
+  EXPECT_LE(observed, kSaturationCeilF32);
+}
+
+// Large-input band. Only sign and saturation are asserted here.
+constexpr int kLargeCount = 8;
+constexpr float kLargeInputs[kLargeCount] = {-8.0f, -7.0f, -6.0f, -5.0f,
+                                             5.0f,  6.0f,  7.0f,  8.0f};
+
 #if ARM_NN_ENABLE_F16
 // Stable golden window: |x| <= 4. ns#303 changed heliaCORE table behavior
 // outside this band in v7.30.0, so exact goldens are only asserted inside it.
@@ -105,14 +240,10 @@ constexpr int kWindowCount = 17;
 constexpr float kWindowInputs[kWindowCount] = {
     -4.0f, -3.5f, -3.0f, -2.5f, -2.0f, -1.5f, -1.0f, -0.5f, 0.0f,
     0.5f,  1.0f,  1.5f,  2.0f,  2.5f,  3.0f,  3.5f,  4.0f};
-#endif  // ARM_NN_ENABLE_F16
 
-// Large-input band. Only sign and saturation are asserted here.
-constexpr int kLargeCount = 8;
-constexpr float kLargeInputs[kLargeCount] = {-8.0f, -7.0f, -6.0f, -5.0f,
-                                             5.0f,  6.0f,  7.0f,  8.0f};
+constexpr float kSaturationCeilF16 = 1.0009f;  // ~2 float16 ULP
+constexpr float kLogisticFloorF16 = -0.0009f;
 
-#if ARM_NN_ENABLE_F16
 // Float16 golden tolerance: half precision has an 11-bit significand, so one
 // ULP just below 1.0 is 2^-11 == 4.88e-4. 3e-3 is about six ULP at that
 // magnitude, which covers the heliaCORE table interpolation error plus the
@@ -135,39 +266,83 @@ constexpr float kFloat16ActivationTolerance = 3e-3f;
 constexpr float kFloat16TanhGoldenTolerance = 3e-2f;
 #endif  // ARM_NN_ENABLE_F16
 
-// Saturation band for |x| >= 5. tanh(5) == 0.99991 and logistic(5) == 0.99331,
-// so 0.99 is a safe floor for both; the small upper slack absorbs a table
-// value that rounds a hair above the mathematical limit in float16.
-constexpr float kSaturationFloor = 0.99f;
-constexpr float kSaturationCeil = 1.0009f;
-
 }  // namespace
 }  // namespace testing
 }  // namespace tflite
 
-TEST(HeliaFloatActivationEdgeTest, TanhFloat32PropagatesNanAndInf) {
-  const float input[tflite::testing::kNonFiniteCount] = {
-      NAN, INFINITY, -INFINITY, 0.5f};
+// ---------------------------------------------------------------------------
+// Optimized-path reachability. See "Proving the optimized kernel actually ran"
+// in the file header: without these, a silent fallback to reference_ops would
+// make the tests below pass while the code under test never executed.
+// ---------------------------------------------------------------------------
+
+TEST(HeliaFloatActivationEdgeTest, OptimizedFloat32PathIsReachable) {
+#if HELIA_TEST_OPTIMIZED_F32
+  // Exactly the element counts the tests in this file use. 17 is deliberately
+  // not a multiple of the MVE vector width, which is the case a future
+  // argument-validation change would most plausibly reject.
+  const int sizes[] = {tflite::testing::kNonFiniteCount,
+                       tflite::testing::kLargeCount, 17};
+  float input[17] = {};
+  float output[17] = {};
+  for (int i = 0; i < 17; ++i) {
+    input[i] = 0.25f * static_cast<float>(i) - 2.0f;
+  }
+  for (int s = 0; s < 3; ++s) {
+    EXPECT_EQ(ARM_CMSIS_NN_SUCCESS,
+              arm_nn_activation_f32(input, output, sizes[s],
+                                    ARM_NN_FLT_ACT_TANH, 0.0f));
+    EXPECT_EQ(ARM_CMSIS_NN_SUCCESS,
+              arm_nn_activation_f32(input, output, sizes[s],
+                                    ARM_NN_FLT_ACT_SIGMOID, 0.0f));
+  }
+#else
+  MicroPrintf(
+      "ARM_NN_ENABLE_F32 unset: heliaCORE float32 not compiled in; the TFLM "
+      "reference kernels are under test here.");
+#endif
+}
+
+TEST(HeliaFloatActivationEdgeTest, TanhFloat32NanBehavior) {
+  const float input[tflite::testing::kNonFiniteCount] = {NAN, INFINITY,
+                                                         -INFINITY, 0.5f};
   float output[tflite::testing::kNonFiniteCount] = {};
   tflite::testing::RunActivation(tflite::testing::Activation::kTanh,
                                  kTfLiteFloat32, input, output,
                                  tflite::testing::kNonFiniteCount);
 
+#if HELIA_TEST_OPTIMIZED_F32 && HELIA_TEST_MVE_FLOAT
+  // CHARACTERIZATION: the MVE leg maps NaN to the negated saturation bound by
+  // design. Not a defect; see the file header.
+  tflite::testing::ExpectTanhNanCharacterized(output[0], "f32/MVE");
+#else
+  // CONTRACT: the scalar leg propagates NaN, and so does the TFLM reference
+  // kernel used on host builds.
   EXPECT_TRUE(std::isnan(output[0]));
+#endif
+
+  // Contract on every path.
   EXPECT_NEAR(1.0f, output[1], 1e-6f);
   EXPECT_NEAR(-1.0f, output[2], 1e-6f);
   EXPECT_NEAR(std::tanh(0.5f), output[3], 1e-5f);
 }
 
-TEST(HeliaFloatActivationEdgeTest, LogisticFloat32PropagatesNanAndInf) {
-  const float input[tflite::testing::kNonFiniteCount] = {
-      NAN, INFINITY, -INFINITY, 0.5f};
+TEST(HeliaFloatActivationEdgeTest, LogisticFloat32NanBehavior) {
+  const float input[tflite::testing::kNonFiniteCount] = {NAN, INFINITY,
+                                                         -INFINITY, 0.5f};
   float output[tflite::testing::kNonFiniteCount] = {};
   tflite::testing::RunActivation(tflite::testing::Activation::kLogistic,
                                  kTfLiteFloat32, input, output,
                                  tflite::testing::kNonFiniteCount);
 
+#if HELIA_TEST_OPTIMIZED_F32
+  // CHARACTERIZATION on both legs: the sigmoid helper's exp input clamp
+  // flushes NaN to +80 on purpose, on scalar and MVE alike.
+  tflite::testing::ExpectLogisticNanCharacterized(output[0], "f32");
+#else
   EXPECT_TRUE(std::isnan(output[0]));
+#endif
+
   EXPECT_NEAR(1.0f, output[1], 1e-6f);
   EXPECT_NEAR(0.0f, output[2], 1e-6f);
   EXPECT_NEAR(static_cast<float>(tflite::testing::ReferenceLogistic(0.5)),
@@ -184,7 +359,7 @@ TEST(HeliaFloatActivationEdgeTest, TanhFloat32LargeInputsSaturate) {
     const float signed_output =
         tflite::testing::kLargeInputs[i] < 0.0f ? -output[i] : output[i];
     EXPECT_GE(signed_output, tflite::testing::kSaturationFloor);
-    EXPECT_LE(signed_output, tflite::testing::kSaturationCeil);
+    EXPECT_LE(signed_output, tflite::testing::kSaturationCeilF32);
   }
 }
 
@@ -196,17 +371,36 @@ TEST(HeliaFloatActivationEdgeTest, LogisticFloat32LargeInputsSaturate) {
 
   for (int i = 0; i < tflite::testing::kLargeCount; ++i) {
     if (tflite::testing::kLargeInputs[i] < 0.0f) {
-      EXPECT_GE(output[i], -0.0009f);
+      EXPECT_GE(output[i], tflite::testing::kLogisticFloorF32);
       EXPECT_LE(output[i], 1.0f - tflite::testing::kSaturationFloor);
     } else {
       EXPECT_GE(output[i], tflite::testing::kSaturationFloor);
-      EXPECT_LE(output[i], tflite::testing::kSaturationCeil);
+      EXPECT_LE(output[i], tflite::testing::kSaturationCeilF32);
     }
   }
 }
 
 #if ARM_NN_ENABLE_F16
-TEST(HeliaFloatActivationEdgeTest, TanhFloat16PropagatesNanAndInf) {
+TEST(HeliaFloatActivationEdgeTest, OptimizedFloat16PathIsReachable) {
+  const int sizes[] = {tflite::testing::kNonFiniteCount,
+                       tflite::testing::kLargeCount,
+                       tflite::testing::kWindowCount};
+  float16_t input[tflite::testing::kWindowCount] = {};
+  float16_t output[tflite::testing::kWindowCount] = {};
+  for (int i = 0; i < tflite::testing::kWindowCount; ++i) {
+    input[i] = static_cast<float16_t>(0.25f * static_cast<float>(i) - 2.0f);
+  }
+  for (int s = 0; s < 3; ++s) {
+    EXPECT_EQ(ARM_CMSIS_NN_SUCCESS,
+              arm_nn_activation_f16(input, output, sizes[s],
+                                    ARM_NN_FLT_ACT_TANH, 0.0f));
+    EXPECT_EQ(ARM_CMSIS_NN_SUCCESS,
+              arm_nn_activation_f16(input, output, sizes[s],
+                                    ARM_NN_FLT_ACT_SIGMOID, 0.0f));
+  }
+}
+
+TEST(HeliaFloatActivationEdgeTest, TanhFloat16NanBehavior) {
   const float16_t input[tflite::testing::kNonFiniteCount] = {
       static_cast<float16_t>(NAN), static_cast<float16_t>(INFINITY),
       static_cast<float16_t>(-INFINITY), static_cast<float16_t>(0.5f)};
@@ -215,7 +409,19 @@ TEST(HeliaFloatActivationEdgeTest, TanhFloat16PropagatesNanAndInf) {
                                  kTfLiteFloat16, input, output,
                                  tflite::testing::kNonFiniteCount);
 
+#if HELIA_TEST_MVE_FLOAT
+  // CHARACTERIZATION: arm_nn_vtanh_lut_direct_mve_f16 has the same
+  // vminnmq/vnegq_m structure as the float32 MVE helper. The float16 table
+  // window stayed at |x| <= 4 in v7.30.0, so the expected magnitude is
+  // tanh(4) rather than the float32 path's tanh(6).
+  tflite::testing::ExpectTanhNanCharacterized(
+      static_cast<float>(output[0]), "f16/MVE");
+#else
+  // CONTRACT: arm_nn_tanh_scalar_ref_f16 is a pure rational evaluation, so a
+  // NaN flows through the arithmetic untouched.
   EXPECT_TRUE(std::isnan(static_cast<float>(output[0])));
+#endif
+
   EXPECT_NEAR(1.0f, static_cast<float>(output[1]),
               tflite::testing::kFloat16ActivationTolerance);
   EXPECT_NEAR(-1.0f, static_cast<float>(output[2]),
@@ -224,7 +430,7 @@ TEST(HeliaFloatActivationEdgeTest, TanhFloat16PropagatesNanAndInf) {
               tflite::testing::kFloat16ActivationTolerance);
 }
 
-TEST(HeliaFloatActivationEdgeTest, LogisticFloat16PropagatesNanAndInf) {
+TEST(HeliaFloatActivationEdgeTest, LogisticFloat16NanBehavior) {
   const float16_t input[tflite::testing::kNonFiniteCount] = {
       static_cast<float16_t>(NAN), static_cast<float16_t>(INFINITY),
       static_cast<float16_t>(-INFINITY), static_cast<float16_t>(0.5f)};
@@ -233,7 +439,11 @@ TEST(HeliaFloatActivationEdgeTest, LogisticFloat16PropagatesNanAndInf) {
                                  kTfLiteFloat16, input, output,
                                  tflite::testing::kNonFiniteCount);
 
-  EXPECT_TRUE(std::isnan(static_cast<float>(output[0])));
+  // CHARACTERIZATION on both legs, same reason as float32: the float16 sigmoid
+  // routes through arm_nn_softmax_exp_scalar_f16, whose clamp flushes NaN.
+  tflite::testing::ExpectLogisticNanCharacterized(
+      static_cast<float>(output[0]), "f16");
+
   EXPECT_NEAR(1.0f, static_cast<float>(output[1]),
               tflite::testing::kFloat16ActivationTolerance);
   EXPECT_NEAR(0.0f, static_cast<float>(output[2]),
@@ -295,7 +505,7 @@ TEST(HeliaFloatActivationEdgeTest, TanhFloat16LargeInputsSaturate) {
     const float signed_output =
         tflite::testing::kLargeInputs[i] < 0.0f ? -value : value;
     EXPECT_GE(signed_output, tflite::testing::kSaturationFloor);
-    EXPECT_LE(signed_output, tflite::testing::kSaturationCeil);
+    EXPECT_LE(signed_output, tflite::testing::kSaturationCeilF16);
   }
 }
 
@@ -312,14 +522,37 @@ TEST(HeliaFloatActivationEdgeTest, LogisticFloat16LargeInputsSaturate) {
   for (int i = 0; i < tflite::testing::kLargeCount; ++i) {
     const float value = static_cast<float>(output[i]);
     if (tflite::testing::kLargeInputs[i] < 0.0f) {
-      EXPECT_GE(value, -0.0009f);
+      EXPECT_GE(value, tflite::testing::kLogisticFloorF16);
       EXPECT_LE(value, 1.0f - tflite::testing::kSaturationFloor);
     } else {
       EXPECT_GE(value, tflite::testing::kSaturationFloor);
-      EXPECT_LE(value, tflite::testing::kSaturationCeil);
+      EXPECT_LE(value, tflite::testing::kSaturationCeilF16);
     }
   }
 }
+
+#elif defined(__ARM_FEATURE_MVE) && ((__ARM_FEATURE_MVE) & 2)
+
+// helia.inc defines ARM_NN_ENABLE_F16 for TARGET_ARCH=cortex-m55 only. If that
+// match ever drifts, or the macro is renamed upstream, every float16 case in
+// this file would vanish silently: the binary would run 5 of 12 cases and the
+// leg would still print ALL TESTS PASSED (helia-rt#231 shows an empty suite
+// scores green). Since this build has MVE floating point, float16 support is
+// expected, so turn the silent compile-out into a loud failure.
+//
+// Known gap: the ATfE legs build cortex-m55 with +nomve (helia-rt#225), so
+// __ARM_FEATURE_MVE is unset there and this guard cannot fire. That is
+// acceptable -- those legs have no MVE body/tail split, so they carry none of
+// the coverage this protects, and helia-rt#231 means they execute 0 tests
+// anyway.
+TEST(HeliaFloatActivationEdgeTest, Float16CoverageMustNotSilentlyDisappear) {
+  FAIL(
+      "ARM_NN_ENABLE_F16 is not defined on a build with MVE floating point. "
+      "The float16 activation coverage silently compiled out. Check "
+      "ext_libs/helia.inc's TARGET_ARCH match and the ARM_NN_ENABLE_F16 macro "
+      "name.");
+}
+
 #endif  // ARM_NN_ENABLE_F16
 
 TF_LITE_MICRO_TESTS_MAIN

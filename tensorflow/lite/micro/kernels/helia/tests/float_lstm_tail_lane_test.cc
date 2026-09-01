@@ -104,6 +104,16 @@ constexpr int kNumTensors = 24 + 1;
 // Largest tensor in the node is the recurrent weight matrix (10 x 10). Only
 // the float16 case needs side storage for the converted payload.
 constexpr int kMaxTensorElements = kStateDimension * kStateDimension;
+// The recurrent weight matrix and the output tensor are the two candidates for
+// largest, and only the second grows with batch and time. Without these,
+// raising kTimeSteps from 2 to 3 would write 120 float16 into a 100-element
+// row and corrupt the next tensor's storage, silently.
+static_assert(kBatchSize * kTimeSteps * kStateDimension <= kMaxTensorElements,
+              "float16 conversion storage row is too small for the output "
+              "tensor; raise kMaxTensorElements");
+static_assert(kStateDimension * kStateDimension <= kMaxTensorElements,
+              "float16 conversion storage row is too small for the recurrent "
+              "weight matrix; raise kMaxTensorElements");
 // The output tensor is the other candidate for largest, and it grows with
 // batch and time while kMaxTensorElements does not. Without this guard,
 // raising kTimeSteps or kBatchSize would silently overflow one row of the
@@ -174,10 +184,28 @@ constexpr float kFloat32GoldenTolerance = 1e-4f;
 
 // Body-vs-tail agreement bound for float32. The two halves evaluate the same
 // LUT expression with and without FMA contraction, so they may differ by a few
-// ULP. Observed divergence on m55-gcc is below 5e-7 absolute at output
-// magnitudes of 0.006 to 0.09; 1e-5 leaves ~20x headroom while staying three
-// orders of magnitude below an ns#315-scale divergence (~2.3e-2), so a genuine
-// two-different-approximations bug would still be caught here.
+// ULP.
+//
+// Both margins, stated honestly, because they are very different sizes:
+//
+//   Headroom over legitimate error: large. The float32 divergence recorded on
+//   m55-gcc printed equal to six decimal places at output magnitudes of 0.006
+//   to 0.09, which bounds it below 1e-6 (six-decimal print equality bounds the
+//   gap at <1e-6; it does NOT establish <5e-7, as an earlier revision of this
+//   comment claimed). So 1e-5 is at least ~10x the observed FMA divergence,
+//   and run 33521505536 confirms the float32 case passes with it.
+//
+//   Margin below a real ns#315-scale divergence: SMALL, about 1.6x. The
+//   measured float16 divergence band in run 33518826216 was 1.6e-5 to 1.10e-3;
+//   the low end came from a low-magnitude lane (output ~0.0074). So this
+//   tolerance would catch the ns#315 signature at these operating points, but
+//   it is not a comfortable margin, and a smaller-magnitude divergence could
+//   slip under it. This float32 check is a consistency check, NOT the ns#315
+//   detector -- that job belongs to the tolerance-free float16 assertion.
+//
+// Follow-up once the pin moves: ns#324 folds the float32 tail into the
+// predicated MVE loop, which should make the lanes bit-exact and let this be
+// tightened back toward exact equality.
 constexpr float kFloat32LaneTolerance = 1e-5f;
 
 #if ARM_NN_ENABLE_F16
@@ -469,6 +497,24 @@ TEST(HeliaFloatLstmTailLaneTest, Float16TailLanesMatchVectorLanes) {
     }
   }
 }
+#elif defined(__ARM_FEATURE_MVE) && ((__ARM_FEATURE_MVE) & 2)
+
+// This is the guard that matters most. Float16TailLanesMatchVectorLanes is the
+// ns#315 detector and cortex-m55 is the only configuration that has the MVE
+// body / scalar tail split it looks for. If ARM_NN_ENABLE_F16 ever stops being
+// defined on such a build, the detector would disappear while the binary still
+// ran its one float32 case and the leg still reported success (helia-rt#231
+// shows an empty suite scores green). Fail loudly instead.
+//
+// Known gap: ATfE builds cortex-m55 with +nomve (helia-rt#225), so
+// __ARM_FEATURE_MVE is unset there and this cannot fire. Acceptable: without
+// MVE there is no body/tail split, so there is no ns#315 coverage to lose.
+TEST(HeliaFloatLstmTailLaneTest, Float16CoverageMustNotSilentlyDisappear) {
+  FAIL(
+      "ARM_NN_ENABLE_F16 is not defined on a build with MVE floating point. "
+      "The ns#315 float16 LSTM tail-lane detector silently compiled out.");
+}
+
 #endif  // ARM_NN_ENABLE_F16
 
 TF_LITE_MICRO_TESTS_MAIN
