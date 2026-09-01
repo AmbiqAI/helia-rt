@@ -47,16 +47,20 @@ limitations under the License.
 //     property of the implementation, not of the input. It cannot be explained
 //     away by rounding or fusion.
 //
-//   * float32 (a weaker consistency check). arm_nn_lstm_step_f32 has the same
-//     MVE-body/scalar-tail split, but both halves interpolate the SAME LUT.
-//     The body uses explicit vfmaq while the tail writes `y0 + (y1-y0)*frac`,
-//     whose fusion is an -ffp-contract decision, so a 1-ULP body-vs-tail
-//     difference is permitted in principle. The specific operating points this
-//     test drives were checked to give identical results with and without
-//     fusion, so exact equality holds here -- but it holds by numerical
-//     circumstance at these inputs, not by construction. If this test ever goes
-//     red on float32 after a weight or shape change, suspect FMA contraction
-//     before concluding ns#315.
+//   * float32 (a weaker consistency check, and it needs a tolerance).
+//     arm_nn_lstm_step_f32 has the same MVE-body/scalar-tail split, but both
+//     halves interpolate the SAME LUT. The body uses explicit vfmaq while the
+//     tail writes `y0 + (y1-y0)*frac`, whose fusion is an -ffp-contract
+//     decision, so a body-vs-tail difference of a few ULP is permitted and
+//     carries no information about correctness.
+//
+//     This is measured, not theoretical. In CI run 33518826216 the float32
+//     lanes diverged on cortex-m55 gcc (MVE) while passing on cortex-m3 and
+//     cortex-m4+fp gcc (no MVE), which isolates FMA contraction as the cause:
+//     every divergent pair agreed to all six printed decimal places, e.g.
+//     0.006203 vs 0.006203 and -0.039712 vs -0.039712. So the float32 case is
+//     asserted with kFloat32LaneTolerance below, NOT with exact equality.
+//     Only the float16 case is tolerance-free.
 //
 // A second, deliberately loose golden comparison against a double-precision
 // reference LSTM guards against the degenerate case where every lane is
@@ -167,6 +171,14 @@ constexpr float kInputData[kInputElements] = {
 // Float32: the optimized and reference paths differ only by accumulation order
 // and FMA contraction over 14-term dot products, which is well inside 1e-4.
 constexpr float kFloat32GoldenTolerance = 1e-4f;
+
+// Body-vs-tail agreement bound for float32. The two halves evaluate the same
+// LUT expression with and without FMA contraction, so they may differ by a few
+// ULP. Observed divergence on m55-gcc is below 5e-7 absolute at output
+// magnitudes of 0.006 to 0.09; 1e-5 leaves ~20x headroom while staying three
+// orders of magnitude below an ns#315-scale divergence (~2.3e-2), so a genuine
+// two-different-approximations bug would still be caught here.
+constexpr float kFloat32LaneTolerance = 1e-5f;
 
 #if ARM_NN_ENABLE_F16
 //
@@ -310,16 +322,17 @@ TEST(HeliaFloatLstmTailLaneTest, Float32TailLanesMatchVectorLanes) {
   const float* output = contents.GetOutputData();
 
   // Invariant: the kStateDimension lanes of one (batch, time step) are the
-  // same number, so they must compare equal. Lanes 8..9 are the scalar tail;
-  // lanes 0..7 are the vector body. (== rather than a bit comparison: +0.0 and
-  // -0.0 compare equal, which is the behavior we want here.)
+  // same number. Lanes 8..9 are the scalar tail; lanes 0..7 are the vector
+  // body. Compared with kFloat32LaneTolerance rather than exactly, because the
+  // two halves differ by FMA contraction on MVE builds -- see the file header.
   for (int b = 0; b < tflite::testing::kBatchSize; ++b) {
     for (int t = 0; t < tflite::testing::kTimeSteps; ++t) {
       const float* lane =
           &output[(b * tflite::testing::kTimeSteps + t) *
                   tflite::testing::kStateDimension];
       for (int s = 1; s < tflite::testing::kStateDimension; ++s) {
-        EXPECT_EQ(lane[0], lane[s]);
+        EXPECT_NEAR(lane[0], lane[s],
+                    tflite::testing::kFloat32LaneTolerance);
       }
     }
   }
@@ -348,8 +361,10 @@ TEST(HeliaFloatLstmTailLaneTest, Float32TailLanesMatchVectorLanes) {
   for (int b = 0; b < tflite::testing::kBatchSize; ++b) {
     for (int s = 0; s < tflite::testing::kStateDimension; ++s) {
       const int index = b * tflite::testing::kStateDimension + s;
-      EXPECT_EQ(hidden[b * tflite::testing::kStateDimension], hidden[index]);
-      EXPECT_EQ(cell[b * tflite::testing::kStateDimension], cell[index]);
+      EXPECT_NEAR(hidden[b * tflite::testing::kStateDimension], hidden[index],
+                  tflite::testing::kFloat32LaneTolerance);
+      EXPECT_NEAR(cell[b * tflite::testing::kStateDimension], cell[index],
+                  tflite::testing::kFloat32LaneTolerance);
       EXPECT_NEAR(expected_hidden[b], hidden[index],
                   tflite::testing::kFloat32GoldenTolerance);
       EXPECT_NEAR(expected_cell[b], cell[index],
