@@ -163,9 +163,30 @@ ifeq ($(TOOLCHAIN), armclang)
   # Upstream's default of `-Oz`/`-O2` regresses those workloads on armclang
   # while leaving GCC and ATfE (clang) essentially unchanged. Override here
   # to keep the helia-rt armclang ABI tuned for speed.
-  CORE_OPTIMIZATION_LEVEL := -Ofast
-  KERNEL_OPTIMIZATION_LEVEL := -Ofast
-  THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := -Ofast
+  #
+  # `-Ofast` implies `-ffast-math`, which disables NaN/Inf semantics. Since
+  # ns-cmsis-nn 7.29.x ships float kernels (`*_f32.c`, `*_f16.c`) that is no
+  # longer harmless, so `-ffp-mode=full` is appended here to switch IEEE
+  # NaN/Inf handling back on.
+  #
+  # POSITION IS THE WHOLE POINT -- do not move these to CCFLAGS/CXXFLAGS.
+  # armclang resolves conflicting floating-point options last-flag-wins, and
+  # every compile recipe emits `$(CC) $(CCFLAGS) $(<X>_OPTIMIZATION_LEVEL)`
+  # (Makefile:574-618), so anything in CCFLAGS/CXXFLAGS is overridden by the
+  # `-Ofast` that follows it. Measured on armclang 6.24, cortex-m55:
+  #
+  #   -ffp-mode=full -Ofast  ->  __FINITE_MATH_ONLY__ 1, `x != x` folds to
+  #                              `movs r0, #0`   (fast-math WINS)
+  #   -Ofast -ffp-mode=full  ->  __FINITE_MATH_ONLY__ 0, real `vcmp.f32`
+  #
+  # These variables are the last flags on every C and C++ compile line, which
+  # is why the fix belongs here and covers both languages at once (issue #228;
+  # the earlier CXXFLAGS-only attempt was inert for the same ordering reason).
+  # The `-Werror=nan-infinity-disabled` assertion further down is what stops
+  # this silently regressing.
+  CORE_OPTIMIZATION_LEVEL := -Ofast -ffp-mode=full
+  KERNEL_OPTIMIZATION_LEVEL := -Ofast -ffp-mode=full
+  THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := -Ofast -ffp-mode=full
 else ifeq ($(TOOLCHAIN), atfe)
   # helia-rt: bump CMSIS-NN (third-party kernels) only to `-O3` for ATfE.
   # Scope is intentionally narrow:
@@ -174,10 +195,15 @@ else ifeq ($(TOOLCHAIN), atfe)
   #     interacts badly with `-ffast-math` and we don't want to risk it.
   #   - KERNEL stays `-O2`: clang 22 (ATfE 22.1.0) miscompiles `elu.cc` and a
   #     few other activation kernels at `-O3`. Keep TFLM kernels at `-O2`.
-  #   - THIRD_PARTY_KERNEL goes to `-O3`: CMSIS-NN is pure integer/SIMD with
-  #     no float, no `frexp`, no transcendentals -- none of the failure modes
-  #     above apply. `-O3` enables loop unrolling + SLP vectorization on the
-  #     hot conv inner loops with no correctness risk.
+  #   - THIRD_PARTY_KERNEL goes to `-O3`: `-O3` enables loop unrolling + SLP
+  #     vectorization on the hot conv inner loops. This block used to justify
+  #     that with "CMSIS-NN is pure integer/SIMD with no float, no `frexp`,
+  #     no transcendentals" -- stale since ns-cmsis-nn 7.29.x, which ships
+  #     float kernels (`*_f32.c`, `*_f16.c`) next to the integer ones. The
+  #     narrower claim still holds and is the one that matters: `-O3` is not
+  #     `-ffast-math`, so IEEE semantics (NaN/Inf propagation, no FP
+  #     reassociation) survive it, and the CORE/KERNEL failure modes listed
+  #     above are `-ffast-math` interactions rather than plain `-O3` ones.
   # Do NOT promote CORE or KERNEL to `-O3` without re-running the kernel test
   # suite; the failure modes above are silent (numerical drift, not crashes).
   CORE_OPTIMIZATION_LEVEL := -Os
@@ -188,8 +214,11 @@ else ifeq ($(TOOLCHAIN), gcc)
   # Same scope/rationale as the ATfE block above:
   #   - CORE/KERNEL stay at upstream defaults (`-Os`/`-O2`) to avoid any
   #     risk of GCC `-O3` regressions in core arithmetic / activation paths.
-  #   - THIRD_PARTY_KERNEL goes to `-O3`: CMSIS-NN is integer-only, so the
-  #     extra unrolling/vectorization is pure win.
+  #   - THIRD_PARTY_KERNEL goes to `-O3`: the extra unrolling/vectorization
+  #     is a win and stays IEEE-correct. The former "CMSIS-NN is integer-only"
+  #     wording is stale -- ns-cmsis-nn 7.29.x onward ships float kernels
+  #     (`*_f32.c`, `*_f16.c`) -- but `-O3` is not `-ffast-math`, so NaN/Inf
+  #     propagation and FP ordering in those sources are preserved.
   # Note: GCC 14 `-O3` on CMSIS-NN inflates `.text` by ~5-6 KiB per
   # integration test image, which would overflow corstone-300 ITCM
   # (512 KiB) under upstream's `platform_parsed.ld`. `corstone_m_corstone_300_makefile.inc`
@@ -624,11 +653,31 @@ $(BINDIR)%.test_target: $(BINDIR)%_test
 # These are microcontroller-specific rules for converting the ELF output
 # of the linker into a binary image that can be loaded directly.
 ifeq ($(TOOLCHAIN), armclang)
-  CXXFLAGS += -ffp-mode=full
-  # helia: armclang's nan/inf-under-fast-math diagnostic is promoted to
-  # an error by upstream's -Werror. Demote to warning to keep helia
-  # builds green; same suppression applied to ATfE in targets/atfe.inc.
-  CXXFLAGS += -Wno-error=nan-infinity-disabled
+  # helia: flags assertion for the `-ffp-mode=full` placement above.
+  #
+  # `-Wnan-infinity-disabled` fires exactly when fast-math is EFFECTIVELY on
+  # for the translation unit being compiled, so it is a precise oracle for the
+  # bug in issue #228 -- a `-ffp-mode=full` that has been moved, dropped, or
+  # ordered before `-Ofast` makes it fire again. Promoting just this one
+  # diagnostic to an error turns that from a warning nobody reads into a build
+  # failure. Measured on armclang 6.24, cortex-m55, `float g(void){return
+  # INFINITY;}`:
+  #
+  #   -Ofast                                          -> warning  (exit 0)
+  #   -ffp-mode=full -Ofast                           -> warning  (exit 0)
+  #   -Ofast -ffp-mode=full                           -> silent   (exit 0)
+  #   -Ofast -Werror=nan-infinity-disabled            -> ERROR    (exit 1)
+  #   -Ofast -ffp-mode=full -Werror=...               -> silent   (exit 0)
+  #
+  # This deliberately replaces the previous `-Wno-error=nan-infinity-disabled`
+  # suppressions. Those were inert (no `-Werror` is set anywhere in this build)
+  # AND pointed the wrong way: they existed to hide the one signal that would
+  # have caught #228. Note the scope is a single `-Werror=<diag>`; global
+  # `-Werror` is NOT enabled here. ATfE keeps its own suppression in
+  # targets/atfe.inc -- it has no `-ffast-math` in its opt levels, so the
+  # diagnostic means something different there.
+  CCFLAGS  += -Werror=nan-infinity-disabled
+  CXXFLAGS += -Werror=nan-infinity-disabled
   FROMELF := $(TARGET_TOOLCHAIN_ROOT)$(TARGET_TOOLCHAIN_PREFIX)fromelf
   $(BINDIR)%.bin: $(BINDIR)%
 		$(Q)$(MKDIR_P) $(dir $@)
