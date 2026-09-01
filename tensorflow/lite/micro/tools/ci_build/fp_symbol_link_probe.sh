@@ -109,15 +109,38 @@ LIB_ABS="$(cd "$(dirname "${LIB}")" && pwd)/$(basename "${LIB}")"
 # followed by an open paren. Declarations match too, which is fine -- helia
 # only declares what it calls -- but comments and doc prose do not, which is
 # the point of requiring the paren.
-harvest_symbols() {
-  grep -rhoE '\barm_[a-z0-9_]+_f(16|32)[[:space:]]*\(' \
+#
+# `-H` keeps the filename, so each symbol is tracked back to the helia kernel(s)
+# that call it (SYMBOL_FILES). A legitimate MISSING report then names the
+# referring kernel, not just a bare `arm_..._f16` -- the ns#329 class (a
+# removed fp16 pair) reports exactly such a bare symbol, and "which kernel
+# breaks?" is the first triage question.
+harvest_pairs() {
+  # Emits "<symbol><TAB><file>" per call site. awk splits on the FIRST colon
+  # only (repo paths carry no colon), then strips the trailing "(" and any
+  # leading space off the matched token.
+  grep -rHoE '\barm_[a-z0-9_]+_f(16|32)[[:space:]]*\(' \
        --include='*.cc' --include='*.h' --include='*.c' \
        "${KERNELS_DIR}" \
-    | sed -E 's/[[:space:]]*\(.*$//' \
+    | awk -F: '{ file=$1; sym=$2; sub(/[[:space:]]*\(.*/, "", sym); print sym "\t" file }' \
     | sort -u
 }
 
-mapfile -t ALL_SYMBOLS < <(harvest_symbols)
+declare -A SYMBOL_FILES=()
+ALL_SYMBOLS=()
+while IFS=$'\t' read -r _sym _file; do
+  [[ -n "${_sym}" ]] || continue
+  if [[ -z "${SYMBOL_FILES[${_sym}]:-}" ]]; then
+    ALL_SYMBOLS+=("${_sym}")
+    SYMBOL_FILES[${_sym}]="${_file}"
+  else
+    # De-dup files per symbol; a symbol called from several kernels lists all.
+    case " ${SYMBOL_FILES[${_sym}]} " in
+      *" ${_file} "*) : ;;
+      *) SYMBOL_FILES[${_sym}]+=" ${_file}" ;;
+    esac
+  fi
+done < <(harvest_pairs)
 
 if [[ "${#ALL_SYMBOLS[@]}" -eq 0 ]]; then
   echo "fp-probe: harvested no FP symbols from ${KERNELS_DIR} -- the harvest" >&2
@@ -147,6 +170,15 @@ make_var() {
 
 PROBE_CC="$(make_var CC)"
 PROBE_CCFLAGS="$(make_var CCFLAGS)"
+# MICROLITE_LIBS is queried, not hardcoded, on purpose: it is `-lm` for gcc and
+# ATfE but EMPTY for armclang, because the upstream Makefile filters `-lm` out
+# under armclang (armlink provides libm implementations itself and rejects the
+# flag with `L6450U: Cannot find library m` -- see cortex_m_generic_makefile.inc).
+# Passing a fixed `-lm` here would make the armclang link fail with an error
+# that names no probe symbol, which the classifier below would (correctly)
+# treat as "guard could not be evaluated" and exit non-zero -- turning a sound
+# library into a red release leg. Inheriting the value from make is what keeps
+# the armclang branch honest. Do not replace this with a literal.
 PROBE_LIBS="$(make_var MICROLITE_LIBS)"
 
 [[ -n "${PROBE_CC}" ]] || { echo "fp-probe: could not resolve CC from ${MAKEFILE}" >&2; exit 2; }
@@ -312,7 +344,10 @@ if [[ "${link_ok}" -ne 1 ]]; then
     echo "fp-probe: the linker could not resolve FP entry points that helia" >&2
     echo "fp-probe: calls -- a real defect in the library, not a probe" >&2
     echo "fp-probe: configuration issue. Unresolved probe symbols:" >&2
-    printf 'fp-probe:   %s\n' "${MISSING[@]}" >&2
+    for _m in "${MISSING[@]}"; do
+      printf 'fp-probe:   MISSING %s (called from %s)\n' \
+        "${_m}" "${SYMBOL_FILES[${_m}]:-unknown}" >&2
+    done
     echo "fp-probe: linker diagnostics:" >&2
     grep -E "${UNDEF_RE}" "${conclusive}" >&2
     echo "fp-probe: full log: ${conclusive}" >&2
