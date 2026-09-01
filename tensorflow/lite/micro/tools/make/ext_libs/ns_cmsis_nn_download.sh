@@ -141,6 +141,22 @@ EOF
   exit 1
 }
 
+# checkout_ref: `git checkout` a ref and, on failure, say plainly that the REF
+# did not resolve. Without this the bare `git checkout` error ("error: pathspec
+# '<ref>' did not match ...") scrolls past inside a make download step and reads
+# like infra breakage -- but the common cause now is a canary dispatched with a
+# charset-valid but nonexistent ref (a `v7.30.O`-for-`v7.30.0` typo). Must run
+# inside the already-cloned repo dir (the callers `pushd` first).
+checkout_ref() {
+  local ref="${1}"
+  if ! git checkout "${ref}" >&2; then
+    echo >&2 "ERROR: ns-cmsis-nn ref '${ref}' did not resolve to a commit in AmbiqAI/ns-cmsis-nn."
+    echo >&2 "       Check the ref passed via NS_CMSIS_NN_COMMIT (or the ns_cmsis_nn_canary"
+    echo >&2 "       dispatch input). A valid full SHA, tag (e.g. v7.30.1), or branch is required."
+    exit 1
+  fi
+}
+
 should_download=$(check_should_download "${DOWNLOADS_DIR}")
 
 if [[ ${should_download} == "no" ]]; then
@@ -154,7 +170,7 @@ elif [ -d "${DOWNLOADED_NS_CMSIS_NN_PATH}" ]; then
     rm -rf "${DOWNLOADED_NS_CMSIS_NN_PATH}"
     clone_ns_cmsis_nn "${DOWNLOADED_NS_CMSIS_NN_PATH}"
     pushd "${DOWNLOADED_NS_CMSIS_NN_PATH}" > /dev/null
-    git checkout "${GIT_COMMIT}" >&2
+    checkout_ref "${GIT_COMMIT}"
     popd > /dev/null
   else
     # Check that the existing clone is at the right commit. Only trust the
@@ -178,7 +194,7 @@ elif [ -d "${DOWNLOADED_NS_CMSIS_NN_PATH}" ]; then
       rm -rf "${DOWNLOADED_NS_CMSIS_NN_PATH}"
       clone_ns_cmsis_nn "${DOWNLOADED_NS_CMSIS_NN_PATH}"
       pushd "${DOWNLOADED_NS_CMSIS_NN_PATH}" > /dev/null
-      git checkout "${GIT_COMMIT}" >&2
+      checkout_ref "${GIT_COMMIT}"
       popd > /dev/null
     fi
   fi
@@ -186,7 +202,7 @@ elif [ -d "${DOWNLOADED_NS_CMSIS_NN_PATH}" ]; then
 else
   clone_ns_cmsis_nn "${DOWNLOADED_NS_CMSIS_NN_PATH}"
   pushd "${DOWNLOADED_NS_CMSIS_NN_PATH}" > /dev/null
-  git checkout "${GIT_COMMIT}" >&2
+  checkout_ref "${GIT_COMMIT}"
   popd > /dev/null
 fi
 
