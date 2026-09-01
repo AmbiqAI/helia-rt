@@ -50,6 +50,12 @@ struct CmsisNnOpDataSvdf {
   int output_zero_point;
   int activation_state_zero_point;
   int32_t* kernel_sums;
+  // Byte size behind kernel_sums / scratch_weight_tensor_index, i.e. the
+  // arm_svdf_s8_get_buffer_size() result computed in Prepare. 0 means the
+  // kernel asked for no buffer (the DSP/plain-C sizer returns 0; only the MVE
+  // one asks for num_filters * sizeof(int32_t)), in which case no buffer was
+  // allocated and none may be handed to the kernel.
+  int32_t kernel_sums_size;
 };
 
 void* Init(TfLiteContext* context, const char* buffer, size_t length) {
@@ -193,16 +199,26 @@ TfLiteStatus CmsisNnPrepareSvdf(TfLiteContext* context, TfLiteNode* node) {
     weights_feature_dims.h = input_size;
 
     const int32_t buf_size = arm_svdf_s8_get_buffer_size(&weights_feature_dims);
+    TF_LITE_ENSURE_MSG(context, buf_size >= 0,
+                       "SVDF: invalid kernel-sums buffer size.");
+    data->kernel_sums = nullptr;
+    data->kernel_sums_size = buf_size;
 
     if (buf_size > 0) {
 #if defined(KERNELS_OPTIMIZED_FOR_SPEED)
       data->kernel_sums = static_cast<int32_t*>(
           context->AllocatePersistentBuffer(context, buf_size));
+      TF_LITE_ENSURE(context, data->kernel_sums != nullptr);
 
-      arm_vector_sum_s8(data->kernel_sums, input_size, num_filters,
-                        GetTensorData<int8_t>(weights_feature),
-                        -data->input_zero_point,
-                        -data->activation_state_zero_point, nullptr);
+      const arm_cmsis_nn_status vector_sum_status = arm_vector_sum_s8(
+          data->kernel_sums, input_size, num_filters,
+          GetTensorData<int8_t>(weights_feature), -data->input_zero_point,
+          -data->activation_state_zero_point, nullptr);
+      if (vector_sum_status != ARM_CMSIS_NN_SUCCESS) {
+        MicroPrintf("SVDF: arm_vector_sum_s8 failed (%d).",
+                    static_cast<int>(vector_sum_status));
+        return kTfLiteError;
+      }
 #elif defined(KERNELS_OPTIMIZED_FOR_SIZE)
       const TfLiteStatus scratch_kernel_status =
           context->RequestScratchBufferInArena(
@@ -305,36 +321,58 @@ TfLiteStatus EvalIntegerSVDF(TfLiteContext* context, TfLiteNode* node,
   TFLITE_DCHECK(context != nullptr);
   TFLITE_DCHECK(context->GetScratchBuffer != nullptr);
 
-  cmsis_nn_context scratch_ctx;
-  scratch_ctx.buf = static_cast<int32_t*>(
-      context->GetScratchBuffer(context, data.scratch_tensor_index));
+  // .size must describe the buffer actually behind .buf: leaving it
+  // indeterminate (or defaulting it to 0) disables the kernel's own
+  // under-allocation check. These two are the arm_svdf_s8 /
+  // arm_svdf_state_s16_s8 input_ctx and output_ctx, and Prepare requested them
+  // as batch * num_filters * sizeof(int32_t) and batch * num_units *
+  // sizeof(int32_t) respectively. Prepare enforces
+  // output->dims == {batch_size, num_units}, so output_dims carries both.
+  const int32_t batch_size = input_dims.n;
+  const int32_t num_filters = weights_feature_dims.n;
+  const int32_t num_units = output_dims.h;
 
-  cmsis_nn_context scratch_output_ctx;
-  scratch_output_ctx.buf = static_cast<int32_t*>(
-      context->GetScratchBuffer(context, data.scratch_output_tensor_index));
+  cmsis_nn_context scratch_ctx = {
+      context->GetScratchBuffer(context, data.scratch_tensor_index),
+      static_cast<int32_t>(batch_size * num_filters * sizeof(int32_t))};
+
+  cmsis_nn_context scratch_output_ctx = {
+      context->GetScratchBuffer(context, data.scratch_output_tensor_index),
+      static_cast<int32_t>(batch_size * num_units * sizeof(int32_t))};
 
   int8_t* output_data = tflite::micro::GetTensorData<int8_t>(output_tensor);
 
   switch (weights_time_tensor->type) {
     case kTfLiteInt8: {
-      cmsis_nn_context ctx;
-
+      // arm_svdf_s8's first context holds the kernel sums. Prepare only
+      // allocates it when arm_svdf_s8_get_buffer_size() asked for one, so
+      // {nullptr, 0} is the correct value when it did not -- neither
+      // data.kernel_sums nor data.scratch_weight_tensor_index is set on that
+      // path.
+      cmsis_nn_context ctx = {nullptr, 0};
+      if (data.kernel_sums_size > 0) {
+        ctx.size = data.kernel_sums_size;
 #if defined(KERNELS_OPTIMIZED_FOR_SPEED)
-      ctx.buf = data.kernel_sums;
+        ctx.buf = data.kernel_sums;
 #elif defined(KERNELS_OPTIMIZED_FOR_SIZE)
-      ctx.buf = static_cast<int32_t*>(
-          context->GetScratchBuffer(context, data.scratch_weight_tensor_index));
+        ctx.buf = context->GetScratchBuffer(context,
+                                            data.scratch_weight_tensor_index);
 
-      const int input_size = input_tensor->dims->data[1];
-      const int num_filters = weights_feature_tensor->dims->data[0];
+        const int input_size = input_tensor->dims->data[1];
 
-      arm_vector_sum_s8(
-          static_cast<int32_t*>(ctx.buf), input_size, num_filters,
-          tflite::micro::GetTensorData<int8_t>(weights_feature_tensor),
-          -data.input_zero_point, -data.activation_state_zero_point, nullptr);
+        const arm_cmsis_nn_status vector_sum_status = arm_vector_sum_s8(
+            static_cast<int32_t*>(ctx.buf), input_size, num_filters,
+            tflite::micro::GetTensorData<int8_t>(weights_feature_tensor),
+            -data.input_zero_point, -data.activation_state_zero_point, nullptr);
+        if (vector_sum_status != ARM_CMSIS_NN_SUCCESS) {
+          MicroPrintf("SVDF: arm_vector_sum_s8 failed (%d).",
+                      static_cast<int>(vector_sum_status));
+          return kTfLiteError;
+        }
 #endif
+      }
 
-      arm_svdf_s8(
+      const arm_cmsis_nn_status status = arm_svdf_s8(
           &ctx, &scratch_ctx, &scratch_output_ctx, &svdf_params,
           &in_quant_params, &out_quant_params, &input_dims,
           tflite::micro::GetTensorData<int8_t>(input_tensor), &state_dims,
@@ -345,11 +383,15 @@ TfLiteStatus EvalIntegerSVDF(TfLiteContext* context, TfLiteNode* node,
           tflite::micro::GetTensorData<int8_t>(weights_time_tensor), &bias_dims,
           tflite::micro::GetTensorData<int32_t>(bias_tensor), &output_dims,
           output_data);
+      if (status != ARM_CMSIS_NN_SUCCESS) {
+        MicroPrintf("SVDF: arm_svdf_s8 failed (%d).", static_cast<int>(status));
+        return kTfLiteError;
+      }
       return kTfLiteOk;
     }
 
     case kTfLiteInt16: {
-      arm_svdf_state_s16_s8(
+      const arm_cmsis_nn_status status = arm_svdf_state_s16_s8(
           &scratch_ctx, &scratch_output_ctx, &svdf_params, &in_quant_params,
           &out_quant_params, &input_dims,
           tflite::micro::GetTensorData<int8_t>(input_tensor), &state_dims,
@@ -360,6 +402,11 @@ TfLiteStatus EvalIntegerSVDF(TfLiteContext* context, TfLiteNode* node,
           tflite::micro::GetTensorData<int16_t>(weights_time_tensor),
           &bias_dims, tflite::micro::GetTensorData<int32_t>(bias_tensor),
           &output_dims, output_data);
+      if (status != ARM_CMSIS_NN_SUCCESS) {
+        MicroPrintf("SVDF: arm_svdf_state_s16_s8 failed (%d).",
+                    static_cast<int>(status));
+        return kTfLiteError;
+      }
       return kTfLiteOk;
     }
 
