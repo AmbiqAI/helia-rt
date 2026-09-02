@@ -714,7 +714,8 @@ TEST(TransposeTest, TransposeFloat16ReferenceFallback) {
   tensors[1].allocation_type = kTfLiteMmapRo;
   int inputs_array_data[] = {2, 0, 1};
   int outputs_array_data[] = {1, 2};
-  micro::KernelRunner runner(Register_TRANSPOSE(), tensors, 3,
+  const TFLMRegistration registration = Register_TRANSPOSE();
+  micro::KernelRunner runner(registration, tensors, 3,
                              IntArrayFromInts(inputs_array_data),
                              IntArrayFromInts(outputs_array_data), nullptr);
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());

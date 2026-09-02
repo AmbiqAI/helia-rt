@@ -1020,7 +1020,8 @@ TEST(SvdfTest, SvdfFloat16_2x2Input2x4OutputShouldMatchGolden) {
   TfLiteSVDFParams params = {};
   params.rank = rank;
   params.activation = kTfLiteActNone;
-  micro::KernelRunner runner(Register_SVDF(), tensors, 6,
+  const TFLMRegistration registration = Register_SVDF();
+  micro::KernelRunner runner(registration, tensors, 6,
                              IntArrayFromInts(inputs_array_data),
                              IntArrayFromInts(outputs_array_data), &params);
 

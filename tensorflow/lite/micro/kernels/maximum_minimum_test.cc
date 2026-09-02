@@ -351,7 +351,8 @@ TEST(MaximumMinimumTest, Float16MultiElementGolden) {
   };
   int inputs_array_data[] = {2, 0, 1};
   int outputs_array_data[] = {1, 2};
-  micro::KernelRunner max_runner(Register_MAXIMUM(), max_tensors, 3,
+  const TFLMRegistration max_registration = Register_MAXIMUM();
+  micro::KernelRunner max_runner(max_registration, max_tensors, 3,
                                  IntArrayFromInts(inputs_array_data),
                                  IntArrayFromInts(outputs_array_data),
                                  nullptr);
@@ -366,7 +367,8 @@ TEST(MaximumMinimumTest, Float16MultiElementGolden) {
       CreateTensor(data2, IntArrayFromInts(dims), false, kTfLiteFloat16),
       CreateTensor(output_data, IntArrayFromInts(dims), false, kTfLiteFloat16),
   };
-  micro::KernelRunner min_runner(Register_MINIMUM(), min_tensors, 3,
+  const TFLMRegistration min_registration = Register_MINIMUM();
+  micro::KernelRunner min_runner(min_registration, min_tensors, 3,
                                  IntArrayFromInts(inputs_array_data),
                                  IntArrayFromInts(outputs_array_data),
                                  nullptr);

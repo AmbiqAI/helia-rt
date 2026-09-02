@@ -772,7 +772,8 @@ TEST(PoolingTest, Float16MaxAndAveragePoolGolden) {
                              kTfLiteActNone,
                              {}};
 
-  micro::KernelRunner max_runner(Register_MAX_POOL_2D(), tensors, 2,
+  const TFLMRegistration max_registration = Register_MAX_POOL_2D();
+  micro::KernelRunner max_runner(max_registration, tensors, 2,
                                  IntArrayFromInts(inputs_array_data),
                                  IntArrayFromInts(outputs_array_data),
                                  &params);
@@ -783,7 +784,8 @@ TEST(PoolingTest, Float16MaxAndAveragePoolGolden) {
 
   output_data[0] = static_cast<float16_t>(0);
   output_data[1] = static_cast<float16_t>(0);
-  micro::KernelRunner avg_runner(Register_AVERAGE_POOL_2D(), tensors, 2,
+  const TFLMRegistration avg_registration = Register_AVERAGE_POOL_2D();
+  micro::KernelRunner avg_runner(avg_registration, tensors, 2,
                                  IntArrayFromInts(inputs_array_data),
                                  IntArrayFromInts(outputs_array_data),
                                  &params);
