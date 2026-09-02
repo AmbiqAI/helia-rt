@@ -93,6 +93,60 @@ jobs:
           - arch: "cortex-m3"
             toolchain: "atfe"
 
+        # Per-leg floors for the executed-case tally in
+        # tools/ci_build/test_helia.sh (issue #231). Without them that script
+        # can only fail a leg that executed literally zero cases; the floors
+        # are what turn it into a "tests do not leave this suite silently"
+        # gate.
+        #
+        # Observed on run 33588738621 (head 39fabfd7, 2026-09-02); the job IDs
+        # are in the PR description. Both profiles of a given arch+toolchain
+        # reported identical numbers, which is why one entry covers SPEED and
+        # SIZE. `min-binaries` counts every binary that ran, including the one
+        # framework-less binary (hello_world_test) that reports no case count
+        # -- that is why these are one higher than the pre-2a2278da tally
+        # format showed.
+        #
+        # These numbers are a LOWER BOUND, not the current exact count. They
+        # were measured before this branch was rebased onto #229 (518a95b4),
+        # which registered five more helia test binaries through
+        # ext_libs/helia_tests.inc (float activation/elementwise/LSTM edge,
+        # quantize zero-point, transpose_conv optional bias). So the legs now
+        # run more than this and the floors still pass, but they would not
+        # catch the loss of one of those newer binaries. RE-PIN from the first
+        # completed run on this head; the intent is an exact match.
+        #
+        # The exact-match intent is deliberate. If an exclusion is intended --
+        # a binary filtered out for a toolchain, a case skipped behind a macro
+        # -- lower the floor in the SAME change and say why. A floor that
+        # drifts down on its own is the failure mode this exists to catch.
+        #
+        # No entry for cortex-m55 + atfe: those two legs still time out on a
+        # hanging FP16 kernel test (issue #239), so there is no completed run
+        # to take a number from. They fall through with the floors unset, and
+        # test_helia.sh then enforces only the non-zero check. Add them when
+        # #239 closes.
+        include:
+          - arch: "cortex-m3"
+            toolchain: "gcc"
+            min-binaries: 130
+            min-cases: 1114
+          - arch: "cortex-m4+fp"
+            toolchain: "gcc"
+            min-binaries: 130
+            min-cases: 1114
+          - arch: "cortex-m4+fp"
+            toolchain: "atfe"
+            # One binary and one case fewer than gcc: cortex_m_corstone_300_atfe.inc
+            # filters flatbuffer_utils_test out for ATfE, with its own
+            # justification in that file.
+            min-binaries: 129
+            min-cases: 1113
+          - arch: "cortex-m55"
+            toolchain: "gcc"
+            min-binaries: 130
+            min-cases: 1134
+
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
 
@@ -186,6 +240,11 @@ jobs:
           CCACHE_COMPRESSLEVEL: "6"
           CCACHE_MAXSIZE: "2G"
           NS_CMSIS_NN_REF: ${{ inputs.ns-cmsis-nn-ref }}
+          # Empty on any leg with no floors in the matrix `include:` above
+          # (today: cortex-m55 + atfe). test_helia.sh treats an empty value as
+          # "no floor" and still fails the leg on a zero tally.
+          HELIA_MIN_TEST_BINARIES: ${{ matrix.min-binaries }}
+          HELIA_MIN_EXECUTED_CASES: ${{ matrix.min-cases }}
         run: |
           # Configure & zero stats before the build so the post-build
           # 'ccache -s' line shows only this run.
