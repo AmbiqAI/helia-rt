@@ -142,6 +142,25 @@ then
   exit 1
 fi
 
+# helia-rt (issue #239): a fault report fails the binary unconditionally, and
+# it is checked BEFORE the pass string. cortex_m_corstone_300/fault_handlers.cc
+# prints one '^FAULT: ...' line from the fault handlers. A fault that happens
+# after micro_test has already printed '~~~ALL TESTS PASSED~~~' -- in teardown,
+# in a static destructor, inside _exit or the semihosting path -- would
+# otherwise leave both lines in the log and be reported as a PASS. This applies
+# to non_test_binary targets too: an example that faults on the way out is a
+# failure whether or not it has a pass string.
+if grep -aq '^FAULT:' "${MICRO_LOG_FILENAME}"
+then
+  echo "--------------------------------------------------------"
+  echo "$BINARY_TO_TEST: FAIL - the program took a CPU fault."
+  grep -a '^FAULT:' "${MICRO_LOG_FILENAME}"
+  echo "Full log: ${MICRO_LOG_FILENAME}. PC/LR in the line above are the"
+  echo "faulting instruction and its caller. See issue #239."
+  echo "--------------------------------------------------------"
+  exit 1
+fi
+
 if [[ ${2} != "non_test_binary" ]]
 then
   if grep -q "$PASS_STRING" ${MICRO_LOG_FILENAME}

@@ -250,6 +250,43 @@ endif
 THIRD_PARTY_CC_SRCS += \
   $(CORTEX_DFP_PATH)/Device/$(ARM_CPU)/Source/system_$(ARM_CPU).c \
   $(CORTEX_DFP_PATH)/Device/$(ARM_CPU)/Source/startup_$(ARM_CPU).c
+
+# helia-rt (issue #239): strong fault handlers for the test runtime.
+#
+# The CMSIS startup file added just above defines HardFault_Handler and the
+# Default_Handler its siblings alias as `while(1);`, so on this target any
+# fault is indistinguishable from a hang -- which is the state the float16
+# golden tests are in under cortex-m55 + ATfE. fault_handlers.cc provides
+# strong definitions that print the fault status registers and the stacked
+# PC/LR and then end the simulation through semihosting SYS_EXIT.
+#
+# MICROLITE_TEST_RUNTIME_SRCS, not MICROLITE_CC_SRCS, is deliberate: these
+# objects go on the link line of test/example binaries only and are never
+# archived into libtensorflow-microlite.a, so nothing here reaches a release
+# library or pack artifact. Set for all three toolchains -- the semihosting
+# path it uses does not depend on the C library.
+#
+# Architecture gate: v7-M and later only. This target is built for cortex-m0
+# as well (helia_build.yml has a cortex-m0 gcc leg that goes through
+# test_helia.sh with TARGET=cortex_m_corstone_300), and Armv6-M has neither
+# the configurable fault vectors (MemManage/BusFault/UsageFault) nor the
+# status registers the report prints (CFSR, HFSR, MMFAR, BFAR) -- on v6-M
+# every fault is a HardFault and there is nothing to read out. Adding the
+# file there would compile a report made entirely of reads of reserved
+# addresses and define three handlers for vectors that do not exist. So it is
+# added only for the v7-M/v8-M-Mainline architectures. cortex-m23 is v8-M
+# Baseline and is excluded for the same reason as cortex-m0.
+#
+# The trampolines in fault_handlers.cc are nevertheless written in the v6-M
+# instruction subset, so a future arch added to this list (or an accidental
+# inclusion) cannot break the build.
+HELIA_FAULT_HANDLER_ARCHS := \
+  cortex-m3% cortex-m4% cortex-m7% cortex-m33% cortex-m35p% cortex-m55% \
+  cortex-m85%
+ifneq ($(filter $(HELIA_FAULT_HANDLER_ARCHS),$(TARGET_ARCH)),)
+  MICROLITE_TEST_RUNTIME_SRCS += \
+    $(TENSORFLOW_ROOT)tensorflow/lite/micro/cortex_m_corstone_300/fault_handlers.cc
+endif
 INCLUDES += \
   -I$(CORTEX_DFP_PATH)/Device/$(ARM_CPU)/Include \
   -I$(CMSIS_PATH)/CMSIS/Core/Include

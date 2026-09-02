@@ -49,7 +49,7 @@ unconditionally on Cortex-M55 (unlikely).
 
 ## `tensorflow/lite/micro/tools/make/Makefile`
 
-Two minimal hooks (~19 lines of inline drift, down from ~80):
+Three minimal hooks (~34 lines of inline drift, down from ~80):
 
 1. `GLOBAL_KERNEL_OPTIMIZE ?= SPEED` knob (defaults match upstream's
    static `KERNELS_OPTIMIZED_FOR_SPEED`) so the helia CI scripts
@@ -71,10 +71,47 @@ Two minimal hooks (~19 lines of inline drift, down from ~80):
    hooked via a 3-line `ifeq ($(TOOLCHAIN), atfe) … include … endif`
    block immediately after the upstream post-link block.
 
+3. `MICROLITE_TEST_RUNTIME_SRCS` / `MICROLITE_TEST_RUNTIME_OBJS` (issue
+   #239): an empty-by-default hook a target makefile can add
+   target-owned test-runtime sources to. Its objects are appended to the
+   link line of the `$(BINDIR)%_test` pattern rule and, via
+   [`helper_functions.inc`](../../tensorflow/lite/micro/tools/make/helper_functions.inc),
+   of every `microlite_test` binary — and are deliberately kept out of
+   `MICROLITE_LIB_OBJS` so they never enter
+   `libtensorflow-microlite.a` or a generated project. Upstream has no
+   hook for "code that must exist when a binary runs on a simulator but
+   must not ship in the library": `MICROLITE_CC_SRCS` archives it,
+   `MICROLITE_LIBS` puts it on the link line without building it. The
+   only consumer today is
+   `targets/cortex_m_corstone_300_makefile.inc`, which uses it for the
+   strong fault handlers in
+   `cortex_m_corstone_300/fault_handlers.cc`. Ordering constraint,
+   documented at the definition: the `_OBJS` assignment must stay above
+   `include tests.inc` and `kernels/Makefile.inc`, because make captures
+   a prerequisite list when the rule is defined but expands the recipe
+   at execution time.
+
 Drop condition: upstream introduces a per-`OPTIMIZED_KERNEL_DIR` Makefile
 include that runs early enough to extend `ADDITIONAL_DEFINES`, **and**
-upstream picks up first-class `atfe` toolchain support (at which point
-both hooks can be deleted).
+upstream picks up first-class `atfe` toolchain support, **and** upstream
+provides a target-owned test-runtime source hook (at which point all
+three hooks can be deleted). The third hook is a strong upstream-PR
+candidate on its own: it is target-agnostic and inert unless a target
+sets the variable.
+
+## `tensorflow/lite/micro/tools/make/helper_functions.inc`
+
+One hook, two lines (issue #239): `$(MICROLITE_TEST_RUNTIME_OBJS)` is
+added to the prerequisites and to the link command of the
+`microlite_test` template, which is what builds every example,
+integration test, benchmark and non-kernel test binary. Without it the
+hook described above would cover only the `$(BINDIR)%_test` pattern rule
+in `tools/make/Makefile`, i.e. the kernel tests, and every other binary
+would link without the target's test runtime. First divergence in this
+file; no upstream extension point exists for the template's link line.
+
+Drop condition: same as the `MICROLITE_TEST_RUNTIME_SRCS` hook above —
+upstream provides a target-owned test-runtime source hook.
 
 ## `tensorflow/lite/micro/tools/make/targets/cortex_m_generic_makefile.inc`
 
@@ -197,9 +234,9 @@ Separate block deliberately: `fix/atfe-test-registration-231` (#236) is
 rewriting the paragraph above at the same time, so keeping this apart keeps
 the two branches to a textual merge.
 
-About 50 lines, most of it the comment justifying the budget. Two changes,
-neither of which upstream offers a hook for — the log path and the FVP
-invocation are both set inline in this script:
+About 70 lines, most of it the comment justifying the budget. Three changes,
+none of which upstream offers a hook for — the pass/fail decision, the log
+path and the FVP invocation are all made inline in this script:
 
 1. The FVP invocation is wrapped in `timeout --kill-after=30 600`
    (`FVP_TIMEOUT_SECONDS` overrides it). A timeout becomes an explicit named
@@ -208,12 +245,18 @@ invocation are both set inline in this script:
    `logs.txt`, so the log of a binary that failed survives the ~90 binaries
    `make -k` runs after it. #236 makes the same change for its own reason
    (concurrent `make -j` interleaving); same expression, so the two agree.
+3. A `^FAULT:` line in the log fails the binary, checked before the
+   pass-string grep. This is what makes the report from
+   `cortex_m_corstone_300/fault_handlers.cc` visible to the harness, and it
+   catches a fault that happens after the pass string has been printed.
 
 `tools/ci_build/test_cortex_m_corstone_300.sh` (the upstream cmsis_nn leg)
-uses this same script and inherits both.
+uses this same script and inherits all three.
 
 Drop condition: upstream bounds each FVP run itself and gives each binary its
-own log.
+own log. The `^FAULT:` check drops together with the fault handlers, i.e.
+when the CMSIS startup for this target stops defining the fault vectors as
+`while(1);`.
 
 ## `.github/workflows/check_tflite_files.yml`
 
