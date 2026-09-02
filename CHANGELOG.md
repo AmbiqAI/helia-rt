@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.19.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.18.0...helia-rt-v1.19.0) (2026-09-02)
+
+
+### Features
+
+* **license:** scope field-of-use to production, permit dev/test/sim ([#220](https://github.com/AmbiqAI/helia-rt/issues/220)) ([0b2d4b7](https://github.com/AmbiqAI/helia-rt/commit/0b2d4b729cae63e1091777f8e2dbb347908c4a0f)), closes [#200](https://github.com/AmbiqAI/helia-rt/issues/200)
+
+
+### Bug Fixes
+
+* **atfe:** run static ctors so ATfE legs actually execute tests ([#236](https://github.com/AmbiqAI/helia-rt/issues/236)) ([2b6bff8](https://github.com/AmbiqAI/helia-rt/commit/2b6bff8dd8e3e30b064ca02d39b2d59511111ee0)), closes [#231](https://github.com/AmbiqAI/helia-rt/issues/231) [#239](https://github.com/AmbiqAI/helia-rt/issues/239)
+* **build:** give .data its own PT_LOAD in the gcc corstone-300 linker script ([#240](https://github.com/AmbiqAI/helia-rt/issues/240)) ([c5fbace](https://github.com/AmbiqAI/helia-rt/commit/c5fbace88c317d30527ca0206873ac9e91455ca0)), closes [#232](https://github.com/AmbiqAI/helia-rt/issues/232)
+* **build:** stop armclang compiling float kernels with fast-math; add FP link-probe, release gate, RC canary ([#230](https://github.com/AmbiqAI/helia-rt/issues/230)) ([e2f1143](https://github.com/AmbiqAI/helia-rt/commit/e2f114335d1cb704a40eb9041333362e9d1edd6c)), closes [#228](https://github.com/AmbiqAI/helia-rt/issues/228) [#227](https://github.com/AmbiqAI/helia-rt/issues/227)
+* **helia:** bump ns-cmsis-nn to v7.31.0 and add float runtime coverage ([#229](https://github.com/AmbiqAI/helia-rt/issues/229)) ([518a95b](https://github.com/AmbiqAI/helia-rt/commit/518a95b45b763e92af4e7bcc134b15e2c22c008b))
+* **helia:** check kernel statuses and initialize contexts in quantize, transpose_conv and SVDF ([#237](https://github.com/AmbiqAI/helia-rt/issues/237)) ([b1b6695](https://github.com/AmbiqAI/helia-rt/commit/b1b6695d43dec0e846d74208a79481fcbc68e234)), closes [#233](https://github.com/AmbiqAI/helia-rt/issues/233)
+* **helia:** initialize the TRANSPOSE_CONV weight-sum input offset on the SPEED path ([#222](https://github.com/AmbiqAI/helia-rt/issues/222)) ([a1a7ff0](https://github.com/AmbiqAI/helia-rt/commit/a1a7ff08d908eea7961d78040f737295c4a37939)), closes [#207](https://github.com/AmbiqAI/helia-rt/issues/207) [#224](https://github.com/AmbiqAI/helia-rt/issues/224)
+
 ## [1.18.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.17.0...helia-rt-v1.18.0) (2026-08-25)
 
 
