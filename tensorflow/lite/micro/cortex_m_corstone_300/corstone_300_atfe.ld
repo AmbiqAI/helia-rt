@@ -135,7 +135,25 @@ SECTIONS
     *(.data)
     *(.data.*)
     . = ALIGN(4);
+    /* picolibc's __libc_init_array() (libc.a:libc_misc_init.c.o) does NOT
+     * walk __preinit_array_start/__init_array_start like newlib's does. It
+     * walks a single combined range bounded by the weakly-referenced
+     * __bothinit_array_start / __bothinit_array_end, which picolibc's own
+     * picolibc.ld provides here. Omitting them leaves both weak references
+     * undefined, i.e. 0, so the loop bound test passes on the first
+     * iteration and NO static constructor ever runs -- which is what left
+     * micro_test_v2's TEST() self-registration list empty and made every
+     * ATfE test binary report "[==========] 0 tests ran." (issue #231).
+     * The GCC linker script needs no equivalent because newlib's
+     * __libc_init_array uses the __preinit_/__init_ pair below.
+     *
+     * Placement matches picolibc.ld: start at the head of .preinit_array,
+     * end at the tail of .init_array. The ALIGN(4) between the two arrays
+     * can never insert padding (both hold only 4-byte function pointers and
+     * the region is already 4-aligned), so the combined range stays free of
+     * null entries. */
     PROVIDE_HIDDEN (__preinit_array_start = .);
+    PROVIDE_HIDDEN (__bothinit_array_start = .);
     KEEP(*(.preinit_array))
     PROVIDE_HIDDEN (__preinit_array_end = .);
     . = ALIGN(4);
@@ -143,6 +161,7 @@ SECTIONS
     KEEP(*(SORT(.init_array.*)))
     KEEP(*(.init_array))
     PROVIDE_HIDDEN (__init_array_end = .);
+    PROVIDE_HIDDEN (__bothinit_array_end = .);
     . = ALIGN(4);
     PROVIDE_HIDDEN (__fini_array_start = .);
     KEEP(*(SORT(.fini_array.*)))

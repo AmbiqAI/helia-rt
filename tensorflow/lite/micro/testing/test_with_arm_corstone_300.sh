@@ -27,7 +27,13 @@ PASS_STRING=${2}
 TARGET=${3}
 
 RESULTS_DIRECTORY=/tmp/${TARGET}_logs
-MICRO_LOG_FILENAME=${RESULTS_DIRECTORY}/logs.txt
+# helia-rt (issue #231): one log per binary, not a single shared logs.txt.
+# The test rules can run under `make -j`, and with one path two concurrent
+# binaries interleave into it -- binary A's assertion would then parse binary
+# B's banner, or see two framework summaries and fail a run that was fine.
+# `tee` still truncates on open, so a binary that never produces output leaves
+# an empty log and still fails the assertion below.
+MICRO_LOG_FILENAME=${RESULTS_DIRECTORY}/$(basename "${BINARY_TO_TEST}").txt
 mkdir -p ${RESULTS_DIRECTORY}
 
 FVP="FVP_Corstone_SSE-300_Ethos-U55 "
@@ -43,12 +49,27 @@ FVP+='-C mps3_board.uart0.shutdown_on_eot=1 '
 # unaffected by this setting.
 FVP+='-C cpu0.semihosting-enable=1 '
 FVP+='--stat'
+# helia-rt (issue #231): the FVP's exit status is deliberately not consulted.
+# The program does not terminate through it -- ethos-u-core-platform's
+# retarget.c _exit() prints "Application exit code: N.", 0x04 and EXITTHESIM
+# to the UART and then spins, so the model stops on uart0.shutdown_on_eot and
+# reports "Simulation stopped by user" (see the sample run in
+# tools/benchmarking/README.md). The log is the authority: the assertion below
+# checks that exit-code line, the executed-case count and the failure markers.
 ${FVP} ${BINARY_TO_TEST} | tee ${MICRO_LOG_FILENAME}
 
 if [[ ${2} != "non_test_binary" ]]
 then
   if grep -q "$PASS_STRING" ${MICRO_LOG_FILENAME}
   then
+    # helia-rt (issue #231): both micro-test frameworks print the pass string
+    # whenever the FAILURE count is zero, which includes the case where the
+    # EXECUTED count is also zero. Require a positive executed-case count
+    # before calling this a pass, so an empty test registry fails the leg
+    # instead of going green.
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    "${SCRIPT_DIR}/assert_tests_executed.sh" \
+      "${MICRO_LOG_FILENAME}" "${BINARY_TO_TEST}"
     echo "$BINARY_TO_TEST: PASS"
     exit 0
   else

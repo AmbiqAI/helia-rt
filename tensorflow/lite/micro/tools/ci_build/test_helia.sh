@@ -222,6 +222,26 @@ for OPTIMIZE_KERNELS_FOR in "${variants[@]}"; do
     --label "${TARGET_ARCH}-${TOOLCHAIN}-${OPTIMIZE_KERNELS_FOR}"
 
   if [[ "${RUN_TESTS}" -eq 1 ]]; then
+    # ---- executed-case tally (issue #231) ------------------------------------
+    # testing/assert_tests_executed.sh fails any individual binary that
+    # executes 0 test cases. This file collects what each binary actually ran
+    # so the leg can also report -- and floor-check -- its total.
+    #
+    # The other half of the failure mode is binaries silently dropping out of
+    # the suite entirely, which no per-binary check can see. The tally can
+    # catch that, but ONLY against a floor: with HELIA_MIN_TEST_BINARIES /
+    # HELIA_MIN_EXECUTED_CASES unset, the only condition below that can fire
+    # is a literal zero. On a leg with no floors set this block reports the
+    # totals and nothing else. The floors are set per leg in
+    # .github/workflows/helia_test.yml.
+    #
+    # An explicit template is required: BSD/macOS mktemp has no default
+    # template, so a bare `mktemp` fails there and would take this script
+    # down under `set -e` on a local run.
+    HELIA_TEST_TALLY_FILE="$(mktemp "${TMPDIR:-/tmp}/helia_test_tally.XXXXXX")"
+    export HELIA_TEST_TALLY_FILE
+    : > "${HELIA_TEST_TALLY_FILE}"
+
     # Individual tests (keep as-is; fast failures, clearer logs)
     readable_run make -j"${JOBS}" "${ARGS[@]}" test_integration_tests_nnaed_conv_test
     readable_run make -j"${JOBS}" "${ARGS[@]}" test_integration_tests_nnaed_pad_test
@@ -267,6 +287,76 @@ for OPTIMIZE_KERNELS_FOR in "${variants[@]}"; do
       echo "ERROR: helia test suite failed (make exit ${suite_status})" >&2
       exit "${suite_status}"
     fi
+    # ---- per-leg executed-case floor (issue #231) ----------------------------
+    # Zero is always a failure: a leg that ran no test binary, or whose
+    # binaries collectively executed no case, is not a passing leg however
+    # green make looked. That check needs no configuration.
+    #
+    # HELIA_MIN_TEST_BINARIES / HELIA_MIN_EXECUTED_CASES are the drop-out
+    # check and are only in force where the workflow sets them. Unset, the
+    # tally is reported and nothing is enforced beyond zero. They are not
+    # hard-coded here because a floor has to come from an observed CI run for
+    # the leg it guards, not from this script's idea of the suite.
+    #
+    # Tally line format: <binary-name><TAB><executed-cases><TAB><kind>.
+    # 'frameworkless' binaries (see FRAMEWORKLESS_BINARIES in
+    # testing/assert_tests_executed.sh) ran but have no case count, so they
+    # count as binaries and contribute zero cases -- which is why the binary
+    # floor for a leg is (counted + framework-less) binaries, not just the
+    # ones with a count. Report them separately so "N binaries, M cases"
+    # cannot be read as "every binary reported cases".
+    #
+    # All three numbers come from the same awk parse, keyed on a non-empty
+    # first field. `wc -l` was wrong for a floor: it counts newlines, so a
+    # blank line would be credited as a binary and a final line left without
+    # a trailing newline by a killed run would not be counted at all.
+    tally_binaries="$(awk -F'\t' '$1 != "" {n += 1} END {print n + 0}' \
+                      "${HELIA_TEST_TALLY_FILE}")"
+    tally_frameworkless="$(awk -F'\t' '$1 != "" && $3 == "frameworkless" \
+                           {n += 1} END {print n + 0}' \
+                           "${HELIA_TEST_TALLY_FILE}")"
+    tally_cases="$(awk -F'\t' '$1 != "" {s += $2} END {print s + 0}' \
+                   "${HELIA_TEST_TALLY_FILE}")"
+    echo "==> executed-case tally for ${TARGET_ARCH}/${TOOLCHAIN}/${OPTIMIZE_KERNELS_FOR}:" \
+         "${tally_binaries} binaries (${tally_frameworkless} framework-less," \
+         "no case count), ${tally_cases} test cases"
+
+    if [[ "${tally_binaries}" -eq 0 || "${tally_cases}" -eq 0 ]]; then
+      echo "::error ::${TARGET_ARCH}/${TOOLCHAIN}/${OPTIMIZE_KERNELS_FOR}:" \
+           "the suite executed ${tally_cases} test cases across" \
+           "${tally_binaries} binaries. A green leg that ran nothing is a" \
+           "harness failure, not a pass (issue #231)."
+      exit 1
+    fi
+
+    # Compare one tally against its floor, if that floor is set.
+    # The regex is not decoration: `[[ x -lt y ]]` evaluates both sides as
+    # bash arithmetic, and a bare word such as `abc` is read there as the
+    # (unset, therefore 0) variable abc. A mistyped floor would then compare
+    # against 0 and silently disable the very gate it was added to arm, so
+    # anything that is not a plain non-negative integer is an error.
+    assert_tally_floor() {  # <observed> <floor> <floor-var-name> <what>
+      local observed="$1" floor="$2" name="$3" what="$4"
+      [[ -n "${floor}" ]] || return 0
+      if [[ ! "${floor}" =~ ^[0-9]+$ ]]; then
+        echo "::error ::${name}='${floor}' is not a non-negative integer."
+        exit 1
+      fi
+      if [[ "${observed}" -lt "${floor}" ]]; then
+        echo "::error ::${TARGET_ARCH}/${TOOLCHAIN}/${OPTIMIZE_KERNELS_FOR}:" \
+             "only ${observed} ${what}; floor is ${floor} (${name})." \
+             "Tests do not leave this suite silently -- if the drop is" \
+             "deliberate, lower the floor in the same change (issue #231)."
+        exit 1
+      fi
+    }
+
+    assert_tally_floor "${tally_binaries}" "${HELIA_MIN_TEST_BINARIES:-}" \
+      HELIA_MIN_TEST_BINARIES "test binaries ran"
+    assert_tally_floor "${tally_cases}" "${HELIA_MIN_EXECUTED_CASES:-}" \
+      HELIA_MIN_EXECUTED_CASES "test cases executed"
+    rm -f "${HELIA_TEST_TALLY_FILE}"
+    unset HELIA_TEST_TALLY_FILE
   else
     echo ">>> Skipping tests for ${OPTIMIZE_KERNELS_FOR} (build-only mode)."
   fi
