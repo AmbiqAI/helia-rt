@@ -96,9 +96,65 @@ parameters are supported by the optimized kernel.
 See [Operator Coverage](../reference/operator-coverage.md) for the available
 HELIA operator wrappers.
 
+## Non-finite inputs (NaN and infinities)
+
+The optimized floating-point kernels do not all treat NaN the way the TFLM
+reference kernels do. The behavior differs by operator, and for `TANH` it also
+differs by target, so it is stated here per case rather than as a single rule.
+
+!!! warning "NaN is not a supported input to the optimized activation kernels"
+    Feeding NaN to the optimized `TANH` or `LOGISTIC` kernels does not produce
+    NaN. It produces a finite value at the activation's saturation bound. If
+    your model can generate NaN and you rely on it propagating, do not use the
+    optimized float activation path for that operator.
+
+| Operator | Input | Optimized FP32/FP16 result | TFLM reference result |
+|---|---|---|---|
+| `TANH` | NaN, Armv8.1-M MVE targets (Cortex-M55) | Finite, negative, at the saturation bound | NaN |
+| `TANH` | NaN, non-MVE targets (Cortex-M4, Cortex-M3) | NaN | NaN |
+| `TANH` | ±Inf | ±1 | ±1 |
+| `LOGISTIC` | NaN, all targets | Finite, at the upper saturation bound (1) | NaN |
+| `LOGISTIC` | +Inf / −Inf | 1 / 0 | 1 / 0 |
+| `ADD`, `MUL` | NaN | NaN | NaN |
+
+Notes and version boundary:
+
+- **`TANH` and `LOGISTIC` are by design.** ns-cmsis-nn documents NaN as
+  unsupported input for these kernels: the vectorized `TANH` path uses
+  `vminnmq`, which is IEEE `minNum` and returns the numeric operand against a
+  quiet NaN, and the `LOGISTIC` path clamps its exponent input before
+  evaluation. Restoring NaN would cost a compare and select in the vector loop
+  body.
+
+  This did not change in v7.31.0 and is not scheduled to change. ns-cmsis-nn
+  issue 382 was closed by PR 388, which restored NaN propagation for
+  `RELU`/`RELU6`/`LEAKY_RELU`/`HARDSWISH` only -- a different function family.
+  That PR states explicitly that `SIGMOID`, `TANH` and `HARDSWISH` are outside
+  the contract it establishes, and it does not touch the `TANH` or `SIGMOID`
+  code paths.
+
+  Two details are worth knowing when reading the table above. The scalar
+  float32 `TANH` reference carries an explicit `if (ax != ax) return x + 0.0f;`
+  NaN guard, which is why the non-MVE row propagates while the MVE row does
+  not. And there is **no MVE `LOGISTIC` implementation at all** for either
+  float32 or float16 -- sigmoid is always the scalar helper -- which is why the
+  `LOGISTIC` row says "all targets" rather than splitting by target like
+  `TANH`.
+- **`ADD` and `MUL` are a defect that is now fixed.** Up to and including
+  v7.30.0 the output activation clamp discarded NaN through compare-select
+  ordering, returning an activation bound instead. ns-cmsis-nn PR 380
+  reclassifies NaN on the integer bit pattern, which holds at every
+  optimization level. **PR 380 first shipped in v7.31.0**, which is the version
+  heliaRT now pins, so `ADD` and `MUL` propagate NaN on the optimized path as
+  of that pin. On v7.30.0 and earlier they did not.
+- **The FP32 fallback softens this in practice.** Where an operator has a TFLM
+  reference implementation, HELIA falls back to it when the optimized kernel
+  declines the configuration, and the reference implementation propagates NaN
+  normally. FP16 has no reference fallback.
+
 ## Make builds
 
-The Make integration pins ns-cmsis-nn v7.29.2 and configures the float features
+The Make integration pins ns-cmsis-nn v7.31.0 and configures the float features
 from `TARGET_ARCH`:
 
 - FP32 is enabled for the HELIA backend.

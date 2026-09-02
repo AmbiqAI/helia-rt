@@ -43,10 +43,10 @@ on:
       ns_cmsis_nn_ref:
         description: "ns-cmsis-nn commit SHA, tag (e.g. v7.30.1) or branch to build against"
         required: true
-        # Current repository pin: AmbiqAI/ns-cmsis-nn v7.29.2. Dispatching with
+        # Current repository pin: AmbiqAI/ns-cmsis-nn v7.31.0. Dispatching with
         # the default is a no-op control run that should match the normal
         # matrix; keep this in step with ext_libs/helia.inc.
-        default: "631726420b04860a5c4236956a3741ff5a96bd7f"
+        default: "9884d5fccab884c90c3d5e8865d5babbb1cabc63"
 
 permissions:
   contents: read

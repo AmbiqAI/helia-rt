@@ -656,7 +656,19 @@ TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMFloat16) {
       0.65625000f, 0.65625000f, 0.60107422f, 0.60107422f};
   constexpr float kExpectedSecondCell[] = {
       0.97021484f, 0.97021484f, 0.92089844f, 0.92089844f};
-  constexpr float kSecondInvokeTolerance = 5e-3f;
+  // The f16 goldens above were captured from a v7.29.x ns-cmsis-nn build, not
+  // derived: the float32 goldens in this file document an independent
+  // derivation, these do not.  ns-cmsis-nn PR 324 (first shipped in v7.30.0)
+  // tail predicates arm_nn_lstm_step_f16 so every lane, tail lanes included,
+  // takes the vector LUT tanh instead of the scalar rational approximation,
+  // and documents that as moving f16 results by up to ~2.4e-2.  This bound
+  // sits just above that documented shift and stays tighter than the 4e-2
+  // first-invoke bound above.  It is an interim bound, not a licence to
+  // loosen a failing check: the tolerance-free lane-uniformity test in
+  // kernels/helia/tests/float_lstm_tail_lane_test.cc is the strong guard on
+  // this kernel, and deriving these goldens from a double-precision reference
+  // so this bound can be tightened again is tracked as a follow-up.
+  constexpr float kSecondInvokeTolerance = 2.5e-2f;
 
   const auto* hidden_f16 = reinterpret_cast<const float16_t*>(
       tensors[kLstmOutputStateTensor].data.raw);

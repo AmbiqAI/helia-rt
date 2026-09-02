@@ -41,8 +41,8 @@ heliaRT provides three kernel backends. Every operator has a **Reference** imple
 | Operator | REF | CMSIS | HELIA | Notes |
 |---|:---:|:---:|:---:|---|
 | `RELU` / `RELU6` / `RELU_N1_TO_1` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
-| `LOGISTIC` (sigmoid) | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
-| `TANH` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
+| `LOGISTIC` (sigmoid) | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive. NaN is not a supported input on the optimized float path; see [Non-finite inputs](../guides/floating-point.md#non-finite-inputs-nan-and-infinities) |
+| `TANH` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive. NaN is not a supported input on the optimized float path; see [Non-finite inputs](../guides/floating-point.md#non-finite-inputs-nan-and-infinities) |
 | `LEAKY_RELU` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
 | `HARD_SWISH` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA adds int16 path |
 
@@ -123,8 +123,8 @@ resolves them.
 | `CONCATENATION` | :white_check_mark: | :white_check_mark: | Optimized for rank ≤ 4; higher ranks use the Reference path (FP32 and FP16) |
 | `RESHAPE` | :white_check_mark: | :white_check_mark: | Pure data movement; FP16 works even without `ARM_NN_ENABLE_F16` via a bitwise copy |
 | `RELU` / `RELU6` | :white_check_mark: | :white_check_mark: | |
-| `LOGISTIC` (sigmoid) | :white_check_mark: | :white_check_mark: | |
-| `TANH` | :white_check_mark: | :white_check_mark: | |
+| `LOGISTIC` (sigmoid) | :white_check_mark: | :white_check_mark: | NaN is not a supported input on the optimized float path; see [Non-finite inputs](../guides/floating-point.md#non-finite-inputs-nan-and-infinities) |
+| `TANH` | :white_check_mark: | :white_check_mark: | NaN is not a supported input on the optimized float path; see [Non-finite inputs](../guides/floating-point.md#non-finite-inputs-nan-and-infinities) |
 
 Other operators use the Reference implementation for FP32, with one
 exception: `QUANTIZE` and `DEQUANTIZE` always convert through optimized
