@@ -148,12 +148,43 @@ set -e
 # escalating case is the likely one for a wedged model, so dropping 137 would
 # have let the exact failure this commit targets fall through to the
 # pass-string check and be reported as a plain FAIL with no timeout diagnosis.
-if [[ ${FVP_STATUS} -eq 124 || ${FVP_STATUS} -eq 137 ]]
+#
+# The classification is gated on TIMEOUT_CMD. 124 and 137 only carry a timeout
+# meaning when `timeout` was the process that produced the status. With no
+# timeout on PATH, FVP_STATUS is the FVP's OWN exit code, and 137 there is an
+# ordinary SIGKILL death -- an OOM kill is the obvious way to get one. Calling
+# that "timed out after ${FVP_TIMEOUT_SECONDS}s" would be a fabricated
+# diagnosis, and it would name a budget that was never applied.
+if [[ -n "${TIMEOUT_CMD}" && ( ${FVP_STATUS} -eq 124 || ${FVP_STATUS} -eq 137 ) ]]
 then
   echo "--------------------------------------------------------"
   echo "$BINARY_TO_TEST: FAIL - timed out after ${FVP_TIMEOUT_SECONDS}s."
   echo "The FVP did not return. Its output is in ${MICRO_LOG_FILENAME}; the"
   echo "last '[ RUN ]' line there names the test case that hung. See #239."
+  echo "--------------------------------------------------------"
+  exit 1
+fi
+
+# Unbounded fallback (no timeout/gtimeout on PATH; the WARNING above fired).
+# Nothing here can tell a hang from a crash, so the conservative reading wins:
+# any non-zero status from the FVP is a failure, reported with the raw number
+# and no interpretation. It deliberately does NOT fall through to the
+# pass-string grep -- a binary that printed the pass string and then died on a
+# signal must not be graded PASS on the strength of the string alone.
+#
+# Note the asymmetry with the bounded path above, which still leaves non-124/137
+# statuses to the pass-string check. That is deliberate: the bounded path is
+# what CI runs, and tightening it would change the verdict for legs unrelated
+# to #239. This branch only affects a host with no coreutils timeout, i.e. a
+# local developer run, where being stricter costs nothing.
+if [[ -z "${TIMEOUT_CMD}" && ${FVP_STATUS} -ne 0 ]]
+then
+  echo "--------------------------------------------------------"
+  echo "$BINARY_TO_TEST: FAIL - the FVP exited with status ${FVP_STATUS}."
+  echo "This run was UNBOUNDED (no 'timeout' or 'gtimeout' on PATH), so the"
+  echo "status is the FVP's own and carries no timeout meaning: 124/137 here"
+  echo "are an ordinary exit or signal death, not a per-binary timeout."
+  echo "Full log: ${MICRO_LOG_FILENAME}."
   echo "--------------------------------------------------------"
   exit 1
 fi
