@@ -12,8 +12,9 @@ Drop-in: same `MicroInterpreter`/`Model`/`OpResolver` API as upstream.
   kernel change. Verify helia kernel work with the make build
   (`OPTIMIZED_KERNEL_DIR=helia`, `tools/make/ext_libs/helia.inc`), which is
   what `.github/workflows/helia_test.yml` runs on the Corstone-300 FVP; note
-  a native make build is host code, so MVE and armclang/ATfE are only
-  exercised by those CI legs. Delivery is multi-path: Zephyr/west module,
+  a native make build is host code, so MVE and ATfE are only exercised by
+  those CI legs, and armclang only by the release workflow and the manual
+  `cortex_m_arm_compiler.yml`. Delivery is multi-path: Zephyr/west module,
   CMSIS-Pack, neuralSPOT, and source/CMake, plus prebuilt `.a` bundles
   published by `helia_release.yml` (built with `build_helia.sh`,
   `TARGET=cortex_m_generic`). Don't assume one build covers another.
@@ -32,6 +33,7 @@ Drop-in: same `MicroInterpreter`/`Model`/`OpResolver` API as upstream.
   manual or label-gated and `cortex_m_virtual_hardware.yml` is dispatch-only.
   Local runs without an EVB or FVP cannot exercise them; say so rather than
   reporting them green.
-- Release or status changes: call them out in the PR description so
-  maintainers can update the internal product-status record.
+- Release or status changes (new version, support window, withdrawn
+  release): state them explicitly in the PR description so maintainers can
+  update product status and docs.
 - CI is the authority on style/lint/test gates; do not restate them here.
