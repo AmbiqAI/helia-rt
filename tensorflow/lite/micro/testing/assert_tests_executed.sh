@@ -57,6 +57,33 @@ if [[ ! -f "${LOG_FILE}" ]]; then
   exit 1
 fi
 
+# The tested program's own return value, when the log carries it.
+#
+# The FVP's process exit status cannot be used for this. On the GCC and
+# armclang paths the binary terminates inside ethos-u-core-platform's
+# retarget.c _exit(), which prints "Application exit code: %d." followed by
+# 0x04 (end-of-transmission) and an "EXITTHESIM" shutdown tag to the MPS3
+# UART and then spins in `while (1) {}`. The model stops because of
+# `-C mps3_board.uart0.shutdown_on_eot=1`, a UART-model shutdown that carries
+# no status -- the sample run in tools/benchmarking/README.md shows exactly
+# that pairing: "Application exit code: 0." followed by "Info: /OSCI/SystemC:
+# Simulation stopped by user". So the log, not $? of the FVP, is where the
+# program's return value survives, and this is the check that reads it.
+#
+# The ATfE path links picolibc + libsemihost instead of retarget.c and prints
+# no such line, so the assertion is conditional on the line being present.
+app_exit="$({ grep -aoE 'Application exit code: -?[0-9]+' "${LOG_FILE}" \
+              || true; } | tail -n 1 | sed -E 's/^.*: //')"
+if [[ -n "${app_exit}" && "${app_exit}" != "0" ]]; then
+  echo "--------------------------------------------------------"
+  echo "ERROR: ${BINARY_NAME}: the program returned ${app_exit}."
+  echo "The log reports 'Application exit code: ${app_exit}.', so the test"
+  echo "binary itself failed however the rest of the output reads. Both"
+  echo "frameworks return kTfLiteError from main() when a case fails."
+  echo "--------------------------------------------------------"
+  exit 1
+fi
+
 # Append one line to the per-leg tally, if the caller asked for one.
 # Arguments: <executed-cases> <kind>.
 record_tally() {

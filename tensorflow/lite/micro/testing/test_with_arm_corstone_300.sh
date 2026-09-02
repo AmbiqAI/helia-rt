@@ -43,6 +43,13 @@ FVP+='-C mps3_board.uart0.shutdown_on_eot=1 '
 # unaffected by this setting.
 FVP+='-C cpu0.semihosting-enable=1 '
 FVP+='--stat'
+# helia-rt (issue #231): the FVP's exit status is deliberately not consulted.
+# The program does not terminate through it -- ethos-u-core-platform's
+# retarget.c _exit() prints "Application exit code: N.", 0x04 and EXITTHESIM
+# to the UART and then spins, so the model stops on uart0.shutdown_on_eot and
+# reports "Simulation stopped by user" (see the sample run in
+# tools/benchmarking/README.md). The log is the authority: the assertion below
+# checks that exit-code line, the executed-case count and the failure markers.
 ${FVP} ${BINARY_TO_TEST} | tee ${MICRO_LOG_FILENAME}
 
 if [[ ${2} != "non_test_binary" ]]
