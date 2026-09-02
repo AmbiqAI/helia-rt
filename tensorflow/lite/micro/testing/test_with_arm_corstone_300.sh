@@ -54,24 +54,33 @@ mkdir -p ${RESULTS_DIRECTORY}
 # A per-binary budget converts that hang into one named FAIL and lets the
 # rest of the suite run, which is what makes the failure diagnosable.
 #
-# Budget: max(10 minutes, 5x the longest observed per-binary wall time).
+# Budget: 120 s. The binding constraint is not the slowest binary, it is the
+# AGGREGATE when many binaries hang, because readable_run's 60m wrap around
+# `make test` is unchanged and `make -k` (on main since #229) keeps going.
+#
 # Evidence, GitHub Actions run 33557473930 (the run whose ATfE m55 leg hung):
 #   - gcc / cortex-m55 / SPEED completed 130 binaries; slowest was
 #     integration_tests_nnaed_conv_test at 5.14 s, then person_detection_test
 #     at 4.14 s; the bulk sit at ~1.1 s.
 #   - atfe / cortex-m55 / SPEED completed 37 binaries before the hang;
 #     slowest was integration_tests_nnaed_conv_test at 2.16 s.
-# 5 x 5.14 s = 25.7 s, so the 10-minute floor is what applies: 600 s, roughly
-# 117x the slowest run ever measured. Deliberately loose -- this is a hang
-# detector, not a performance gate, and a slow shared CI runner must never
-# trip it.
 #
-# Cost containment: at ~1-5 s per binary the whole suite is ~5 minutes, so
-# even two hanging binaries (the two float16 goldens in #239) add ~20 minutes
-# and stay inside readable_run's unchanged 60m leg budget.
+# Headroom: 120 s is 23x the slowest binary ever measured (5.14 s), so a
+# shared CI runner having a bad day does not trip it. This is a hang
+# detector, not a performance gate.
+#
+# Aggregate: ~19 binaries carry the float16 goldens implicated in #239, i.e.
+# the worst realistic case is 19 binaries each burning the full budget.
+#   19 x 120 s = 38 min, plus ~7 min for the ~130 binaries that do return,
+#   = ~45 min, inside readable_run's 60m.
+# At 600 s (the first revision of this commit) the same case is
+#   19 x 600 s = 190 min, which re-exhausts the 60m leg budget and loses the
+# aggregate result -- the per-binary logs would survive, but the leg would be
+# killed before most binaries ran, which is the failure this commit exists to
+# remove. Hence 120 s.
 #
 # Override with FVP_TIMEOUT_SECONDS for a local bisect or a slower host.
-FVP_TIMEOUT_SECONDS="${FVP_TIMEOUT_SECONDS:-600}"
+FVP_TIMEOUT_SECONDS="${FVP_TIMEOUT_SECONDS:-120}"
 # Grace period between SIGTERM and SIGKILL. The FVP spawns subprocesses and
 # does not always die on the first signal.
 FVP_TIMEOUT_KILL_AFTER_SECONDS="${FVP_TIMEOUT_KILL_AFTER_SECONDS:-30}"
@@ -127,12 +136,19 @@ fi
 FVP_STATUS=${PIPESTATUS[0]}
 set -e
 
-# 124 is the only status to test for. GNU timeout reports 124 whenever it was
-# the one that ended the command, including when --kill-after had to escalate
-# to SIGKILL; it does not report 137 in that case. (128+SIGKILL would only
-# appear if something other than timeout killed the FVP, which is not a
-# timeout and is left to the pass-string check below.)
-if [[ ${FVP_STATUS} -eq 124 ]]
+# Both statuses mean "timeout ended this run", and both must be handled:
+#   124 - the FVP died on the SIGTERM timeout sent at the deadline.
+#   137 - (128 + SIGKILL) the FVP did not die on SIGTERM and --kill-after had
+#         to escalate. timeout propagates the child's signal death here; it
+#         does NOT collapse this case to 124.
+# Verified on GNU coreutils 9.11: a child with `trap '' TERM` piped through
+# tee yields PIPESTATUS[0]=137, while one with the default disposition yields
+# 124. This matters because, as the --kill-after comment above says, the FVP
+# spawns subprocesses and does not always die on the first signal -- the
+# escalating case is the likely one for a wedged model, so dropping 137 would
+# have let the exact failure this commit targets fall through to the
+# pass-string check and be reported as a plain FAIL with no timeout diagnosis.
+if [[ ${FVP_STATUS} -eq 124 || ${FVP_STATUS} -eq 137 ]]
 then
   echo "--------------------------------------------------------"
   echo "$BINARY_TO_TEST: FAIL - timed out after ${FVP_TIMEOUT_SECONDS}s."

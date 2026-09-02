@@ -187,8 +187,13 @@ __attribute__((used)) void HeliaCorstoneReportFault(const uint32_t* frame,
                                                 "BusFault", "UsageFault"};
   const char* name = (exception < 4) ? kExceptionNames[exception] : "Unknown";
 
+  // Leading '\n': the harness anchors its check on '^FAULT:'. A fault taken
+  // part-way through a MicroPrintf leaves an unterminated line in the UART /
+  // semihosting stream, and without this the report would be appended to that
+  // partial line and the anchor would miss it. A spurious blank line in a log
+  // that is about to end in a fault costs nothing.
   char* out = g_report;
-  out = AppendString(out, "FAULT: ");
+  out = AppendString(out, "\nFAULT: ");
   out = AppendField(out, "HFSR=", ReadRegister(kSCB_HFSR));
   out = AppendField(out, "CFSR=", ReadRegister(kSCB_CFSR));
   out = AppendField(out, "PC=", frame[kFramePcIndex]);

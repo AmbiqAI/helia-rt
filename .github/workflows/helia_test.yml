@@ -149,10 +149,15 @@ jobs:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
       # helia-rt (issue #239): per-binary FVP budget, read by
       # testing/test_with_arm_corstone_300.sh. Set here rather than left to
-      # the script default so a leg can be retuned in one place. 600s is
-      # about 117x the slowest binary ever measured on any leg -- it is a
-      # hang detector, not a performance gate.
-      FVP_TIMEOUT_SECONDS: "600"
+      # the script default so a leg can be retuned in one place.
+      #
+      # 120s is 23x the slowest binary ever measured on any leg (5.14 s), so
+      # it is a hang detector rather than a performance gate, and it is sized
+      # by the aggregate: ~19 binaries carry the float16 goldens implicated
+      # in #239, so the worst case is 19 x 120 s = 38 min plus ~7 min of
+      # normal runtime, which fits inside readable_run's unchanged 60m leg
+      # budget. See the budget comment in the harness for the full arithmetic.
+      FVP_TIMEOUT_SECONDS: "120"
 
     name: test-${{ matrix.arch }}-${{ matrix.toolchain }}-${{ matrix.opt }}
 

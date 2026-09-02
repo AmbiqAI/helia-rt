@@ -238,7 +238,7 @@ About 70 lines, most of it the comment justifying the budget. Three changes,
 none of which upstream offers a hook for — the pass/fail decision, the log
 path and the FVP invocation are all made inline in this script:
 
-1. The FVP invocation is wrapped in `timeout --kill-after=30 600`
+1. The FVP invocation is wrapped in `timeout --kill-after=30 120`
    (`FVP_TIMEOUT_SECONDS` overrides it). A timeout becomes an explicit named
    FAIL, instead of one binary silently consuming the whole leg budget.
 2. The log path is per binary (`<binary>.txt`) rather than one shared
