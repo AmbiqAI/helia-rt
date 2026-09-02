@@ -520,7 +520,8 @@ TEST(SoftmaxTest, Softmax2DFloat16ShouldMatchGolden) {
   int inputs_array_data[] = {1, 0};
   int outputs_array_data[] = {1, 1};
   TfLiteSoftmaxParams params = {1.0f};
-  micro::KernelRunner runner(Register_SOFTMAX(), tensors, 2,
+  const TFLMRegistration registration = Register_SOFTMAX();
+  micro::KernelRunner runner(registration, tensors, 2,
                              IntArrayFromInts(inputs_array_data),
                              IntArrayFromInts(outputs_array_data), &params);
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());

@@ -1605,7 +1605,8 @@ TEST(ConvTest, Float16MultiChannelGolden) {
   };
   int inputs_array_data[] = {3, 0, 1, 2};
   int outputs_array_data[] = {1, 3};
-  micro::KernelRunner runner(Register_CONV_2D(), tensors, 4,
+  const TFLMRegistration registration = Register_CONV_2D();
+  micro::KernelRunner runner(registration, tensors, 4,
                              IntArrayFromInts(inputs_array_data),
                              IntArrayFromInts(outputs_array_data), &params);
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());

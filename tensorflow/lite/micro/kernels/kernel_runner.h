@@ -20,6 +20,7 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/compatibility.h"
 #include "tensorflow/lite/micro/arena_allocator/single_arena_buffer_allocator.h"
 #include "tensorflow/lite/micro/fake_micro_context.h"
+#include "tensorflow/lite/micro/micro_common.h"
 #include "tensorflow/lite/micro/mock_micro_graph.h"
 
 namespace tflite {
@@ -81,7 +82,10 @@ class KernelRunner {
 
   TfLiteContext context_ = {};
   TfLiteNode node_ = {};
-  const TFLMRegistration& registration_;
+  // Stored by value: TFLMRegistration is a small POD of function pointers and
+  // ints, and callers routinely pass a temporary (e.g. Register_CONV_2D()),
+  // which a reference member would not lifetime-extend.
+  const TFLMRegistration registration_;
 
   SingleArenaBufferAllocator* allocator_;
   MockMicroGraph mock_micro_graph_;

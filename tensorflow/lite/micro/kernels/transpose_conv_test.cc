@@ -1093,7 +1093,8 @@ TEST(TransposeConvTest, Float16Stride1Golden) {
   };
   int inputs_array_data[] = {4, 0, 1, 2, 3};
   int outputs_array_data[] = {1, 4};
-  micro::KernelRunner runner(Register_TRANSPOSE_CONV(), tensors, 5,
+  const TFLMRegistration registration = Register_TRANSPOSE_CONV();
+  micro::KernelRunner runner(registration, tensors, 5,
                              IntArrayFromInts(inputs_array_data),
                              IntArrayFromInts(outputs_array_data), &params);
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());

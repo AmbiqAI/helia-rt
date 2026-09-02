@@ -544,7 +544,8 @@ TEST(AddTest, Float16AddNoActivationGolden) {
   TfLiteAddParams params = {};
   params.activation = kTfLiteActNone;
 
-  micro::KernelRunner runner(Register_ADD(), tensors, 3,
+  const TFLMRegistration registration = Register_ADD();
+  micro::KernelRunner runner(registration, tensors, 3,
                              IntArrayFromInts(inputs_array_data),
                              IntArrayFromInts(outputs_array_data), &params);
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());

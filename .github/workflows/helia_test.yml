@@ -76,6 +76,19 @@ jobs:
       - id: image
         run: echo "image=ghcr.io/ambiqai/helia-rt-ci@sha256:55372f29023cd1be1887af5761c8e6c18765b4e68ac28e02510d519e461692c9" >> "$GITHUB_OUTPUT"  # ghcr.io/ambiqai/helia-rt-ci:latest as of 2026-08-25
 
+      # Source checks that need neither the CI image nor a toolchain live in
+      # this job: it is a `needs:` of the matrix, so a hit fails the PR in
+      # seconds instead of after a ~25min FVP leg. Keep anything added here
+      # image-independent and fast.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.trigger-sha }}
+
+      # helia-rt #239: a KernelRunner built from a temporary registration
+      # reads a dead stack slot and faults under ATfE on cortex-m55.
+      - name: Check for KernelRunner temporaries
+        run: ./tensorflow/lite/micro/tools/ci_build/check_helia_kernel_runner_temporaries.sh
+
   helia_test:
     needs: ci-image
     runs-on: ubuntu-latest-md

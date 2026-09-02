@@ -270,7 +270,8 @@ TEST(MulTest, Float16MulNoActivationGolden) {
   TfLiteMulParams params = {};
   params.activation = kTfLiteActNone;
 
-  micro::KernelRunner runner(Register_MUL(), tensors, 3,
+  const TFLMRegistration registration = Register_MUL();
+  micro::KernelRunner runner(registration, tensors, 3,
                              IntArrayFromInts(inputs_array_data),
                              IntArrayFromInts(outputs_array_data), &params);
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());

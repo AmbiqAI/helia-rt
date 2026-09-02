@@ -336,7 +336,8 @@ TEST(TanhTest, SimpleTestFloat16Golden) {
   };
   int inputs_array_data[] = {1, 0};
   int outputs_array_data[] = {1, 1};
-  micro::KernelRunner runner(Register_TANH(), tensors, 2,
+  const TFLMRegistration registration = Register_TANH();
+  micro::KernelRunner runner(registration, tensors, 2,
                              IntArrayFromInts(inputs_array_data),
                              IntArrayFromInts(outputs_array_data), nullptr);
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());

@@ -390,7 +390,8 @@ TEST(ActivationsTest, SimpleReluTestFloat16Golden) {
   };
   int inputs_array_data[] = {1, 0};
   int outputs_array_data[] = {1, 1};
-  micro::KernelRunner runner(Register_RELU(), tensors, 2,
+  const TFLMRegistration registration = Register_RELU();
+  micro::KernelRunner runner(registration, tensors, 2,
                              IntArrayFromInts(inputs_array_data),
                              IntArrayFromInts(outputs_array_data), nullptr);
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
@@ -413,7 +414,8 @@ TEST(ActivationsTest, SimpleRelu6TestFloat16Golden) {
   };
   int inputs_array_data[] = {1, 0};
   int outputs_array_data[] = {1, 1};
-  micro::KernelRunner runner(Register_RELU6(), tensors, 2,
+  const TFLMRegistration registration = Register_RELU6();
+  micro::KernelRunner runner(registration, tensors, 2,
                              IntArrayFromInts(inputs_array_data),
                              IntArrayFromInts(outputs_array_data), nullptr);
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());

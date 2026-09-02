@@ -809,7 +809,8 @@ TEST(BatchMatmulTest, BatchMatMulFloat16SimpleGolden) {
   int inputs_array_data[] = {2, 0, 1};
   int outputs_array_data[] = {1, 2};
   TfLiteBatchMatMulParams params = {false, false, false};
-  micro::KernelRunner runner(Register_BATCH_MATMUL(), tensors, 3,
+  const TFLMRegistration registration = Register_BATCH_MATMUL();
+  micro::KernelRunner runner(registration, tensors, 3,
                              IntArrayFromInts(inputs_array_data),
                              IntArrayFromInts(outputs_array_data), &params);
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());

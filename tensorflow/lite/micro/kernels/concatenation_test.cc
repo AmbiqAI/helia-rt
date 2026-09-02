@@ -606,7 +606,8 @@ TEST(ConcatenationTest, ConcatenationFloat16Golden) {
   int inputs_array_data[] = {2, 0, 1};
   int outputs_array_data[] = {1, 2};
   TfLiteConcatenationParams params = {0, kTfLiteActNone};
-  micro::KernelRunner runner(Register_CONCATENATION(), tensors, 3,
+  const TFLMRegistration registration = Register_CONCATENATION();
+  micro::KernelRunner runner(registration, tensors, 3,
                              IntArrayFromInts(inputs_array_data),
                              IntArrayFromInts(outputs_array_data), &params);
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());

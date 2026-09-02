@@ -1036,7 +1036,8 @@ TEST(FullyConnectedTest, SimpleFloat16MultiBatchGolden) {
       kTfLiteActNone, kTfLiteFullyConnectedWeightsFormatDefault, false, false,
       kTfLiteNoType};
 
-  micro::KernelRunner runner(Register_FULLY_CONNECTED(), tensors, 4,
+  const TFLMRegistration registration = Register_FULLY_CONNECTED();
+  micro::KernelRunner runner(registration, tensors, 4,
                              IntArrayFromInts(inputs_array_data),
                              IntArrayFromInts(outputs_array_data), &params);
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());

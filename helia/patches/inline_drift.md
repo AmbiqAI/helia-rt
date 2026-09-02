@@ -47,6 +47,33 @@ unconditionally on Cortex-M55 (unlikely).
 `-DCMSIS_NN` (see "Shared kernel headers" section above), so the existing
 `#if !defined(CMSIS_NN)` guard already covers the helia case.
 
+## `tensorflow/lite/micro/kernels/kernel_runner.h`
+
+Stores the kernel registration **by value** (`const TFLMRegistration
+registration_;`) instead of upstream's reference member
+(`const TFLMRegistration& registration_;`). Three added comment lines
+explain why; the constructor signature is unchanged
+(`const TFLMRegistration&`), so every caller and the `.cc` are untouched.
+A by-value member needs `TFLMRegistration` to be a complete type, which the
+header previously got only transitively (`mock_micro_graph.h` ->
+`micro_graph.h` -> `micro_common.h`), so the entry also adds a direct
+`#include "tensorflow/lite/micro/micro_common.h"`. That include is part of
+the same drift and goes away with it.
+
+Rationale: a temporary bound to a *reference member* through a constructor
+is not lifetime-extended, so `KernelRunner runner(Register_X(), ...)`
+leaves the runner pointing at a dead stack slot. Under ATfE clang 22 for
+cortex-m55 the compiler reuses that slot before `InitAndPrepare()`, which
+corrupts `registration.init` and faults (see AmbiqAI/helia-rt#239).
+`TFLMRegistration` is a 7-field POD of function pointers and ints, so the
+copy is cheap and the class of bug cannot recur.
+
+Cannot be moved to `kernels/helia/`: `KernelRunner` is upstream shared test
+infrastructure used by every kernel test.
+
+Drop condition: upstream tflite-micro adopts a by-value member (or otherwise
+lifetime-extends the registration) in `kernel_runner.h`.
+
 ## `tensorflow/lite/micro/tools/make/Makefile`
 
 Three minimal hooks (~34 lines of inline drift, down from ~80):

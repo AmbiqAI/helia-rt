@@ -296,7 +296,8 @@ TEST(PadTest, TestFloat16NontrivialPadGolden) {
 
   int inputs_array_data[] = {2, 0, 1};
   int outputs_array_data[] = {1, 2};
-  micro::KernelRunner runner(Register_PAD(), tensors, 3,
+  const TFLMRegistration registration = Register_PAD();
+  micro::KernelRunner runner(registration, tensors, 3,
                              IntArrayFromInts(inputs_array_data),
                              IntArrayFromInts(outputs_array_data), nullptr);
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
