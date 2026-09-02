@@ -233,11 +233,22 @@ __attribute__((used)) void HeliaCorstoneReportFault(const uint32_t* frame,
 // Every instruction here is in the Armv6-M subset, so the body assembles for
 // any Cortex-M even though the makefile only adds this file for v7-M and
 // later (see the header comment). Two consequences worth stating:
-//  - `lsls r1, r1, #29` + `bmi`, not `tst r1, #4` + `bne`. TST with an
+//  - `lsls r3, r1, #29` + `bmi`, not `tst r1, #4` + `bne`. TST with an
 //    immediate is a 32-bit Armv7-M encoding with no v6-M form; the shift
 //    moves EXC_RETURN bit 2 into the N flag and is a 16-bit T1 instruction
-//    on every M-profile core. r1 is a scratch copy of LR, so destroying it
-//    costs nothing.
+//    on every M-profile core.
+//
+//    The shift MUST target a scratch register, not r1. r1 is the second
+//    argument of the call below -- it carries EXC_RETURN to the reporter and
+//    is printed as EXC_RETURN=0x... -- so it has to survive intact all the
+//    way to the tail branch. Shifting r1 in place (as an earlier revision
+//    did) left the reporter printing EXC_RETURN << 29, i.e. 0xa0000000 for a
+//    genuine 0xfffffffd, which silently destroys the one field that says
+//    which stack and which mode the fault came from. r3 is the right scratch:
+//    it is caller-saved under AAPCS and unused by this call's three
+//    arguments, the core already stacked the faulting r3 in the exception
+//    frame, and `lsls <Rd>, <Rm>, #imm5` encodes in 16 bits for any r0-r7 on
+//    v6-M.
 //  - The tail `b` to the reporter is a plain branch. On v6-M that is a
 //    +/-2 KB range; if this file is ever genuinely built for a v6-M target
 //    the link may need a veneer or an ldr/bx pair. Nothing is affected today
@@ -250,7 +261,7 @@ __attribute__((used)) void HeliaCorstoneReportFault(const uint32_t* frame,
   __attribute__((naked)) void handler(void) {          \
     __asm__ volatile(                                  \
         "mov  r1, lr                        \n"        \
-        "lsls r1, r1, #29                   \n"        \
+        "lsls r3, r1, #29                   \n"        \
         "bmi  1f                            \n"        \
         "mrs  r0, msp                       \n"        \
         "b    2f                            \n"        \
