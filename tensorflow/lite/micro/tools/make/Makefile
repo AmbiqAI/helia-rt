@@ -133,6 +133,18 @@ TEST_SCRIPT :=
 
 MICROLITE_LIBS := -lm
 
+# helia-rt (issue #239): sources linked into every test/example/benchmark
+# binary but NEVER archived into libtensorflow-microlite.a, and never emitted
+# by project generation. Empty unless a target makefile adds to it, so no
+# other target's build changes.
+#
+# This is the hook for target-owned test-runtime code -- fault handlers, exit
+# stubs -- that must exist when a binary runs on a simulator but must not ship
+# inside the library a customer links against. Adding such code to
+# MICROLITE_CC_SRCS would put it in the release archive; adding it to
+# MICROLITE_LIBS would put it on the link line without ever building it.
+MICROLITE_TEST_RUNTIME_SRCS :=
+
 # For the optimized_kernel_dir, co-processor and optimize_kernels_for as specified on the
 # command line we add -D<tag> to the cflags to allow for #idefs in the code.
 #
@@ -577,6 +589,22 @@ all: $(MICROLITE_LIB_PATH)
 INCLUDES += -I$(GENERATED_SRCS_DIR)
 INCLUDES += -I$(GENERATED_SRCS_DIR)$(TENSORFLOW_ROOT)
 
+# helia-rt (issue #239): deliberately not folded into MICROLITE_LIB_OBJS --
+# see MICROLITE_TEST_RUNTIME_SRCS above. These objects go on the binary link
+# lines only.
+#
+# This MUST stay above every include that defines a test/example/benchmark
+# target (tests.inc immediately below, and kernels/Makefile.inc further down).
+# Each of those runs $(eval $(call microlite_test,...)), and make expands a
+# prerequisite list at the moment the rule is defined while expanding the
+# recipe only at execution time. Defined after the include, the variable is
+# still empty when the prerequisites are captured but non-empty when the link
+# command runs, so every non-kernel binary would name fault_handlers.o on its
+# link line with nothing having built it: a clean `make build` fails on the
+# first example/integration binary.
+MICROLITE_TEST_RUNTIME_OBJS := $(addprefix $(CORE_OBJDIR), \
+$(patsubst %.S,%.o,$(patsubst %.cc,%.o,$(patsubst %.c,%.o,$(MICROLITE_TEST_RUNTIME_SRCS)))))
+
 # Load test and benchmark definitions.
 include $(MAKEFILE_DIR)/tests.inc
 
@@ -648,10 +676,10 @@ $(MICROLITE_LIB_PATH): $(MICROLITE_LIB_OBJS) $(MICROLITE_KERNEL_OBJS) $(MICROLIT
 	$(Q)$(AR) $(ARFLAGS) $(MICROLITE_LIB_PATH) $(MICROLITE_LIB_OBJS) \
 	$(MICROLITE_KERNEL_OBJS) $(MICROLITE_THIRD_PARTY_OBJS) $(MICROLITE_THIRD_PARTY_KERNEL_OBJS) $(MICROLITE_CUSTOM_OP_OBJS)
 
-$(BINDIR)%_test : $(CORE_OBJDIR)%_test.o $(MICROLITE_LIB_PATH)
+$(BINDIR)%_test : $(CORE_OBJDIR)%_test.o $(MICROLITE_TEST_RUNTIME_OBJS) $(MICROLITE_LIB_PATH)
 	$(Q)$(MKDIR_P) $(dir $@)
 	$(Q)$(CXX) $(CXXFLAGS) $(INCLUDES) \
-	-o $@ $< \
+	-o $@ $< $(MICROLITE_TEST_RUNTIME_OBJS) \
 	$(MICROLITE_LIB_PATH) $(LDFLAGS) $(MICROLITE_LIBS)
 
 $(BINDIR)%.test_target: $(BINDIR)%_test
