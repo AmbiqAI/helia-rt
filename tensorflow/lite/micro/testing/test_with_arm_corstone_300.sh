@@ -119,9 +119,10 @@ FVP+='--stat'
 # executed-case count and the failure markers.
 #
 # helia-rt (issue #239): the status IS now consulted, for one thing only --
-# whether the `timeout` wrapper ended the run. 124 comes from timeout, not
-# from the model, and is the only status interpreted below. Everything about
-# the program's own result still comes from the log.
+# whether the `timeout` wrapper ended the run. 124 and 137 come from timeout,
+# not from the model, and they are the only statuses interpreted below, and
+# only when timeout actually ran. Everything about the program's own result
+# still comes from the log.
 #
 # `set -e` does not fire on a failing pipeline element, and the exit status of
 # the pipeline is tee's, so the FVP status has to be read out of PIPESTATUS.
@@ -135,6 +136,31 @@ else
 fi
 FVP_STATUS=${PIPESTATUS[0]}
 set -e
+
+# helia-rt (issue #239): the fault check runs FIRST, ahead of the timeout and
+# status classification below. If a binary both faults and then fails to
+# terminate -- which is exactly what happens if the FVP does not honour the
+# handler's semihosting SYS_EXIT -- the fault is the actionable diagnosis: it
+# names the faulting PC and LR, where a timeout only says the model never came
+# back. Reporting the timeout instead would bury the cause.
+# helia-rt (issue #239): a fault report fails the binary unconditionally, and
+# it is checked BEFORE the pass string. cortex_m_corstone_300/fault_handlers.cc
+# prints one '^FAULT: ...' line from the fault handlers. A fault that happens
+# after micro_test has already printed '~~~ALL TESTS PASSED~~~' -- in teardown,
+# in a static destructor, inside _exit or the semihosting path -- would
+# otherwise leave both lines in the log and be reported as a PASS. This applies
+# to non_test_binary targets too: an example that faults on the way out is a
+# failure whether or not it has a pass string.
+if grep -aq '^FAULT:' "${MICRO_LOG_FILENAME}"
+then
+  echo "--------------------------------------------------------"
+  echo "$BINARY_TO_TEST: FAIL - the program took a CPU fault."
+  grep -a '^FAULT:' "${MICRO_LOG_FILENAME}"
+  echo "Full log: ${MICRO_LOG_FILENAME}. PC/LR in the line above are the"
+  echo "faulting instruction and its caller. See issue #239."
+  echo "--------------------------------------------------------"
+  exit 1
+fi
 
 # Both statuses mean "timeout ended this run", and both must be handled:
 #   124 - the FVP died on the SIGTERM timeout sent at the deadline.
@@ -189,24 +215,6 @@ then
   exit 1
 fi
 
-# helia-rt (issue #239): a fault report fails the binary unconditionally, and
-# it is checked BEFORE the pass string. cortex_m_corstone_300/fault_handlers.cc
-# prints one '^FAULT: ...' line from the fault handlers. A fault that happens
-# after micro_test has already printed '~~~ALL TESTS PASSED~~~' -- in teardown,
-# in a static destructor, inside _exit or the semihosting path -- would
-# otherwise leave both lines in the log and be reported as a PASS. This applies
-# to non_test_binary targets too: an example that faults on the way out is a
-# failure whether or not it has a pass string.
-if grep -aq '^FAULT:' "${MICRO_LOG_FILENAME}"
-then
-  echo "--------------------------------------------------------"
-  echo "$BINARY_TO_TEST: FAIL - the program took a CPU fault."
-  grep -a '^FAULT:' "${MICRO_LOG_FILENAME}"
-  echo "Full log: ${MICRO_LOG_FILENAME}. PC/LR in the line above are the"
-  echo "faulting instruction and its caller. See issue #239."
-  echo "--------------------------------------------------------"
-  exit 1
-fi
 
 if [[ ${2} != "non_test_binary" ]]
 then
