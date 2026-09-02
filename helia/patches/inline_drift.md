@@ -137,12 +137,59 @@ Drop condition: upstream merges the equivalent hook.
 
 ## `tensorflow/lite/micro/testing/test_with_arm_corstone_300.sh`
 
-Adds `-C cpu0.semihosting-enable=1` to the FVP invocation so picolibc's
-`libsemihost` (used by the ATfE toolchain) can route stdout/stderr through
-SYS_WRITEC/SYS_WRITE0 to the FVP host. GCC and armclang builds use the
-MPS3 UART and are unaffected. Five-line change. Strong upstream-PR candidate.
+Three changes:
 
-Drop condition: upstream enables semihosting unconditionally on Corstone-300.
+1. Adds `-C cpu0.semihosting-enable=1` to the FVP invocation so picolibc's
+   `libsemihost` (used by the ATfE toolchain) can route stdout/stderr through
+   SYS_WRITEC/SYS_WRITE0 to the FVP host. GCC and armclang builds use the
+   MPS3 UART and are unaffected. Five-line change. Strong upstream-PR
+   candidate.
+
+   Drop condition: upstream enables semihosting unconditionally on
+   Corstone-300.
+
+2. Calls `testing/assert_tests_executed.sh` on the captured log inside the
+   `grep -q "$PASS_STRING"` success branch, before declaring PASS (issue
+   #231). Cannot be a hook: the pass/fail decision is made in this script and
+   there is no upstream extension point inside it. Also a comment explaining
+   why the FVP's own process exit status is not consulted.
+
+   Drop condition: upstream stops treating a bare pass-string match as
+   sufficient evidence and asserts a positive executed-case count itself.
+
+3. Gives each binary its own log file
+   (`${RESULTS_DIRECTORY}/$(basename ${BINARY_TO_TEST}).txt` instead of the
+   shared `logs.txt`), so binaries running concurrently under `make -j` do
+   not interleave into one file and have their banners parsed against the
+   wrong binary. Two-line change, needed for (2) to mean anything.
+
+   Drop condition: upstream adopts a per-binary log path (worth an upstream
+   PR on its own — the shared path is a latent bug there too).
+
+## `tensorflow/lite/micro/testing/assert_tests_executed.sh`
+
+Helia-only **new file** in an upstream-owned directory (so not drift inside
+an upstream file, but listed here because the top-of-file exemptions —
+`kernels/helia/`, `tools/make/ext_libs/helia*.inc`, `tools/ci_build/*_helia.sh`,
+`.github/workflows/helia_*.yml`, `helia/` — do not cover
+`tensorflow/lite/micro/testing/`, and a sync reviewer needs to know it is
+intentional).
+
+Asserts that a test binary actually executed cases: it rejects a zero
+executed-case count, a failure marker, two concatenated runs, and a non-zero
+`Application exit code:` line, and it appends the per-leg tally consumed by
+`tools/ci_build/test_helia.sh`. Exists because both micro-test frameworks
+print `~~~ALL TESTS PASSED~~~` whenever the failure count is zero, including
+when the executed count is also zero — which is how the ATfE legs were
+vacuously green (issue #231).
+
+Why here and not under `helia/`: it is invoked by
+`testing/test_with_arm_corstone_300.sh` via `$(dirname "${BASH_SOURCE[0]}")`,
+so it has to sit next to its only caller. It is inert for upstream callers —
+without `HELIA_TEST_TALLY_FILE` it writes no tally.
+
+Drop condition: upstream makes the executed-case assertion part of its own
+test runner, at which point this file and its call site go together.
 
 ## `.github/workflows/check_tflite_files.yml`
 

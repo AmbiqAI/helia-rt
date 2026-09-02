@@ -27,7 +27,13 @@ PASS_STRING=${2}
 TARGET=${3}
 
 RESULTS_DIRECTORY=/tmp/${TARGET}_logs
-MICRO_LOG_FILENAME=${RESULTS_DIRECTORY}/logs.txt
+# helia-rt (issue #231): one log per binary, not a single shared logs.txt.
+# The test rules can run under `make -j`, and with one path two concurrent
+# binaries interleave into it -- binary A's assertion would then parse binary
+# B's banner, or see two framework summaries and fail a run that was fine.
+# `tee` still truncates on open, so a binary that never produces output leaves
+# an empty log and still fails the assertion below.
+MICRO_LOG_FILENAME=${RESULTS_DIRECTORY}/$(basename "${BINARY_TO_TEST}").txt
 mkdir -p ${RESULTS_DIRECTORY}
 
 FVP="FVP_Corstone_SSE-300_Ethos-U55 "
