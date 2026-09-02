@@ -228,7 +228,10 @@ for OPTIMIZE_KERNELS_FOR in "${variants[@]}"; do
     # so the leg can also report -- and optionally floor-check -- its total.
     # That catches the other half of the failure mode: binaries silently
     # dropping out of the suite entirely, which no per-binary check can see.
-    HELIA_TEST_TALLY_FILE="$(mktemp)"
+    # An explicit template is required: BSD/macOS mktemp has no default
+    # template, so a bare `mktemp` fails there and would take this script
+    # down under `set -e` on a local run.
+    HELIA_TEST_TALLY_FILE="$(mktemp "${TMPDIR:-/tmp}/helia_test_tally.XXXXXX")"
     export HELIA_TEST_TALLY_FILE
     : > "${HELIA_TEST_TALLY_FILE}"
 
@@ -285,11 +288,19 @@ for OPTIMIZE_KERNELS_FOR in "${variants[@]}"; do
     # real floor once CI has reported the actual per-leg numbers. They are
     # deliberately not hard-coded here: a guessed floor is either useless or
     # a false alarm waiting to happen.
+    # Tally line format: <binary-name><TAB><executed-cases><TAB><kind>.
+    # 'frameworkless' binaries (see FRAMEWORKLESS_BINARIES in
+    # testing/assert_tests_executed.sh) ran but have no case count, so they
+    # count as binaries and contribute zero cases. Report them separately so
+    # "N binaries, M cases" cannot be read as "every binary reported cases".
     tally_binaries="$(wc -l < "${HELIA_TEST_TALLY_FILE}" | tr -d '[:space:]')"
+    tally_frameworkless="$(awk -F'\t' '$3 == "frameworkless" {n += 1} \
+                           END {print n + 0}' "${HELIA_TEST_TALLY_FILE}")"
     tally_cases="$(awk -F'\t' '{s += $2} END {print s + 0}' \
                    "${HELIA_TEST_TALLY_FILE}")"
     echo "==> executed-case tally for ${TARGET_ARCH}/${TOOLCHAIN}/${OPTIMIZE_KERNELS_FOR}:" \
-         "${tally_binaries} binaries, ${tally_cases} test cases"
+         "${tally_binaries} binaries (${tally_frameworkless} framework-less," \
+         "no case count), ${tally_cases} test cases"
 
     if [[ "${tally_binaries}" -eq 0 || "${tally_cases}" -eq 0 ]]; then
       echo "::error ::${TARGET_ARCH}/${TOOLCHAIN}/${OPTIMIZE_KERNELS_FOR}:" \

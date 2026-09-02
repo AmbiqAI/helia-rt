@@ -38,9 +38,12 @@
 # binary is a documented framework-less exception), non-zero otherwise.
 #
 # Side effect: when HELIA_TEST_TALLY_FILE is set in the environment, appends
-# one '<binary-name><TAB><executed-cases>' line so the calling CI script can
-# report and floor-check a per-leg total. Unset (the upstream CI scripts) it
-# does nothing.
+# one '<binary-name><TAB><executed-cases><TAB><kind>' line so the calling CI
+# script can report and floor-check a per-leg total. <kind> is 'counted' for a
+# binary that reported a case count and 'frameworkless' for one of the exempt
+# binaries below, which ran but has no count to contribute; both are real
+# binaries and both are recorded, so the per-leg binary count stays honest.
+# Unset (the upstream CI scripts) it does nothing.
 
 set -euo pipefail
 
@@ -53,6 +56,15 @@ if [[ ! -f "${LOG_FILE}" ]]; then
        "confirm that any test case executed."
   exit 1
 fi
+
+# Append one line to the per-leg tally, if the caller asked for one.
+# Arguments: <executed-cases> <kind>.
+record_tally() {
+  if [[ -n "${HELIA_TEST_TALLY_FILE:-}" ]]; then
+    printf '%s\t%s\t%s\n' "${BINARY_NAME}" "${1}" "${2}" \
+      >> "${HELIA_TEST_TALLY_FILE}"
+  fi
+}
 
 # Binaries that legitimately report no case count. These are hand-rolled
 # main() programs that print the pass string directly and never link either
@@ -75,9 +87,54 @@ FRAMEWORKLESS_BINARIES=(
 for exempt in "${FRAMEWORKLESS_BINARIES[@]}"; do
   if [[ "${BINARY_NAME}" == "${exempt}" ]]; then
     echo "${BINARY_NAME}: no case count expected (framework-less test binary)"
+    # It still ran, so it counts as a binary for the per-leg tally -- with
+    # zero executed cases and flagged so the leg summary can say how many of
+    # its binaries carry no count. Dropping it here would undercount the
+    # binaries the leg actually executed, and any HELIA_MIN_TEST_BINARIES
+    # floor would be measured against an incomplete list.
+    record_tally 0 frameworkless
     exit 0
   fi
 done
+
+# A count banner is necessary but not sufficient. Two more log shapes must
+# not be allowed through, because the caller reaches this script via a bare
+# `grep -q '~~~ALL TESTS PASSED~~~'`:
+#
+#  1. A failure marker anywhere in the log. Both frameworks print the pass
+#     string only when their own failure count is zero, but a binary can
+#     print that string itself from inside a test body
+#     (examples/network_tester/network_tester_test.cc does), so a log can
+#     hold both the pass string and a real framework failure.
+#     micro_test.h prints '~~~SOME TESTS FAILED~~~'; micro_test_v2.h prints
+#     '[  FAILED  ] ...' per failing case and in its summary.
+#  2. More than one framework summary in one log, i.e. two runs concatenated.
+#     The count taken below is the last one, so a failing or empty first run
+#     could hide behind a later good one, and the tally would credit the leg
+#     with cases from a run that is not this binary's.
+if grep -aqE '~~~SOME TESTS FAILED~~~|\[ +FAILED +\]' "${LOG_FILE}"; then
+  echo "--------------------------------------------------------"
+  echo "ERROR: ${BINARY_NAME}: the log contains a test-failure marker."
+  grep -aoE '~~~SOME TESTS FAILED~~~|\[ +FAILED +\].*' "${LOG_FILE}" \
+    | head -n 5
+  echo "The pass string is not evidence when the framework reported a"
+  echo "failure: a binary can print '~~~ALL TESTS PASSED~~~' itself from"
+  echo "inside a test body. Treat this run as FAILED. See issue #231."
+  echo "--------------------------------------------------------"
+  exit 1
+fi
+
+summaries="$({ grep -aoE '\[==========\] [0-9]+ tests ran|[0-9]+/[0-9]+ tests passed' \
+                 "${LOG_FILE}" || true; } | wc -l | tr -d '[:space:]')"
+if [[ "${summaries}" -gt 1 ]]; then
+  echo "--------------------------------------------------------"
+  echo "ERROR: ${BINARY_NAME}: ${summaries} framework summaries in one log."
+  echo "The log looks like more than one run concatenated, so no single"
+  echo "executed-case count describes this binary and a bad run could be"
+  echo "masked by a good one. Give each binary its own log. See issue #231."
+  echo "--------------------------------------------------------"
+  exit 1
+fi
 
 # micro_test_v2.h: "[==========] %d tests ran."
 # Matched with grep -oE rather than an anchored sed so that FVP/UART output
@@ -114,10 +171,7 @@ if [[ -z "${executed}" ]]; then
   exit 1
 fi
 
-if [[ -n "${HELIA_TEST_TALLY_FILE:-}" ]]; then
-  printf '%s\t%s\n' "${BINARY_NAME}" "${executed}" \
-    >> "${HELIA_TEST_TALLY_FILE}"
-fi
+record_tally "${executed}" counted
 
 if [[ "${executed}" -eq 0 ]]; then
   echo "--------------------------------------------------------"
