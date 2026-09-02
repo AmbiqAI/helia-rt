@@ -91,6 +91,7 @@ helia-specific shell entrypoints follow the naming pattern `*_helia.sh`:
 | `package_helia_bundle.sh` | `helia_release.yml` |
 | `resolve_release_meta.sh` | `helia_release.yml` |
 | `release_asset_helpers.sh` | sourced by `helia_release.yml` |
+| `check_helia_kernel_runner_temporaries.sh` | `helia_test.yml` |
 
 New helia CI scripts must follow the same `*_helia.sh` (or
 `<verb>_helia*.sh`) pattern. Avoid editing the upstream `test_*.sh`
@@ -122,7 +123,7 @@ helia-specific files:
 | `tensorflow/lite/micro/tools/make/targets/cortex_m_corstone_300_atfe.inc` | Externalized ATfE toolchain logic, included from `cortex_m_corstone_300_makefile.inc`. New target/toolchain combinations should follow the same `<target>_<toolchain>.inc` convention. |
 | `tensorflow/lite/micro/tools/make/arm_clang_download.sh`, `arm_toolchain_embedded_download.sh` | helia-managed toolchain downloaders invoked from the cortex_m_* target makefiles. |
 | `tensorflow/lite/micro/tools/make/ext_libs/ns_cmsis_nn_download.sh` | NS-CMSIS-NN downloader invoked from `helia.inc`. The `NS_CMSIS_NN_COMMIT` it consumes is exported from `helia.inc`. |
-| `tensorflow/lite/micro/tools/ci_build/{ns_local_build,package_helia_bundle,resolve_release_meta,release_asset_helpers}.sh` | helia CI helpers. The `*_helia.sh` naming is preferred for new scripts. |
+| `tensorflow/lite/micro/tools/ci_build/{ns_local_build,package_helia_bundle,resolve_release_meta,release_asset_helpers,check_helia_kernel_runner_temporaries}.sh` | helia CI helpers. The `*_helia.sh` naming is preferred for new scripts. |
 | `tensorflow/lite/micro/tools/github/arm_virtual_hardware/cortex_m_*_avh.yml` | Arm Virtual Hardware test configs consumed by `.github/workflows/cortex_m_virtual_hardware.yml`. |
 | `tensorflow/lite/micro/integration_tests/nnaed/` | helia integration tests vendored from the nnaed test generator. New helia-only integration tests go here, not under `integration_tests/seanet/` (upstream). |
 | `tensorflow/lite/micro/tools/ci_build/templates/zephyr_prebuilt/` | Zephyr module template assets used by `zephyr_static_export.sh` and `zephyr_tflm_rt_assets.yml`. |
