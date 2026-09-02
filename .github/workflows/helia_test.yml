@@ -81,6 +81,11 @@ jobs:
     runs-on: ubuntu-latest-md
     container:
       image: ${{ needs.ci-image.outputs.image }}
+    # helia-rt (issue #239): a hard ceiling above readable_run's own 60m
+    # `timeout` around each make invocation, so a leg that wedges outside
+    # readable_run (in the FVP download, the container, or the runner) is
+    # ended by Actions instead of running to the 6h default.
+    timeout-minutes: 75
 
     strategy:
       fail-fast: false
@@ -142,6 +147,12 @@ jobs:
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
+      # helia-rt (issue #239): per-binary FVP budget, read by
+      # testing/test_with_arm_corstone_300.sh. Set here rather than left to
+      # the script default so a leg can be retuned in one place. 600s is
+      # about 117x the slowest binary ever measured on any leg -- it is a
+      # hang detector, not a performance gate.
+      FVP_TIMEOUT_SECONDS: "600"
 
     name: test-${{ matrix.arch }}-${{ matrix.toolchain }}-${{ matrix.opt }}
 

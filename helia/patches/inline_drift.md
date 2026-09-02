@@ -191,6 +191,30 @@ without `HELIA_TEST_TALLY_FILE` it writes no tally.
 Drop condition: upstream makes the executed-case assertion part of its own
 test runner, at which point this file and its call site go together.
 
+### Per-binary hang and fault handling (issue #239)
+
+Separate block deliberately: `fix/atfe-test-registration-231` (#236) is
+rewriting the paragraph above at the same time, so keeping this apart keeps
+the two branches to a textual merge.
+
+About 50 lines, most of it the comment justifying the budget. Two changes,
+neither of which upstream offers a hook for — the log path and the FVP
+invocation are both set inline in this script:
+
+1. The FVP invocation is wrapped in `timeout --kill-after=30 600`
+   (`FVP_TIMEOUT_SECONDS` overrides it). A timeout becomes an explicit named
+   FAIL, instead of one binary silently consuming the whole leg budget.
+2. The log path is per binary (`<binary>.txt`) rather than one shared
+   `logs.txt`, so the log of a binary that failed survives the ~90 binaries
+   `make -k` runs after it. #236 makes the same change for its own reason
+   (concurrent `make -j` interleaving); same expression, so the two agree.
+
+`tools/ci_build/test_cortex_m_corstone_300.sh` (the upstream cmsis_nn leg)
+uses this same script and inherits both.
+
+Drop condition: upstream bounds each FVP run itself and gives each binary its
+own log.
+
 ## `.github/workflows/check_tflite_files.yml`
 
 Replaces the upstream `tools/ci_build/check_tflite_files.sh` shell entry
