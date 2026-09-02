@@ -19,9 +19,16 @@ bug fixes and are the versions Ambiq expects to reproduce reports against.
 
 | Track | Version | Status |
 |---|---|---|
-| Current minor | `v1.17.x` | Supported |
-| Previous minor | `v1.16.x` | Supported |
-| Older minors | `v1.15.x` and earlier | Not supported |
+| Current minor | `v1.19.x` | Supported |
+| Previous minor | `v1.17.x` | Supported |
+| Older minors | `v1.16.x` and earlier | Not supported |
+
+`v1.18.0` is **withdrawn** and does not count as a supported minor: its
+heliaCORE pin is defective for the float32 and float16 kernels (NaN handling
+and the FP16 LSTM), and `v1.19.0` supersedes it. Users on `v1.18.0` should
+upgrade to `v1.19.0`. The `helia-rt-v1.18.0` tag remains in place for
+reproducibility. Because the withdrawn release is skipped, the supported
+previous minor is `v1.17.x`.
 
 Being supported means running the **latest patch release** of a supported minor.
 A defect that is already fixed in a later patch of your minor is addressed by
@@ -90,13 +97,15 @@ supported toolchains and targets.
 
 ## Known Unsupported Behavior
 
-**Stateful/streaming quantized HELIA LSTM is unsupported until a released fix is
-verified.** No release up to and including `v1.17.0` contains this fix: the
-state-persistence change landed on `main` in
-[#197](https://github.com/AmbiqAI/helia-rt/pull/197) after `v1.17.0` was cut.
-Check the release notes of any release after `v1.17.0` before relying on
-stateful behavior. Until then, treat quantized
-`UNIDIRECTIONAL_SEQUENCE_LSTM` as single-shot.
+**Stateful/streaming quantized HELIA LSTM: the state-persistence fix is
+released.** The change landed on `main` in
+[#197](https://github.com/AmbiqAI/helia-rt/pull/197) after `v1.17.0` was cut and
+first shipped in `v1.18.0`, where it is listed in the release notes. It is
+carried forward in `v1.19.0`. Because `v1.18.0` is withdrawn (see
+[Supported Releases](#supported-releases)), take this fix from `v1.19.0`.
+
+Releases up to and including `v1.17.0` do not contain it. On those releases,
+treat quantized `UNIDIRECTIONAL_SEQUENCE_LSTM` as single-shot.
 
 This statement is quantized-only. It says nothing about the FP16 and FP32 LSTM
 paths — see [FP16 and FP32](../guides/floating-point.md) for those.
