@@ -74,24 +74,28 @@ infrastructure used by every kernel test.
 Drop condition: upstream tflite-micro adopts a by-value member (or otherwise
 lifetime-extends the registration) in `kernel_runner.h`.
 
-## DEQUANTIZE float16 input — `kernels/dequantize{.h,.cc,_common.cc,_test.cc}`
+## `tensorflow/lite/micro/kernels/dequantize.h`, `dequantize.cc`, `dequantize_common.cc`, `dequantize_test.cc`, `xtensa/dequantize.cc`
 
 Widens DEQUANTIZE to accept a `kTfLiteFloat16` input with a float32 output,
 the form the LiteRT converter emits for fp16-PTQ weights (see
-AmbiqAI/helia-rt#255). Four inline changes:
+AmbiqAI/helia-rt#255). Five inline changes:
 
-- `dequantize_common.cc`: `DequantizePrepare` admits `kTfLiteFloat16` and
-  skips the scale/zero-point read for it (f16 tensors carry no quantization
-  params).
+- `dequantize_common.cc`: `DequantizePrepare` admits `kTfLiteFloat16`. The
+  scale/zero-point read stays unconditional; an f16 tensor carries `{0, 0}`
+  params, which the widening path never uses.
 - `dequantize.h`: adds the shared `Float16BitsToFloat32()` bit-expansion
   helper.
 - `dequantize.cc`: adds the `kTfLiteFloat16` case to the reference Eval.
+- `xtensa/dequantize.cc`: adds the same case to the xtensa Eval, using the
+  same portable helper (there is no HiFi f16 widening primitive to call).
 - `dequantize_test.cc`: adds the float16 golden and Prepare-rejection tests.
 
 Prepare is shared with `kernels/helia/dequantize.cc`, so the type admission
 cannot live under `kernels/helia/`; the helper and the reference Eval case
-are kept inline so the helia kernel and the reference kernel behave
-identically on hosts and on cores without f16 arithmetic.
+are kept inline so the helia kernel and the reference kernel produce
+identical bits for every finite value, zero, infinity and NaN (signalling
+NaNs are quieted on both paths), on hosts and on cores without f16
+arithmetic.
 
 Drop condition: upstream TFLM accepts float16 DEQUANTIZE input.
 

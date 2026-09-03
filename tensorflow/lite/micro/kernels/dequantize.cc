@@ -66,6 +66,7 @@ TfLiteStatus DequantizeEval(TfLiteContext* context, TfLiteNode* node) {
                                 tflite::micro::GetTensorShape(output),
                                 tflite::micro::GetTensorData<float>(output));
       break;
+    // helia: f16 input, see AmbiqAI/helia-rt#255
     case kTfLiteFloat16: {
       const TfLiteFloat16* input_data =
           tflite::micro::GetTensorData<TfLiteFloat16>(input);

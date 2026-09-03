@@ -36,8 +36,8 @@ struct DequantizeOpData {
 
 TfLiteStatus DequantizePrepare(TfLiteContext* context, TfLiteNode* node);
 
-// Widens an IEEE-754 binary16 bit pattern to float. Used on cores without
-// float16 arithmetic, so it must not touch a float16 register.
+// Must not use a float16 register: this also runs on cores without float16
+// arithmetic. see AmbiqAI/helia-rt#255
 inline float Float16BitsToFloat32(uint16_t bits) {
   const uint32_t sign = static_cast<uint32_t>(bits & 0x8000u) << 16;
   const uint32_t exponent = (bits >> 10) & 0x1Fu;
@@ -46,6 +46,7 @@ inline float Float16BitsToFloat32(uint16_t bits) {
   uint32_t result;
   if (exponent == 0x1F) {
     result = sign | 0x7F800000u | (mantissa << 13);
+    if (mantissa != 0) result |= 0x00400000u;
   } else if (exponent != 0) {
     result = sign | ((exponent + 112) << 23) | (mantissa << 13);
   } else if (mantissa == 0) {

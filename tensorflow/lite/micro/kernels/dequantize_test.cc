@@ -13,6 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#include <cmath>
+#include <cstdint>
+#include <cstring>
 #include <limits>
 
 #include "tensorflow/lite/c/builtin_op_data.h"
@@ -112,18 +115,22 @@ TEST(DequantizeTest, DequantizeOpTestUint8) {
                                          zero_point, dims, values, output);
 }
 
+// helia: f16 input, see AmbiqAI/helia-rt#255
 TEST(DequantizeTest, DequantizeOpTestFloat16) {
-  const int length = 6;
-  int dims[] = {2, 2, 3};
-  // 1.0, -2.0, +0.0, smallest subnormal, largest normal, +inf.
+  const int length = 9;
+  int dims[] = {2, 3, 3};
+  // 1.0, -2.0, +0.0, smallest subnormal, largest normal, +inf, -0.0,
+  // lowest normal, sNaN.
   const TfLiteFloat16 input[length] = {{0x3C00}, {0xC000}, {0x0000},
-                                       {0x0001}, {0x7BFF}, {0x7C00}};
-  const float expected[length] = {1.0f,
-                                  -2.0f,
-                                  0.0f,
-                                  5.9604644775390625e-08f,
-                                  65504.0f,
-                                  std::numeric_limits<float>::infinity()};
+                                       {0x0001}, {0x7BFF}, {0x7C00},
+                                       {0x8000}, {0xFBFF}, {0x7C01}};
+  // The last entry is NaN and is checked separately; NaN never compares equal.
+  const float expected[length] = {
+      1.0f,     -2.0f,
+      0.0f,     5.9604644775390625e-08f,
+      65504.0f, std::numeric_limits<float>::infinity(),
+      -0.0f,    -65504.0f,
+      0.0f};
   float output[length];
 
   TfLiteIntArray* tensor_dims = tflite::testing::IntArrayFromInts(dims);
@@ -143,9 +150,16 @@ TEST(DequantizeTest, DequantizeOpTestFloat16) {
 
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
   EXPECT_EQ(kTfLiteOk, runner.Invoke());
-  for (int i = 0; i < length; ++i) {
+  for (int i = 0; i < length - 1; ++i) {
     EXPECT_EQ(expected[i], output[i]);
   }
+  // -0.0f == 0.0f, so the sign of zero needs its own assertion.
+  EXPECT_TRUE(std::signbit(output[6]));
+  // A signalling NaN must come back quiet, i.e. with the mantissa MSB set.
+  EXPECT_TRUE(std::isnan(output[8]));
+  uint32_t nan_bits;
+  std::memcpy(&nan_bits, &output[8], sizeof(nan_bits));
+  EXPECT_NE(0u, nan_bits & 0x00400000u);
 }
 
 TEST(DequantizeTest, DequantizeOpTestFloat16NonFloat32OutputFailsPrepare) {
