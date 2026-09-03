@@ -82,10 +82,10 @@ parameters are supported by the optimized kernel.
 - Grouped `CONV_2D` (input channels a multiple of filter channels) is outside
   the optimized float kernels' support: FP32 uses the reference kernel, FP16
   is rejected at `AllocateTensors()`.
-- Pure data-movement operators (`TRANSPOSE`, `RESHAPE`) and the FLOAT16 input
-  path of `DEQUANTIZE` handle FP16 tensors bitwise through their 16-bit
-  reference paths, so they work even without `ARM_NN_ENABLE_F16` and on
-  Cortex-M4+FP.
+- Pure data-movement operators (`TRANSPOSE`, `RESHAPE`) copy FP16 tensors
+  bitwise, and the FLOAT16 input path of `DEQUANTIZE` widens f16 storage to
+  float32 without f16 arithmetic, so all three work even without
+  `ARM_NN_ENABLE_F16` and on Cortex-M4+FP.
 - HELIA softmax supports only unit beta. FP32 softmax falls back to reference
   for non-unit beta; FP16 non-unit beta is unsupported.
 - HELIA FP16/FP32 `UNIDIRECTIONAL_SEQUENCE_LSTM` preserves the TFLite hidden and
