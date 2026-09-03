@@ -397,6 +397,19 @@ function(helia_rt_float_feature_flags OUT_F32 OUT_F16)
         # same Kconfig) never compiled, breaking the final link.
         set(_f32 "${CONFIG_NS_CMSIS_NN_ENABLE_F32}")
         set(_f16 "${CONFIG_NS_CMSIS_NN_ENABLE_F16}")
+    elseif(DEFINED HELIA_RT_FLOAT32_ENABLED OR DEFINED HELIA_RT_FLOAT16_ENABLED)
+        # Already resolved against the linked target by nsx/CMakeLists.txt;
+        # prefer it over the raw options, which are only a request.
+        if(DEFINED HELIA_RT_FLOAT32_ENABLED)
+            set(_f32 "${HELIA_RT_FLOAT32_ENABLED}")
+        else()
+            set(_f32 OFF)
+        endif()
+        if(DEFINED HELIA_RT_FLOAT16_ENABLED)
+            set(_f16 "${HELIA_RT_FLOAT16_ENABLED}")
+        else()
+            set(_f16 OFF)
+        endif()
     else()
         if(DEFINED NSX_CMSIS_NN_ENABLE_F32)
             set(_f32 "${NSX_CMSIS_NN_ENABLE_F32}")
@@ -588,3 +601,67 @@ function(helia_rt_build_type_compile_definitions OUT_VAR)
     set(${OUT_VAR} ${_defs} PARENT_SCOPE)
 endfunction()
 
+# ---------------------------------------------------------------------------
+# helia_rt_collect_interface_compile_flags(OUT_VAR TARGET <name>)
+#
+# Collects the compile flags a target imposes on consumers, walking
+# INTERFACE_LINK_LIBRARIES transitively: boards reach -mcpu through a linked
+# SoC flags target, and try_compile()'s LINK_LIBRARIES does not propagate
+# usage requirements for a non-IMPORTED target. Generator expressions cannot
+# be evaluated at configure time and are skipped.
+# see #254
+# ---------------------------------------------------------------------------
+function(helia_rt_collect_interface_compile_flags OUT_VAR)
+    cmake_parse_arguments(_ARG "" "TARGET" "" ${ARGN})
+
+    set(_flags "")
+    set(_seen "")
+    set(_queue "${_ARG_TARGET}")
+
+    while(_queue)
+        list(POP_FRONT _queue _t)
+        if(NOT _t OR NOT TARGET "${_t}")
+            continue()
+        endif()
+        if("${_t}" IN_LIST _seen)
+            continue()
+        endif()
+        list(APPEND _seen "${_t}")
+
+        get_target_property(_alias "${_t}" ALIASED_TARGET)
+        if(_alias)
+            list(APPEND _queue "${_alias}")
+            continue()
+        endif()
+
+        get_target_property(_opts "${_t}" INTERFACE_COMPILE_OPTIONS)
+        if(_opts)
+            foreach(_o IN LISTS _opts)
+                if(NOT _o MATCHES "\\$<")
+                    string(APPEND _flags " ${_o}")
+                endif()
+            endforeach()
+        endif()
+
+        get_target_property(_defs "${_t}" INTERFACE_COMPILE_DEFINITIONS)
+        if(_defs)
+            foreach(_d IN LISTS _defs)
+                if(NOT _d MATCHES "\\$<")
+                    string(APPEND _flags " -D${_d}")
+                endif()
+            endforeach()
+        endif()
+
+        get_target_property(_deps "${_t}" INTERFACE_LINK_LIBRARIES)
+        if(_deps)
+            foreach(_dep IN LISTS _deps)
+                if(NOT _dep MATCHES "\\$<")
+                    list(APPEND _queue "${_dep}")
+                endif()
+            endforeach()
+        endif()
+    endwhile()
+
+    string(STRIP "${_flags}" _flags)
+    set(${OUT_VAR} "${_flags}" PARENT_SCOPE)
+endfunction()
