@@ -87,8 +87,9 @@ heliaRT provides three kernel backends. Every operator has a **Reference** imple
 The HELIA backend also dispatches FP32 and FP16 operators to heliaCORE. These
 paths are gated at build time by `ARM_NN_ENABLE_F32` / `ARM_NN_ENABLE_F16`.
 The Make build and the published static libraries always enable FP32 (plus
-FP16 on Cortex-M55), NSX requires FP32, and Zephyr implies both from the
-target; only standalone CMake is fully opt-in. See the
+FP16 on Cortex-M55) and Zephyr implies both from the target; NSX and
+standalone CMake are fully opt-in, and an int8-only build carries neither.
+See the
 [FP16 and FP32 guide](../guides/floating-point.md) for how each build system
 resolves them.
 

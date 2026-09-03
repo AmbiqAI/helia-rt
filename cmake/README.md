@@ -18,7 +18,7 @@ Tracked in [issue #147](https://github.com/AmbiqAI/helia-rt/issues/147).
 
 | File | Purpose |
 |---|---|
-| `helia_rt_sources.cmake` | Lists (`HELIA_RT_INCLUDE_DIRS`, `HELIA_RT_COMMON_SOURCES`, `HELIA_RT_KERNEL_BASENAMES`) + helper functions (`helia_rt_select_kernel_sources`, `helia_rt_backend_compile_definitions`, `helia_rt_build_type_compile_definitions`). Pure data + logic, no `add_library` calls. Safe to `include()` from any context including `cmake -P` script mode. |
+| `helia_rt_sources.cmake` | Lists (`HELIA_RT_INCLUDE_DIRS`, `HELIA_RT_COMMON_SOURCES`, `HELIA_RT_KERNEL_BASENAMES`) + helper functions (`helia_rt_select_kernel_sources`, `helia_rt_backend_compile_definitions`, `helia_rt_build_type_compile_definitions`, `helia_rt_float_feature_flags`, `helia_rt_float_flags_from_target`, `helia_rt_resolve_float_flags`). The float resolvers are the single answer to "which float kernels does this build have?", shared by the repo-root `CMakeLists.txt`, `nsx/CMakeLists.txt` and the Zephyr module so no two entry points can disagree (see [FP16 and FP32 HELIA kernels](../docs/guides/floating-point.md)). Pure data + logic, no `add_library` calls. Safe to `include()` from any context including `cmake -P` script mode. |
 | `dump_manifest.cmake` | Emits the resolved manifest as JSON on stdout. Runnable in script mode: `cmake -DBACKEND=reference -P cmake/dump_manifest.cmake`. |
 
 ## Adding a new kernel

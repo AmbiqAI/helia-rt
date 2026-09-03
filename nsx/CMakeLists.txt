@@ -28,14 +28,11 @@
 # Backend-specific upstream targets:
 #   helia:    nsx::cmsis_nn (or alias) — ns-cmsis-nn kernels, with Ambiq's
 #             additive weight-sum / fast-path symbols actively referenced.
-#             Requires ns-cmsis-nn v7.28.0 or later, and the parent build MUST
-#             set the float options *before* it adds the ns-cmsis-nn module:
-#                 set(NSX_CMSIS_NN_ENABLE_F32 ON CACHE BOOL "" FORCE)
-#                 set(NSX_CMSIS_NN_ENABLE_F16 ON CACHE BOOL "" FORCE)  # MVE-F
-#                 add_subdirectory(<ns-cmsis-nn>/nsx ...)
-#                 add_subdirectory(<helia-rt>/nsx ...)
-#             ns-cmsis-nn reads those options while its own CMakeLists runs, so
-#             this module can only validate them — see the check below.
+#             fp32/fp16 are opt-in: set NSX_CMSIS_NN_ENABLE_F32/F16 before
+#             add_subdirectory(<ns-cmsis-nn>/nsx ...), which is where
+#             ns-cmsis-nn reads them. Publishes what it observed as
+#             HELIA_RT_FLOAT32_ENABLED / HELIA_RT_FLOAT16_ENABLED.
+#             see AmbiqAI/helia-rt#253, AmbiqAI/helia-rt#254, docs/guides/floating-point.md
 #   cmsis_nn: User-supplied upstream CMSIS-NN target. ns-cmsis-nn is NOT
 #             compatible (modified API signatures). Supply the target via
 #             -DHELIA_RT_CMSISNN_TARGET=<name> (e.g. CMSIS::NN from an
@@ -229,43 +226,219 @@ unset(_nsx_ethosu_wrote)
 # NSX_HELIA_RT_BACKEND in the same build dir) by unsetting the inactive one
 # rather than leaving a stale FORCE entry behind.
 if(NSX_HELIA_RT_BACKEND STREQUAL "helia")
-    # The helia backend consumes the experimental float API from ns-cmsis-nn.
-    #
-    # These options control *ns-cmsis-nn's own* source selection and the
-    # ARM_NN_ENABLE_F32/F16 compile definitions it exports. ns-cmsis-nn reads
-    # them while its own CMakeLists is processed, which a consumer does
-    # *before* adding this module (nsx::cmsis_nn must exist by the time
-    # helia_rt::helia links it). Assigning them here would therefore be a
-    # no-op: the dependency's target and source list are already fixed.
-    #
-    # So we validate rather than assign. The parent NSX build must set them
-    # before add_subdirectory(<ns-cmsis-nn>/nsx), e.g.
-    #     set(NSX_CMSIS_NN_ENABLE_F32 ON CACHE BOOL "" FORCE)
-    #     set(NSX_CMSIS_NN_ENABLE_F16 ON CACHE BOOL "" FORCE)  # MVE-F cores
-    if(NOT NSX_CMSIS_NN_ENABLE_F32)
-        message(FATAL_ERROR
-            "nsx-helia-rt: NSX_HELIA_RT_BACKEND=helia requires the fp32 "
-            "kernels from ns-cmsis-nn, but NSX_CMSIS_NN_ENABLE_F32 is not "
-            "enabled. Set -DNSX_CMSIS_NN_ENABLE_F32=ON (or set it in the "
-            "parent CMakeLists) *before* the ns-cmsis-nn module is added; "
-            "setting it afterwards has no effect. Requires ns-cmsis-nn "
-            "v7.28.0 or later, which bridges NSX_CMSIS_NN_ENABLE_F32/F16 to "
-            "source selection and to the exported ARM_NN_ENABLE_F32/F16 "
-            "definitions.")
-    endif()
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "cortex-m55" AND NOT NSX_CMSIS_NN_ENABLE_F16)
-        message(WARNING
-            "nsx-helia-rt: NSX_CMSIS_NN_ENABLE_F16 is not enabled, so the "
-            "fp16 helia kernels are unavailable on this MVE-F capable core "
-            "and float16 operators without a reference path will fail. Set "
-            "-DNSX_CMSIS_NN_ENABLE_F16=ON before the ns-cmsis-nn module is "
-            "added to enable them.")
-    endif()
     if(NOT HELIA_RT_NSCMSISNN_TARGET)
         set(HELIA_RT_NSCMSISNN_TARGET "nsx::cmsis_nn" CACHE STRING
             "ns-cmsis-nn target to link from helia_rt::helia (nsx-helia-rt default)" FORCE)
     endif()
     unset(HELIA_RT_CMSISNN_TARGET CACHE)
+
+    # --- Effective float kernel set ---
+    # fp32/fp16 are opt-in. ns-cmsis-nn fixed its source list before this
+    # module was added, so observe the resolved target, never assign.
+    # see AmbiqAI/helia-rt#253, AmbiqAI/helia-rt#254
+    include("${HELIA_RT_TFLM_ROOT}/cmake/helia_rt_sources.cmake")
+    helia_rt_resolve_float_flags(
+        _nsx_helia_rt_f32 _nsx_helia_rt_f16 _nsx_helia_rt_float_source
+        DEP "${HELIA_RT_NSCMSISNN_TARGET}")
+
+    message(STATUS
+        "nsx-helia-rt: float kernels: "
+        "fp32=${_nsx_helia_rt_f32} fp16=${_nsx_helia_rt_f16} "
+        "(source: ${_nsx_helia_rt_float_source})")
+
+    # The option is only a request. Flag a target that shipped something
+    # else, which almost always means the option was set too late.
+    if(_nsx_helia_rt_float_source STREQUAL "ns-cmsis-nn target")
+        foreach(_nsx_f IN ITEMS 32 16)
+            if(DEFINED NSX_CMSIS_NN_ENABLE_F${_nsx_f})
+                if(NSX_CMSIS_NN_ENABLE_F${_nsx_f})
+                    set(_nsx_req ON)
+                else()
+                    set(_nsx_req OFF)
+                endif()
+                if(NOT _nsx_req STREQUAL "${_nsx_helia_rt_f${_nsx_f}}")
+                    message(WARNING
+                        "nsx-helia-rt: NSX_CMSIS_NN_ENABLE_F${_nsx_f}="
+                        "${_nsx_req} was ignored -- the linked ns-cmsis-nn "
+                        "target '${HELIA_RT_NSCMSISNN_TARGET}' shipped "
+                        "fp${_nsx_f}=${_nsx_helia_rt_f${_nsx_f}}, and heliaRT "
+                        "compiles against what it shipped. ns-cmsis-nn reads "
+                        "that option while its own CMakeLists runs, so it "
+                        "must be set *before* "
+                        "add_subdirectory(<ns-cmsis-nn>/nsx ...) -- setting "
+                        "it afterwards, or on a build dir that already "
+                        "configured ns-cmsis-nn, has no effect.")
+                endif()
+            endif()
+        endforeach()
+        unset(_nsx_f)
+        unset(_nsx_req)
+    endif()
+
+    # NOTICE, not WARNING: int8-only is a supported configuration and a
+    # WARNING would break consumers configuring with -Werror=dev.
+    if(NOT _nsx_helia_rt_f32)
+        message(NOTICE
+            "nsx-helia-rt: fp32 helia kernels are OFF, so no arm_*_f32 kernel "
+            "is linked. FLOAT32 operators still run, on the slower reference "
+            "float path; int8 models are unaffected. To get the optimized "
+            "fp32 kernels, add\n"
+            "    set(NSX_CMSIS_NN_ENABLE_F32 ON CACHE BOOL \"\" FORCE)\n"
+            "to the parent CMakeLists *before* "
+            "add_subdirectory(<ns-cmsis-nn>/nsx ...) -- ns-cmsis-nn selects "
+            "its float sources at that point, so setting it afterwards has no "
+            "effect. Requires ns-cmsis-nn v7.28.0 or later.")
+    endif()
+
+    # --- MVE-F capability probe ---
+    # Ask the toolchain, not CMAKE_SYSTEM_PROCESSOR. Flags come from a
+    # transitive walk: boards put -mcpu on a linked SoC flags target.
+    # Compile-only; a cross build may have no linkable runtime yet.
+    # see AmbiqAI/helia-rt#254
+    helia_rt_collect_interface_compile_flags(_nsx_helia_rt_mve_flags
+        TARGET "${NSX_BOARD_FLAGS_TARGET}")
+
+    # check_<lang>_source_compiles() keys its cache on the result variable
+    # name alone, so tie the answer to the flags it was probed with.
+    string(SHA256 _nsx_helia_rt_mve_key
+        "${_nsx_helia_rt_mve_flags}|${CMAKE_C_FLAGS}|${CMAKE_CXX_FLAGS}")
+    # Both sides expanded so an undefined side cannot compare as a literal name.
+    if(DEFINED HELIA_RT_MVE_FP_PROBE_KEY AND NOT
+       "${HELIA_RT_MVE_FP_PROBE_KEY}" STREQUAL "${_nsx_helia_rt_mve_key}")
+        unset(HELIA_RT_TARGET_HAS_MVE_FP CACHE)
+    endif()
+    set(HELIA_RT_MVE_FP_PROBE_KEY "${_nsx_helia_rt_mve_key}" CACHE INTERNAL
+        "Flag string HELIA_RT_TARGET_HAS_MVE_FP was last probed with")
+
+    set(_nsx_helia_rt_mve_src
+"#if !(defined(__ARM_FEATURE_MVE) && (__ARM_FEATURE_MVE & 2))
+#error no MVE-F
+#endif
+int main(void){return 0;}
+")
+    get_property(_nsx_helia_rt_languages GLOBAL PROPERTY ENABLED_LANGUAGES)
+    # Save and restore exactly, undefined included: both belong to the
+    # consumer and are inherited by everything this module adds below.
+    set(_nsx_helia_rt_had_req_flags OFF)
+    if(DEFINED CMAKE_REQUIRED_FLAGS)
+        set(_nsx_helia_rt_had_req_flags ON)
+        set(_nsx_helia_rt_saved_req_flags "${CMAKE_REQUIRED_FLAGS}")
+    endif()
+    set(_nsx_helia_rt_had_try_type OFF)
+    if(DEFINED CMAKE_TRY_COMPILE_TARGET_TYPE)
+        set(_nsx_helia_rt_had_try_type ON)
+        set(_nsx_helia_rt_saved_try_type "${CMAKE_TRY_COMPILE_TARGET_TYPE}")
+    endif()
+    set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+    set(CMAKE_REQUIRED_FLAGS "${_nsx_helia_rt_mve_flags}")
+    if("C" IN_LIST _nsx_helia_rt_languages)
+        include(CheckCSourceCompiles)
+        check_c_source_compiles("${_nsx_helia_rt_mve_src}"
+            HELIA_RT_TARGET_HAS_MVE_FP)
+    elseif("CXX" IN_LIST _nsx_helia_rt_languages)
+        include(CheckCXXSourceCompiles)
+        check_cxx_source_compiles("${_nsx_helia_rt_mve_src}"
+            HELIA_RT_TARGET_HAS_MVE_FP)
+    elseif(NOT DEFINED HELIA_RT_TARGET_HAS_MVE_FP)
+        # No compiler to ask (languages not enabled yet / script mode).
+        set(HELIA_RT_TARGET_HAS_MVE_FP OFF CACHE INTERNAL
+            "Target has MVE floating point (__ARM_FEATURE_MVE & 2)")
+    endif()
+    if(_nsx_helia_rt_had_req_flags)
+        set(CMAKE_REQUIRED_FLAGS "${_nsx_helia_rt_saved_req_flags}")
+    else()
+        unset(CMAKE_REQUIRED_FLAGS)
+    endif()
+    if(_nsx_helia_rt_had_try_type)
+        set(CMAKE_TRY_COMPILE_TARGET_TYPE "${_nsx_helia_rt_saved_try_type}")
+    else()
+        unset(CMAKE_TRY_COMPILE_TARGET_TYPE)
+    endif()
+    unset(_nsx_helia_rt_had_req_flags)
+    unset(_nsx_helia_rt_saved_req_flags)
+    unset(_nsx_helia_rt_had_try_type)
+    unset(_nsx_helia_rt_saved_try_type)
+
+    # NOTICE for the same reason as fp32, plus this module cannot see
+    # whether the model has a FLOAT16 operator. see AmbiqAI/helia-rt#254
+    if(HELIA_RT_TARGET_HAS_MVE_FP AND NOT _nsx_helia_rt_f16)
+        message(NOTICE
+            "nsx-helia-rt: this target has MVE floating point but the fp16 "
+            "helia kernels are OFF. A FLOAT16 operator will fail at run time "
+            "with kTfLiteError and a message naming the type -- most helia "
+            "kernels have no reference float16 path. To enable fp16, add\n"
+            "    set(NSX_CMSIS_NN_ENABLE_F16 ON CACHE BOOL \"\" FORCE)\n"
+            "to the parent CMakeLists *before* "
+            "add_subdirectory(<ns-cmsis-nn>/nsx ...). On GCC 14 this needs "
+            "ns-cmsis-nn v7.30.0 or later, which fixed the fp16 sources that "
+            "ICE the compiler (GCC PR 118460); the -fno-ssa-phiopt workaround "
+            "in tools/make/ext_libs/helia.inc covers the Make path only and "
+            "has no effect on this build.")
+    endif()
+
+    # Outputs, not knobs: what the build actually has, for consumers to
+    # branch on instead of re-deriving it.
+    set(HELIA_RT_FLOAT32_ENABLED ${_nsx_helia_rt_f32} CACHE BOOL
+        "Effective fp32 helia kernel availability, resolved by nsx-helia-rt from the linked ns-cmsis-nn target (output, not a knob)"
+        FORCE)
+    set(HELIA_RT_FLOAT16_ENABLED ${_nsx_helia_rt_f16} CACHE BOOL
+        "Effective fp16 helia kernel availability, resolved by nsx-helia-rt from the linked ns-cmsis-nn target (output, not a knob)"
+        FORCE)
+
+    # Mirror onto the ARM_NN_ENABLE_F32/F16 cache names for consumers that
+    # read those. Ours to update when the value matches the companion or the
+    # resolved truth; anything else is consumer-owned and left alone.
+    # TODO(AmbiqAI/helia-rt#254): drop once ns-cmsis-nn publishes this mirror itself
+    # (cross-repo consumer: AmbiqAI/helia-aot#349).
+    foreach(_nsx_f IN ITEMS 32 16)
+        set(_nsx_want "${_nsx_helia_rt_f${_nsx_f}}")
+        set(_nsx_ours OFF)
+        if(NOT DEFINED ARM_NN_ENABLE_F${_nsx_f})
+            set(_nsx_ours ON)
+        else()
+            if(ARM_NN_ENABLE_F${_nsx_f})
+                set(_nsx_have ON)
+            else()
+                set(_nsx_have OFF)
+            endif()
+            if(_nsx_have STREQUAL _nsx_want)
+                # Matches reality: nothing to disagree about, so adopt it
+                # and refresh the companion.
+                set(_nsx_ours ON)
+            elseif(DEFINED HELIA_RT_ARM_NN_MIRROR_F${_nsx_f})
+                if(HELIA_RT_ARM_NN_MIRROR_F${_nsx_f})
+                    set(_nsx_last ON)
+                else()
+                    set(_nsx_last OFF)
+                endif()
+                if(_nsx_have STREQUAL _nsx_last)
+                    set(_nsx_ours ON)
+                endif()
+            endif()
+        endif()
+
+        if(_nsx_ours)
+            set(ARM_NN_ENABLE_F${_nsx_f} ${_nsx_want} CACHE BOOL
+                "Mirror of the effective fp${_nsx_f} kernel availability, for consumers that read the ARM_NN_ENABLE_* names (set by nsx-helia-rt)"
+                FORCE)
+            set(HELIA_RT_ARM_NN_MIRROR_F${_nsx_f} ${_nsx_want} CACHE INTERNAL
+                "Value nsx-helia-rt last wrote to ARM_NN_ENABLE_F${_nsx_f}")
+        else()
+            message(WARNING
+                "nsx-helia-rt: ARM_NN_ENABLE_F${_nsx_f}=${_nsx_have} "
+                "disagrees with the float set this build actually has "
+                "(fp${_nsx_f}=${_nsx_want}, source: "
+                "${_nsx_helia_rt_float_source}). Leaving your value alone; "
+                "heliaRT compiles against the real one. Set "
+                "NSX_CMSIS_NN_ENABLE_F${_nsx_f}=${_nsx_have} before the "
+                "ns-cmsis-nn module is added if that is what you meant.")
+        endif()
+    endforeach()
+    unset(_nsx_f)
+    unset(_nsx_want)
+    unset(_nsx_have)
+    unset(_nsx_last)
+    unset(_nsx_ours)
 elseif(NSX_HELIA_RT_BACKEND STREQUAL "cmsis_nn")
     if(NOT HELIA_RT_CMSISNN_TARGET)
         message(FATAL_ERROR
