@@ -61,10 +61,9 @@ limitations under the License.
 // These stay TRUE CONTRACT assertions, unlike the tanh/logistic NaN cases in
 // float_activation_edge_test.cc. ns#380 (merged) reclassifies NaN on the
 // integer bit pattern in arm_nn_clamp_scalar_f32/f16 and
-// arm_nn_clamp_propagate_nan_mve_f32/f16, which survives -Ofast, so these go
-// green on the pin bump. The bump target is the first ns-cmsis-nn release
-// that contains ns#380; no such release has been cut yet -- v7.30.0
-// (2026-08-30) is the latest tag and predates it.
+// arm_nn_clamp_propagate_nan_mve_f32/f16, which survives -Ofast. v7.31.0 is
+// the first ns-cmsis-nn release that contains ns#380 (v7.30.0 predates it;
+// there was never a v7.30.1), and it is the current pin, so these are green.
 //
 // SUB is not covered: kernels/helia/sub.cc has no float dispatch into
 // heliaCORE (float32 SUB runs the TFLM reference and there is no float16 SUB),

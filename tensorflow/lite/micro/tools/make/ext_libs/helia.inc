@@ -104,38 +104,34 @@ ifneq (,$(filter cortex-m55,$(TARGET_ARCH)))
   CCFLAGS  += -DARM_NN_ENABLE_F16=1
   CXXFLAGS += -DARM_NN_ENABLE_F16=1
 
-  # GCC ICE workaround for GCC PR target/118460 ("[14 Regression] ICE on
-  # armv8.1-m.main with -mfloat-abi=hard"):
-  #   error: unrecognizable insn:
-  #   (set (reg:HF ...) (if_then_else:HF (lt (reg:CCFPE cc) 0) ...))
-  #   during RTL pass: vregs
-  # Scalar _Float16 conditional selects (`x < y ? x : y`, MIN/MAX/CLAMP)
-  # on Armv8.1-M+MVE.FP hard-float hit a broken `movhfcc` expander: it
-  # emits a vsel-style if_then_else:HF with a comparison the backend's
-  # arm_vsel_comparison_operator then rejects, so recognition fails. The
-  # trigger is ssa-phiopt turning if-diamonds into COND_EXPR/MIN/MAX
-  # which expand routes through emit_conditional_move (regression from
-  # GCC commit r14-2699). Disabling phiopt avoids the broken expander
-  # while keeping all other optimizations. Verified against Arm GNU
-  # Toolchain 14.3.Rel1: all 37 FP16 TUs ICE-free at -O2/-O3 with
-  # -fno-ssa-phiopt (6 of them ICE without it).
+  # No FP16 build workaround is needed here. GCC PR target/118460 ("[14
+  # Regression] ICE on armv8.1-m.main with -mfloat-abi=hard") makes GCC 14
+  # ICE on scalar _Float16 conditional selects for Armv8.1-M+MVE.FP
+  # hard-float, and heliaRT used to compile the ns-cmsis-nn %_f16.c/%_fp16.c
+  # translation units with -fno-ssa-phiopt to dodge it. That is now handled
+  # at the source: ns-cmsis-nn routes the affected scalar FP16
+  # min/max/clamp/abs paths through the guarded helpers in
+  # Include/arm_nnsupportfunctions.h (arm_nn_{min,max,clamp,abs}_f16h and
+  # friends, gated on __GNUC__ >= 14 && __GNUC__ < 16), so the offending
+  # HFmode conditional move is never emitted.
   #
-  # Fix status upstream: fixed on master (r16-4445, r16-5119) and
-  # backported to releases/gcc-15 (r15-10491, r15-10492) — Arm GNU
-  # Toolchain 15.2.Rel1+ is clean (verified). NOT backported to the
-  # gcc-14 branch (14.4 shipped without it; retargeted to 14.5), so this
-  # stays until the pinned toolchain in arm_gcc_download.sh moves to
-  # >= 15.2.Rel1, at which point this block can be removed.
+  # The pin this removal depends on is v7.31.0, not the v7.30.0 that first
+  # carried the ICE fix (ns PR 221). Those helpers replaced compare-selects
+  # with min/max primitives that suppress NaN, and the NaN-propagating
+  # behaviour was only restored in ns PR 380, which first shipped in
+  # v7.31.0. Dropping the flag against v7.30.0 would buy ICE-freedom at the
+  # cost of the float NaN contract that docs/guides/floating-point.md and
+  # kernels/helia/tests/float_elementwise_edge_test.cc assert.
   #
-  # Only TOOLCHAIN=gcc is affected; armclang/ATfE are clang-based and
-  # neither have the bug nor accept -fno-ssa-phiopt.
-  ifeq ($(TOOLCHAIN), gcc)
-    NS_CMSIS_NN_FP16_OBJS := \
-        $(patsubst %.c,$(THIRD_PARTY_KERNEL_OBJDIR)%.o, \
-          $(filter %_f16.c %_fp16.c,$(NS_CMSIS_NN_SOURCE_FILES)))
-    NS_CMSIS_NN_FP16_OPT_LEVEL ?= $(THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL) -fno-ssa-phiopt
-    $(NS_CMSIS_NN_FP16_OBJS): THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := $(NS_CMSIS_NN_FP16_OPT_LEVEL)
-  endif
+  # Verified with the pinned Arm GNU Toolchain 14.3.Rel1 at the -O3 these
+  # TUs are built with: pre-helper v7.29.2 ICEs on 7 of 45 FP16 TUs, while
+  # the pinned v7.31.0 builds all of them clean with no extra flag.
+  #
+  # The GCC bug itself is unfixed on the gcc-14 branch (fixed on master via
+  # r16-4445/r16-5119 and backported to releases/gcc-15 as r15-10491/2, so
+  # Arm GNU Toolchain 15.2.Rel1+ is clean). Keep using those ns-cmsis-nn
+  # helpers in any new scalar FP16 code rather than reintroducing a
+  # build-flag workaround.
 endif
 
 # helia per-kernel optimization knobs.
