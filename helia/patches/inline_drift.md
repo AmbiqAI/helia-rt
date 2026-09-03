@@ -74,7 +74,7 @@ infrastructure used by every kernel test.
 Drop condition: upstream tflite-micro adopts a by-value member (or otherwise
 lifetime-extends the registration) in `kernel_runner.h`.
 
-## `tensorflow/lite/micro/kernels/dequantize.h`, `dequantize.cc`, `dequantize_common.cc`, `dequantize_test.cc`, `xtensa/dequantize.cc`
+## `tensorflow/lite/micro/kernels/dequantize.h`, `tensorflow/lite/micro/kernels/dequantize.cc`, `tensorflow/lite/micro/kernels/dequantize_common.cc`, `tensorflow/lite/micro/kernels/dequantize_test.cc`, `tensorflow/lite/micro/kernels/xtensa/dequantize.cc`
 
 Widens DEQUANTIZE to accept a `kTfLiteFloat16` input with a float32 output,
 the form the LiteRT converter emits for fp16-PTQ weights (see
@@ -95,7 +95,9 @@ cannot live under `kernels/helia/`; the helper and the reference Eval case
 are kept inline so the helia kernel and the reference kernel produce
 identical bits for every finite value, zero, infinity and NaN (signalling
 NaNs are quieted on both paths), on hosts and on cores without f16
-arithmetic.
+arithmetic. With `ARM_NN_ENABLE_F16` the helia kernel uses the hardware
+convert instead, whose NaN and subnormal results follow FPSCR; the float16
+golden test pins it on the cortex-m55 leg.
 
 Drop condition: upstream TFLM accepts float16 DEQUANTIZE input.
 
