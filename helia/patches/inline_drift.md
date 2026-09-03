@@ -101,6 +101,24 @@ golden test pins it on the cortex-m55 leg.
 
 Drop condition: upstream TFLM accepts float16 DEQUANTIZE input.
 
+## `tensorflow/lite/micro/kernels/cmsis_nn/svdf.cc`
+
+First inline drift in `kernels/cmsis_nn/` (AmbiqAI/ns-cmsis-nn#312). Two
+edits: `.size` is populated on the two SVDF scratch contexts with the exact
+byte counts Prepare requested (upstream leaves the field indeterminate;
+upstream ARM CMSIS-NN never reads it, an ns-cmsis-nn-backed build would),
+and the `arm_svdf_s8` / `arm_svdf_state_s16_s8` calls are wrapped in
+`TF_LITE_ENSURE_EQ(..., ARM_CMSIS_NN_SUCCESS)` instead of discarding the
+status. The status half matches upstream's own `cmsis_nn/fully_connected.cc`
+idiom, so on a sync conflict prefer keeping it and offering it upstream.
+
+Cannot be moved to `kernels/helia/` because helia builds never compile this
+directory; the caller-side fix has to live in the cmsis_nn kernel itself.
+
+Drop condition: upstream tflite-micro takes an equivalent fix (the status
+half is upstream-idiomatic today; the `.size` half matters upstream only if
+ARM CMSIS-NN adopts a `ctx->size` contract).
+
 ## `tensorflow/lite/micro/tools/make/Makefile`
 
 Three minimal hooks (~34 lines of inline drift, down from ~80):
