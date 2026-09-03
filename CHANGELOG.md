@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.19.1](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.19.0...helia-rt-v1.19.1) (2026-09-03)
+
+
+### Bug Fixes
+
+* **dequantize:** accept float16 input so fp16-weight models pass AllocateTensors ([#266](https://github.com/AmbiqAI/helia-rt/issues/266)) ([3205d3c](https://github.com/AmbiqAI/helia-rt/commit/3205d3c133575cde77ca223ce9d8f9659f22f0c4))
+* **nsx:** stop requiring fp32 kernels for every helia build; decide fp16 from the toolchain and one knob ([#257](https://github.com/AmbiqAI/helia-rt/issues/257)) ([f1b0378](https://github.com/AmbiqAI/helia-rt/commit/f1b0378bb58e3628025bea36ef21607bb72eab2d))
+* **svdf:** size the scratch contexts via the heliaCORE sizers and propagate kernel status ([#270](https://github.com/AmbiqAI/helia-rt/issues/270)) ([3312df1](https://github.com/AmbiqAI/helia-rt/commit/3312df177d28573d636baf04c919d8ed4c9542a7))
+* **test:** give KernelRunner a live registration in every float16 test block ([#248](https://github.com/AmbiqAI/helia-rt/issues/248)) ([cfab152](https://github.com/AmbiqAI/helia-rt/commit/cfab1523a58bcfab69a106efea22c530b8100285))
+
 ## [1.19.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.18.0...helia-rt-v1.19.0) (2026-09-02)
 
 
