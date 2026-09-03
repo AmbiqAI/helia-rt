@@ -82,9 +82,8 @@ class KernelRunner {
 
   TfLiteContext context_ = {};
   TfLiteNode node_ = {};
-  // Stored by value: TFLMRegistration is a small POD of function pointers and
-  // ints, and callers routinely pass a temporary (e.g. Register_CONV_2D()),
-  // which a reference member would not lifetime-extend.
+  // Stored by value: callers routinely pass a temporary (Register_CONV_2D()),
+  // which a reference member would not lifetime-extend. see #248
   const TFLMRegistration registration_;
 
   SingleArenaBufferAllocator* allocator_;

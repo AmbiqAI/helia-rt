@@ -13,85 +13,34 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-// helia-rt (issue #239): fault diagnostics for the Corstone-300 test runtime.
+// helia-rt: fault diagnostics for the Corstone-300 test runtime. The CMSIS
+// startup this target links defines every fault vector as `while(1);`, so a
+// fault and a genuine infinite loop look identical from the outside. These
+// strong definitions replace the weak ones so a fault prints its cause and
+// stops the simulation instead. see #239
 //
-// Why this file exists
-// --------------------
-// The CMSIS startup this target links (Cortex_DFP/Device/ARMCM55/Source/
-// startup_ARMCM55.c, added by targets/cortex_m_corstone_300_makefile.inc)
-// defines every fault vector as `while(1);`:
+// Scope: test runtime only. Wired in through MICROLITE_TEST_RUNTIME_SRCS, so
+// it cannot reach libtensorflow-microlite.a or a pack artifact. Added for v7-M
+// and later only, because Armv6-M has neither the configurable fault vectors
+// nor CFSR/HFSR/MMFAR/BFAR; the trampolines below are nonetheless written in
+// the v6-M instruction subset so an accidental inclusion is a no-op.
 //
-//     void HardFault_Handler(void) __attribute__ ((weak));
-//     void HardFault_Handler(void) { while(1); }
-//     void MemManage_Handler(void) __attribute__((weak, alias("Default_Handler")));
-//     ... and Default_Handler(void) { while(1); }
+// Output is raw semihosting (BKPT 0xAB), not DebugLog/MicroPrintf: DebugLog
+// here is vfprintf(stderr, ...) and stdio is not safe from handler context.
+// The exit is SYS_EXIT rather than a return, so a fault ends the run and the
+// harness sees a FAIL rather than a hang.
 //
-// So on this target a fault and a genuine infinite loop look identical from
-// the outside: the FVP keeps running and prints nothing more. That is exactly
-// the state ConvTest.Float16MultiChannelGolden and
-// TransposeConvTest.Float16Stride1Golden are in under cortex-m55 + ATfE --
-// '[ RUN ]' is printed and nothing follows -- and it is why the cause is not
-// currently knowable from CI. These strong definitions replace the weak ones
-// so a fault prints its cause and stops the simulation instead.
+// Default_Handler is deliberately not overridden: it has a NON-weak definition
+// in the CMSIS startup file, so a second one would be a duplicate-symbol link
+// error. MemManage, BusFault and UsageFault are disabled at reset and escalate
+// to HardFault, which still reports the original cause in CFSR; the three
+// specific handlers exist so the report stays correct if they are enabled.
 //
-// Scope: test runtime only. This file is wired in through
-// MICROLITE_TEST_RUNTIME_SRCS, which the makefile links into test/example
-// binaries and deliberately keeps out of libtensorflow-microlite.a, so it
-// cannot reach a release library or pack artifact. It is compiled for every
-// toolchain on this target (gcc/newlib, ATfE/picolibc, armclang).
-//
-// Architecture: targets/cortex_m_corstone_300_makefile.inc adds this file for
-// v7-M and later only, because Armv6-M (the cortex-m0 leg of helia_build.yml)
-// has neither the configurable fault vectors nor CFSR/HFSR/MMFAR/BFAR. The
-// trampolines below are nonetheless written in the v6-M instruction subset so
-// that an accidental future inclusion is a no-op rather than a build break.
-//
-// Output and exit path
-// --------------------
-// Everything here is raw semihosting (BKPT 0xAB), not DebugLog/MicroPrintf:
-//
-//  - DebugLog on this target is the generic tensorflow/lite/micro/debug_log.cc
-//    implementation, i.e. vfprintf(stderr, ...). stdio is not safe to call
-//    from handler context -- it can take locks and allocate, and the fault may
-//    well have happened inside libc -- so the report would risk faulting
-//    again and giving us the same silence we are trying to remove.
-//  - Semihosting is enabled for every toolchain on this target: the harness
-//    testing/test_with_arm_corstone_300.sh passes
-//    '-C cpu0.semihosting-enable=1' unconditionally, and the FVP traps
-//    BKPT 0xAB regardless of which C library the binary was linked against.
-//    SYS_WRITE0 output goes to the FVP's stdout, which the harness captures.
-//  - The exit is SYS_EXIT rather than a return, so a fault ends the run.
-//    That turns the hang into a FAIL the harness can see (no pass string in
-//    the log) instead of something only the per-binary timeout can end.
-//
-// Deliberately not overridden: Default_Handler and the interrupt vectors that
-// alias it. Unlike the fault handlers, Default_Handler has a NON-weak
-// definition in the CMSIS startup file, so a second definition here would be
-// a duplicate-symbol link error on every toolchain.
-//
-// Note on which handler actually runs: MemManage, BusFault and UsageFault are
-// disabled at reset (SCB->SHCSR), so in practice these faults escalate to
-// HardFault. That loses nothing -- the escalation sets HFSR.FORCED and the
-// original cause still lands in CFSR, which is printed either way. The three
-// specific handlers are provided so the report stays correct if something
-// later enables them.
-//
-// Known limitation: a main-stack overflow is not reportable from here.
-// Everything this file owns that could need memory is at file scope (the
-// report buffer and the semihosting exit block) precisely so the reporter
-// itself adds no stack, but that is not sufficient, and switching MSP to a
-// dedicated scratch stack inside the trampoline would not fix it either:
-//  - If MSPLIM is armed and MSP overflows, the exception ENTRY stacking for
-//    this handler hits the limit too, which is a lockup. Control never
-//    reaches the trampoline, so no instruction it could execute helps.
-//  - If MSPLIM is 0, which is the state the CMSIS startup on this target
-//    leaves it in, no STKOF is raised at all: the overflow silently walks
-//    into whatever is below the stack and surfaces later, if ever, as some
-//    other fault, which this file does report.
-// Reporting the armed case needs the limit registers reset before the
-// stacking, i.e. work in the startup file, not here. It is deliberately out
-// of scope: it would trade a specific, currently untriggerable case for
-// changes to code shared with every non-test build of this target.
+// Known limitation: a main-stack overflow is not reportable from here. With
+// MSPLIM armed the exception entry stacking hits the limit and locks up before
+// the trampoline runs; with MSPLIM 0 (what the CMSIS startup leaves) no STKOF
+// is raised at all. Covering the armed case needs the limits reset in the
+// startup file, which is shared with every non-test build. see #239
 
 #include <stdint.h>
 
@@ -187,11 +136,8 @@ __attribute__((used)) void HeliaCorstoneReportFault(const uint32_t* frame,
                                                 "BusFault", "UsageFault"};
   const char* name = (exception < 4) ? kExceptionNames[exception] : "Unknown";
 
-  // Leading '\n': the harness anchors its check on '^FAULT:'. A fault taken
-  // part-way through a MicroPrintf leaves an unterminated line in the UART /
-  // semihosting stream, and without this the report would be appended to that
-  // partial line and the anchor would miss it. A spurious blank line in a log
-  // that is about to end in a fault costs nothing.
+  // Leading '\n': the harness anchors on '^FAULT:', and a fault taken part-way
+  // through a MicroPrintf would otherwise leave the report on a partial line.
   char* out = g_report;
   out = AppendString(out, "\nFAULT: ");
   out = AppendField(out, "HFSR=", ReadRegister(kSCB_HFSR));
@@ -209,15 +155,9 @@ __attribute__((used)) void HeliaCorstoneReportFault(const uint32_t* frame,
   WriteString(g_report);
 
   // Terminate with a non-zero status so the run ends in a failure rather than
-  // in the hang this file exists to remove. SYS_EXIT_EXTENDED is the form
-  // that can carry an exit code on a 32-bit target; fall back to the plain
-  // 32-bit SYS_EXIT with a run-time-error reason if it is not honoured, and
-  // to a spin only if neither call ends the simulation (the per-binary
-  // timeout in the harness bounds that last case).
-  //
-  // static, for the same reason as g_report: SYS_EXIT_EXTENDED takes a
-  // pointer to a two-word block, and a fault that ran the stack out must not
-  // need two more words of it to say so.
+  // a hang. SYS_EXIT_EXTENDED is the form that carries an exit code on a
+  // 32-bit target; fall back to plain SYS_EXIT, then to a spin. `static` for
+  // the same reason as g_report: a stack overflow must not need more stack.
   static uint32_t exit_block[2] = {kApplicationExit, 1};
   SemihostingCall(kSysExitExtended, reinterpret_cast<uint32_t>(exit_block));
   SemihostingCall(kSysExit, kRunTimeErrorUnknown);
@@ -230,29 +170,15 @@ __attribute__((used)) void HeliaCorstoneReportFault(const uint32_t* frame,
 // value in LR that tells us which stack the frame is on. Bit 2 of EXC_RETURN
 // is 0 for MSP and 1 for PSP.
 //
-// Every instruction here is in the Armv6-M subset, so the body assembles for
-// any Cortex-M even though the makefile only adds this file for v7-M and
-// later (see the header comment). Two consequences worth stating:
-//  - `lsls r3, r1, #29` + `bmi`, not `tst r1, #4` + `bne`. TST with an
-//    immediate is a 32-bit Armv7-M encoding with no v6-M form; the shift
-//    moves EXC_RETURN bit 2 into the N flag and is a 16-bit T1 instruction
-//    on every M-profile core.
-//
-//    The shift MUST target a scratch register, not r1. r1 is the second
-//    argument of the call below -- it carries EXC_RETURN to the reporter and
-//    is printed as EXC_RETURN=0x... -- so it has to survive intact all the
-//    way to the tail branch. Shifting r1 in place (as an earlier revision
-//    did) left the reporter printing EXC_RETURN << 29, i.e. 0xa0000000 for a
-//    genuine 0xfffffffd, which silently destroys the one field that says
-//    which stack and which mode the fault came from. r3 is the right scratch:
-//    it is caller-saved under AAPCS and unused by this call's three
-//    arguments, the core already stacked the faulting r3 in the exception
-//    frame, and `lsls <Rd>, <Rm>, #imm5` encodes in 16 bits for any r0-r7 on
-//    v6-M.
-//  - The tail `b` to the reporter is a plain branch. On v6-M that is a
-//    +/-2 KB range; if this file is ever genuinely built for a v6-M target
-//    the link may need a veneer or an ldr/bx pair. Nothing is affected today
-//    because the makefile does not add it there.
+// Every instruction here is in the Armv6-M subset:
+//  - `lsls r3, r1, #29` + `bmi`, not `tst r1, #4` + `bne`, because TST with
+//    an immediate has no 16-bit v6-M encoding. The shift MUST target a
+//    scratch register: r1 is the second argument of the call below, carries
+//    EXC_RETURN to the reporter and is printed, so shifting it in place
+//    corrupts the one field that says which stack the fault came from. r3 is
+//    unused by this call's three arguments.
+//  - The tail `b` to the reporter is a plain branch, whose v6-M range is
+//    +/-2 KB; a genuine v6-M build may need a veneer or an ldr/bx pair.
 //
 // The exception index is passed as a bare immediate rather than a string
 // pointer so that no literal pool is needed inside the naked body, which

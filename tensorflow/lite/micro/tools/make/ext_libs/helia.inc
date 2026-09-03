@@ -100,35 +100,16 @@ CXXFLAGS += -DARM_NN_ENABLE_F32=1
 
 # The fp16 API requires ARMv8.1-M MVEF toolchain support. Keep it disabled for
 # other targets because heliaCore rejects ARM_NN_ENABLE_F16 without float16_t.
+# see #253, #254, #256
 ifneq (,$(filter cortex-m55,$(TARGET_ARCH)))
   CCFLAGS  += -DARM_NN_ENABLE_F16=1
   CXXFLAGS += -DARM_NN_ENABLE_F16=1
 
-  # GCC ICE workaround for GCC PR target/118460 ("[14 Regression] ICE on
-  # armv8.1-m.main with -mfloat-abi=hard"):
-  #   error: unrecognizable insn:
-  #   (set (reg:HF ...) (if_then_else:HF (lt (reg:CCFPE cc) 0) ...))
-  #   during RTL pass: vregs
-  # Scalar _Float16 conditional selects (`x < y ? x : y`, MIN/MAX/CLAMP)
-  # on Armv8.1-M+MVE.FP hard-float hit a broken `movhfcc` expander: it
-  # emits a vsel-style if_then_else:HF with a comparison the backend's
-  # arm_vsel_comparison_operator then rejects, so recognition fails. The
-  # trigger is ssa-phiopt turning if-diamonds into COND_EXPR/MIN/MAX
-  # which expand routes through emit_conditional_move (regression from
-  # GCC commit r14-2699). Disabling phiopt avoids the broken expander
-  # while keeping all other optimizations. Verified against Arm GNU
-  # Toolchain 14.3.Rel1: all 37 FP16 TUs ICE-free at -O2/-O3 with
-  # -fno-ssa-phiopt (6 of them ICE without it).
-  #
-  # Fix status upstream: fixed on master (r16-4445, r16-5119) and
-  # backported to releases/gcc-15 (r15-10491, r15-10492) — Arm GNU
-  # Toolchain 15.2.Rel1+ is clean (verified). NOT backported to the
-  # gcc-14 branch (14.4 shipped without it; retargeted to 14.5), so this
-  # stays until the pinned toolchain in arm_gcc_download.sh moves to
-  # >= 15.2.Rel1, at which point this block can be removed.
-  #
-  # Only TOOLCHAIN=gcc is affected; armclang/ATfE are clang-based and
-  # neither have the bug nor accept -fno-ssa-phiopt.
+  # GCC 14 ICEs on scalar _Float16 conditional selects for Armv8.1-M
+  # hard-float (GCC PR target/118460); -fno-ssa-phiopt avoids the broken
+  # expander. Clang-based toolchains neither have the bug nor take the flag.
+  # TODO(#193): drop when arm_gcc_download.sh pins >= 15.2.Rel1 (fix not
+  # backported to gcc-14).
   ifeq ($(TOOLCHAIN), gcc)
     NS_CMSIS_NN_FP16_OBJS := \
         $(patsubst %.c,$(THIRD_PARTY_KERNEL_OBJDIR)%.o, \

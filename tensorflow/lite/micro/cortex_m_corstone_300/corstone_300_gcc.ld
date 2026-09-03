@@ -9,37 +9,21 @@
  * ============================================================================
  *
  * helia-rt: Linker script for the Arm Corstone-300 FVP target when building
- * with arm-none-eabi-gcc.
- *
- * Derived verbatim from upstream `tensorflow/lite/micro/tools/make/downloads/
- * ethos_u_core_platform/targets/corstone-300/platform_parsed.ld` (the script
- * patched into ethos-u-core-platform by `ethos_u_core_platform.patch`).
+ * with arm-none-eabi-gcc. Derived from ethos-u-core-platform's
+ * `targets/corstone-300/platform_parsed.ld` (as patched by
+ * `ethos_u_core_platform.patch`); everything not listed below tracks that
+ * script verbatim so future syncs stay easy to diff.
  *
  * Intentional divergences from upstream:
  *
  *   - `.vectors` is split out of `.text` and KEEP'd at the start of ITCM so
  *     the CPU can still fetch the initial SP and Reset_Handler from VTOR=0
  *     (ITCM is aliased at 0x00000000 on Corstone-300).
- *   - The bulk of `.text`, `.ARM.extab`, and `.ARM.exidx` is moved from
- *     ITCM to DDR (`:rom_dram`). Cortex-M55 caches DDR, so this is
- *     functionally transparent for the integration tests we run on FVP.
+ *   - The bulk of `.text`, `.ARM.extab`, and `.ARM.exidx` is in DDR
+ *     (`:rom_dram`), which the integration-test images need because they do
+ *     not fit ITCM's 512 KiB. Cortex-M55 caches DDR.
  *   - `.data` gets its own PT_LOAD (`:rom_data`) instead of riding in
- *     `:rom_exec`, so GNU ld stops warning `section '.data' can't be
- *     allocated in segment N` on every link. Section addresses and the
- *     physical load image are unchanged; see the note above the PHDRS block.
- *
- * Why we need this:
- *   ITCM is 512 KiB. With `THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := -O3`
- *   on GCC 14 the CMSIS-NN inner loops unroll/vectorise enough that the
- *   `tensorflow/lite/micro/integration_tests/{nnaed,seanet}/...` link
- *   images overflow ITCM by 4-6 KiB. Moving `.text` to DDR matches what
- *   the ATfE linker script already does (see `corstone_300_atfe.ld`) so
- *   GCC- and ATfE-built integration tests share the same memory layout
- *   and the same kernel optimisation level.
- *
- * Everything else (memory map, .data/.bss/.heap/.stack placement, section
- * VMAs and LMAs, symbol names) tracks `platform_parsed.ld` verbatim so
- * future ethos-u syncs are easy to diff against this file.
+ *     `:rom_exec`; see the note above the PHDRS block. see #240
  */
 
 __STACK_SIZE = 0x00030000;
@@ -53,21 +37,10 @@ MEMORY
   DDR (rwx) : ORIGIN = 0x70000000, LENGTH = 0x60000000
 }
 /* helia-rt: `rom_data` is not upstream. `.data` has its VMA in DTCM and its
- * LMA at `__etext` in ITCM; upstream leaves it in `rom_exec`, whose `p_vaddr`
- * is the ITCM base, so `.data`'s VMA falls outside the segment it is assigned
- * to. GNU ld cannot express that and warns
- *   `section '.data' can't be allocated in segment N`
- * on every link (~275 times per gcc CI leg), which buries real link errors
- * (see #229, #232). A dedicated PT_LOAD lets ld record `p_vaddr` = DTCM VMA
- * and `p_paddr` = ITCM LMA properly. The bytes an ELF loader writes to
- * physical memory are unchanged -- the init image still lands at `__etext`,
- * which is where `.copy.table` points the startup copy loop.
- *
- * `.sram.data` (VMA in BRAM, LMA in DDR) has the same shape but stays on
- * `rom_dram` as upstream: no TFLM target emits `.sram.data` input sections,
- * so it is empty, is dropped from the image and never warns, and giving it a
- * segment of its own would only add an empty PT_LOAD to every binary. If a
- * future target does place data there, give it its own PT_LOAD too.
+ * LMA at `__etext` in ITCM, which upstream's `rom_exec` cannot express; a
+ * dedicated PT_LOAD records both without changing the load image. `.sram.data`
+ * has the same shape but is always empty here, so it stays on `rom_dram` as
+ * upstream; give it its own PT_LOAD if a target ever fills it. see #240
  */
 PHDRS
 {

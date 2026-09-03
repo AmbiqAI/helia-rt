@@ -11,22 +11,16 @@
  * Linker script for the Arm Corstone-300 FVP target when building with
  * the Arm Toolchain for Embedded (ATfE; LLVM/Clang + picolibc).
  *
- * This script is derived from the GCC-targeted
- * `tensorflow/lite/micro/tools/make/downloads/ethos_u_core_platform/
- * targets/corstone-300/platform_parsed.ld` script that ships with
- * ethos-u-core-platform (and is patched by `ethos_u_core_platform.patch`).
+ * This script is derived from ethos-u-core-platform's
+ * `targets/corstone-300/platform_parsed.ld` (as patched by
+ * `ethos_u_core_platform.patch`).
  *
  * Differences from `platform_parsed.ld`:
- *   - Adds (NOLOAD) `.tdata` / `.tbss` anchor sections so picolibc TLS
- *     objects (e.g. `errno`, declared `__thread` in libc.a) link
- *     cleanly. Without an explicit `.tbss` lld errors with
- *     `STT_TLS without PT_TLS`. lld auto-generates the corresponding
- *     `PT_TLS` program header.
- *   - Drops the explicit `PHDRS { ... }` block (and `:rom_exec`,
- *     `:rom_dram`, `:null` per-section phdr selectors). The original
- *     script was authored for ld.bfd; lld mishandles its layout
- *     (resulting in `output file too large`). Letting lld auto-generate
- *     PT_LOAD segments produces the correct ELF.
+ *   - Adds (NOLOAD) `.tdata` / `.tbss` anchor sections, without which lld
+ *     errors `STT_TLS without PT_TLS` on picolibc's `__thread` objects.
+ *   - Drops the explicit `PHDRS { ... }` block and the per-section phdr
+ *     selectors: that layout was authored for ld.bfd and gives `output file
+ *     too large` under lld, which auto-generates the PT_LOAD segments.
  *   - Switches `.heap` / `.stack` from `(COPY)` to `(NOLOAD)` so the
  *     location counter advances correctly under lld.
  *   - Adds `PROVIDE(...)` aliases for the symbols picolibc's `crt0.o`
@@ -36,14 +30,9 @@
  *     `__arm32_tls_tcb_offset`, `__heap_start`, `__heap_end`).
  *   - Splits `.vectors` (KEEP'd at start of ITCM so the CPU can fetch
  *     the initial SP and Reset_Handler from VTOR=0) from the bulk of
- *     `.text` / `.ARM.extab` / `.ARM.exidx`, which are placed in DDR.
- *     The picolibc + libsemihost + libc++ runtime plus generated
- *     SeaNet integration kernels exceed ITCM's 512 KiB; DDR (rwx,
- *     cached on Cortex-M55) absorbs the overflow with negligible
- *     runtime impact. The GCC linker script keeps `.text` in ITCM
- *     because newlib-nano's footprint is small enough to fit.
- *
- * The resulting ELF still boots on FVP_Corstone_SSE-300_Ethos-U55.
+ *     `.text` / `.ARM.extab` / `.ARM.exidx`, which are placed in DDR
+ *     because the runtime plus generated kernels exceed ITCM's 512 KiB.
+ *     DDR is rwx and cached on Cortex-M55.
  */
 
 __STACK_SIZE = 0x00030000;
@@ -135,23 +124,13 @@ SECTIONS
     *(.data)
     *(.data.*)
     . = ALIGN(4);
-    /* picolibc's __libc_init_array() (libc.a:libc_misc_init.c.o) does NOT
-     * walk __preinit_array_start/__init_array_start like newlib's does. It
-     * walks a single combined range bounded by the weakly-referenced
-     * __bothinit_array_start / __bothinit_array_end, which picolibc's own
-     * picolibc.ld provides here. Omitting them leaves both weak references
-     * undefined, i.e. 0, so the loop bound test passes on the first
-     * iteration and NO static constructor ever runs -- which is what left
-     * micro_test_v2's TEST() self-registration list empty and made every
-     * ATfE test binary report "[==========] 0 tests ran." (issue #231).
-     * The GCC linker script needs no equivalent because newlib's
-     * __libc_init_array uses the __preinit_/__init_ pair below.
-     *
-     * Placement matches picolibc.ld: start at the head of .preinit_array,
-     * end at the tail of .init_array. The ALIGN(4) between the two arrays
-     * can never insert padding (both hold only 4-byte function pointers and
-     * the region is already 4-aligned), so the combined range stays free of
-     * null entries. */
+    /* picolibc's __libc_init_array() walks one combined range bounded by the
+     * weakly-referenced __bothinit_array_start / __bothinit_array_end, not
+     * the __preinit_/__init_ pair newlib uses, so both symbols have to be
+     * provided here or no static constructor runs at all. Placement matches
+     * picolibc.ld: head of .preinit_array to tail of .init_array; nothing
+     * that can pad or insert a non-pointer word may go between the two
+     * bounds, or the walk calls a zero word. see #231 */
     PROVIDE_HIDDEN (__preinit_array_start = .);
     PROVIDE_HIDDEN (__bothinit_array_start = .);
     KEEP(*(.preinit_array))
