@@ -68,7 +68,7 @@ heliaRT provides three kernel backends. Every operator has a **Reference** imple
 | `STRIDED_SLICE` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
 | `FILL` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
 | `ZEROS_LIKE` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
-| `DEQUANTIZE` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
+| `DEQUANTIZE` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive; int8 / int16 / uint8 / float16 input, float32 output |
 
 ## Quantization
 
@@ -97,13 +97,16 @@ resolves them.
     **FP32** falls back to the Reference kernel whenever the optimized kernel
     is disabled or rejects a configuration — results stay correct, only slower.
     **Most FP16 operators have no TFLM Reference implementation** (pure data
-    movement such as `TRANSPOSE` and `RESHAPE` is the exception). Where a
+    movement such as `TRANSPOSE` and `RESHAPE`, and the f16-to-f32 widening
+    in `DEQUANTIZE`, are the exceptions). Where a
     limitation is known at graph preparation the operator fails
     `AllocateTensors()`; otherwise it returns `kTfLiteError` from `Invoke()`,
     in most cases with a logged diagnostic.
 
-    FP16 additionally requires Armv8.1-M with MVE floating point (Cortex-M55).
-    It is not available on Cortex-M4+FP.
+    FP16 *arithmetic* additionally requires Armv8.1-M with MVE floating point
+    (Cortex-M55) and is not available on Cortex-M4+FP. Operators that only
+    move or widen f16 storage, `TRANSPOSE`, `RESHAPE` and `DEQUANTIZE`, run
+    on any supported core.
 
 | Operator | FP32 | FP16 | Constraints |
 |---|:---:|:---:|---|
@@ -123,15 +126,18 @@ resolves them.
 | `MUL` | :white_check_mark: | :white_check_mark: | FP16 requires matching input shapes; broadcasting is rejected at prepare |
 | `CONCATENATION` | :white_check_mark: | :white_check_mark: | Optimized for rank ≤ 4; higher ranks use the Reference path (FP32 and FP16) |
 | `RESHAPE` | :white_check_mark: | :white_check_mark: | Pure data movement; FP16 works even without `ARM_NN_ENABLE_F16` via a bitwise copy |
+| `DEQUANTIZE` | :white_check_mark: | :white_check_mark: | FP16 is an input storage type widened to an FP32 output, not FP16 arithmetic; works even without `ARM_NN_ENABLE_F16` |
 | `RELU` / `RELU6` | :white_check_mark: | :white_check_mark: | |
 | `LOGISTIC` (sigmoid) | :white_check_mark: | :white_check_mark: | NaN is not a supported input on the optimized float path; see [Non-finite inputs](../guides/floating-point.md#non-finite-inputs-nan-and-infinities) |
 | `TANH` | :white_check_mark: | :white_check_mark: | NaN is not a supported input on the optimized float path; see [Non-finite inputs](../guides/floating-point.md#non-finite-inputs-nan-and-infinities) |
 
 Other operators use the Reference implementation for FP32, with one
-exception: `QUANTIZE` and `DEQUANTIZE` always convert through optimized
-heliaCORE kernels on their float32 side, independent of `ARM_NN_ENABLE_F32`.
-The published static libraries ship FP32 kernels for Cortex-M4+FP and both
-FP32 and FP16 for Cortex-M55.
+exception: on their quantized-integer side, `QUANTIZE` and `DEQUANTIZE`
+always convert through optimized heliaCORE kernels, independent of
+`ARM_NN_ENABLE_F32`. `DEQUANTIZE` with a FLOAT16 input is the one path that
+does not: it widens f16 storage to float32 in the kernel itself, so it needs
+neither heliaCORE nor `ARM_NN_ENABLE_F16`. The published static libraries
+ship FP32 kernels for Cortex-M4+FP and both FP32 and FP16 for Cortex-M55.
 
 ## Summary
 
