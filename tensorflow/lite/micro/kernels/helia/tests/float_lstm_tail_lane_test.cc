@@ -177,7 +177,7 @@ constexpr float kFloat32GoldenTolerance = 1e-4f;
 // ULP. This is a consistency check with a small margin below a real tail-lane
 // divergence, NOT the detector -- that job belongs to the tolerance-free
 // float16 assertion.
-// TODO(AmbiqAI/helia-rt#227): tighten toward exact equality once the
+// TODO(AmbiqAI/helia-rt#265): tighten toward exact equality once the
 // float32 tail uses the vector lanes' tanh (AmbiqAI/ns-cmsis-nn#324 did
 // this for float16).
 constexpr float kFloat32LaneTolerance = 1e-5f;
