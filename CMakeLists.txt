@@ -11,7 +11,7 @@
 #     include(FetchContent)
 #     FetchContent_Declare(helia_rt
 #         GIT_REPOSITORY https://github.com/AmbiqAI/helia-rt.git
-#         GIT_TAG        helia-rt-v1.19.0) # x-release-please-version
+#         GIT_TAG        helia-rt-v1.19.1) # x-release-please-version
 #     FetchContent_MakeAvailable(helia_rt)
 #
 # It exposes one STATIC library per backend, depending on what external
@@ -42,7 +42,7 @@ if(NOT _helia_rt_languages)
         # X.Y.Z[.W]; a prerelease or build-metadata form (X.Y.Z-rc.N) is NOT
         # valid and would hard-fail configure. This repo cuts no prereleases
         # through release-please today -- see issue #200 before changing that.
-        VERSION 1.19.0 # x-release-please-version
+        VERSION 1.19.1 # x-release-please-version
         DESCRIPTION "heliaRT — Ambiq's TensorFlow Lite for Microcontrollers (TFLM) runtime"
         LANGUAGES C CXX)
 endif()

@@ -89,7 +89,7 @@ target_link_libraries(my_app PRIVATE helia_rt::helia)
 include(FetchContent)
 FetchContent_Declare(helia_rt
     GIT_REPOSITORY https://github.com/AmbiqAI/helia-rt.git
-    GIT_TAG        helia-rt-v1.19.0) # x-release-please-version
+    GIT_TAG        helia-rt-v1.19.1) # x-release-please-version
 FetchContent_MakeAvailable(helia_rt)
 target_link_libraries(my_app PRIVATE helia_rt::reference)
 ```
