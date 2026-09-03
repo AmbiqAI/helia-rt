@@ -13,114 +13,46 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-// Edge-of-range coverage for the helia float TANH and LOGISTIC kernels
-// (AmbiqAI/helia-rt#227).
+// Edge-of-range (NaN, +/-Inf) coverage for the helia float TANH and LOGISTIC
+// kernels. The shared kernels/tanh_test.cc and logistic_test.cc feed only
+// finite values, so nothing else in the tree observes this.
+// see AmbiqAI/helia-rt#227
 //
-// What the shared upstream tests already execute, and why it is not enough:
-//   * kernels/tanh_test.cc sweeps float32 tanh over [-8, 8] with goldens, and
-//     has one four-point float16 golden case ({-2, 0.5, 2, 4}).
-//   * kernels/logistic_test.cc has float32 and float16 golden cases.
-//   * Neither file feeds a non-finite value to any float kernel, so nothing in
-//     the tree observes what the heliaCORE activation entry points do with NaN
-//     or +/-Inf.
-//
-// ---------------------------------------------------------------------------
-// NaN: two different situations, do not conflate them
-// ---------------------------------------------------------------------------
-//
-// An earlier revision of this file blamed armclang's fast-math (helia-rt#228)
-// for the NaN behavior here. That was wrong and is retracted. There are two
-// separate mechanisms, and only one of them is a defect:
-//
-//   (a) ELEMENTWISE add/mul (see float_elementwise_edge_test.cc) lost NaN
-//       through compare-select ordering in the output clamp -- CLAMP(x,h,l) is
-//       MAX(MIN(x,h),l) and `NaN < h` is false, so MIN returns h; the MVE form
-//       used vmaxnmq/vminnmq, which are IEEE maxNum/minNum and return the
-//       non-NaN operand. Both are plain compare ordering, so this happened at
-//       every optimization level on every toolchain, NOT only under fast-math.
-//       That is a real defect (ns#333/#334) and it IS fixed: ns#380
-//       reclassifies NaN on the integer bit pattern, which survives -Ofast.
-//       ns#380 first shipped in ns-cmsis-nn v7.31.0, which is the pin this
-//       file is now built against, so those assertions are true contract
-//       assertions and are expected GREEN. (ns#384 is a follow-up that scopes
-//       the NaN promise in the docs and headers and adds the -Ofast probe
-//       test; it is not the bit-pattern change itself.)
-//
-//   (b) TANH and LOGISTIC do not promise NaN propagation on the vectorized
-//       path, by design. ns-cmsis-nn documents this in
-//       Include/Internal/arm_nn_activation_flt.h on arm_nn_tanh_scalar_ref_f32:
-//       "MVE (arm_nn_vtanh_lut_direct_mve_f32) does not [propagate NaN].
-//       vminnmq is IEEE minNum, which returns the numeric operand when the
-//       other is a quiet NaN, so a qNaN lane is replaced by xmax and
-//       interpolates to tanh(xmax) ... Restoring NaN in general would cost an
-//       extra compare and select in the vector loop body ... NaN is not a
-//       supported input to these kernels, so the divergence is accepted rather
-//       than paid for."
-//
-//       Re-verified at ns-cmsis-nn v7.31.0 (9884d5fccab8), the current pin.
-//       ns#382 was closed by ns#388, which restored NaN propagation for
-//       RELU/RELU6/LEAKY_RELU/HARDSWISH by adding integer-domain
-//       arm_nn_*_propagate_nan_* helpers. That PR states explicitly that
-//       SIGMOID, TANH and HARDSWISH are outside the contract it establishes,
-//       and it does not touch the TANH or SIGMOID code paths at all. ns#380
-//       touches only the elementwise clamp helpers and the f16 RELU/RELU6
-//       legs. So the tanh/sigmoid behavior below is unchanged at v7.31.0 and
-//       these remain characterization cases, not contract cases.
-//
-// The tests below therefore split by path, because the behavior genuinely
-// splits by path. Asserting NaN propagation where upstream declines to provide
-// it would be a permanently-red test; characterizing behavior that is about to
-// be fixed would be an inverted version of the same mistake.
+// NaN behaviour splits by path, and the tests below split the same way:
 //
 //   TANH float32, scalar leg (cortex-m3, cortex-m4+fp)   -> NaN propagates.
-//       CONTRACT. arm_nn_tanh_scalar_ref_f32 carries an explicit
-//       `if (ax != ax) return x + 0.0f;` guard, still present at v7.31.0
-//       (Include/Internal/arm_nn_activation_flt.h). The NaN is returned before
-//       the table-index conversion is reached. Note that guard is
-//       deleted by -ffinite-math-only; helia builds ns-cmsis-nn at -O3 for gcc
-//       and ATfE (tools/make/Makefile), so it survives on every leg this
-//       repository tests. The armclang legs use -Ofast (helia-rt#228) and are
-//       outside that contract -- they are not part of helia_test.yml.
+//       CONTRACT. arm_nn_tanh_scalar_ref_f32 carries an explicit NaN guard,
+//       which -ffinite-math-only would delete; helia builds ns-cmsis-nn at -O3
+//       for gcc and ATfE, and armclang appends -ffp-mode=full after -Ofast, so
+//       the guard holds there too. see AmbiqAI/helia-rt#230
 //   TANH float32/float16, MVE leg (cortex-m55)           -> saturation bound.
-//       CHARACTERIZATION. Documented, deliberate, unchanged at v7.31.0.
+//       CHARACTERIZATION. Documented and deliberate upstream: vminnmq is IEEE
+//       minNum, so a qNaN lane is replaced by the table bound.
+//       see AmbiqAI/ns-cmsis-nn#382, AmbiqAI/ns-cmsis-nn#388
 //   LOGISTIC float32/float16                             -> saturation bound.
-//       CHARACTERIZATION. There is no MVE sigmoid helper for either precision
-//       -- LOGISTIC is always the scalar path, which is why this row does not
-//       split by leg the way TANH does. The sigmoid helpers route through
-//       arm_nn_softmax_exp_lut_f32, whose input clamp flushes NaN to +80 on
-//       purpose; at origin/main that flush carries a comment explaining that
-//       the min-then-max order is load-bearing and reproduces the
-//       long-standing behavior "bit for bit in every optimisation mode".
+//       CHARACTERIZATION. There is no MVE sigmoid helper for either precision,
+//       so LOGISTIC is always the scalar path; its exp input clamp flushes NaN
+//       to +80 on purpose.
+//       see AmbiqAI/ns-cmsis-nn#382, AmbiqAI/ns-cmsis-nn#388
 //
-// The characterization cases assert the behavior CLASS (finite, correct sign,
-// at the saturation bound) rather than a literal constant, because the literal
-// moved between v7.29.2 and v7.30.0: ns#303 widened the float32 tanh table
-// from |x| <= 4 to |x| <= 6, so the float32 MVE NaN result moves from
-// -tanh(4) = -0.99932930 to -tanh(6) = -0.9999877 (0xbf7fff32) with no change
-// in contract. Each case logs the value it observed, so the CI record carries
-// the concrete number for whichever pin ran. If one of these ever fails,
-// upstream changed a documented behavior: re-read ns#382 and the helper
-// comments before touching the assertion, and convert it back to a contract
-// assertion if NaN propagation has been restored.
+// The characterization cases assert the behaviour CLASS (finite, correct sign,
+// at the saturation bound) rather than a literal, because the literal moves
+// when the upstream table window changes. Each logs what it observed, so the
+// CI record carries the concrete number for whichever pin ran. A failure means
+// upstream changed a documented behaviour: re-read the helper comments before
+// touching the assertion, and convert the case back to a contract assertion if
+// NaN propagation has been restored.
 //
-// The +/-Inf assertions are true contract assertions on every path and pass
-// today: tanh(+/-Inf) = +/-1, logistic(+Inf) = 1, logistic(-Inf) = 0.
+// The +/-Inf assertions are contract assertions on every path:
+// tanh(+/-Inf) = +/-1, logistic(+Inf) = 1, logistic(-Inf) = 0.
 //
-// ---------------------------------------------------------------------------
-// Proving the optimized kernel actually ran
-// ---------------------------------------------------------------------------
-//
-// kernels/helia/tanh.cc:230 and logistic.cc:73 fall back to reference_ops::*
-// and still return kTfLiteOk when the heliaCORE entry point reports anything
-// other than ARM_CMSIS_NN_SUCCESS. A kernel test alone therefore cannot tell
-// "heliaCORE computed this" from "heliaCORE declined and the reference kernel
-// computed this" -- and the reference kernel propagates NaN, so a future
-// version that tightened argument validation would flip these tests GREEN
-// while the code under test never executed. The *PathIsReachable tests below
-// call arm_nn_activation_f32/f16 directly and assert ARM_CMSIS_NN_SUCCESS for
-// exactly the element counts the other tests use, which pins that dispatch
-// precondition. (helia-rt#230's link probe is a different guard: it proves the
-// SYMBOL exists at link time, not that dispatch took the optimized branch.)
+// kernels/helia/tanh.cc and logistic.cc fall back to reference_ops::* and
+// still return kTfLiteOk when the heliaCORE entry point declines, and the
+// reference kernels propagate NaN, so a tightening of argument validation
+// would flip these tests GREEN while the code under test never ran. The
+// *PathIsReachable tests call arm_nn_activation_f32/f16 directly to pin that
+// dispatch precondition; the link probe is a different guard, proving only
+// that the symbol exists. see AmbiqAI/helia-rt#234
 
 #include <cmath>
 
@@ -147,9 +79,8 @@ limitations under the License.
 
 // Does this build select the MVE (vector) activation helpers? heliaCORE gates
 // them on ARM_MATH_MVEF / ARM_MATH_MVE_FLOAT16, which track the compiler's
-// __ARM_FEATURE_MVE; bit 1 is MVE floating point. cortex-m55 gcc reports 3;
-// cortex-m55+nomve (the ATfE legs, helia-rt#225), cortex-m4+fp and cortex-m3
-// report nothing.
+// __ARM_FEATURE_MVE; bit 1 is MVE floating point. The ATfE legs build
+// cortex-m55 with +nomve and do not set it. see AmbiqAI/helia-rt#225
 #if defined(__ARM_FEATURE_MVE) && ((__ARM_FEATURE_MVE) & 2)
 #define HELIA_TEST_MVE_FLOAT 1
 #else
@@ -179,9 +110,8 @@ void RunActivation(Activation activation, TfLiteType tensor_type,
   int inputs_array_data[] = {1, 0};
   int outputs_array_data[] = {1, 1};
 
-  // micro::KernelRunner keeps a `const TFLMRegistration&`, so the registration
-  // has to outlive the runner: bind it to a named local rather than passing a
-  // temporary.
+  // Bound to a named local, not passed as a temporary: the registration has
+  // to outlive the runner. see AmbiqAI/helia-rt#248
   const TFLMRegistration registration = ActivationRegistration(activation);
   micro::KernelRunner runner(registration, tensors, 2,
                              IntArrayFromInts(inputs_array_data),
@@ -201,16 +131,14 @@ double ReferenceLogistic(double x) { return 1.0 / (1.0 + std::exp(-x)); }
 // logistic(5) == 0.99331, so 0.99 is a safe floor for both.
 constexpr float kSaturationFloor = 0.99f;
 
-// Upper slack differs by precision (helia-rt#229 review). float32 resolves
-// ~6e-8 near 1.0, so anything meaningfully above 1.0 is a real overshoot and
-// must fail; a few ULP of slack is all that is warranted. float16 resolves
-// ~4.9e-4 near 1.0, so it genuinely needs more room.
+// Upper slack differs by precision: float32 resolves ~6e-8 near 1.0, so a few
+// ULP is all that is warranted; float16 resolves ~4.9e-4 and needs more room.
 constexpr float kSaturationCeilF32 = 1.0000005f;  // ~8 float32 ULP
 constexpr float kLogisticFloorF32 = -2e-7f;       // ~3 float32 ULP below 0
 
 // Asserts the "NaN was mapped to the saturation bound" behavior class without
-// pinning a literal, because the literal moved between our pin and v7.30.0.
-// Logs the observed value so the CI record carries the concrete number.
+// pinning a literal, which moves with the upstream table window. Logs the
+// observed value so the CI record carries the concrete number.
 void ExpectTanhNanCharacterized(float observed, const char* label) {
   MicroPrintf("%s: tanh(NaN) observed = %f", label,
               static_cast<double>(observed));
@@ -241,9 +169,9 @@ constexpr float kLargeInputs[kLargeCount] = {-8.0f, -7.0f, -6.0f, -5.0f,
                                              5.0f,  6.0f,  7.0f,  8.0f};
 
 #if ARM_NN_ENABLE_F16
-// Stable golden window: |x| <= 4. ns#303 changed heliaCORE table behavior
-// outside this band in v7.30.0, so exact goldens are only asserted inside it.
-// Float32 goldens over the whole [-8, 8] sweep already live in the shared
+// Stable golden window: |x| <= 4. The heliaCORE table behavior outside this
+// band has changed across releases, so exact goldens are asserted only inside
+// it. Float32 goldens over the whole [-8, 8] sweep already live in the shared
 // kernels/tanh_test.cc, so this window is only used by the float16 cases.
 constexpr int kWindowCount = 17;
 constexpr float kWindowInputs[kWindowCount] = {
@@ -259,19 +187,10 @@ constexpr float kLogisticFloorF16 = -0.0009f;
 // round trip through float16 storage without admitting a wrong result.
 constexpr float kFloat16ActivationTolerance = 3e-3f;
 
-// Float16 TANH golden tolerance is deliberately much looser than the tolerance
-// above, because heliaCORE computes float16 tanh two different ways and the
-// goldens have to hold for both:
-//   * MVE builds route TANH through arm_nn_vtanh_lut_direct_mve_f16, whose
-//     LUT256 table IS the golden curve, so the error there is ~1 ULP.
-//   * Scalar builds (any non-MVE float16 target, e.g. ATfE's +nomve) use
-//     arm_nn_tanh_scalar_ref_f16, a Pade form x(27+x^2)/(27+9x^2) with
-//     coefficients {3, 27, 9}. That approximation deviates from true tanh by up
-//     to 2.34e-2 at x = +/-1.5 (also 2.00e-2 at +/-2.0, 1.61e-2 at +/-1.0):
-//     12 of the 17 window points below exceed 3e-3.
-// 3e-2 is therefore set by the scalar rational path, not by rounding. This
-// assertion is a "the curve is roughly right" check; it is NOT a defect
-// detector, and it must not be read as one.
+// Much looser than the tolerance above because heliaCORE computes float16 tanh
+// two ways and the goldens hold for both: the MVE LUT (~1 ULP) and a scalar
+// Pade form whose error sets this bound. A "the curve is roughly right" check,
+// not a defect detector. see AmbiqAI/ns-cmsis-nn#407
 constexpr float kFloat16TanhGoldenTolerance = 3e-2f;
 #endif  // ARM_NN_ENABLE_F16
 
@@ -347,7 +266,8 @@ TEST(HeliaFloatActivationEdgeTest, LogisticFloat32NanBehavior) {
 #if HELIA_TEST_OPTIMIZED_F32
   // CHARACTERIZATION: there is no MVE sigmoid helper, so this is the scalar
   // path on every target. Its exp input clamp flushes NaN to +80 on purpose,
-  // giving sigmoid(80) == 1. Unchanged at v7.31.0 (ns#388 excludes SIGMOID).
+  // giving sigmoid(80) == 1.
+  // AmbiqAI/ns-cmsis-nn#388 excludes SIGMOID.
   tflite::testing::ExpectLogisticNanCharacterized(output[0], "f32");
 #else
   EXPECT_TRUE(std::isnan(output[0]));
@@ -421,9 +341,8 @@ TEST(HeliaFloatActivationEdgeTest, TanhFloat16NanBehavior) {
 
 #if HELIA_TEST_MVE_FLOAT
   // CHARACTERIZATION: arm_nn_vtanh_lut_direct_mve_f16 has the same
-  // vminnmq/vnegq_m structure as the float32 MVE helper. The float16 table
-  // window is still |x| <= 4 at v7.31.0, so the expected magnitude is
-  // tanh(4) rather than the float32 path's tanh(6).
+  // vminnmq/vnegq_m structure as the float32 MVE helper, over a narrower
+  // table window, so the expected magnitude is the float16 window's bound.
   tflite::testing::ExpectTanhNanCharacterized(
       static_cast<float>(output[0]), "f16/MVE");
 #else
@@ -545,17 +464,14 @@ TEST(HeliaFloatActivationEdgeTest, LogisticFloat16LargeInputsSaturate) {
 #elif defined(__ARM_FEATURE_MVE) && ((__ARM_FEATURE_MVE) & 2)
 
 // helia.inc defines ARM_NN_ENABLE_F16 for TARGET_ARCH=cortex-m55 only. If that
-// match ever drifts, or the macro is renamed upstream, every float16 case in
-// this file would vanish silently: the binary would run 5 of 12 cases and the
-// leg would still print ALL TESTS PASSED (helia-rt#231 shows an empty suite
-// scores green). Since this build has MVE floating point, float16 support is
-// expected, so turn the silent compile-out into a loud failure.
+// match drifts, every float16 case here would vanish silently and the leg
+// would still print ALL TESTS PASSED, so turn the compile-out into a loud
+// failure on a build that has MVE floating point.
+// see AmbiqAI/helia-rt#231, AmbiqAI/helia-rt#256
 //
-// Known gap: the ATfE legs build cortex-m55 with +nomve (helia-rt#225), so
-// __ARM_FEATURE_MVE is unset there and this guard cannot fire. That is
-// acceptable -- those legs have no MVE body/tail split, so they carry none of
-// the coverage this protects, and helia-rt#231 means they execute 0 tests
-// anyway.
+// Known gap: the ATfE legs build cortex-m55 with +nomve, so __ARM_FEATURE_MVE
+// is unset there and this guard cannot fire. Acceptable: without MVE there is
+// no body/tail split to protect. see AmbiqAI/helia-rt#225
 TEST(HeliaFloatActivationEdgeTest, Float16CoverageMustNotSilentlyDisappear) {
   FAIL(
       "ARM_NN_ENABLE_F16 is not defined on a build with MVE floating point. "

@@ -15,23 +15,13 @@ limitations under the License.
 
 // UNIDIRECTIONAL_SEQUENCE_LSTM tail-lane coverage for the helia float kernels.
 //
-// Why this test exists (AmbiqAI/helia-rt#227, AmbiqAI/ns-cmsis-nn#315):
-// heliaCORE's `arm_nn_lstm_step_f16` vectorises the gate activations over the
-// hidden dimension with MVE and finishes the remainder with a scalar tail. In
-// ns-cmsis-nn v7.29.2 the two halves did not use the same tanh approximation:
-// the MVE body used a lookup-table tanh and the scalar tail a rational
-// approximation, so lanes 0..7 and lanes 8..9 of the *same* gate tensor were
-// computed by different math. ns#324 makes the tail use the same LUT tanh as
-// the body; it first shipped in v7.30.0 and is present in the current v7.31.0
-// pin, so this test is expected GREEN.
-//
-// ns#315 reports a divergence of ~2.3e-2 in half precision on the same
-// input: 0x3B3D == 0.90478515625 from one path against
-// 0x3B6D == 0.92822265625 from the other. That reported figure is not this
-// fixture's own measurement -- the worst divergence this test has observed is
-// 1.10e-3 (CI run 33518826216), because it drives different operating points.
-// Same defect, different magnitude; do not quote 2.3e-2 as something this
-// test measured.
+// Why this test exists: heliaCORE's `arm_nn_lstm_step_f16` vectorises the gate
+// activations over the hidden dimension with MVE and finishes the remainder
+// with a scalar tail, and the two halves once used different tanh
+// approximations, so lanes of the *same* gate tensor were computed by
+// different math.
+// see AmbiqAI/helia-rt#227, AmbiqAI/ns-cmsis-nn#315,
+// AmbiqAI/ns-cmsis-nn#324
 //
 // The existing shared coverage cannot see this. The float16 case in
 // kernels/unidirectional_sequence_lstm_test.cc uses state_dimension == 2,
@@ -50,30 +40,22 @@ limitations under the License.
 // The strength of that claim differs by precision, so read the two cases
 // differently:
 //
-//   * float16 (the ns#315 detector). The body and the tail run genuinely
-//     different math -- LUT256 vs a Pade rational -- so the divergence is a
-//     property of the implementation, not of the input. It cannot be explained
-//     away by rounding or fusion.
+//   * float16 is the detector. The body and the tail run genuinely different
+//     math -- LUT256 vs a Pade rational -- so a divergence is a property of
+//     the implementation and cannot be explained away by rounding or fusion.
+//     This case is tolerance-free.
 //
-//   * float32 (a weaker consistency check, and it needs a tolerance).
-//     arm_nn_lstm_step_f32 has the same MVE-body/scalar-tail split, but both
-//     halves interpolate the SAME LUT. The body uses explicit vfmaq while the
+//   * float32 is a weaker consistency check and needs a tolerance. Both halves
+//     interpolate the SAME LUT, but the body uses explicit vfmaq while the
 //     tail writes `y0 + (y1-y0)*frac`, whose fusion is an -ffp-contract
-//     decision, so a body-vs-tail difference of a few ULP is permitted and
-//     carries no information about correctness.
-//
-//     This is measured, not theoretical. In CI run 33518826216 the float32
-//     lanes diverged on cortex-m55 gcc (MVE) while passing on cortex-m3 and
-//     cortex-m4+fp gcc (no MVE), which isolates FMA contraction as the cause:
-//     every divergent pair agreed to all six printed decimal places, e.g.
-//     0.006203 vs 0.006203 and -0.039712 vs -0.039712. So the float32 case is
-//     asserted with kFloat32LaneTolerance below, NOT with exact equality.
-//     Only the float16 case is tolerance-free.
+//     decision, so a few ULP of body-vs-tail difference is permitted and
+//     carries no information about correctness. Asserted with
+//     kFloat32LaneTolerance below, not with exact equality.
 //
 // A second, deliberately loose golden comparison against a double-precision
 // reference LSTM guards against the degenerate case where every lane is
-// uniformly wrong. Its tolerance is a magnitude sanity bound, NOT the ns#315
-// detector -- see kFloat16GoldenTolerance below.
+// uniformly wrong. Its tolerance is a magnitude sanity bound, not the
+// tail-lane detector -- see kFloat16GoldenTolerance below.
 //
 // This file lives under kernels/helia/tests/ (registered by
 // ext_libs/helia_tests.inc) so the upstream shared test file keeps its
@@ -192,42 +174,23 @@ constexpr float kFloat32GoldenTolerance = 1e-4f;
 
 // Body-vs-tail agreement bound for float32. The two halves evaluate the same
 // LUT expression with and without FMA contraction, so they may differ by a few
-// ULP.
-//
-// Both margins, stated honestly, because they are very different sizes:
-//
-//   Headroom over legitimate error: large. The float32 divergence recorded on
-//   m55-gcc printed equal to six decimal places at output magnitudes of 0.006
-//   to 0.09, which bounds it below 1e-6 (six-decimal print equality bounds the
-//   gap at <1e-6; it does NOT establish <5e-7, as an earlier revision of this
-//   comment claimed). So 1e-5 is at least ~10x the observed FMA divergence,
-//   and run 33521505536 confirms the float32 case passes with it.
-//
-//   Margin below a real ns#315-scale divergence: SMALL, about 1.6x. The
-//   measured float16 divergence band in run 33518826216 was 1.6e-5 to 1.10e-3;
-//   the low end came from a low-magnitude lane (output ~0.0074). So this
-//   tolerance would catch the ns#315 signature at these operating points, but
-//   it is not a comfortable margin, and a smaller-magnitude divergence could
-//   slip under it. This float32 check is a consistency check, NOT the ns#315
-//   detector -- that job belongs to the tolerance-free float16 assertion.
-//
-// Follow-up once the pin moves: ns#324 folds the float32 tail into the
-// predicated MVE loop, which should make the lanes bit-exact and let this be
-// tightened back toward exact equality.
+// ULP. This is a consistency check with a small margin below a real tail-lane
+// divergence, NOT the detector -- that job belongs to the tolerance-free
+// float16 assertion.
+// TODO(AmbiqAI/helia-rt#227): tighten toward exact equality once the
+// float32 tail uses the vector lanes' tanh (AmbiqAI/ns-cmsis-nn#324 did
+// this for float16).
 constexpr float kFloat32LaneTolerance = 1e-5f;
 
 #if ARM_NN_ENABLE_F16
 //
-// Float16: this bound is a *magnitude sanity check*, not the ns#315 detector.
-// Half precision carries 11 significand bits, so one ULP near |y| == 1 is
-// 2^-11 == 4.9e-4. Two time steps of 14-term dot products, four gate
-// activations and the heliaCORE tanh/logistic table error accumulate a few
-// ULP, and the shipped shared float16 LSTM test already documents deviations
-// up to 2.7e-2 for its (much more aggressive) weights. 3e-2 therefore stays
-// clear of false failures. It is deliberately LOOSER than the ~2.3e-2
-// divergence ns#315 reports: the tolerance-free lane-uniformity assertion
-// below is what catches that defect, so this check does not need to, and
-// overloading it would make it flaky.
+// Float16: a *magnitude sanity check*, not the tail-lane detector. Half
+// precision carries 11 significand bits, so one ULP near |y| == 1 is
+// 2^-11 == 4.9e-4, and two time steps of 14-term dot products plus four gate
+// activations accumulate several of those. Deliberately looser than the
+// divergence AmbiqAI/ns-cmsis-nn#315 reports: the tolerance-free
+// lane-uniformity assertion below is what catches that, so overloading this
+// would make it flaky.
 constexpr float kFloat16GoldenTolerance = 3e-2f;
 #endif  // ARM_NN_ENABLE_F16
 
@@ -358,9 +321,8 @@ TEST(HeliaFloatLstmTailLaneTest, Float32TailLanesMatchVectorLanes) {
   const float* output = contents.GetOutputData();
 
   // Invariant: the kStateDimension lanes of one (batch, time step) are the
-  // same number. Lanes 8..9 are the scalar tail; lanes 0..7 are the vector
-  // body. Compared with kFloat32LaneTolerance rather than exactly, because the
-  // two halves differ by FMA contraction on MVE builds -- see the file header.
+  // same number. Compared with kFloat32LaneTolerance rather than exactly,
+  // because the two halves differ by FMA contraction on MVE builds.
   for (int b = 0; b < tflite::testing::kBatchSize; ++b) {
     for (int t = 0; t < tflite::testing::kTimeSteps; ++t) {
       const float* lane =
@@ -410,7 +372,7 @@ TEST(HeliaFloatLstmTailLaneTest, Float32TailLanesMatchVectorLanes) {
 }
 
 #if ARM_NN_ENABLE_F16
-// The ns#315 catcher. Same construction, float16 tensors.
+// The tail-lane catcher. Same construction, float16 tensors.
 TEST(HeliaFloatLstmTailLaneTest, Float16TailLanesMatchVectorLanes) {
   auto contents = tflite::testing::CreateUniformLaneNodeContents();
   contents.SetInputData(tflite::testing::kInputData);
@@ -453,12 +415,11 @@ TEST(HeliaFloatLstmTailLaneTest, Float16TailLanesMatchVectorLanes) {
   const float16_t* cell = reinterpret_cast<const float16_t*>(
       tensors[tflite::kLstmCellStateTensor].data.raw);
 
-  // ns#315: lanes 0..7 (MVE body) and lanes 8..9 (scalar tail) of the same
-  // gate tensor must not be computed by different tanh approximations. All
-  // lanes are mathematically identical here, so any difference at all is the
-  // defect. No tolerance is involved. Unlike the float32 case above, this is
-  // not sensitive to FMA contraction: the two halves evaluate different
-  // functions (LUT256 vs the Pade rational), not the same function two ways.
+  // Lanes 0..7 (MVE body) and lanes 8..9 (scalar tail) of the same gate tensor
+  // must not be computed by different tanh approximations. All lanes are
+  // mathematically identical here, so any difference at all is the defect and
+  // no tolerance is involved; unlike the float32 case above this is not
+  // sensitive to FMA contraction. see AmbiqAI/ns-cmsis-nn#315
   for (int b = 0; b < tflite::testing::kBatchSize; ++b) {
     for (int t = 0; t < tflite::testing::kTimeSteps; ++t) {
       const float16_t* lane =
@@ -507,16 +468,15 @@ TEST(HeliaFloatLstmTailLaneTest, Float16TailLanesMatchVectorLanes) {
 }
 #elif defined(__ARM_FEATURE_MVE) && ((__ARM_FEATURE_MVE) & 2)
 
-// This is the guard that matters most. Float16TailLanesMatchVectorLanes is the
-// ns#315 detector and cortex-m55 is the only configuration that has the MVE
-// body / scalar tail split it looks for. If ARM_NN_ENABLE_F16 ever stops being
-// defined on such a build, the detector would disappear while the binary still
-// ran its one float32 case and the leg still reported success (helia-rt#231
-// shows an empty suite scores green). Fail loudly instead.
+// Float16TailLanesMatchVectorLanes is the detector, and cortex-m55 is the only
+// configuration with the MVE body / scalar tail split it looks for. If
+// ARM_NN_ENABLE_F16 ever stops being defined on such a build the detector
+// would disappear while the leg still reported success, so fail loudly.
+// see AmbiqAI/helia-rt#231, AmbiqAI/helia-rt#256
 //
-// Known gap: ATfE builds cortex-m55 with +nomve (helia-rt#225), so
-// __ARM_FEATURE_MVE is unset there and this cannot fire. Acceptable: without
-// MVE there is no body/tail split, so there is no ns#315 coverage to lose.
+// Known gap: ATfE builds cortex-m55 with +nomve, so __ARM_FEATURE_MVE is unset
+// there and this cannot fire. Acceptable: without MVE there is no body/tail
+// split, so there is no coverage to lose. see AmbiqAI/helia-rt#225
 TEST(HeliaFloatLstmTailLaneTest, Float16CoverageMustNotSilentlyDisappear) {
   FAIL(
       "ARM_NN_ENABLE_F16 is not defined on a build with MVE floating point. "

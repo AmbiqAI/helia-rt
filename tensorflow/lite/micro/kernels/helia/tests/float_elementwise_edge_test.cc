@@ -13,17 +13,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-// NaN-propagation coverage for the helia float ADD and MUL kernels
-// (AmbiqAI/helia-rt#227, ns#333 defect class).
+// NaN-propagation coverage for the helia float ADD and MUL kernels. The shared
+// kernels/add_test.cc and mul_test.cc use only finite operands, so nothing else
+// in the tree observes what arm_elementwise_add/mul_f32/f16 do with a NaN.
+// see AmbiqAI/helia-rt#227
 //
-// What the shared upstream tests already execute: kernels/add_test.cc and
-// kernels/mul_test.cc have float32 and float16 golden cases, but every operand
-// in them is finite. Nothing in the tree observes what
-// arm_elementwise_add_f32/f16 or arm_elementwise_mul_f32/f16 do with a NaN
-// operand, which is the ns#333 class.
-//
-// Cases asserted here are the ones whose IEEE-754 result is NaN regardless of
-// the activation clamp:
+// Asserted here are the cases whose IEEE-754 result is NaN regardless of the
+// activation clamp:
 //   * NaN op x  -> NaN
 //   * (+Inf) + (-Inf) -> NaN
 //   * 0 * (+Inf) -> NaN
@@ -36,35 +32,10 @@ limitations under the License.
 // clamps a raw infinity to the finite bound. Only the NaN-producing cases are
 // implementation-independent.
 //
-// Expected result on the current pin: the float32 cases FAIL on every gcc leg,
-// and the failure has nothing to do with fast-math. At ns-cmsis-nn 631726420b
-// the activation clamp drops NaN by compare-select ordering, on both paths:
-//   * MVE: arm_elementwise_add_f32.c / _mul_f32.c clamp via arm_nn_clamp_mve_f32
-//     = vmaxnmq then vminnmq. Those implement IEEE-754 maxNum/minNum, which
-//     return the NON-NaN operand, so NaN becomes out_activation_min (-FLT_MAX).
-//   * Scalar: the same files' `#else` path uses CLAMP(v, max, min), and
-//     CLAMP(x,h,l) is MAX(MIN(x,h),l) with MIN(A,B) = ((A)<(B)?(A):(B)). Since
-//     `NaN < h` is false, MIN returns h, so NaN becomes +FLT_MAX.
-// With kTfLiteActNone the bounds are +/-FLT_MAX, so a NaN operand comes back as
-// a finite +/-FLT_MAX rather than NaN. This is plain compare ordering, present
-// in every shipped library on every toolchain -- not the armclang-only
-// exposure that helia-rt#228 describes.
-//
-// The float16 path was asymmetric before the fix: the float16 scalar clamp
-// orders its compares correctly and DOES preserve NaN, so
-// Add/MulFloat16PropagatesNan passed on a scalar float16 build. On cortex-m55
-// gcc the MVE float16 clamp is selected instead (arm_elementwise_add_f16.c:53
-// picks arm_nn_clamp_mve_f16; only the #else at :70 is scalar), so it failed
-// there on v7.30.0 and earlier. ns#380 fixes the MVE leg too, and first
-// shipped in v7.31.0 -- the current pin -- so both legs are expected green.
-//
-// These stay TRUE CONTRACT assertions, unlike the tanh/logistic NaN cases in
-// float_activation_edge_test.cc. ns#380 (merged) reclassifies NaN on the
-// integer bit pattern in arm_nn_clamp_scalar_f32/f16 and
-// arm_nn_clamp_propagate_nan_mve_f32/f16, which survives -Ofast, so these go
-// green on the pin bump. The bump target is the first ns-cmsis-nn release
-// that contains ns#380; no such release has been cut yet -- v7.30.0
-// (2026-08-30) is the latest tag and predates it.
+// These are TRUE CONTRACT assertions, unlike the tanh/logistic NaN cases in
+// float_activation_edge_test.cc: the elementwise clamp helpers reclassify NaN
+// on the integer bit pattern, which survives -Ofast, so this holds on every
+// toolchain rather than only outside fast-math. see AmbiqAI/ns-cmsis-nn#380
 //
 // SUB is not covered: kernels/helia/sub.cc has no float dispatch into
 // heliaCORE (float32 SUB runs the TFLM reference and there is no float16 SUB),
@@ -117,13 +88,12 @@ void RunBinary(const TFLMRegistration& registration, const T* lhs, const T* rhs,
 }  // namespace testing
 }  // namespace tflite
 
-// kernels/helia/add.cc:307 and mul.cc:199 fall back to reference_ops and still
-// return kTfLiteOk when the heliaCORE entry point declines. The reference
-// kernels propagate NaN, so a future version that tightened argument
-// validation would flip the tests below GREEN while the code under test never
-// ran. Assert the dispatch precondition directly. (helia-rt#230's link probe
-// proves the symbol exists at link time; it does not prove dispatch took the
-// optimized branch.)
+// kernels/helia/add.cc and mul.cc fall back to reference_ops and still return
+// kTfLiteOk when the heliaCORE entry point declines, and the reference kernels
+// propagate NaN, so a tightening of argument validation would flip the tests
+// below GREEN while the code under test never ran. Assert the dispatch
+// precondition directly; the link probe proves only that the symbol exists.
+// see AmbiqAI/helia-rt#234
 TEST(HeliaFloatElementwiseEdgeTest, OptimizedFloat32PathIsReachable) {
 #if ARM_NN_ENABLE_F32
   const float lhs[tflite::testing::kCount] = {1.0f, 2.0f, 3.0f, 4.0f};

@@ -27,21 +27,10 @@ limitations under the License.
 #include "arm_nnfunctions_flt.h"
 #endif
 
-// The reference kernels and the heliaCORE kernels
-// (OPTIMIZED_KERNEL_DIR=helia, backed by ns-cmsis-nn) keep the quantized
-// hidden and cell state in the TFLite variable tensors, so a second invocation
-// continues from the state of the first one. The upstream CMSIS-NN release
-// pinned by this repository still evaluates the quantized LSTM statelessly
-// (arm_lstm_unidirectional_s8/s16 force a NULL initial hidden state and clear
-// the cell state), so the state assertions are skipped for those builds.
-//
-// The persistent-state contract for the *quantized* kernels
-// (cmsis_nn_lstm_context::hidden_state) landed in ns-cmsis-nn v7.28.0.  A HELIA
-// build against anything older compiles the stateless fallback in
-// kernels/helia/unidirectional_sequence_lstm.cc, so the version has to be part
-// of the gate -- otherwise the stateless kernel would be run against stateful
-// assertions and fail by construction.  Keep this threshold in sync with the
-// quantized NS_CMSIS_NN_VERSION fences in that kernel.
+// The stateful quantized-LSTM assertions below need the persistent-state
+// contract, which upstream CMSIS-NN lacks and ns-cmsis-nn added in v7.28.0.
+// Keep this threshold in sync with the quantized NS_CMSIS_NN_VERSION fences in
+// kernels/helia/unidirectional_sequence_lstm.cc.
 #if defined(HELIA)
 #include "Include/arm_nn_types.h"  // NS_CMSIS_NN_VERSION
 #endif
@@ -656,18 +645,8 @@ TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMFloat16) {
       0.65625000f, 0.65625000f, 0.60107422f, 0.60107422f};
   constexpr float kExpectedSecondCell[] = {
       0.97021484f, 0.97021484f, 0.92089844f, 0.92089844f};
-  // The f16 goldens above were captured from a v7.29.x ns-cmsis-nn build, not
-  // derived: the float32 goldens in this file document an independent
-  // derivation, these do not.  ns-cmsis-nn PR 324 (first shipped in v7.30.0)
-  // tail predicates arm_nn_lstm_step_f16 so every lane, tail lanes included,
-  // takes the vector LUT tanh instead of the scalar rational approximation,
-  // and documents that as moving f16 results by up to ~2.4e-2.  This bound
-  // sits just above that documented shift and stays tighter than the 4e-2
-  // first-invoke bound above.  It is an interim bound, not a licence to
-  // loosen a failing check: the tolerance-free lane-uniformity test in
-  // kernels/helia/tests/float_lstm_tail_lane_test.cc is the strong guard on
-  // this kernel, and deriving these goldens from a double-precision reference
-  // so this bound can be tightened again is tracked as a follow-up.
+  // TODO(AmbiqAI/helia-rt#242): interim 2.5e-2 bound, captured not derived;
+  // do not loosen further. see AmbiqAI/ns-cmsis-nn#324.
   constexpr float kSecondInvokeTolerance = 2.5e-2f;
 
   const auto* hidden_f16 = reinterpret_cast<const float16_t*>(

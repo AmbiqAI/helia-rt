@@ -16,20 +16,11 @@
 #
 # helia-rt: assert that a micro-test binary actually EXECUTED test cases.
 #
-# Why this exists (issue #231): both test frameworks in this tree print the
-# CI pass string, '~~~ALL TESTS PASSED~~~', whenever the failure count is
-# zero -- including when the executed count is also zero. Under the ATfE
-# toolchain no static constructor ran, so micro_test_v2's TEST()
-# self-registration list was empty and all ~127 binaries printed
-#
-#     [==========] 0 tests ran.
-#     [  PASSED  ] 0 tests.
-#     ~~~ALL TESTS PASSED~~~
-#
-# and the leg went green. Four required status contexts were vacuous for as
-# long as that held. The pass string alone is therefore NOT evidence that
-# anything ran; a positive executed-case count is. This script is the check
-# that turns "all 0 of 0 passed" into a failure.
+# Why this exists: both test frameworks in this tree print the CI pass string,
+# '~~~ALL TESTS PASSED~~~', whenever the failure count is zero -- including
+# when the executed count is also zero. The pass string alone is therefore not
+# evidence that anything ran; a positive executed-case count is.
+# see AmbiqAI/helia-rt#231
 #
 # Usage:
 #   assert_tests_executed.sh <log-file> <binary-path>
@@ -39,10 +30,8 @@
 #
 # Side effect: when HELIA_TEST_TALLY_FILE is set in the environment, appends
 # one '<binary-name><TAB><executed-cases><TAB><kind>' line so the calling CI
-# script can report and floor-check a per-leg total. <kind> is 'counted' for a
-# binary that reported a case count and 'frameworkless' for one of the exempt
-# binaries below, which ran but has no count to contribute; both are real
-# binaries and both are recorded, so the per-leg binary count stays honest.
+# script can report and floor-check a per-leg total. <kind> is 'counted' or
+# 'frameworkless'; both are recorded, so the per-leg binary count stays honest.
 # Unset (the upstream CI scripts) it does nothing.
 
 set -euo pipefail
@@ -57,21 +46,11 @@ if [[ ! -f "${LOG_FILE}" ]]; then
   exit 1
 fi
 
-# The tested program's own return value, when the log carries it.
-#
-# The FVP's process exit status cannot be used for this. On the GCC and
-# armclang paths the binary terminates inside ethos-u-core-platform's
-# retarget.c _exit(), which prints "Application exit code: %d." followed by
-# 0x04 (end-of-transmission) and an "EXITTHESIM" shutdown tag to the MPS3
-# UART and then spins in `while (1) {}`. The model stops because of
-# `-C mps3_board.uart0.shutdown_on_eot=1`, a UART-model shutdown that carries
-# no status -- the sample run in tools/benchmarking/README.md shows exactly
-# that pairing: "Application exit code: 0." followed by "Info: /OSCI/SystemC:
-# Simulation stopped by user". So the log, not $? of the FVP, is where the
-# program's return value survives, and this is the check that reads it.
-#
-# The ATfE path links picolibc + libsemihost instead of retarget.c and prints
-# no such line, so the assertion is conditional on the line being present.
+# The tested program's own return value, when the log carries it. The FVP's
+# process exit status cannot be used: the program spins after printing
+# "Application exit code: %d." and the model stops on uart0.shutdown_on_eot,
+# which carries no status. The ATfE path prints no such line, so the assertion
+# is conditional on it being present. see AmbiqAI/helia-rt#231
 app_exit="$({ grep -aoE 'Application exit code: -?[0-9]+' "${LOG_FILE}" \
               || true; } | tail -n 1 | sed -E 's/^.*: //')"
 if [[ -n "${app_exit}" && "${app_exit}" != "0" ]]; then
@@ -93,20 +72,11 @@ record_tally() {
   fi
 }
 
-# Binaries that legitimately report no case count. These are hand-rolled
-# main() programs that print the pass string directly and never link either
-# micro-test framework, so there is no registry to be empty and no count to
-# assert. Keep this list exact and short: anything added here stops being
-# covered by this guard, so a new entry needs the same justification.
-#
-#   hello_world_test  - tensorflow/lite/micro/examples/hello_world/
-#                       hello_world_test.cc: main() calls three inference
-#                       helpers under TF_LITE_ENSURE_STATUS and prints the
-#                       pass string itself. No TEST()/TF_LITE_MICRO_TEST.
-#
-# Every other pass-string emitter in the tree is one of the two frameworks
-# (testing/micro_test.h, testing/micro_test_v2.h), both of which always print
-# a count banner ahead of the pass string.
+# Binaries that legitimately report no case count: hand-rolled main() programs
+# that print the pass string themselves and never link either micro-test
+# framework, so there is no registry to be empty and no count to assert. Keep
+# this list exact -- an entry here stops being covered by this guard. Every
+# other pass-string emitter prints a count banner ahead of the pass string.
 FRAMEWORKLESS_BINARIES=(
   hello_world_test
 )
@@ -114,31 +84,21 @@ FRAMEWORKLESS_BINARIES=(
 for exempt in "${FRAMEWORKLESS_BINARIES[@]}"; do
   if [[ "${BINARY_NAME}" == "${exempt}" ]]; then
     echo "${BINARY_NAME}: no case count expected (framework-less test binary)"
-    # It still ran, so it counts as a binary for the per-leg tally -- with
-    # zero executed cases and flagged so the leg summary can say how many of
-    # its binaries carry no count. Dropping it here would undercount the
-    # binaries the leg actually executed, and any HELIA_MIN_TEST_BINARIES
-    # floor would be measured against an incomplete list.
+    # It still ran, so it counts as a binary for the per-leg tally, with zero
+    # cases and flagged, so a HELIA_MIN_TEST_BINARIES floor stays honest.
     record_tally 0 frameworkless
     exit 0
   fi
 done
 
-# A count banner is necessary but not sufficient. Two more log shapes must
-# not be allowed through, because the caller reaches this script via a bare
-# `grep -q '~~~ALL TESTS PASSED~~~'`:
-#
-#  1. A failure marker anywhere in the log. Both frameworks print the pass
-#     string only when their own failure count is zero, but a binary can
-#     print that string itself from inside a test body
-#     (examples/network_tester/network_tester_test.cc does), so a log can
-#     hold both the pass string and a real framework failure.
-#     micro_test.h prints '~~~SOME TESTS FAILED~~~'; micro_test_v2.h prints
-#     '[  FAILED  ] ...' per failing case and in its summary.
-#  2. More than one framework summary in one log, i.e. two runs concatenated.
-#     The count taken below is the last one, so a failing or empty first run
-#     could hide behind a later good one, and the tally would credit the leg
-#     with cases from a run that is not this binary's.
+# A count banner is necessary but not sufficient, because the caller reaches
+# this script via a bare `grep -q '~~~ALL TESTS PASSED~~~'`:
+#  1. A binary can print the pass string itself from inside a test body, so a
+#     log can hold both that string and a real framework failure marker
+#     ('~~~SOME TESTS FAILED~~~' or '[  FAILED  ]').
+#  2. Two runs concatenated: the count taken below is the last one, so a
+#     failing or empty first run could hide behind a later good one.
+# see AmbiqAI/helia-rt#231
 if grep -aqE '~~~SOME TESTS FAILED~~~|\[ +FAILED +\]' "${LOG_FILE}"; then
   echo "--------------------------------------------------------"
   echo "ERROR: ${BINARY_NAME}: the log contains a test-failure marker."
@@ -163,18 +123,11 @@ if [[ "${summaries}" -gt 1 ]]; then
   exit 1
 fi
 
-# micro_test_v2.h: "[==========] %d tests ran."
-# Matched with grep -oE rather than an anchored sed so that FVP/UART output
-# that prefixes or wraps the line still parses. Take the last occurrence.
-#
-# -a (--text) is load-bearing, not defensive. Some tests emit raw bytes into
-# the captured log -- micro_log_test deliberately prints badly-formed format
-# strings -- and GNU grep then classifies the whole file as binary. With -o
-# that suppresses the matched text entirely: grep writes "binary file matches"
-# to stderr, exits 0, and prints NOTHING on stdout. The count would come back
-# empty and this guard would fail a binary that ran its cases perfectly well.
-# The pass-string check in test_with_arm_corstone_300.sh does not hit this
-# because grep -q only needs the exit status.
+# micro_test_v2.h: "[==========] %d tests ran." Matched with grep -oE rather
+# than an anchored sed so UART output that wraps the line still parses; take
+# the last occurrence. -a is load-bearing: some tests emit raw bytes into the
+# log, and grep -o on a file it classifies as binary prints nothing at all, so
+# the count would come back empty for a binary that ran fine.
 executed="$(grep -aoE '\[==========\] [0-9]+ tests ran' "${LOG_FILE}" \
             | tail -n 1 | grep -oE '[0-9]+' || true)"
 
