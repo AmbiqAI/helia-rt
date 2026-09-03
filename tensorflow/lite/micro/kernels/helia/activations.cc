@@ -58,7 +58,7 @@ TfLiteStatus ReluEval(TfLiteContext* context, TfLiteNode* node) {
                  : kTfLiteError;
 #else
       // Label stays outside the guard so the diagnostic names the missing
-      // option rather than falling to `default:`. see #254
+      // option rather than falling to `default:`. see AmbiqAI/helia-rt#254
       MicroPrintf("Float16 RELU requires ARM_NN_ENABLE_F16.");
       return kTfLiteError;
 #endif
@@ -144,7 +144,7 @@ TfLiteStatus Relu6Eval(TfLiteContext* context, TfLiteNode* node) {
                  : kTfLiteError;
 #else
       // Label stays outside the guard so the diagnostic names the missing
-      // option rather than falling to `default:`. see #254
+      // option rather than falling to `default:`. see AmbiqAI/helia-rt#254
       MicroPrintf("Float16 RELU6 requires ARM_NN_ENABLE_F16.");
       return kTfLiteError;
 #endif

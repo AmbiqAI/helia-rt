@@ -718,7 +718,7 @@ jobs:
 
   # The helia backend must build and link with the float kernels off.
   # Separate job, not a matrix cell: nsx-cross-build asserts the opposite.
-  # see #253
+  # see AmbiqAI/helia-rt#253
   nsx-cross-build-int8:
     name: nsx::helia_rt int8-only cross-compile (Cortex-M55, gcc, no fp32/fp16)
     runs-on: ubuntu-latest
@@ -762,7 +762,7 @@ jobs:
 
           # Board stub shaped like a real NSX board: -mcpu lives on a SoC
           # flags target the board target only links, so the MVE-F probe has
-          # to walk to it. see #254
+          # to walk to it. see AmbiqAI/helia-rt#254
           add_library(nsx_soc_flags INTERFACE)
           target_compile_options(nsx_soc_flags INTERFACE
               -mcpu=cortex-m55 -mthumb -mfloat-abi=hard -mfpu=fpv5-d16)
@@ -928,7 +928,7 @@ jobs:
       - name: Report int8-only archive size
         run: |
           set -euo pipefail
-          # Not an assertion, and not comparable with the figure in #253,
+          # Not an assertion, and not comparable with the figure in AmbiqAI/helia-rt#253,
           # which is a linked application image. One line, so runs diff.
           ARCHIVE=smoke-int8/build/nsx_helia_rt/helia-rt-src/libhelia_rt_helia.a
           totals=$(arm-none-eabi-size -t "${ARCHIVE}" | tail -1)

@@ -609,7 +609,7 @@ endfunction()
 # SoC flags target, and try_compile()'s LINK_LIBRARIES does not propagate
 # usage requirements for a non-IMPORTED target. Generator expressions cannot
 # be evaluated at configure time and are skipped.
-# see #254
+# see AmbiqAI/helia-rt#254
 # ---------------------------------------------------------------------------
 function(helia_rt_collect_interface_compile_flags OUT_VAR)
     cmake_parse_arguments(_ARG "" "TARGET" "" ${ARGN})

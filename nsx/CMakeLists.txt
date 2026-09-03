@@ -32,7 +32,7 @@
 #             add_subdirectory(<ns-cmsis-nn>/nsx ...), which is where
 #             ns-cmsis-nn reads them. Publishes what it observed as
 #             HELIA_RT_FLOAT32_ENABLED / HELIA_RT_FLOAT16_ENABLED.
-#             see #253, #254, docs/guides/floating-point.md
+#             see AmbiqAI/helia-rt#253, AmbiqAI/helia-rt#254, docs/guides/floating-point.md
 #   cmsis_nn: User-supplied upstream CMSIS-NN target. ns-cmsis-nn is NOT
 #             compatible (modified API signatures). Supply the target via
 #             -DHELIA_RT_CMSISNN_TARGET=<name> (e.g. CMSIS::NN from an
@@ -235,7 +235,7 @@ if(NSX_HELIA_RT_BACKEND STREQUAL "helia")
     # --- Effective float kernel set ---
     # fp32/fp16 are opt-in. ns-cmsis-nn fixed its source list before this
     # module was added, so observe the resolved target, never assign.
-    # see #253, #254
+    # see AmbiqAI/helia-rt#253, AmbiqAI/helia-rt#254
     include("${HELIA_RT_TFLM_ROOT}/cmake/helia_rt_sources.cmake")
     helia_rt_resolve_float_flags(
         _nsx_helia_rt_f32 _nsx_helia_rt_f16 _nsx_helia_rt_float_source
@@ -294,7 +294,7 @@ if(NSX_HELIA_RT_BACKEND STREQUAL "helia")
     # Ask the toolchain, not CMAKE_SYSTEM_PROCESSOR. Flags come from a
     # transitive walk: boards put -mcpu on a linked SoC flags target.
     # Compile-only; a cross build may have no linkable runtime yet.
-    # see #254
+    # see AmbiqAI/helia-rt#254
     helia_rt_collect_interface_compile_flags(_nsx_helia_rt_mve_flags
         TARGET "${NSX_BOARD_FLAGS_TARGET}")
 
@@ -360,7 +360,7 @@ int main(void){return 0;}
     unset(_nsx_helia_rt_saved_try_type)
 
     # NOTICE for the same reason as fp32, plus this module cannot see
-    # whether the model has a FLOAT16 operator. see #254
+    # whether the model has a FLOAT16 operator. see AmbiqAI/helia-rt#254
     if(HELIA_RT_TARGET_HAS_MVE_FP AND NOT _nsx_helia_rt_f16)
         message(NOTICE
             "nsx-helia-rt: this target has MVE floating point but the fp16 "
@@ -388,7 +388,7 @@ int main(void){return 0;}
     # Mirror onto the ARM_NN_ENABLE_F32/F16 cache names for consumers that
     # read those. Ours to update when the value matches the companion or the
     # resolved truth; anything else is consumer-owned and left alone.
-    # TODO(#254): drop once ns-cmsis-nn publishes this mirror itself
+    # TODO(AmbiqAI/helia-rt#254): drop once ns-cmsis-nn publishes this mirror itself
     # (cross-repo consumer: AmbiqAI/helia-aot#349).
     foreach(_nsx_f IN ITEMS 32 16)
         set(_nsx_want "${_nsx_helia_rt_f${_nsx_f}}")
