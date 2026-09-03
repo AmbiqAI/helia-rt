@@ -424,6 +424,67 @@ function(helia_rt_float_feature_flags OUT_F32 OUT_F16)
 endfunction()
 
 # ---------------------------------------------------------------------------
+# helia_rt_float_flags_from_target(DEP OUT_F32 OUT_F16)
+#
+# Reads ARM_NN_ENABLE_F32/F16 off a resolved ns-cmsis-nn target's
+# INTERFACE_COMPILE_DEFINITIONS: what it compiled, not what was requested.
+# A non-existent target yields OFF/OFF; for the option fallback use
+# helia_rt_resolve_float_flags().
+# ---------------------------------------------------------------------------
+function(helia_rt_float_flags_from_target dep OUT_F32 OUT_F16)
+    set(_dep_defs "")
+    if(TARGET "${dep}")
+        get_target_property(_dep_prop "${dep}" INTERFACE_COMPILE_DEFINITIONS)
+        if(_dep_prop)
+            set(_dep_defs "${_dep_prop}")
+        endif()
+    endif()
+
+    # Regex per entry, not IN_LIST: a definition may be wrapped in a
+    # generator expression, which an exact match reads as absent.
+    set(_have_f32 OFF)
+    set(_have_f16 OFF)
+    foreach(_d IN LISTS _dep_defs)
+        if(_d MATCHES "(^|[^A-Za-z0-9_])ARM_NN_ENABLE_F32=1($|[^0-9])")
+            set(_have_f32 ON)
+        endif()
+        if(_d MATCHES "(^|[^A-Za-z0-9_])ARM_NN_ENABLE_F16=1($|[^0-9])")
+            set(_have_f16 ON)
+        endif()
+    endforeach()
+
+    set(${OUT_F32} ${_have_f32} PARENT_SCOPE)
+    set(${OUT_F16} ${_have_f16} PARENT_SCOPE)
+endfunction()
+
+# ---------------------------------------------------------------------------
+# helia_rt_resolve_float_flags(OUT_F32 OUT_F16 OUT_SOURCE [DEP <target>])
+#
+# Shared by the nsx module, the root CMakeLists and Zephyr so they cannot
+# disagree. Order: DEP <target> when it exists, else
+# helia_rt_float_feature_flags(). OUT_SOURCE reports which one answered.
+# ---------------------------------------------------------------------------
+function(helia_rt_resolve_float_flags OUT_F32 OUT_F16 OUT_SOURCE)
+    cmake_parse_arguments(_ARG "" "DEP" "" ${ARGN})
+
+    if(_ARG_DEP AND TARGET "${_ARG_DEP}")
+        helia_rt_float_flags_from_target("${_ARG_DEP}" _rf_f32 _rf_f16)
+        set(_rf_source "ns-cmsis-nn target")
+    else()
+        helia_rt_float_feature_flags(_rf_f32 _rf_f16)
+        if(DEFINED CONFIG_HELIA_RT)
+            set(_rf_source "Zephyr Kconfig")
+        else()
+            set(_rf_source "NSX option")
+        endif()
+    endif()
+
+    set(${OUT_F32}    ${_rf_f32}     PARENT_SCOPE)
+    set(${OUT_F16}    ${_rf_f16}     PARENT_SCOPE)
+    set(${OUT_SOURCE} "${_rf_source}" PARENT_SCOPE)
+endfunction()
+
+# ---------------------------------------------------------------------------
 # helia_rt_backend_compile_definitions(OUT_VAR BACKEND <name>)
 #
 # Returns the compile definitions a backend variant of heliaRT requires.
@@ -526,3 +587,4 @@ function(helia_rt_build_type_compile_definitions OUT_VAR)
     endif()
     set(${OUT_VAR} ${_defs} PARENT_SCOPE)
 endfunction()
+

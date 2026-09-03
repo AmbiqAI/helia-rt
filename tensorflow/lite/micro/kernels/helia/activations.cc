@@ -47,8 +47,8 @@ TfLiteStatus ReluEval(TfLiteContext* context, TfLiteNode* node) {
       tflite::micro::GetEvalOutput(context, node, kActivationsOutputTensor);
 
   switch (input->type) {
-#if ARM_NN_ENABLE_F16
     case kTfLiteFloat16:
+#if ARM_NN_ENABLE_F16
       return arm_nn_activation_f16(
                  tflite::micro::GetTensorData<float16_t>(input),
                  tflite::micro::GetTensorData<float16_t>(output),
@@ -56,6 +56,11 @@ TfLiteStatus ReluEval(TfLiteContext* context, TfLiteNode* node) {
                  0.0f) == ARM_CMSIS_NN_SUCCESS
                  ? kTfLiteOk
                  : kTfLiteError;
+#else
+      // Label stays outside the guard so the diagnostic names the missing
+      // option rather than falling to `default:`. see #254
+      MicroPrintf("Float16 RELU requires ARM_NN_ENABLE_F16.");
+      return kTfLiteError;
 #endif
     case kTfLiteFloat32: {
 #if ARM_NN_ENABLE_F32
@@ -128,8 +133,8 @@ TfLiteStatus Relu6Eval(TfLiteContext* context, TfLiteNode* node) {
       tflite::micro::GetEvalOutput(context, node, kActivationsOutputTensor);
 
   switch (input->type) {
-#if ARM_NN_ENABLE_F16
     case kTfLiteFloat16:
+#if ARM_NN_ENABLE_F16
       return arm_nn_activation_f16(
                  tflite::micro::GetTensorData<float16_t>(input),
                  tflite::micro::GetTensorData<float16_t>(output),
@@ -137,6 +142,11 @@ TfLiteStatus Relu6Eval(TfLiteContext* context, TfLiteNode* node) {
                  0.0f) == ARM_CMSIS_NN_SUCCESS
                  ? kTfLiteOk
                  : kTfLiteError;
+#else
+      // Label stays outside the guard so the diagnostic names the missing
+      // option rather than falling to `default:`. see #254
+      MicroPrintf("Float16 RELU6 requires ARM_NN_ENABLE_F16.");
+      return kTfLiteError;
 #endif
     case kTfLiteFloat32: {
 #if ARM_NN_ENABLE_F32

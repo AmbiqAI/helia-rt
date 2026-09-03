@@ -119,18 +119,8 @@ option(HELIA_RT_ENABLE_ETHOSU
 # We therefore adopt the dependency's values and warn on any mismatch.
 # ---------------------------------------------------------------------------
 function(_helia_rt_sync_float_definitions target dep)
-    get_target_property(_dep_defs ${dep} INTERFACE_COMPILE_DEFINITIONS)
-    if(NOT _dep_defs)
-        set(_dep_defs "")
-    endif()
-
-    foreach(_feature F32 F16)
-        if("ARM_NN_ENABLE_${_feature}=1" IN_LIST _dep_defs)
-            set(_dep_${_feature} ON)
-        else()
-            set(_dep_${_feature} OFF)
-        endif()
-    endforeach()
+    # Shared resolver; see cmake/helia_rt_sources.cmake.
+    helia_rt_float_flags_from_target(${dep} _dep_F32 _dep_F16)
 
     foreach(_prop COMPILE_DEFINITIONS INTERFACE_COMPILE_DEFINITIONS)
         get_target_property(_cur ${target} ${_prop})
