@@ -645,8 +645,8 @@ TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMFloat16) {
       0.65625000f, 0.65625000f, 0.60107422f, 0.60107422f};
   constexpr float kExpectedSecondCell[] = {
       0.97021484f, 0.97021484f, 0.92089844f, 0.92089844f};
-  // TODO(#242): interim 2.5e-2 bound, captured not derived; do not loosen
-  // further. see ns-cmsis-nn#324.
+  // TODO(AmbiqAI/helia-rt#242): interim 2.5e-2 bound, captured not derived;
+  // do not loosen further. see AmbiqAI/ns-cmsis-nn#324.
   constexpr float kSecondInvokeTolerance = 2.5e-2f;
 
   const auto* hidden_f16 = reinterpret_cast<const float16_t*>(

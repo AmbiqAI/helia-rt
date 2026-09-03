@@ -15,8 +15,8 @@ limitations under the License.
 
 // NaN-propagation coverage for the helia float ADD and MUL kernels. The shared
 // kernels/add_test.cc and mul_test.cc use only finite operands, so nothing else
-// in the tree observes what arm_elementwise_add/mul_f32/f16 do with a NaN. see
-// #227
+// in the tree observes what arm_elementwise_add/mul_f32/f16 do with a NaN.
+// see AmbiqAI/helia-rt#227
 //
 // Asserted here are the cases whose IEEE-754 result is NaN regardless of the
 // activation clamp:
@@ -35,7 +35,7 @@ limitations under the License.
 // These are TRUE CONTRACT assertions, unlike the tanh/logistic NaN cases in
 // float_activation_edge_test.cc: the elementwise clamp helpers reclassify NaN
 // on the integer bit pattern, which survives -Ofast, so this holds on every
-// toolchain rather than only outside fast-math. see ns-cmsis-nn#380
+// toolchain rather than only outside fast-math. see AmbiqAI/ns-cmsis-nn#380
 //
 // SUB is not covered: kernels/helia/sub.cc has no float dispatch into
 // heliaCORE (float32 SUB runs the TFLM reference and there is no float16 SUB),
@@ -93,7 +93,7 @@ void RunBinary(const TFLMRegistration& registration, const T* lhs, const T* rhs,
 // propagate NaN, so a tightening of argument validation would flip the tests
 // below GREEN while the code under test never ran. Assert the dispatch
 // precondition directly; the link probe proves only that the symbol exists.
-// see #234
+// see AmbiqAI/helia-rt#234
 TEST(HeliaFloatElementwiseEdgeTest, OptimizedFloat32PathIsReachable) {
 #if ARM_NN_ENABLE_F32
   const float lhs[tflite::testing::kCount] = {1.0f, 2.0f, 3.0f, 4.0f};

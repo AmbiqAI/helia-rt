@@ -30,7 +30,8 @@ RESULTS_DIRECTORY=/tmp/${TARGET}_logs
 # helia-rt: one log per binary, not a single shared logs.txt. The test rules
 # can run under `make -j`, and a shared path also loses the log of a binary
 # that hung or faulted as soon as the next one starts. `tee` truncates on
-# open, so a silent binary leaves an empty log and still fails. see #231, #239
+# open, so a silent binary leaves an empty log and still fails.
+# see AmbiqAI/helia-rt#231, AmbiqAI/helia-rt#239
 MICRO_LOG_FILENAME=${RESULTS_DIRECTORY}/$(basename "${BINARY_TO_TEST}").txt
 mkdir -p ${RESULTS_DIRECTORY}
 
@@ -38,7 +39,8 @@ mkdir -p ${RESULTS_DIRECTORY}
 # fails by name instead of burning the whole `make test` timeout that
 # readable_run wraps around the leg. The budget is set by the aggregate case
 # (many binaries hanging), not by the slowest binary; it is a hang detector,
-# not a performance gate. Override with FVP_TIMEOUT_SECONDS. see #239
+# not a performance gate. Override with FVP_TIMEOUT_SECONDS.
+# see AmbiqAI/helia-rt#239
 FVP_TIMEOUT_SECONDS="${FVP_TIMEOUT_SECONDS:-120}"
 # Grace period between SIGTERM and SIGKILL. The FVP spawns subprocesses and
 # does not always die on the first signal.
@@ -73,7 +75,7 @@ FVP+='--stat'
 # The status is consulted for one thing only: whether the `timeout` wrapper
 # ended the run. `set -e` does not fire on a failing pipeline element and the
 # pipeline status is tee's, so read the FVP's out of PIPESTATUS.
-# see #231, #239
+# see AmbiqAI/helia-rt#231, AmbiqAI/helia-rt#239
 set +e
 if [[ -n "${TIMEOUT_CMD}" ]]; then
   ${TIMEOUT_CMD} --kill-after="${FVP_TIMEOUT_KILL_AFTER_SECONDS}" \
@@ -89,7 +91,7 @@ set -e
 # The check runs FIRST, ahead of the timeout classification and the pass
 # string: the faulting PC/LR is the actionable diagnosis, and a fault after
 # '~~~ALL TESTS PASSED~~~' (in teardown, a static destructor, _exit) is still a
-# failure -- for non_test_binary targets too. see #239
+# failure -- for non_test_binary targets too. see AmbiqAI/helia-rt#239
 if grep -aq '^FAULT:' "${MICRO_LOG_FILENAME}"
 then
   echo "--------------------------------------------------------"
@@ -105,7 +107,7 @@ fi
 # the deadline, 137 (128 + SIGKILL) when --kill-after had to escalate, which
 # `timeout` propagates rather than collapsing to 124. Gated on TIMEOUT_CMD,
 # because without it FVP_STATUS is the FVP's own status and 137 there is an
-# ordinary signal death, not a timeout. see #239
+# ordinary signal death, not a timeout. see AmbiqAI/helia-rt#239
 if [[ -n "${TIMEOUT_CMD}" && ( ${FVP_STATUS} -eq 124 || ${FVP_STATUS} -eq 137 ) ]]
 then
   echo "--------------------------------------------------------"
@@ -119,7 +121,8 @@ fi
 # Unbounded fallback (no timeout/gtimeout on PATH; the WARNING above fired).
 # Nothing here can tell a hang from a crash, so any non-zero FVP status is a
 # failure and deliberately does not fall through to the pass-string grep.
-# Stricter than the bounded path above, which is what CI runs. see #239
+# Stricter than the bounded path above, which is what CI runs.
+# see AmbiqAI/helia-rt#239
 if [[ -z "${TIMEOUT_CMD}" && ${FVP_STATUS} -ne 0 ]]
 then
   echo "--------------------------------------------------------"
@@ -139,7 +142,8 @@ then
   then
     # helia-rt: both micro-test frameworks print the pass string whenever the
     # FAILURE count is zero, including when the EXECUTED count is zero too, so
-    # a positive executed-case count is required as well. see #231
+    # a positive executed-case count is required as well.
+    # see AmbiqAI/helia-rt#231
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     "${SCRIPT_DIR}/assert_tests_executed.sh" \
       "${MICRO_LOG_FILENAME}" "${BINARY_TO_TEST}"

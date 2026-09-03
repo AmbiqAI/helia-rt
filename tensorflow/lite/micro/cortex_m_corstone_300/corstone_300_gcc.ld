@@ -23,7 +23,7 @@
  *     (`:rom_dram`), which the integration-test images need because they do
  *     not fit ITCM's 512 KiB. Cortex-M55 caches DDR.
  *   - `.data` gets its own PT_LOAD (`:rom_data`) instead of riding in
- *     `:rom_exec`; see the note above the PHDRS block. see #240
+ *     `:rom_exec`; see the note above the PHDRS block. see AmbiqAI/helia-rt#240
  */
 
 __STACK_SIZE = 0x00030000;
@@ -40,7 +40,8 @@ MEMORY
  * LMA at `__etext` in ITCM, which upstream's `rom_exec` cannot express; a
  * dedicated PT_LOAD records both without changing the load image. `.sram.data`
  * has the same shape but is always empty here, so it stays on `rom_dram` as
- * upstream; give it its own PT_LOAD if a target ever fills it. see #240
+ * upstream; give it its own PT_LOAD if a target ever fills it.
+ * see AmbiqAI/helia-rt#229, AmbiqAI/helia-rt#240
  */
 PHDRS
 {

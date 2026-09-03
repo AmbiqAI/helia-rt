@@ -130,7 +130,7 @@ SECTIONS
      * provided here or no static constructor runs at all. Placement matches
      * picolibc.ld: head of .preinit_array to tail of .init_array; nothing
      * that can pad or insert a non-pointer word may go between the two
-     * bounds, or the walk calls a zero word. see #231 */
+     * bounds, or the walk calls a zero word. see AmbiqAI/helia-rt#231 */
     PROVIDE_HIDDEN (__preinit_array_start = .);
     PROVIDE_HIDDEN (__bothinit_array_start = .);
     KEEP(*(.preinit_array))

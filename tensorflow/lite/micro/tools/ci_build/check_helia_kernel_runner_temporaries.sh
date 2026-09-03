@@ -19,7 +19,8 @@
 # Why: a temporary bound to a reference *member* through a constructor is NOT
 # lifetime-extended, so every later call reads a dead stack slot. KernelRunner
 # stores the registration by value now, so this keeps the *source* idiom honest
-# across upstream syncs (see helia/patches/inline_drift.md). see #239
+# across upstream syncs (see helia/patches/inline_drift.md).
+# see AmbiqAI/helia-rt#239
 #
 # The correct idiom, which every other test in these files already uses:
 #

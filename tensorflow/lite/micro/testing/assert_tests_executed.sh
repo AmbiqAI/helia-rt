@@ -19,7 +19,8 @@
 # Why this exists: both test frameworks in this tree print the CI pass string,
 # '~~~ALL TESTS PASSED~~~', whenever the failure count is zero -- including
 # when the executed count is also zero. The pass string alone is therefore not
-# evidence that anything ran; a positive executed-case count is. see #231
+# evidence that anything ran; a positive executed-case count is.
+# see AmbiqAI/helia-rt#231
 #
 # Usage:
 #   assert_tests_executed.sh <log-file> <binary-path>
@@ -49,7 +50,7 @@ fi
 # process exit status cannot be used: the program spins after printing
 # "Application exit code: %d." and the model stops on uart0.shutdown_on_eot,
 # which carries no status. The ATfE path prints no such line, so the assertion
-# is conditional on it being present. see #231
+# is conditional on it being present. see AmbiqAI/helia-rt#231
 app_exit="$({ grep -aoE 'Application exit code: -?[0-9]+' "${LOG_FILE}" \
               || true; } | tail -n 1 | sed -E 's/^.*: //')"
 if [[ -n "${app_exit}" && "${app_exit}" != "0" ]]; then
@@ -97,7 +98,7 @@ done
 #     ('~~~SOME TESTS FAILED~~~' or '[  FAILED  ]').
 #  2. Two runs concatenated: the count taken below is the last one, so a
 #     failing or empty first run could hide behind a later good one.
-# see #231
+# see AmbiqAI/helia-rt#231
 if grep -aqE '~~~SOME TESTS FAILED~~~|\[ +FAILED +\]' "${LOG_FILE}"; then
   echo "--------------------------------------------------------"
   echo "ERROR: ${BINARY_NAME}: the log contains a test-failure marker."

@@ -15,7 +15,8 @@ limitations under the License.
 
 // Edge-of-range (NaN, +/-Inf) coverage for the helia float TANH and LOGISTIC
 // kernels. The shared kernels/tanh_test.cc and logistic_test.cc feed only
-// finite values, so nothing else in the tree observes this. see #227
+// finite values, so nothing else in the tree observes this.
+// see AmbiqAI/helia-rt#227
 //
 // NaN behaviour splits by path, and the tests below split the same way:
 //
@@ -23,14 +24,16 @@ limitations under the License.
 //       CONTRACT. arm_nn_tanh_scalar_ref_f32 carries an explicit NaN guard,
 //       which -ffinite-math-only would delete; helia builds ns-cmsis-nn at -O3
 //       for gcc and ATfE, and armclang appends -ffp-mode=full after -Ofast, so
-//       the guard holds there too. see #230
+//       the guard holds there too. see AmbiqAI/helia-rt#230
 //   TANH float32/float16, MVE leg (cortex-m55)           -> saturation bound.
 //       CHARACTERIZATION. Documented and deliberate upstream: vminnmq is IEEE
 //       minNum, so a qNaN lane is replaced by the table bound.
+//       see AmbiqAI/ns-cmsis-nn#382, AmbiqAI/ns-cmsis-nn#388
 //   LOGISTIC float32/float16                             -> saturation bound.
 //       CHARACTERIZATION. There is no MVE sigmoid helper for either precision,
 //       so LOGISTIC is always the scalar path; its exp input clamp flushes NaN
 //       to +80 on purpose.
+//       see AmbiqAI/ns-cmsis-nn#382, AmbiqAI/ns-cmsis-nn#388
 //
 // The characterization cases assert the behaviour CLASS (finite, correct sign,
 // at the saturation bound) rather than a literal, because the literal moves
@@ -49,7 +52,7 @@ limitations under the License.
 // would flip these tests GREEN while the code under test never ran. The
 // *PathIsReachable tests call arm_nn_activation_f32/f16 directly to pin that
 // dispatch precondition; the link probe is a different guard, proving only
-// that the symbol exists. see #234
+// that the symbol exists. see AmbiqAI/helia-rt#234
 
 #include <cmath>
 
@@ -77,7 +80,7 @@ limitations under the License.
 // Does this build select the MVE (vector) activation helpers? heliaCORE gates
 // them on ARM_MATH_MVEF / ARM_MATH_MVE_FLOAT16, which track the compiler's
 // __ARM_FEATURE_MVE; bit 1 is MVE floating point. The ATfE legs build
-// cortex-m55 with +nomve and do not set it. see #225
+// cortex-m55 with +nomve and do not set it. see AmbiqAI/helia-rt#225
 #if defined(__ARM_FEATURE_MVE) && ((__ARM_FEATURE_MVE) & 2)
 #define HELIA_TEST_MVE_FLOAT 1
 #else
@@ -108,7 +111,7 @@ void RunActivation(Activation activation, TfLiteType tensor_type,
   int outputs_array_data[] = {1, 1};
 
   // Bound to a named local, not passed as a temporary: the registration has
-  // to outlive the runner. see #248
+  // to outlive the runner. see AmbiqAI/helia-rt#248
   const TFLMRegistration registration = ActivationRegistration(activation);
   micro::KernelRunner runner(registration, tensors, 2,
                              IntArrayFromInts(inputs_array_data),
@@ -187,7 +190,7 @@ constexpr float kFloat16ActivationTolerance = 3e-3f;
 // Much looser than the tolerance above because heliaCORE computes float16 tanh
 // two ways and the goldens hold for both: the MVE LUT (~1 ULP) and a scalar
 // Pade form whose error sets this bound. A "the curve is roughly right" check,
-// not a defect detector. see ns-cmsis-nn#407
+// not a defect detector. see AmbiqAI/ns-cmsis-nn#407
 constexpr float kFloat16TanhGoldenTolerance = 3e-2f;
 #endif  // ARM_NN_ENABLE_F16
 
@@ -264,6 +267,7 @@ TEST(HeliaFloatActivationEdgeTest, LogisticFloat32NanBehavior) {
   // CHARACTERIZATION: there is no MVE sigmoid helper, so this is the scalar
   // path on every target. Its exp input clamp flushes NaN to +80 on purpose,
   // giving sigmoid(80) == 1.
+  // AmbiqAI/ns-cmsis-nn#388 excludes SIGMOID.
   tflite::testing::ExpectLogisticNanCharacterized(output[0], "f32");
 #else
   EXPECT_TRUE(std::isnan(output[0]));
@@ -462,11 +466,12 @@ TEST(HeliaFloatActivationEdgeTest, LogisticFloat16LargeInputsSaturate) {
 // helia.inc defines ARM_NN_ENABLE_F16 for TARGET_ARCH=cortex-m55 only. If that
 // match drifts, every float16 case here would vanish silently and the leg
 // would still print ALL TESTS PASSED, so turn the compile-out into a loud
-// failure on a build that has MVE floating point. see #231, #256
+// failure on a build that has MVE floating point.
+// see AmbiqAI/helia-rt#231, AmbiqAI/helia-rt#256
 //
 // Known gap: the ATfE legs build cortex-m55 with +nomve, so __ARM_FEATURE_MVE
 // is unset there and this guard cannot fire. Acceptable: without MVE there is
-// no body/tail split to protect. see #225
+// no body/tail split to protect. see AmbiqAI/helia-rt#225
 TEST(HeliaFloatActivationEdgeTest, Float16CoverageMustNotSilentlyDisappear) {
   FAIL(
       "ARM_NN_ENABLE_F16 is not defined on a build with MVE floating point. "

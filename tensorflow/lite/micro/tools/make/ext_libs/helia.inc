@@ -100,7 +100,7 @@ CXXFLAGS += -DARM_NN_ENABLE_F32=1
 
 # The fp16 API requires ARMv8.1-M MVEF toolchain support. Keep it disabled for
 # other targets because heliaCore rejects ARM_NN_ENABLE_F16 without float16_t.
-# see #253, #254, #256
+# see AmbiqAI/helia-rt#253, AmbiqAI/helia-rt#254, AmbiqAI/helia-rt#256
 ifneq (,$(filter cortex-m55,$(TARGET_ARCH)))
   CCFLAGS  += -DARM_NN_ENABLE_F16=1
   CXXFLAGS += -DARM_NN_ENABLE_F16=1
@@ -108,8 +108,8 @@ ifneq (,$(filter cortex-m55,$(TARGET_ARCH)))
   # GCC 14 ICEs on scalar _Float16 conditional selects for Armv8.1-M
   # hard-float (GCC PR target/118460); -fno-ssa-phiopt avoids the broken
   # expander. Clang-based toolchains neither have the bug nor take the flag.
-  # TODO(#193): drop when arm_gcc_download.sh pins >= 15.2.Rel1 (fix not
-  # backported to gcc-14).
+  # TODO(AmbiqAI/helia-rt#193): drop when arm_gcc_download.sh pins >=
+  # 15.2.Rel1 (fix not backported to gcc-14).
   ifeq ($(TOOLCHAIN), gcc)
     NS_CMSIS_NN_FP16_OBJS := \
         $(patsubst %.c,$(THIRD_PARTY_KERNEL_OBJDIR)%.o, \

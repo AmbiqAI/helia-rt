@@ -83,7 +83,8 @@ class KernelRunner {
   TfLiteContext context_ = {};
   TfLiteNode node_ = {};
   // Stored by value: callers routinely pass a temporary (Register_CONV_2D()),
-  // which a reference member would not lifetime-extend. see #248
+  // which a reference member would not lifetime-extend.
+  // see AmbiqAI/helia-rt#248
   const TFLMRegistration registration_;
 
   SingleArenaBufferAllocator* allocator_;

@@ -17,7 +17,7 @@ limitations under the License.
 // startup this target links defines every fault vector as `while(1);`, so a
 // fault and a genuine infinite loop look identical from the outside. These
 // strong definitions replace the weak ones so a fault prints its cause and
-// stops the simulation instead. see #239
+// stops the simulation instead. see AmbiqAI/helia-rt#239
 //
 // Scope: test runtime only. Wired in through MICROLITE_TEST_RUNTIME_SRCS, so
 // it cannot reach libtensorflow-microlite.a or a pack artifact. Added for v7-M
@@ -40,7 +40,8 @@ limitations under the License.
 // MSPLIM armed the exception entry stacking hits the limit and locks up before
 // the trampoline runs; with MSPLIM 0 (what the CMSIS startup leaves) no STKOF
 // is raised at all. Covering the armed case needs the limits reset in the
-// startup file, which is shared with every non-test build. see #239
+// startup file, which is shared with every non-test build.
+// see AmbiqAI/helia-rt#239
 
 #include <stdint.h>
 

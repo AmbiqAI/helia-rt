@@ -259,7 +259,8 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     conv_params.stride.w = params->stride_width;
     conv_params.stride.h = params->stride_height;
     // The SPEED-path weight-sum precompute below needs the real input offset,
-    // which CalculateOpData() does not derive until further down. see #222
+    // which CalculateOpData() does not derive until further down.
+    // see AmbiqAI/helia-rt#222
     conv_params.input_offset = -input->params.zero_point;
 
     cmsis_nn_dims input_dims;
@@ -491,7 +492,8 @@ TfLiteStatus EvalQuantizedPerChannel(TfLiteContext* context, TfLiteNode* node,
       weight_sum_ctx.buf = context->GetScratchBuffer(context, data.weight_buffer_idx);
       // Now need to redo the weight sum because we didn't precompute.
       // Status checked: a failure leaves the weight-sum buffer unwritten and
-      // the wrapper below would still report success. see #233
+      // the wrapper below would still report success.
+      // see AmbiqAI/helia-rt#233, AmbiqAI/helia-rt#237
       const arm_cmsis_nn_status weight_sum_status = arm_convolve_weight_sum(
           (int32_t*)weight_sum_ctx.buf,
           tflite::micro::GetTensorData<const int8_t>(filter), &input_dims,
