@@ -152,7 +152,7 @@ checkout_ref() {
   if ! git checkout "${ref}" >&2; then
     echo >&2 "ERROR: ns-cmsis-nn ref '${ref}' did not resolve to a commit in AmbiqAI/ns-cmsis-nn."
     echo >&2 "       Check the ref passed via NS_CMSIS_NN_COMMIT (or the ns_cmsis_nn_canary"
-    echo >&2 "       dispatch input). A valid full SHA, tag (e.g. v7.30.1), or branch is required."
+    echo >&2 "       dispatch input). A valid full SHA, tag (e.g. v7.31.0), or branch is required."
     exit 1
   fi
 }
