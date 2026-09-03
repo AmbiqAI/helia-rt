@@ -74,6 +74,27 @@ infrastructure used by every kernel test.
 Drop condition: upstream tflite-micro adopts a by-value member (or otherwise
 lifetime-extends the registration) in `kernel_runner.h`.
 
+## DEQUANTIZE float16 input — `kernels/dequantize{.h,.cc,_common.cc,_test.cc}`
+
+Widens DEQUANTIZE to accept a `kTfLiteFloat16` input with a float32 output,
+the form the LiteRT converter emits for fp16-PTQ weights (see
+AmbiqAI/helia-rt#255). Four inline changes:
+
+- `dequantize_common.cc`: `DequantizePrepare` admits `kTfLiteFloat16` and
+  skips the scale/zero-point read for it (f16 tensors carry no quantization
+  params).
+- `dequantize.h`: adds the shared `Float16BitsToFloat32()` bit-expansion
+  helper.
+- `dequantize.cc`: adds the `kTfLiteFloat16` case to the reference Eval.
+- `dequantize_test.cc`: adds the float16 golden and Prepare-rejection tests.
+
+Prepare is shared with `kernels/helia/dequantize.cc`, so the type admission
+cannot live under `kernels/helia/`; the helper and the reference Eval case
+are kept inline so the helia kernel and the reference kernel behave
+identically on hosts and on cores without f16 arithmetic.
+
+Drop condition: upstream TFLM accepts float16 DEQUANTIZE input.
+
 ## `tensorflow/lite/micro/tools/make/Makefile`
 
 Three minimal hooks (~34 lines of inline drift, down from ~80):
