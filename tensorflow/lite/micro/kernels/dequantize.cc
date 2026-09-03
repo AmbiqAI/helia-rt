@@ -71,7 +71,9 @@ TfLiteStatus DequantizeEval(TfLiteContext* context, TfLiteNode* node) {
       const TfLiteFloat16* input_data =
           tflite::micro::GetTensorData<TfLiteFloat16>(input);
       float* output_data = tflite::micro::GetTensorData<float>(output);
-      const int flat_size = tflite::micro::GetTensorShape(input).FlatSize();
+      const int flat_size = MatchingFlatSize(
+          tflite::micro::GetTensorShape(input),
+          tflite::micro::GetTensorShape(output));
       for (int i = 0; i < flat_size; ++i) {
         output_data[i] = Float16BitsToFloat32(input_data[i].data);
       }

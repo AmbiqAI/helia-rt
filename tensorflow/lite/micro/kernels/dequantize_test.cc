@@ -120,7 +120,7 @@ TEST(DequantizeTest, DequantizeOpTestFloat16) {
   const int length = 9;
   int dims[] = {2, 3, 3};
   // 1.0, -2.0, +0.0, smallest subnormal, largest normal, +inf, -0.0,
-  // lowest normal, sNaN.
+  // most negative normal, sNaN.
   const TfLiteFloat16 input[length] = {{0x3C00}, {0xC000}, {0x0000},
                                        {0x0001}, {0x7BFF}, {0x7C00},
                                        {0x8000}, {0xFBFF}, {0x7C01}};
