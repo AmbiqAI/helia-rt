@@ -183,11 +183,11 @@ TfLiteStatus CmsisNnPrepareSvdf(TfLiteContext* context, TfLiteNode* node) {
 
     TFLITE_DCHECK(context->RequestScratchBufferInArena != nullptr);
 
-    cmsis_nn_dims input_dims;
+    cmsis_nn_dims input_dims = {};
     input_dims.n = batch_size;
     input_dims.h = input_size;
 
-    cmsis_nn_dims weights_feature_dims;
+    cmsis_nn_dims weights_feature_dims = {};
     weights_feature_dims.n = num_filters;
     weights_feature_dims.h = input_size;
 
@@ -346,8 +346,6 @@ TfLiteStatus EvalIntegerSVDF(TfLiteContext* context, TfLiteNode* node,
   // indeterminate (or defaulting it to 0) disables the kernel's own
   // under-allocation check. Both figures come from the same published sizers
   // Prepare used for its arena requests (AmbiqAI/ns-cmsis-nn#312).
-  const int32_t num_filters = weights_feature_dims.n;
-
   const bool state_s16 = weights_time_tensor->type == kTfLiteInt16;
   const int32_t scratch_size =
       state_s16 ? arm_svdf_state_s16_s8_input_ctx_get_buffer_size(
@@ -389,6 +387,7 @@ TfLiteStatus EvalIntegerSVDF(TfLiteContext* context, TfLiteNode* node,
                                             data.scratch_weight_tensor_index);
 
         const int input_size = input_tensor->dims->data[1];
+        const int32_t num_filters = weights_feature_dims.n;
 
         const arm_cmsis_nn_status vector_sum_status = arm_vector_sum_s8(
             static_cast<int32_t*>(ctx.buf), input_size, num_filters,
