@@ -28,6 +28,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # Pin CI to the tested ns-cmsis-nn release, shared by every job that
+  # clones it so the cross-compile legs cannot drift apart.
+  NS_CMSIS_NN_REF: v7.31.0
+
 jobs:
   manifest:
     name: dump_manifest (${{ matrix.backend }})
@@ -245,10 +250,7 @@ jobs:
     # longer needs a repo secret and runs for fork and Dependabot PRs too.
     # (It previously skipped for those, silently dropping the only Cortex-M55
     # cross-compile coverage from exactly the PRs that change CI actions.)
-    env:
-      # Pin CI to the tested ns-cmsis-nn release. This may be newer than the
-      # minimum compatible version declared by the CMSIS-Pack metadata.
-      NS_CMSIS_NN_REF: v7.31.0
+    # NS_CMSIS_NN_REF comes from the workflow-level env.
     steps:
       - name: Checkout helia-rt
         uses: actions/checkout@v7
@@ -713,6 +715,226 @@ jobs:
             exit 1
           fi
           echo "OK: provenance tracked by value; a conflicting -D on a reused build dir is still rejected"
+
+  # The helia backend must build and link with the float kernels off.
+  # Separate job, not a matrix cell: nsx-cross-build asserts the opposite.
+  # see #253
+  nsx-cross-build-int8:
+    name: nsx::helia_rt int8-only cross-compile (Cortex-M55, gcc, no fp32/fp16)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout helia-rt
+        uses: actions/checkout@v7
+        with:
+          path: helia-rt
+      - name: Checkout ns-cmsis-nn (pinned ref)
+        run: |
+          set -euo pipefail
+          # Same anonymous-clone idiom, and the same self-insteadOf pin, as
+          # nsx-cross-build; see the long comment there.
+          NS_CMSIS_NN_URL="https://github.com/AmbiqAI/ns-cmsis-nn.git"
+          git -c url."${NS_CMSIS_NN_URL}".insteadOf="${NS_CMSIS_NN_URL}" \
+              clone --depth 1 --branch "${NS_CMSIS_NN_REF}" \
+              "${NS_CMSIS_NN_URL}" \
+              ns-cmsis-nn
+          (cd ns-cmsis-nn && git rev-parse HEAD)
+      - name: Install cross toolchain + ninja
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+              cmake ninja-build gcc-arm-none-eabi \
+              libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib
+          # Capture first, then trim: `x | head -1` leaves the producer writing
+          # into a closed pipe, and `set -o pipefail` turns that into failure.
+          gcc_version=$(arm-none-eabi-gcc --version)
+          head -1 <<<"${gcc_version}"
+          # Confirm libc headers (string.h etc.) and libgcc are reachable.
+          arm-none-eabi-gcc -print-sysroot
+          arm-none-eabi-gcc -E -x c -include string.h /dev/null > /dev/null
+          echo "OK: libc headers reachable"
+      - name: Write int8-only smoke harness
+        run: |
+          mkdir -p smoke-int8
+          cat > smoke-int8/CMakeLists.txt <<'EOF'
+          cmake_minimum_required(VERSION 3.21)
+          project(nsx_helia_rt_int8_smoke C CXX ASM)
+
+          # Board stub shaped like a real NSX board: -mcpu lives on a SoC
+          # flags target the board target only links, so the MVE-F probe has
+          # to walk to it. see #254
+          add_library(nsx_soc_flags INTERFACE)
+          target_compile_options(nsx_soc_flags INTERFACE
+              -mcpu=cortex-m55 -mthumb -mfloat-abi=hard -mfpu=fpv5-d16)
+          target_link_options(nsx_soc_flags INTERFACE
+              -mcpu=cortex-m55 -mthumb -mfloat-abi=hard -mfpu=fpv5-d16)
+
+          add_library(nsx_board_flags INTERFACE)
+          target_compile_options(nsx_board_flags INTERFACE
+              -ffunction-sections -fdata-sections
+              -Wno-unused-parameter)
+          target_compile_definitions(nsx_board_flags INTERFACE
+              ARM_MATH_LOOPUNROLL ARM_MATH_DSP)
+          target_link_libraries(nsx_board_flags INTERFACE nsx_soc_flags)
+
+          set(NSX_BOARD_FLAGS_TARGET nsx_board_flags)
+          set(NSX_SOC_FAMILY apollo510)
+
+          add_library(nsx_soc_hal INTERFACE)
+
+          # An int8-only consumer that never turns the float kernels on.
+          set(NSX_CMSIS_NN_ENABLE_F32 OFF CACHE BOOL "" FORCE)
+          set(NSX_CMSIS_NN_ENABLE_F16 OFF CACHE BOOL "" FORCE)
+
+          add_subdirectory(${NS_CMSIS_NN_DIR}/nsx ns_cmsis_nn EXCLUDE_FROM_ALL)
+          add_subdirectory(${HELIA_RT_DIR}/nsx   nsx_helia_rt   EXCLUDE_FROM_ALL)
+
+          # An archive leaves references unresolved, so force a real link:
+          # QUANTIZE/DEQUANTIZE reach the conversion kernels unconditionally.
+          add_executable(nsx_helia_rt_int8_link_probe
+              ${CMAKE_CURRENT_SOURCE_DIR}/int8_link_probe.cc)
+          target_link_libraries(nsx_helia_rt_int8_link_probe
+              PRIVATE nsx::helia_rt nsx_board_flags)
+          target_link_options(nsx_helia_rt_int8_link_probe PRIVATE
+              --specs=nosys.specs)
+          set_target_properties(nsx_helia_rt_int8_link_probe PROPERTIES
+              SUFFIX .elf)
+          EOF
+          cat > smoke-int8/int8_link_probe.cc <<'EOF'
+          // An int8-only kernel set must link against an ns-cmsis-nn built
+          // without its fp32/fp16 sources.
+          #include <stdint.h>
+
+          #include "tensorflow/lite/micro/kernels/micro_ops.h"
+
+          // Defined as 0 when off, so test the value, not definedness.
+          #if defined(ARM_NN_ENABLE_F32) && ARM_NN_ENABLE_F32
+          #error "int8-only build must not enable ARM_NN_ENABLE_F32"
+          #endif
+          #if defined(ARM_NN_ENABLE_F16) && ARM_NN_ENABLE_F16
+          #error "int8-only build must not enable ARM_NN_ENABLE_F16"
+          #endif
+
+          namespace {
+          // QUANTIZE/DEQUANTIZE pull in the conversion entry points;
+          // CONV_2D pulls in the int8 dispatch object.
+          void* const kHeliaKernels[] = {
+              reinterpret_cast<void*>(&tflite::Register_QUANTIZE),
+              reinterpret_cast<void*>(&tflite::Register_DEQUANTIZE),
+              reinterpret_cast<void*>(&tflite::Register_CONV_2D),
+          };
+          }  // namespace
+
+          extern "C" int main(void) {
+            uintptr_t acc = 0;
+            for (auto* p : kHeliaKernels) acc ^= reinterpret_cast<uintptr_t>(p);
+            return static_cast<int>(acc & 1u);
+          }
+          EOF
+          cat > smoke-int8/toolchain.cmake <<'EOF'
+          set(CMAKE_SYSTEM_NAME Generic)
+          set(CMAKE_SYSTEM_PROCESSOR cortex-m55)
+          set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+          set(CMAKE_C_COMPILER   arm-none-eabi-gcc)
+          set(CMAKE_CXX_COMPILER arm-none-eabi-g++)
+          set(CMAKE_ASM_COMPILER arm-none-eabi-gcc)
+          # No architecture flags here: they come from the board/SoC flags
+          # targets, which is what the MVE-F probe has to walk.
+          set(CMAKE_CXX_FLAGS_INIT "-fno-exceptions -fno-rtti")
+          EOF
+      - name: Configure int8-only (must not fail, must not warn as an error)
+        run: |
+          set -euo pipefail
+          # The float advisories are NOTICEs by design; -Werror=dev catches
+          # a regression to a developer warning. Capture the status so a
+          # failure still prints the CMake output that explains it.
+          rc=0
+          out=$(cmake -S smoke-int8 -B smoke-int8/build -G Ninja \
+              --warn-uninitialized -Werror=dev \
+              -DCMAKE_TOOLCHAIN_FILE="$(pwd)/smoke-int8/toolchain.cmake" \
+              -DHELIA_RT_DIR="$(pwd)/helia-rt" \
+              -DNS_CMSIS_NN_DIR="$(pwd)/ns-cmsis-nn" \
+              -DHELIA_RT_VARIANT=release-with-logs 2>&1) || rc=$?
+          echo "${out}"
+          if [ "${rc}" -ne 0 ]; then
+            echo "::error::int8-only configure failed (rc=${rc}); see the CMake output above"
+            exit "${rc}"
+          fi
+          flat=$(tr -s '[:space:]' ' ' <<<"${out}")
+          # One line naming the resolved float set.
+          if ! grep -q "float kernels: fp32=OFF fp16=OFF" <<<"${flat}"; then
+            echo "::error::the float-set STATUS line is missing or reports the wrong set"
+            exit 1
+          fi
+          # The probe must have walked to the board's architecture flags.
+          if ! grep -q "^HELIA_RT_TARGET_HAS_MVE_FP:INTERNAL=1$" \
+                 smoke-int8/build/CMakeCache.txt; then
+            echo "::error::MVE-F probe did not see the board's architecture flags"
+            grep 'HELIA_RT_TARGET_HAS_MVE_FP' smoke-int8/build/CMakeCache.txt || true
+            exit 1
+          fi
+          echo "OK: configured int8-only under -Werror=dev, MVE-F probe resolved transitively"
+      - name: Build helia backend (int8-only)
+        run: |
+          cmake --build smoke-int8/build --target helia_rt_helia nsx_cmsis_nn -j
+      - name: Assert no float kernels in the archive
+        run: |
+          set -euo pipefail
+          ARCHIVE=smoke-int8/build/nsx_helia_rt/helia-rt-src/libhelia_rt_helia.a
+          test -f "${ARCHIVE}"
+          # Capture once, then grep: `nm | grep -q` makes nm take SIGPIPE,
+          # which `set -o pipefail` turns into a spurious failure.
+          syms=$(arm-none-eabi-nm "${ARCHIVE}")
+          rc=0
+          # The only float entry points an int8-only build may reference:
+          # QUANTIZE/DEQUANTIZE convert through them unconditionally.
+          # see docs/reference/operator-coverage.md
+          ALLOWED='^(arm_dequantize_s8_f32|arm_dequantize_s16_f32|arm_quantize_f32_s8|arm_quantize_f32_s16)$'
+          # Not anchored on _f32$: helpers carry the type mid-name.
+          for suffix in f32 f16; do
+            hits=$(grep -E " [A-Za-z] arm_[A-Za-z0-9_]*_${suffix}[A-Za-z0-9_]*$" <<<"${syms}" \
+                   | awk '{print $NF}' | sort -u \
+                   | grep -Ev "${ALLOWED}" || true)
+            if [ -n "${hits}" ]; then
+              echo "::error::arm_*_${suffix}* symbols present in an int8-only build:"
+              echo "${hits}"
+              rc=1
+            fi
+          done
+          # No companion check on heliaRT-side names: that dispatch is
+          # inlined or cloned, so any such pattern is vacuous or tied to one
+          # compiler's optimizer naming.
+          [ "${rc}" -eq 0 ]
+          echo "OK: no float dispatch symbols beyond the four unconditional quantize/dequantize entry points"
+      - name: Link int8 probe (must resolve without the float kernels)
+        run: |
+          set -euo pipefail
+          cmake --build smoke-int8/build --target nsx_helia_rt_int8_link_probe -j
+          # Capture, then trim: `find | head -1` makes find take SIGPIPE.
+          probe_paths=$(find smoke-int8/build -name 'nsx_helia_rt_int8_link_probe.elf')
+          PROBE=$(head -1 <<<"${probe_paths}")
+          test -n "${PROBE}"
+          file "${PROBE}"
+          probe_syms=$(arm-none-eabi-nm -C "${PROBE}")
+          # The conversion kernels must really be in the image; a gating
+          # regression would fail the link above, but say why.
+          for sym in arm_quantize_f32_s8 arm_dequantize_s8_f32; do
+            if ! grep -qE " (T|t|W|w) ${sym}$" <<<"${probe_syms}"; then
+              echo "::error::${sym} missing from the int8 link probe image"
+              exit 1
+            fi
+          done
+          echo "OK: int8 graph links against an ns-cmsis-nn built without fp32/fp16"
+      - name: Report int8-only archive size
+        run: |
+          set -euo pipefail
+          # Not an assertion, and not comparable with the figure in #253,
+          # which is a linked application image. One line, so runs diff.
+          ARCHIVE=smoke-int8/build/nsx_helia_rt/helia-rt-src/libhelia_rt_helia.a
+          totals=$(arm-none-eabi-size -t "${ARCHIVE}" | tail -1)
+          text=$(awk '{print $1}' <<<"${totals}")
+          bss=$(awk '{print $3}' <<<"${totals}")
+          echo "helia-archive-int8 text=${text} bss=${bss}"
 
   zephyr-build:
     name: Zephyr module build (qemu_cortex_m3, REFERENCE)
