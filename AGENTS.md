@@ -36,10 +36,19 @@ Drop-in: same `MicroInterpreter`/`Model`/`OpResolver` API as upstream.
 - Release or status changes (new version, support window, withdrawn
   release): state them explicitly in the PR description so maintainers can
   update product status and docs.
-- Comments: one or two lines saying what the code needs. Anything that can
-  go stale (why a workaround exists, what another repo does today, measured
-  numbers, which CI contexts are required, "drop this when X lands") is one
-  line in the form `TODO(#<issue>): <reason>` (or `// see #<issue>` for
-  context) so `grep -rn "TODO(#"` lists every cleanup site. Evidence and
-  narrative go in the issue, the commit body or the docs, not the code.
+- Comments in Ambiq-authored files (heliaCORE kernels under
+  `kernels/helia/`, `helia/`, `cortex_m_corstone_300/`, `nsx/`, `cmake/`,
+  `tools/make/ext_libs/helia.inc`, Ambiq workflows): say what the code needs
+  and no more. A comment earns its length by stating a constraint, invariant
+  or hardware quirk the code cannot express; docstrings and API contracts
+  (parameters, units, error behavior, ownership) are exempt from trimming.
+  Anything that can go stale (why a workaround exists, what another repo
+  does today, measured numbers, which CI contexts are required, "drop this
+  when X lands") is one line in the form
+  `TODO(AmbiqAI/<repo>#<issue>): <reason>`, or a `see AmbiqAI/<repo>#<issue>`
+  reference in the file's own comment syntax, so `grep -rn 'TODO(AmbiqAI/'`
+  lists every Ambiq cleanup site. Evidence and narrative go in the issue, the
+  commit body or the docs. Bare `TODO(#nnn)` and `TODO(b/nnn)` are upstream
+  tflite-micro markers: leave them alone, and keep upstream-derived files'
+  comments as upstream wrote them. `TODO(verify)` is never committed.
 - CI is the authority on style/lint/test gates; do not restate them here.
