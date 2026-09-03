@@ -45,9 +45,10 @@ Drop-in: same `MicroInterpreter`/`Model`/`OpResolver` API as upstream.
   Anything that can go stale (why a workaround exists, what another repo
   does today, measured numbers, which CI contexts are required, "drop this
   when X lands") is one line in the form
-  `TODO(AmbiqAI/<repo>#<issue>): <reason>`, or a `see AmbiqAI/<repo>#<issue>`
-  reference in the file's own comment syntax, so `grep -rn 'TODO(AmbiqAI/'`
-  lists every Ambiq cleanup site. Evidence and narrative go in the issue, the
+  `TODO(AmbiqAI/<repo>#<issue>): <reason>`, so `grep -rn 'TODO(AmbiqAI/'`
+  lists every Ambiq cleanup site. Context that needs no cleanup is a
+  `see AmbiqAI/<repo>#<issue>` reference in the file's own comment syntax;
+  it is not a cleanup site. Evidence and narrative go in the issue, the
   commit body or the docs. Bare `TODO(#nnn)` and `TODO(b/nnn)` are upstream
   tflite-micro markers: leave them alone, and keep upstream-derived files'
   comments as upstream wrote them. `TODO(verify)` is never committed.
