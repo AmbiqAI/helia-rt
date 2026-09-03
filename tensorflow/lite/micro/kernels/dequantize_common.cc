@@ -42,11 +42,16 @@ TfLiteStatus DequantizePrepare(TfLiteContext* context, TfLiteNode* node) {
 
   TF_LITE_ENSURE(context, input->type == kTfLiteInt8 ||
                               input->type == kTfLiteInt16 ||
-                              input->type == kTfLiteUInt8);
+                              input->type == kTfLiteUInt8 ||
+                              input->type == kTfLiteFloat16);
   TF_LITE_ENSURE(context, output->type == kTfLiteFloat32);
 
-  data->quantization_params.zero_point = input->params.zero_point;
-  data->quantization_params.scale = static_cast<double>(input->params.scale);
+  // A float16 input is a storage widening, not a dequantization, so the
+  // tensor carries no scale or zero point to read.
+  if (input->type != kTfLiteFloat16) {
+    data->quantization_params.zero_point = input->params.zero_point;
+    data->quantization_params.scale = static_cast<double>(input->params.scale);
+  }
   data->output_zero_point = output->params.zero_point;
 
   micro_context->DeallocateTempTfLiteTensor(input);
