@@ -8,7 +8,9 @@ APIs are available.
 
 ## Feature contract
 
-ns-cmsis-nn v7.28.0 or later exports these definitions from its CMake target:
+ns-cmsis-nn v7.28.0 or later exports these definitions from its CMake target;
+from v7.32.0 they are also the only names it accepts as CMake inputs,
+including on the NSX path:
 
 ```text
 ARM_NN_ENABLE_F32=0|1
@@ -244,8 +246,8 @@ came from:
 
 `source:` is `ns-cmsis-nn target` when the resolved library itself answered
 (the normal case, and the ground truth: it reports what was actually
-compiled), or `NSX option` / `Zephyr Kconfig` when the target is not available
-yet.
+compiled), or `ARM_NN_ENABLE option` / `Zephyr Kconfig` when the target is
+not available yet.
 
 #### Published values
 
@@ -268,9 +270,8 @@ request, and a request the library did not ship is reported as a `WARNING`.
 
 !!! warning "ns-cmsis-nn revision"
     `ARM_NN_ENABLE_F32/F16` are the only float switches from ns-cmsis-nn
-    v7.32.0 on. The earlier `NSX_CMSIS_NN_ENABLE_F32/F16` spelling was removed
-    there, and this heliaRT release fails configure with a `FATAL_ERROR` if
-    either is set. An NSX registry that still pins an `nsx-cmsis-nn` older
+    v7.32.0 on: the earlier `NSX_CMSIS_NN_ENABLE_F32/F16` spelling was
+    removed there. An NSX registry that still pins an `nsx-cmsis-nn` older
     than v7.32.0 does not read `ARM_NN_ENABLE_*` in its NSX module, so
     override the module revision in the app's `nsx.yml` (a `module_registry`
     revision override, or `source.path` for a local working tree) before
@@ -396,22 +397,27 @@ Enabling the float feature contract changes behavior for integrations built
 against earlier heliaRT releases:
 
 - **Float switch names**: `NSX_CMSIS_NN_ENABLE_F32/F16` were removed in
-  ns-cmsis-nn v7.32.0 and in this heliaRT release; setting either now fails
-  configure with a `FATAL_ERROR` naming the replacement. Set
+  ns-cmsis-nn v7.32.0 and in this heliaRT release. Set
   `ARM_NN_ENABLE_F32/F16` instead, in the same place and with the same
-  values. The Zephyr symbols `CONFIG_NS_CMSIS_NN_ENABLE_F32/F16` are
-  unchanged.
+  values; nothing reads the old names, so a build that still sets one gets
+  the default float set rather than the one it asked for. A build directory
+  configured with the old names keeps them in `CMakeCache.txt`: clear them
+  with
+  `cmake -U NSX_CMSIS_NN_ENABLE_F32 -U NSX_CMSIS_NN_ENABLE_F16 <build-dir>`,
+  or configure a fresh build directory. The Zephyr symbols
+  `CONFIG_NS_CMSIS_NN_ENABLE_F32/F16` are unchanged.
 - **NSX apps**: the helia backend no longer requires FP32. An app that never
   set `ARM_NN_ENABLE_F32` configures and builds int8-only, and pays
   none of the float code size. Apps that want the optimized float kernels
   still need the `set(... CACHE BOOL "" FORCE)` lines shown above before
-  `nsx_bootstrap_app()`, plus an `nsx-cmsis-nn` of v7.28.0 or newer (v7.30.0
-  or newer for FP16 on GCC 14, which ICEs on the FP16 sources below that —
-  GCC PR 118460). Releases 1.19.0 and earlier failed configure with a
-  `FATAL_ERROR` in this situation.
+  `nsx_bootstrap_app()`, plus an ns-cmsis-nn of v7.32.0 or newer, the first
+  revision whose NSX module reads `ARM_NN_ENABLE_F32/F16`. That floor also
+  covers the GCC 14 FP16 ICE fixed in v7.30.0 (GCC PR 118460). Releases
+  1.19.0 and earlier failed configure with a `FATAL_ERROR` in this
+  situation.
 - **Recovering the size on an int8 app.** `ARM_NN_ENABLE_F32/F16`
-  default to `OFF` in ns-cmsis-nn's NSX module, so nothing enables them for
-  you. If you added
+  default to `OFF` in ns-cmsis-nn's NSX module from v7.32.0, so nothing
+  enables them for you. If you added
   `set(ARM_NN_ENABLE_F32 ON CACHE BOOL "" FORCE)` only to clear the
   1.19.0 `FATAL_ERROR`, and your models are int8, **delete that line** — it
   is what is costing the ~31 KB. Keep it if you run float32 models and want

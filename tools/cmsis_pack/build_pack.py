@@ -90,9 +90,9 @@ CSUB = "helia-rt"
 # consistent. Consumers who need the prebuilt heliaCORE for binary-size
 # reasons can override at integration time.
 #
-# 7.28.0 is the floor because it is the first release that turns
-# ARM_NN_ENABLE_F32/F16 into fp32/fp16 source selection and exports them as
-# public compile definitions. The helia backend's float kernels do not link
+# 7.28.0 is the floor because it is the first release that exports
+# ARM_NN_ENABLE_F32/F16 as public compile definitions, which the pack's
+# source selection mirrors. The helia backend's float kernels do not link
 # against anything older.
 NS_CMSIS_NN_VENDOR = "Ambiq"
 NS_CMSIS_NN_CCLASS = "Machine Learning"

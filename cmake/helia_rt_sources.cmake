@@ -476,18 +476,30 @@ endfunction()
 #
 # Asks the resolved ns-cmsis-nn library which float kernels it shipped, rather
 # than re-deriving it from cache variables. see AmbiqAI/ns-cmsis-nn#420
+# Without TARGET there is no library to ask, so the option/Kconfig answer
+# stands in; that is a request, not what was compiled.
 # ---------------------------------------------------------------------------
 function(helia_rt_query_float_support OUT_F32 OUT_F16)
     cmake_parse_arguments(_ARG "" "TARGET" "" ${ARGN})
+    if(_ARG_UNPARSED_ARGUMENTS)
+        message(FATAL_ERROR
+            "helia_rt_query_float_support: unexpected argument(s): "
+            "${_ARG_UNPARSED_ARGUMENTS}")
+    endif()
 
-    if(COMMAND ns_cmsis_nn_float_support)
-        set(_q_args F32 _q_f32 F16 _q_f16)
-        if(_ARG_TARGET)
-            list(APPEND _q_args TARGET "${_ARG_TARGET}")
+    if(NOT _ARG_TARGET)
+        helia_rt_float_feature_flags(_q_f32 _q_f16)
+    elseif(COMMAND ns_cmsis_nn_float_support)
+        ns_cmsis_nn_float_support(F32 _q_f32 F16 _q_f16 TARGET "${_ARG_TARGET}")
+        if("${_q_f32}" STREQUAL "" AND "${_q_f16}" STREQUAL "")
+            message(WARNING
+                "helia_rt_query_float_support: ns_cmsis_nn_float_support() "
+                "query returned nothing for ${_ARG_TARGET}; reading its "
+                "compile definitions instead")
+            helia_rt_float_flags_from_target("${_ARG_TARGET}" _q_f32 _q_f16)
         endif()
-        ns_cmsis_nn_float_support(${_q_args})
     else()
-        # TODO(AmbiqAI/ns-cmsis-nn#420): drop the fallback once the query ships in the pinned release.
+        # TODO(AmbiqAI/helia-rt#272): drop the fallback once the pin carries the query.
         helia_rt_float_flags_from_target("${_ARG_TARGET}" _q_f32 _q_f16)
     endif()
 
@@ -521,7 +533,7 @@ function(helia_rt_resolve_float_flags OUT_F32 OUT_F16 OUT_SOURCE)
         if(DEFINED CONFIG_HELIA_RT)
             set(_rf_source "Zephyr Kconfig")
         else()
-            set(_rf_source "NSX option")
+            set(_rf_source "ARM_NN_ENABLE option")
         endif()
     endif()
 

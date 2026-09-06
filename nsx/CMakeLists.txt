@@ -48,18 +48,6 @@
 
 cmake_minimum_required(VERSION 3.21)
 
-# The float switches use ns-cmsis-nn's own names now; nothing bridges the old
-# ones. see AmbiqAI/ns-cmsis-nn#420
-foreach(_nsx_helia_rt_old IN ITEMS 32 16)
-    if(DEFINED NSX_CMSIS_NN_ENABLE_F${_nsx_helia_rt_old})
-        message(FATAL_ERROR
-            "nsx-helia-rt: NSX_CMSIS_NN_ENABLE_F${_nsx_helia_rt_old} was "
-            "removed. Set ARM_NN_ENABLE_F${_nsx_helia_rt_old} instead, in the "
-            "app CMakeLists before ns-cmsis-nn is added.")
-    endif()
-endforeach()
-unset(_nsx_helia_rt_old)
-
 if(NOT DEFINED NSX_BOARD_FLAGS_TARGET)
     message(FATAL_ERROR
         "nsx-helia-rt: NSX_BOARD_FLAGS_TARGET must be defined before this module is added.")

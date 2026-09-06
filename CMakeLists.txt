@@ -105,18 +105,6 @@ set(HELIA_RT_NSCMSISNN_TARGET "" CACHE STRING
 option(HELIA_RT_ENABLE_ETHOSU
     "Enable Ethos-U operator support in heliaRT targets" OFF)
 
-# The float switches use ns-cmsis-nn's own names now; nothing bridges the old
-# ones. see AmbiqAI/ns-cmsis-nn#420
-foreach(_helia_rt_old_float IN ITEMS 32 16)
-    if(DEFINED NSX_CMSIS_NN_ENABLE_F${_helia_rt_old_float})
-        message(FATAL_ERROR
-            "helia_rt: NSX_CMSIS_NN_ENABLE_F${_helia_rt_old_float} was "
-            "removed. Set ARM_NN_ENABLE_F${_helia_rt_old_float} instead, "
-            "before ns-cmsis-nn is added.")
-    endif()
-endforeach()
-unset(_helia_rt_old_float)
-
 # ---------------------------------------------------------------------------
 # Helper: reconcile heliaRT's ARM_NN_ENABLE_F32/F16 definitions with the ones
 # actually exported by the linked ns-cmsis-nn target.
