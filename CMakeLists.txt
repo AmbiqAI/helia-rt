@@ -105,6 +105,18 @@ set(HELIA_RT_NSCMSISNN_TARGET "" CACHE STRING
 option(HELIA_RT_ENABLE_ETHOSU
     "Enable Ethos-U operator support in heliaRT targets" OFF)
 
+# The float switches use ns-cmsis-nn's own names now; nothing bridges the old
+# ones. see AmbiqAI/ns-cmsis-nn#420
+foreach(_helia_rt_old_float IN ITEMS 32 16)
+    if(DEFINED NSX_CMSIS_NN_ENABLE_F${_helia_rt_old_float})
+        message(FATAL_ERROR
+            "helia_rt: NSX_CMSIS_NN_ENABLE_F${_helia_rt_old_float} was "
+            "removed. Set ARM_NN_ENABLE_F${_helia_rt_old_float} instead, "
+            "before ns-cmsis-nn is added.")
+    endif()
+endforeach()
+unset(_helia_rt_old_float)
+
 # ---------------------------------------------------------------------------
 # Helper: reconcile heliaRT's ARM_NN_ENABLE_F32/F16 definitions with the ones
 # actually exported by the linked ns-cmsis-nn target.
@@ -120,7 +132,7 @@ option(HELIA_RT_ENABLE_ETHOSU
 # ---------------------------------------------------------------------------
 function(_helia_rt_sync_float_definitions target dep)
     # Shared resolver; see cmake/helia_rt_sources.cmake.
-    helia_rt_float_flags_from_target(${dep} _dep_F32 _dep_F16)
+    helia_rt_query_float_support(_dep_F32 _dep_F16 TARGET ${dep})
 
     foreach(_prop COMPILE_DEFINITIONS INTERFACE_COMPILE_DEFINITIONS)
         get_target_property(_cur ${target} ${_prop})
@@ -148,11 +160,11 @@ function(_helia_rt_sync_float_definitions target dep)
                 "helia_rt_helia: requested ARM_NN_ENABLE_${_feature}="
                 "${_want_${_feature}} but the linked target '${dep}' exports "
                 "${_dep_${_feature}}. Using the dependency's value. Configure "
-                "NSX_CMSIS_NN_ENABLE_${_feature} (NSX module), "
-                "ARM_NN_ENABLE_${_feature} (ns-cmsis-nn root CMakeLists), or "
+                "ARM_NN_ENABLE_${_feature} (CMake) or "
                 "CONFIG_NS_CMSIS_NN_ENABLE_${_feature} (Zephyr) *before* "
                 "ns-cmsis-nn is added — it selects its sources at that point. "
-                "Requires ns-cmsis-nn v7.28.0 or later.")
+                "ARM_NN_ENABLE_* is the only CMake spelling from "
+                "ns-cmsis-nn v7.32.0 on.")
         endif()
     endforeach()
 endfunction()

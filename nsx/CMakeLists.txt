@@ -28,7 +28,7 @@
 # Backend-specific upstream targets:
 #   helia:    nsx::cmsis_nn (or alias) — ns-cmsis-nn kernels, with Ambiq's
 #             additive weight-sum / fast-path symbols actively referenced.
-#             fp32/fp16 are opt-in: set NSX_CMSIS_NN_ENABLE_F32/F16 before
+#             fp32/fp16 are opt-in: set ARM_NN_ENABLE_F32/F16 before
 #             add_subdirectory(<ns-cmsis-nn>/nsx ...), which is where
 #             ns-cmsis-nn reads them. Publishes what it observed as
 #             HELIA_RT_FLOAT32_ENABLED / HELIA_RT_FLOAT16_ENABLED.
@@ -47,6 +47,18 @@
 # ---------------------------------------------------------------------------
 
 cmake_minimum_required(VERSION 3.21)
+
+# The float switches use ns-cmsis-nn's own names now; nothing bridges the old
+# ones. see AmbiqAI/ns-cmsis-nn#420
+foreach(_nsx_helia_rt_old IN ITEMS 32 16)
+    if(DEFINED NSX_CMSIS_NN_ENABLE_F${_nsx_helia_rt_old})
+        message(FATAL_ERROR
+            "nsx-helia-rt: NSX_CMSIS_NN_ENABLE_F${_nsx_helia_rt_old} was "
+            "removed. Set ARM_NN_ENABLE_F${_nsx_helia_rt_old} instead, in the "
+            "app CMakeLists before ns-cmsis-nn is added.")
+    endif()
+endforeach()
+unset(_nsx_helia_rt_old)
 
 if(NOT DEFINED NSX_BOARD_FLAGS_TARGET)
     message(FATAL_ERROR
@@ -250,15 +262,15 @@ if(NSX_HELIA_RT_BACKEND STREQUAL "helia")
     # else, which almost always means the option was set too late.
     if(_nsx_helia_rt_float_source STREQUAL "ns-cmsis-nn target")
         foreach(_nsx_f IN ITEMS 32 16)
-            if(DEFINED NSX_CMSIS_NN_ENABLE_F${_nsx_f})
-                if(NSX_CMSIS_NN_ENABLE_F${_nsx_f})
+            if(DEFINED ARM_NN_ENABLE_F${_nsx_f})
+                if(ARM_NN_ENABLE_F${_nsx_f})
                     set(_nsx_req ON)
                 else()
                     set(_nsx_req OFF)
                 endif()
                 if(NOT _nsx_req STREQUAL "${_nsx_helia_rt_f${_nsx_f}}")
                     message(WARNING
-                        "nsx-helia-rt: NSX_CMSIS_NN_ENABLE_F${_nsx_f}="
+                        "nsx-helia-rt: ARM_NN_ENABLE_F${_nsx_f}="
                         "${_nsx_req} was ignored -- the linked ns-cmsis-nn "
                         "target '${HELIA_RT_NSCMSISNN_TARGET}' shipped "
                         "fp${_nsx_f}=${_nsx_helia_rt_f${_nsx_f}}, and heliaRT "
@@ -283,7 +295,7 @@ if(NSX_HELIA_RT_BACKEND STREQUAL "helia")
             "is linked. FLOAT32 operators still run, on the slower reference "
             "float path; int8 models are unaffected. To get the optimized "
             "fp32 kernels, add\n"
-            "    set(NSX_CMSIS_NN_ENABLE_F32 ON CACHE BOOL \"\" FORCE)\n"
+            "    set(ARM_NN_ENABLE_F32 ON CACHE BOOL \"\" FORCE)\n"
             "to the parent CMakeLists *before* "
             "add_subdirectory(<ns-cmsis-nn>/nsx ...) -- ns-cmsis-nn selects "
             "its float sources at that point, so setting it afterwards has no "
@@ -367,7 +379,7 @@ int main(void){return 0;}
             "helia kernels are OFF. A FLOAT16 operator will fail at run time "
             "with kTfLiteError and a message naming the type -- most helia "
             "kernels have no reference float16 path. To enable fp16, add\n"
-            "    set(NSX_CMSIS_NN_ENABLE_F16 ON CACHE BOOL \"\" FORCE)\n"
+            "    set(ARM_NN_ENABLE_F16 ON CACHE BOOL \"\" FORCE)\n"
             "to the parent CMakeLists *before* "
             "add_subdirectory(<ns-cmsis-nn>/nsx ...). On GCC 14 this needs "
             "ns-cmsis-nn v7.30.0 or later, which fixed the fp16 sources that "
@@ -384,61 +396,6 @@ int main(void){return 0;}
     set(HELIA_RT_FLOAT16_ENABLED ${_nsx_helia_rt_f16} CACHE BOOL
         "Effective fp16 helia kernel availability, resolved by nsx-helia-rt from the linked ns-cmsis-nn target (output, not a knob)"
         FORCE)
-
-    # Mirror onto the ARM_NN_ENABLE_F32/F16 cache names for consumers that
-    # read those. Ours to update when the value matches the companion or the
-    # resolved truth; anything else is consumer-owned and left alone.
-    # TODO(AmbiqAI/helia-rt#254): drop once ns-cmsis-nn publishes this mirror itself
-    # (cross-repo consumer: AmbiqAI/helia-aot#349).
-    foreach(_nsx_f IN ITEMS 32 16)
-        set(_nsx_want "${_nsx_helia_rt_f${_nsx_f}}")
-        set(_nsx_ours OFF)
-        if(NOT DEFINED ARM_NN_ENABLE_F${_nsx_f})
-            set(_nsx_ours ON)
-        else()
-            if(ARM_NN_ENABLE_F${_nsx_f})
-                set(_nsx_have ON)
-            else()
-                set(_nsx_have OFF)
-            endif()
-            if(_nsx_have STREQUAL _nsx_want)
-                # Matches reality: nothing to disagree about, so adopt it
-                # and refresh the companion.
-                set(_nsx_ours ON)
-            elseif(DEFINED HELIA_RT_ARM_NN_MIRROR_F${_nsx_f})
-                if(HELIA_RT_ARM_NN_MIRROR_F${_nsx_f})
-                    set(_nsx_last ON)
-                else()
-                    set(_nsx_last OFF)
-                endif()
-                if(_nsx_have STREQUAL _nsx_last)
-                    set(_nsx_ours ON)
-                endif()
-            endif()
-        endif()
-
-        if(_nsx_ours)
-            set(ARM_NN_ENABLE_F${_nsx_f} ${_nsx_want} CACHE BOOL
-                "Mirror of the effective fp${_nsx_f} kernel availability, for consumers that read the ARM_NN_ENABLE_* names (set by nsx-helia-rt)"
-                FORCE)
-            set(HELIA_RT_ARM_NN_MIRROR_F${_nsx_f} ${_nsx_want} CACHE INTERNAL
-                "Value nsx-helia-rt last wrote to ARM_NN_ENABLE_F${_nsx_f}")
-        else()
-            message(WARNING
-                "nsx-helia-rt: ARM_NN_ENABLE_F${_nsx_f}=${_nsx_have} "
-                "disagrees with the float set this build actually has "
-                "(fp${_nsx_f}=${_nsx_want}, source: "
-                "${_nsx_helia_rt_float_source}). Leaving your value alone; "
-                "heliaRT compiles against the real one. Set "
-                "NSX_CMSIS_NN_ENABLE_F${_nsx_f}=${_nsx_have} before the "
-                "ns-cmsis-nn module is added if that is what you meant.")
-        endif()
-    endforeach()
-    unset(_nsx_f)
-    unset(_nsx_want)
-    unset(_nsx_have)
-    unset(_nsx_last)
-    unset(_nsx_ours)
 elseif(NSX_HELIA_RT_BACKEND STREQUAL "cmsis_nn")
     if(NOT HELIA_RT_CMSISNN_TARGET)
         message(FATAL_ERROR
