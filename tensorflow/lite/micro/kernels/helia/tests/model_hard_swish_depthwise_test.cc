@@ -42,7 +42,7 @@ limitations under the License.
 namespace {
 
 // Sized from the arena_used_bytes() each case logs, taking the largest of the
-// three models (3312 bytes on the host) and rounding up; the models are
+// three models (2736 bytes on the host) and rounding up; the models are
 // fixed, so the only movement is per-target alignment padding.
 constexpr size_t kTensorArenaSize = 4096;
 alignas(16) uint8_t g_tensor_arena[kTensorArenaSize];

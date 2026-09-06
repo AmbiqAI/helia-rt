@@ -39,7 +39,7 @@ MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
 
 # Model-level coverage (helia-rt#272). This one needs a second source file for
 # the embedded models and goldens, which the MICROLITE_KERNEL_SIMPLE_TEST_SRCS
-# loop below cannot express (it passes one source per target), so the target is
+# loop in tools/make/Makefile cannot express (it passes one source per target), so the target is
 # declared here instead. The kernel_ prefix keeps it with the other kernel
 # binaries in the FVP test tally.
 $(eval $(call microlite_test,kernel_model_hard_swish_depthwise_test,\
