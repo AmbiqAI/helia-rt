@@ -147,9 +147,9 @@ Notes and version boundary:
   v7.30.0 the output activation clamp discarded NaN through compare-select
   ordering, returning an activation bound instead. ns-cmsis-nn PR 380
   reclassifies NaN on the integer bit pattern, which holds at every
-  optimization level. **PR 380 first shipped in v7.31.0**, which is the version
-  heliaRT now pins, so `ADD` and `MUL` propagate NaN on the optimized path as
-  of that pin. On v7.30.0 and earlier they did not.
+  optimization level. **PR 380 first shipped in v7.31.0**, which the heliaRT
+  pin includes, so `ADD` and `MUL` propagate NaN on the optimized path. On
+  v7.30.0 and earlier they did not.
 - **The FP32 fallback softens this in practice.** Where an operator has a TFLM
   reference implementation, HELIA falls back to it when the optimized kernel
   declines the configuration, and the reference implementation propagates NaN
@@ -157,7 +157,7 @@ Notes and version boundary:
 
 ## Make builds
 
-The Make integration pins ns-cmsis-nn v7.31.0 and configures the float features
+The Make integration pins ns-cmsis-nn v7.32.0 and configures the float features
 from `TARGET_ARCH`:
 
 - FP32 is enabled for the HELIA backend.

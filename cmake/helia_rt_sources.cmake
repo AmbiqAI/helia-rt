@@ -499,7 +499,7 @@ function(helia_rt_query_float_support OUT_F32 OUT_F16)
             helia_rt_float_flags_from_target("${_ARG_TARGET}" _q_f32 _q_f16)
         endif()
     else()
-        # TODO(AmbiqAI/helia-rt#272): drop the fallback once the pin carries the query.
+        # Libraries before ns-cmsis-nn 7.32.0 have no query; read their exported definitions. see AmbiqAI/ns-cmsis-nn#420
         helia_rt_float_flags_from_target("${_ARG_TARGET}" _q_f32 _q_f16)
     endif()
 
