@@ -399,10 +399,10 @@ against earlier heliaRT releases:
 - **Float switch names**: `NSX_CMSIS_NN_ENABLE_F32/F16` were removed in
   ns-cmsis-nn v7.32.0 and in this heliaRT release. Set
   `ARM_NN_ENABLE_F32/F16` instead, in the same place and with the same
-  values; nothing reads the old names, so a build that still sets one gets
-  the default float set rather than the one it asked for. A build directory
-  configured with the old names keeps them in `CMakeCache.txt`: clear them
-  with
+  values. Below ns-cmsis-nn 7.32.0 the old names keep working as before;
+  from 7.32.0 the library rejects them at configure, so rename before you
+  bump the pin. A build directory configured with the old names keeps them
+  in `CMakeCache.txt`: clear them with
   `cmake -U NSX_CMSIS_NN_ENABLE_F32 -U NSX_CMSIS_NN_ENABLE_F16 <build-dir>`,
   or configure a fresh build directory. The Zephyr symbols
   `CONFIG_NS_CMSIS_NN_ENABLE_F32/F16` are unchanged.
@@ -418,10 +418,12 @@ against earlier heliaRT releases:
 - **Recovering the size on an int8 app.** `ARM_NN_ENABLE_F32/F16`
   default to `OFF` in ns-cmsis-nn's NSX module from v7.32.0, so nothing
   enables them for you. If you added
-  `set(ARM_NN_ENABLE_F32 ON CACHE BOOL "" FORCE)` only to clear the
-  1.19.0 `FATAL_ERROR`, and your models are int8, **delete that line** — it
-  is what is costing the ~31 KB. Keep it if you run float32 models and want
-  the optimized kernels. Nothing else in the app needs to change.
+  `set(NSX_CMSIS_NN_ENABLE_F32 ON CACHE BOOL "" FORCE)` only to clear the
+  1.19.0 configure error, replace it with
+  `set(ARM_NN_ENABLE_F32 OFF CACHE BOOL "" FORCE)` or drop it: on an int8
+  model that line is what is costing the ~31 KB. Keep the switch `ON` if you
+  run float32 models and want the optimized kernels. Nothing else in the app
+  needs to change.
 - **Zephyr**: `CONFIG_HELIA_RT_BACKEND_HELIA` now `imply`s
   `NS_CMSIS_NN_ENABLE_F32/F16`. If your west workspace pins an ns-cmsis-nn
   module older than v7.28.0, those Kconfig symbols do not exist and the

@@ -32,7 +32,8 @@
 #             add_subdirectory(<ns-cmsis-nn>/nsx ...), which is where
 #             ns-cmsis-nn reads them. Publishes what it observed as
 #             HELIA_RT_FLOAT32_ENABLED / HELIA_RT_FLOAT16_ENABLED.
-#             see AmbiqAI/helia-rt#253, AmbiqAI/helia-rt#254, docs/guides/floating-point.md
+#             see AmbiqAI/helia-rt#253, AmbiqAI/ns-cmsis-nn#420,
+#             docs/guides/floating-point.md
 #   cmsis_nn: User-supplied upstream CMSIS-NN target. ns-cmsis-nn is NOT
 #             compatible (modified API signatures). Supply the target via
 #             -DHELIA_RT_CMSISNN_TARGET=<name> (e.g. CMSIS::NN from an
@@ -235,7 +236,7 @@ if(NSX_HELIA_RT_BACKEND STREQUAL "helia")
     # --- Effective float kernel set ---
     # fp32/fp16 are opt-in. ns-cmsis-nn fixed its source list before this
     # module was added, so observe the resolved target, never assign.
-    # see AmbiqAI/helia-rt#253, AmbiqAI/helia-rt#254
+    # see AmbiqAI/helia-rt#253, AmbiqAI/ns-cmsis-nn#420
     include("${HELIA_RT_TFLM_ROOT}/cmake/helia_rt_sources.cmake")
     helia_rt_resolve_float_flags(
         _nsx_helia_rt_f32 _nsx_helia_rt_f16 _nsx_helia_rt_float_source
@@ -287,14 +288,14 @@ if(NSX_HELIA_RT_BACKEND STREQUAL "helia")
             "to the parent CMakeLists *before* "
             "add_subdirectory(<ns-cmsis-nn>/nsx ...) -- ns-cmsis-nn selects "
             "its float sources at that point, so setting it afterwards has no "
-            "effect. Requires ns-cmsis-nn v7.28.0 or later.")
+            "effect. Requires ns-cmsis-nn 7.32.0 or later on the NSX path.")
     endif()
 
     # --- MVE-F capability probe ---
     # Ask the toolchain, not CMAKE_SYSTEM_PROCESSOR. Flags come from a
     # transitive walk: boards put -mcpu on a linked SoC flags target.
     # Compile-only; a cross build may have no linkable runtime yet.
-    # see AmbiqAI/helia-rt#254
+    # see AmbiqAI/ns-cmsis-nn#420
     helia_rt_collect_interface_compile_flags(_nsx_helia_rt_mve_flags
         TARGET "${NSX_BOARD_FLAGS_TARGET}")
 
@@ -360,7 +361,7 @@ int main(void){return 0;}
     unset(_nsx_helia_rt_saved_try_type)
 
     # NOTICE for the same reason as fp32, plus this module cannot see
-    # whether the model has a FLOAT16 operator. see AmbiqAI/helia-rt#254
+    # whether the model has a FLOAT16 operator. see AmbiqAI/ns-cmsis-nn#420
     if(HELIA_RT_TARGET_HAS_MVE_FP AND NOT _nsx_helia_rt_f16)
         message(NOTICE
             "nsx-helia-rt: this target has MVE floating point but the fp16 "
@@ -369,7 +370,8 @@ int main(void){return 0;}
             "kernels have no reference float16 path. To enable fp16, add\n"
             "    set(ARM_NN_ENABLE_F16 ON CACHE BOOL \"\" FORCE)\n"
             "to the parent CMakeLists *before* "
-            "add_subdirectory(<ns-cmsis-nn>/nsx ...). On GCC 14 this needs "
+            "add_subdirectory(<ns-cmsis-nn>/nsx ...). Requires ns-cmsis-nn "
+            "7.32.0 or later on the NSX path. On GCC 14 this needs "
             "ns-cmsis-nn v7.30.0 or later, which fixed the fp16 sources that "
             "ICE the compiler (GCC PR 118460); the -fno-ssa-phiopt workaround "
             "in tools/make/ext_libs/helia.inc covers the Make path only and "

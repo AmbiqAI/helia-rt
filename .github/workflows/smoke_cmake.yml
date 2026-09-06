@@ -315,7 +315,8 @@ jobs:
           # export ARM_NN_ENABLE_F32/F16 — while its own CMakeLists is
           # processed. These options MUST therefore be set by the parent build
           # BEFORE add_subdirectory(<ns-cmsis-nn>/nsx). Setting them later
-          # (e.g. from nsx-helia-rt) is a no-op. Requires ns-cmsis-nn v7.28.0+.
+          # (e.g. from nsx-helia-rt) is a no-op. Requires ns-cmsis-nn 7.32.0+
+          # on the NSX path (see AmbiqAI/helia-rt#272).
           set(ARM_NN_ENABLE_F32 ON CACHE BOOL "" FORCE)
           set(ARM_NN_ENABLE_F16 ON CACHE BOOL "" FORCE)
 
