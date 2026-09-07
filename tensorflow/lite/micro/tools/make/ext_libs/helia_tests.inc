@@ -37,6 +37,11 @@ MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_elementwise_edge_test.cc \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_lstm_tail_lane_test.cc
 
+# heliaCORE float routing tests; each compares the kernel against the TFLM
+# reference and exercises the fallback. see AmbiqAI/helia-rt#275
+MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_hard_swish_test.cc
+
 # Two-source test; the kernels/Makefile.inc simple-test loop takes one file per
 # target. kernel_ prefix keeps it in the FVP kernel tally. see AmbiqAI/helia-rt#272
 $(eval $(call microlite_test,kernel_model_hard_swish_depthwise_test,\

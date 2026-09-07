@@ -27,6 +27,7 @@ limitations under the License.
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/op_macros.h"
 #include "tensorflow/lite/micro/kernels/hard_swish.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/micro_utils.h"
@@ -129,6 +130,12 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
 
   }
 
+  // heliaCORE is the only float16 HARD_SWISH implementation; TFLM has no
+  // float16 reference to fall back to.
+  TF_LITE_ENSURE_MSG(context,
+                     input->type != kTfLiteFloat16 || kHeliaFloat16Enabled,
+                     "Float16 HARD_SWISH requires ARM_NN_ENABLE_F16.");
+
   micro_context->DeallocateTempTfLiteTensor(input);
   micro_context->DeallocateTempTfLiteTensor(output);
 
@@ -143,7 +150,30 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
   OpData* data = static_cast<OpData*>(node->user_data);
 
   switch (input->type) {
+    case kTfLiteFloat16: {
+#if ARM_NN_ENABLE_F16
+      if (arm_hard_swish_f16(
+              tflite::micro::GetTensorData<float16_t>(input),
+              tflite::micro::GetTensorData<float16_t>(output),
+              tflite::micro::GetTensorShape(output).FlatSize()) ==
+          ARM_CMSIS_NN_SUCCESS) {
+        break;
+      }
+#endif
+      MicroPrintf(
+          "Float16 HARD_SWISH: optimized kernel rejected the configuration.");
+      return kTfLiteError;
+    }
     case kTfLiteFloat32: {
+#if ARM_NN_ENABLE_F32
+      if (arm_hard_swish_f32(
+              tflite::micro::GetTensorData<float>(input),
+              tflite::micro::GetTensorData<float>(output),
+              tflite::micro::GetTensorShape(output).FlatSize()) ==
+          ARM_CMSIS_NN_SUCCESS) {
+        break;
+      }
+#endif
       tflite::reference_ops::HardSwish<float>(
           tflite::micro::GetTensorShape(input),
           tflite::micro::GetTensorData<float>(input),
