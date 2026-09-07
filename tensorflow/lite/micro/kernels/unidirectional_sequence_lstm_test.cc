@@ -654,6 +654,22 @@ TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMFloat16) {
   const auto* cell_f16 = reinterpret_cast<const float16_t*>(
       tensors[kLstmCellStateTensor].data.raw);
   EXPECT_EQ(kTfLiteOk, runner.Invoke());
+
+  // Diagnostic for AmbiqAI/helia-rt#242; revert before merge.
+  for (int i = 0; i < 12; ++i) {
+    MicroPrintf("LSTM16 out[%d]=%.6f exp=%.6f", i,
+                static_cast<double>(static_cast<float>(out_f16[i])),
+                static_cast<double>(kExpectedSecondOutput[i]));
+  }
+  for (int i = 0; i < 4; ++i) {
+    MicroPrintf("LSTM16 hid[%d]=%.6f exp=%.6f", i,
+                static_cast<double>(static_cast<float>(hidden_f16[i])),
+                static_cast<double>(kExpectedSecondHidden[i]));
+    MicroPrintf("LSTM16 cell[%d]=%.6f exp=%.6f", i,
+                static_cast<double>(static_cast<float>(cell_f16[i])),
+                static_cast<double>(kExpectedSecondCell[i]));
+  }
+
   for (int i = 0; i < 12; ++i) {
     EXPECT_NEAR(kExpectedSecondOutput[i], static_cast<float>(out_f16[i]),
                 kSecondInvokeTolerance);
