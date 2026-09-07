@@ -371,8 +371,9 @@ TEST(HeliaFloatBroadcastTest, Float32General) {
   }
 }
 
-// Rank 5 has no NHWC spelling, so this must come back from reference_ops.
-TEST(HeliaFloatBroadcastTest, Float32Rank5FallsBackToReference) {
+// Equal shapes reach the flat kernel whatever the rank, because the flat walk
+// never spells out n/h/w/c.
+TEST(HeliaFloatBroadcastTest, Float32Rank5SameShapeUsesFlatKernel) {
   for (int i = 0; i < tflite::testing::kNumOps; ++i) {
     const tflite::testing::BinaryOp op = tflite::testing::kOps[i];
     int dims1[] = {5, 1, 1, 2, 3, 2};
@@ -390,7 +391,37 @@ TEST(HeliaFloatBroadcastTest, Float32Rank5FallsBackToReference) {
                              kTfLiteFloat32));
 
     for (int e = 0; e < tflite::testing::kWide; ++e) {
-      EXPECT_EQ(expected[e], output[e]);
+      EXPECT_NEAR(expected[e], output[e], tflite::testing::kFloat32Tolerance);
+    }
+  }
+}
+
+// A rank-5 pair that actually broadcasts has no NHWC spelling, so it must come
+// back from reference_ops. The expectation is built from the rank-4 dims that
+// describe the same buffers, since the leading unit axis does not change the
+// element order and the 4DSlow walkers stop at rank 4.
+TEST(HeliaFloatBroadcastTest, Float32Rank5FallsBackToReference) {
+  for (int i = 0; i < tflite::testing::kNumOps; ++i) {
+    const tflite::testing::BinaryOp op = tflite::testing::kOps[i];
+    int dims1[] = {5, 1, 1, 2, 3, 1};
+    int dims2[] = {5, 1, 1, 1, 1, 2};
+    int dims_out[] = {5, 1, 1, 2, 3, 2};
+    int ref_dims1[] = {4, 1, 2, 3, 1};
+    int ref_dims2[] = {4, 1, 1, 1, 2};
+    int ref_dims_out[] = {4, 1, 2, 3, 2};
+    float output[tflite::testing::kWide] = {};
+    float expected[tflite::testing::kWide] = {};
+
+    tflite::testing::ReferenceBinary(op, ref_dims1, tflite::testing::kNarrow,
+                                     ref_dims2, tflite::testing::kChannel,
+                                     ref_dims_out, expected);
+    EXPECT_EQ(kTfLiteOk, tflite::testing::RunBinary(
+                             op, dims1, tflite::testing::kNarrow, dims2,
+                             tflite::testing::kChannel, dims_out, output,
+                             kTfLiteFloat32));
+
+    for (int e = 0; e < tflite::testing::kWide; ++e) {
+      EXPECT_NEAR(expected[e], output[e], tflite::testing::kFloat32Tolerance);
     }
   }
 }
@@ -448,10 +479,11 @@ TEST(HeliaFloatBroadcastTest, Float16General) {
   }
 }
 
-// float16 has no reference fallback, so an unsupported shape pair has to fail
-// at AllocateTensors rather than mid-inference.
-TEST(HeliaFloatBroadcastTest, Float16Rank5IsRejectedAtPrepare) {
+// Rank 5 with equal shapes stays on the flat kernel, so float16 keeps working
+// where it worked at rank 4.
+TEST(HeliaFloatBroadcastTest, Float16Rank5SameShapeUsesFlatKernel) {
   for (int i = 0; i < tflite::testing::kNumOps; ++i) {
+    const tflite::testing::BinaryOp op = tflite::testing::kOps[i];
     int dims1[] = {5, 1, 1, 2, 3, 2};
     int dims2[] = {5, 1, 1, 2, 3, 2};
     int dims_out[] = {5, 1, 1, 2, 3, 2};
@@ -462,6 +494,32 @@ TEST(HeliaFloatBroadcastTest, Float16Rank5IsRejectedAtPrepare) {
                             tflite::testing::kWide);
     tflite::testing::Narrow(tflite::testing::kWideB, narrow2,
                             tflite::testing::kWide);
+
+    EXPECT_EQ(kTfLiteOk,
+              tflite::testing::RunBinary(op, dims1, narrow1, dims2, narrow2,
+                                         dims_out, output, kTfLiteFloat16));
+
+    for (int e = 0; e < tflite::testing::kWide; ++e) {
+      const float expected = tflite::testing::ApplyOp(
+          op, static_cast<float>(narrow1[e]), static_cast<float>(narrow2[e]));
+      EXPECT_NEAR(expected, static_cast<float>(output[e]),
+                  tflite::testing::kFloat16Tolerance);
+    }
+  }
+}
+
+// float16 has no reference fallback, so a shape pair the kernel cannot walk
+// has to fail at AllocateTensors rather than mid-inference.
+TEST(HeliaFloatBroadcastTest, Float16Rank5IsRejectedAtPrepare) {
+  for (int i = 0; i < tflite::testing::kNumOps; ++i) {
+    int dims1[] = {5, 1, 1, 2, 3, 1};
+    int dims2[] = {5, 1, 1, 1, 1, 2};
+    int dims_out[] = {5, 1, 1, 2, 3, 2};
+    float16_t narrow1[6] = {};
+    float16_t narrow2[2] = {};
+    float16_t output[tflite::testing::kWide] = {};
+    tflite::testing::Narrow(tflite::testing::kNarrow, narrow1, 6);
+    tflite::testing::Narrow(tflite::testing::kChannel, narrow2, 2);
 
     EXPECT_EQ(kTfLiteError,
               tflite::testing::RunBinary(tflite::testing::kOps[i], dims1,

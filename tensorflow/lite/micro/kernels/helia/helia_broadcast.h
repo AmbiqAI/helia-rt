@@ -35,12 +35,22 @@ enum class HeliaBroadcastClass : uint8_t {
 
 // The heliaCore broadcast entry points take 4-D NHWC dims and require every
 // n/h/w/c pair to be equal or 1, with the output the elementwise maximum;
-// rank above 4 has no NHWC spelling and stays on the reference path.
+// rank above 4 has no NHWC spelling and stays on the reference path unless the
+// shapes are identical, which the flat kernel handles at any rank.
 // see AmbiqAI/ns-cmsis-nn#415
 inline HeliaBroadcastClass HeliaClassifyBroadcast(
     const RuntimeShape& unextended_input1_shape,
     const RuntimeShape& unextended_input2_shape,
     const RuntimeShape& unextended_output_shape) {
+  // Identical shapes go to the flat kernel, which walks FlatSize and never
+  // spells out n/h/w/c, so the 4-D ceiling below does not apply to them. An
+  // empty tensor still falls through, matching the zero-dim rejection below.
+  if (unextended_input1_shape == unextended_input2_shape &&
+      unextended_input1_shape == unextended_output_shape &&
+      unextended_input1_shape.FlatSize() > 0) {
+    return HeliaBroadcastClass::kSameShape;
+  }
+
   if (unextended_input1_shape.DimensionsCount() > 4 ||
       unextended_input2_shape.DimensionsCount() > 4 ||
       unextended_output_shape.DimensionsCount() > 4) {

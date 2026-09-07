@@ -23,6 +23,7 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/internal/types.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/reduce.h"
 #include "tensorflow/lite/micro/micro_log.h"
@@ -464,6 +465,17 @@ TfLiteStatus PrepareMeanOrSumHelper(TfLiteContext* context, TfLiteNode* node,
   TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
   TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
   TfLiteTensor* axis = micro_context->AllocateTempInputTensor(node, 1);
+
+  // The float16 MEAN and REDUCE_SUM paths are optimized-only (TFLM has no
+  // float16 reference to fall back to) and heliaCore takes 4-D NHWC dims;
+  // reject the rest here so AllocateTensors fails rather than Invoke.
+  if (input->type == kTfLiteFloat16) {
+    TF_LITE_ENSURE_MSG(context, kHeliaFloat16Enabled,
+                       "Float16 MEAN/REDUCE_SUM requires ARM_NN_ENABLE_F16.");
+    TF_LITE_ENSURE_MSG(context, NumDimensions(input) <= kCmsisRank,
+                       "Float16 MEAN/REDUCE_SUM supports rank 4 and below.");
+  }
+
   if (input->type == kTfLiteInt8 || input->type == kTfLiteInt16) {
     const double real_multiplier = static_cast<double>(input->params.scale) /
                                    static_cast<double>(output->params.scale);

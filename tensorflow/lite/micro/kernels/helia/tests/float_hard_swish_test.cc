@@ -80,7 +80,8 @@ void RunHardSwish(const T* input, T* output, TfLiteType tensor_type) {
   int inputs_array_data[] = {1, 0};
   int outputs_array_data[] = {1, 1};
 
-  micro::KernelRunner runner(tflite::Register_HARD_SWISH(), tensors, 2,
+  const TFLMRegistration registration = tflite::Register_HARD_SWISH();
+  micro::KernelRunner runner(registration, tensors, 2,
                              IntArrayFromInts(inputs_array_data),
                              IntArrayFromInts(outputs_array_data), nullptr);
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
