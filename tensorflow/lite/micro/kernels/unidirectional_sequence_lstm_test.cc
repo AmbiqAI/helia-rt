@@ -641,8 +641,9 @@ TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMFloat16) {
   // accumulator can exceed 1, and |acc| <= 4 for the cell and output gates;
   // the forget and input gates saturate here and pass nothing through.
   // arm_nn_tanh_lut_f16 (see AmbiqAI/ns-cmsis-nn#407) documents only its
-  // geometry -- [0, 4] in 256 linearly interpolated segments -- so its error
-  // is a half-ulp of the float16 node plus max|tanh''|/8 * (1/64)^2 < 2.4e-5:
+  // geometry, [0, 4] in 256 linearly interpolated segments, so its error is
+  // the float16 node's half-ulp (2.4e-4 for |tanh| <= 1) plus an
+  // interpolation term below 2.4e-5, about 2.4e-4 per activation:
   //   (4 + 1 + 1 + 1 + 1) * 2^-11 + 2 * 2.4e-4 = 4.4e-3 per time step
   //   three time steps -> 1.4e-2
   constexpr float kFirstInvokeTolerance = 1.4e-2f;
