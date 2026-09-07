@@ -137,11 +137,10 @@ jobs:
         # every binary that ran, including the one framework-less binary
         # (hello_world_test) that reports no case count.
         #
-        # No entry for cortex-m55 + atfe: those two legs still time out on a
-        # hanging FP16 kernel test (issue #239), so there is no completed run
-        # to take a number from. They fall through with the floors unset, and
-        # test_helia.sh then enforces only the non-zero check. Add them when
-        # #239 closes.
+        # cortex-m55 + atfe: one binary and one case fewer than gcc, the same
+        # flatbuffer_utils_test filter as cortex-m4+fp. Observed on the same
+        # run 34078955826, after the scalar float16 tanh fix in ns-cmsis-nn
+        # 7.32.0 ended the hangs. see AmbiqAI/helia-rt#239
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
@@ -162,6 +161,10 @@ jobs:
             toolchain: "gcc"
             min-binaries: 139
             min-cases: 1190
+          - arch: "cortex-m55"
+            toolchain: "atfe"
+            min-binaries: 138
+            min-cases: 1189
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
