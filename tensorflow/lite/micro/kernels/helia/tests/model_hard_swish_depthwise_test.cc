@@ -41,9 +41,8 @@ limitations under the License.
 
 namespace {
 
-// Sized from the arena_used_bytes() each case logs, taking the largest of the
-// three models (2736 bytes on the host) and rounding up; the models are
-// fixed, so the only movement is per-target alignment padding.
+// Sized from the logged arena_used_bytes() of the largest model, rounded up.
+// see AmbiqAI/ns-cmsis-nn#448
 constexpr size_t kTensorArenaSize = 4096;
 alignas(16) uint8_t g_tensor_arena[kTensorArenaSize];
 

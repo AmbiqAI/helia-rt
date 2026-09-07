@@ -478,6 +478,7 @@ endfunction()
 # than re-deriving it from cache variables. see AmbiqAI/ns-cmsis-nn#420
 # Without TARGET there is no library to ask, so the option/Kconfig answer
 # stands in; that is a request, not what was compiled.
+# A TARGET that names no target yields OFF/OFF, as helia_rt_float_flags_from_target() does.
 # ---------------------------------------------------------------------------
 function(helia_rt_query_float_support OUT_F32 OUT_F16)
     cmake_parse_arguments(_ARG "" "TARGET" "" ${ARGN})
@@ -489,15 +490,11 @@ function(helia_rt_query_float_support OUT_F32 OUT_F16)
 
     if(NOT _ARG_TARGET)
         helia_rt_float_feature_flags(_q_f32 _q_f16)
+    elseif(NOT TARGET "${_ARG_TARGET}")
+        set(_q_f32 OFF)
+        set(_q_f16 OFF)
     elseif(COMMAND ns_cmsis_nn_float_support)
         ns_cmsis_nn_float_support(F32 _q_f32 F16 _q_f16 TARGET "${_ARG_TARGET}")
-        if("${_q_f32}" STREQUAL "" AND "${_q_f16}" STREQUAL "")
-            message(WARNING
-                "helia_rt_query_float_support: ns_cmsis_nn_float_support() "
-                "query returned nothing for ${_ARG_TARGET}; reading its "
-                "compile definitions instead")
-            helia_rt_float_flags_from_target("${_ARG_TARGET}" _q_f32 _q_f16)
-        endif()
     else()
         # Libraries before ns-cmsis-nn 7.32.0 have no query; read their exported definitions. see AmbiqAI/ns-cmsis-nn#420
         helia_rt_float_flags_from_target("${_ARG_TARGET}" _q_f32 _q_f16)

@@ -262,9 +262,9 @@ generated modules do not have to re-derive it:
 
 Both values come from asking the resolved ns-cmsis-nn library what it built:
 its float query where the pinned revision exports one, otherwise the compile
-definitions on its target. heliaAOT's generated module asks the same question
-([helia-aot#349](https://github.com/AmbiqAI/helia-aot/issues/349)), so the two
-Ambiq engines cannot disagree about the same build. heliaRT does not write the
+definitions on its target. heliaAOT's generated module is tracked to read the
+same query ([helia-aot#384](https://github.com/AmbiqAI/helia-aot/issues/384)),
+so the two engines resolve one answer once that lands. heliaRT does not write the
 `ARM_NN_ENABLE_F32` / `ARM_NN_ENABLE_F16` cache entries: those are your
 request, and a request the library did not ship is reported as a `WARNING`.
 
@@ -402,9 +402,12 @@ against earlier heliaRT releases:
   values. Below ns-cmsis-nn 7.32.0 the old names keep working as before;
   from 7.32.0 the library rejects them at configure, so rename before you
   bump the pin. A build directory configured with the old names keeps them
-  in `CMakeCache.txt`: clear them with
-  `cmake -U NSX_CMSIS_NN_ENABLE_F32 -U NSX_CMSIS_NN_ENABLE_F16 <build-dir>`,
-  or configure a fresh build directory. The Zephyr symbols
+  in `CMakeCache.txt`, and the pre-rename NSX module also wrote the new names
+  into the cache, where 7.32.0's `option()` keeps whatever value it finds.
+  Clear all six with
+  `cmake -U NSX_CMSIS_NN_ENABLE_F32 -U NSX_CMSIS_NN_ENABLE_F16 -U ARM_NN_ENABLE_F32 -U ARM_NN_ENABLE_F16 -U HELIA_RT_ARM_NN_MIRROR_F32 -U HELIA_RT_ARM_NN_MIRROR_F16 <build-dir>`.
+  Configuring a fresh build directory is the reliable route, since it leaves
+  no stale cache entry to override the new defaults. The Zephyr symbols
   `CONFIG_NS_CMSIS_NN_ENABLE_F32/F16` are unchanged.
 - **NSX apps**: the helia backend no longer requires FP32. An app that never
   set `ARM_NN_ENABLE_F32` configures and builds int8-only, and pays

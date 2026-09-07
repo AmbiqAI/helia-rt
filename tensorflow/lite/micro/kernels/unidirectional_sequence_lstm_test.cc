@@ -646,7 +646,12 @@ TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMFloat16) {
   // interpolation term below 2.4e-5, about 2.4e-4 per activation:
   //   (4 + 1 + 1 + 1 + 1) * 2^-11 + 2 * 2.4e-4 = 4.4e-3 per time step
   //   three time steps -> 1.4e-2
+#if NS_CMSIS_NN_VERSION >= 7032000
   constexpr float kFirstInvokeTolerance = 1.4e-2f;
+#else
+  // Pre-LUT scalar tanh (see AmbiqAI/ns-cmsis-nn#407) needs the wider bound.
+  constexpr float kFirstInvokeTolerance = 4e-2f;
+#endif
   for (int i = 0; i < 12; ++i) {
     EXPECT_NEAR(kExpectedFirstOutput[i], static_cast<float>(out_f16[i]),
                 kFirstInvokeTolerance);
