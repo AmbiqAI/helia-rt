@@ -104,23 +104,36 @@ void RunReduce(const TFLMRegistration& registration, int* input_dims_data,
 int temp_index[8];
 int resolved_axis[2];
 
+// The axis tensor holds int32_t, but the reference reducers take int, and the
+// two are distinct types on arm-none-eabi where int32_t is long.
+void NarrowAxis(const int32_t* axis, int num_axis, int* narrowed) {
+  for (int i = 0; i < num_axis; ++i) {
+    narrowed[i] = static_cast<int>(axis[i]);
+  }
+}
+
 void ReferenceMean(const float* input, const int* input_shape,
                    int input_num_dims, float* output, const int* output_shape,
                    int output_num_dims, const int32_t* axis, int num_axis,
                    bool keep_dims) {
+  int axis_int[4];
+  NarrowAxis(axis, num_axis, axis_int);
   EXPECT_TRUE(reference_ops::Mean(input, input_shape, input_num_dims, output,
-                                  output_shape, output_num_dims, axis, num_axis,
-                                  keep_dims, temp_index, resolved_axis,
-                                  output));
+                                  output_shape, output_num_dims, axis_int,
+                                  num_axis, keep_dims, temp_index,
+                                  resolved_axis, output));
 }
 
 void ReferenceSum(const float* input, const int* input_shape,
                   int input_num_dims, float* output, const int* output_shape,
                   int output_num_dims, const int32_t* axis, int num_axis,
                   bool keep_dims) {
+  int axis_int[4];
+  NarrowAxis(axis, num_axis, axis_int);
   EXPECT_TRUE(reference_ops::ReduceGeneric<float>(
       input, input_shape, input_num_dims, output, output_shape, output_num_dims,
-      axis, num_axis, keep_dims, temp_index, resolved_axis, /*init_value=*/0.f,
+      axis_int, num_axis, keep_dims, temp_index, resolved_axis,
+      /*init_value=*/0.f,
       [](const float current, const float in) -> float { return in + current; }));
 }
 

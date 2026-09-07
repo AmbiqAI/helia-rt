@@ -162,8 +162,14 @@ TfLiteStatus RunBinary(BinaryOp op, int* dims1, const T* input1, int* dims2,
   return runner.Invoke();
 }
 
+// dims is int, RuntimeShape takes int32_t, and the two are distinct types on
+// arm-none-eabi where int32_t is long.
 RuntimeShape ShapeOf(const int* dims) {
-  return RuntimeShape(dims[0], &dims[1]);
+  RuntimeShape shape(dims[0]);
+  for (int i = 0; i < dims[0]; ++i) {
+    shape.SetDim(i, dims[i + 1]);
+  }
+  return shape;
 }
 
 // The TFLM reference for the same op, over the same shapes. The 4DSlow
