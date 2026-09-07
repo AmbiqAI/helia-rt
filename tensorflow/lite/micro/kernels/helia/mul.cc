@@ -15,6 +15,8 @@ limitations under the License.
 
 #include "tensorflow/lite/kernels/internal/reference/mul.h"
 
+#include <cstddef>
+
 #include "Include/arm_nnfunctions.h"
 #include "tensorflow/lite/kernels/internal/quantization_util.h"
 #include "tensorflow/lite/kernels/internal/reference/integer_ops/mul.h"
@@ -38,6 +40,8 @@ struct HeliaOpDataMul {
   OpDataMul base;
   HeliaBroadcastClass broadcast_class;
 };
+static_assert(offsetof(HeliaOpDataMul, base) == 0,
+              "MulPrepare() writes OpDataMul at the start of user_data");
 
 void* HeliaMulInit(TfLiteContext* context, const char* /*buffer*/,
                    size_t /*length*/) {

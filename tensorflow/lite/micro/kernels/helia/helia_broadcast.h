@@ -43,11 +43,10 @@ inline HeliaBroadcastClass HeliaClassifyBroadcast(
     const RuntimeShape& unextended_input2_shape,
     const RuntimeShape& unextended_output_shape) {
   // Identical shapes go to the flat kernel, which walks FlatSize and never
-  // spells out n/h/w/c, so the 4-D ceiling below does not apply to them. An
-  // empty tensor still falls through, matching the zero-dim rejection below.
+  // spells out n/h/w/c, so the 4-D ceiling below does not apply to them; an
+  // empty tensor is a zero-length walk.
   if (unextended_input1_shape == unextended_input2_shape &&
-      unextended_input1_shape == unextended_output_shape &&
-      unextended_input1_shape.FlatSize() > 0) {
+      unextended_input1_shape == unextended_output_shape) {
     return HeliaBroadcastClass::kSameShape;
   }
 
