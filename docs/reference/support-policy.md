@@ -19,16 +19,15 @@ bug fixes and are the versions Ambiq expects to reproduce reports against.
 
 | Track | Version | Status |
 |---|---|---|
-| Current minor | `v1.19.x` | Supported |
-| Previous minor | `v1.17.x` | Supported |
-| Older minors | `v1.16.x` and earlier | Not supported |
+| Current minor | `v1.20.x` | Supported |
+| Previous minor | `v1.19.x` | Supported |
+| Older minors | `v1.17.x` and earlier | Not supported |
 
 `v1.18.0` is **withdrawn** and does not count as a supported minor: its
 heliaCORE pin is defective for the float32 and float16 kernels (NaN handling
 and the FP16 LSTM), and `v1.19.0` supersedes it. Users on `v1.18.0` should
-upgrade to `v1.19.0`. The `helia-rt-v1.18.0` tag remains in place for
-reproducibility. Because the withdrawn release is skipped, the supported
-previous minor is `v1.17.x`.
+upgrade to the current minor. The `helia-rt-v1.18.0` tag remains in place for
+reproducibility.
 
 Being supported means running the **latest patch release** of a supported minor.
 A defect that is already fixed in a later patch of your minor is addressed by
