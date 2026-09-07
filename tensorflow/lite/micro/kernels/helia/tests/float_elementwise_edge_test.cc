@@ -37,9 +37,9 @@ limitations under the License.
 // on the integer bit pattern, which survives -Ofast, so this holds on every
 // toolchain rather than only outside fast-math. see AmbiqAI/ns-cmsis-nn#380
 //
-// SUB is not covered: kernels/helia/sub.cc has no float dispatch into
-// heliaCORE (float32 SUB runs the TFLM reference and there is no float16 SUB),
-// so there is no optimized path to guard.
+// SUB is not covered here. Its float dispatch into heliaCORE arrived with
+// AmbiqAI/helia-rt#275 and shares the clamp helpers asserted above; the routing
+// itself is covered by float_elementwise_broadcast_test.cc.
 
 #include <cmath>
 

@@ -44,7 +44,7 @@ heliaRT provides three kernel backends. Every operator has a **Reference** imple
 | `LOGISTIC` (sigmoid) | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive. NaN is not a supported input on the optimized float path; see [Non-finite inputs](../guides/floating-point.md#non-finite-inputs-nan-and-infinities) |
 | `TANH` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive. NaN is not a supported input on the optimized float path; see [Non-finite inputs](../guides/floating-point.md#non-finite-inputs-nan-and-infinities) |
 | `LEAKY_RELU` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
-| `HARD_SWISH` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA adds int16 path |
+| `HARD_SWISH` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA adds int16 path, and FP32/FP16 |
 
 ## Arithmetic
 
@@ -80,7 +80,7 @@ heliaRT provides three kernel backends. Every operator has a **Reference** imple
 
 | Operator | REF | CMSIS | HELIA | Notes |
 |---|:---:|:---:|:---:|---|
-| `MEAN` / `REDUCE_MAX` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
+| `MEAN` / `REDUCE_MAX` / `SUM` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive. `MEAN` and `SUM` (REDUCE_SUM) add FP32/FP16 |
 
 ## Floating-Point Coverage
 
@@ -122,8 +122,9 @@ resolves them.
 | `PAD` / `PADV2` | :white_check_mark: | :white_check_mark: | FP16 requires 4-D tensors, enforced at prepare |
 | `TRANSPOSE` | :white_check_mark: | :white_check_mark: | Optimized for rank ≤ 4; higher ranks use Reference (float path for FP32, bitwise 16-bit path for FP16). FP16 works even without `ARM_NN_ENABLE_F16` |
 | `MAXIMUM` / `MINIMUM` | :white_check_mark: | :white_check_mark: | Optimized for rank ≤ 4; higher ranks use Reference (FP32) |
-| `ADD` | :white_check_mark: | :white_check_mark: | FP16 requires matching input shapes; broadcasting is rejected at prepare |
-| `MUL` | :white_check_mark: | :white_check_mark: | FP16 requires matching input shapes; broadcasting is rejected at prepare |
+| `ADD` / `SUB` / `MUL` | :white_check_mark: | :white_check_mark: | Identical input shapes are optimized at any rank; broadcasting is optimized for rank ≤ 4 with every dimension pair equal or 1, and a higher-rank broadcast uses Reference (FP32) or is rejected at prepare (FP16) |
+| `HARD_SWISH` | :white_check_mark: | :white_check_mark: | FP16 requires `ARM_NN_ENABLE_F16`; without it there is no reference to fall back to, so it is rejected at prepare |
+| `MEAN` / `SUM` | :white_check_mark: | :white_check_mark: | Optimized for rank ≤ 4 with any axis set; higher ranks use Reference (FP32). FP16 requires `ARM_NN_ENABLE_F16` and rank ≤ 4, both enforced at prepare |
 | `CONCATENATION` | :white_check_mark: | :white_check_mark: | Optimized for rank ≤ 4; higher ranks use the Reference path (FP32 and FP16) |
 | `RESHAPE` | :white_check_mark: | :white_check_mark: | Pure data movement; FP16 works even without `ARM_NN_ENABLE_F16` via a bitwise copy |
 | `DEQUANTIZE` | :white_check_mark: | :white_check_mark: | FP16 is an input storage type widened to an FP32 output, not FP16 arithmetic; works even without `ARM_NN_ENABLE_F16` |

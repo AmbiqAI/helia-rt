@@ -124,12 +124,17 @@ jobs:
         # floor that drifts down on its own is the failure mode this exists
         # to catch.
         #
-        # Observed on run 34067908404 (head 941a11a9, 2026-09-06); the job IDs
-        # are in the PR description. The one binary and three cases above the
-        # previous floors are kernel_model_hard_swish_depthwise_test. Both
-        # profiles of a given arch+toolchain reported identical numbers, which
-        # is why one entry covers SPEED and SIZE. `min-binaries` counts every
-        # binary that ran, including the one framework-less binary
+        # Observed on run 34078955826 (head bf334f81, 2026-09-07), which
+        # supersedes run 34067908404 (head 941a11a9, 2026-09-06); the job IDs
+        # are in the PR description. The three binaries added here --
+        # kernel_float_hard_swish_test, kernel_float_reduce_test and
+        # kernel_float_elementwise_broadcast_test -- account for the rise over
+        # that earlier run, and for the cortex-m55 gcc leg carrying more than
+        # the others: it is the only leg where ARM_NN_ENABLE_F16 compiles
+        # their float16 cases in.
+        # Both profiles of a given arch+toolchain reported identical numbers,
+        # which is why one entry covers SPEED and SIZE. `min-binaries` counts
+        # every binary that ran, including the one framework-less binary
         # (hello_world_test) that reports no case count.
         #
         # No entry for cortex-m55 + atfe: those two legs still time out on a
@@ -140,23 +145,23 @@ jobs:
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 136
-            min-cases: 1131
+            min-binaries: 139
+            min-cases: 1151
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 136
-            min-cases: 1131
+            min-binaries: 139
+            min-cases: 1151
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and one case fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 135
-            min-cases: 1130
+            min-binaries: 138
+            min-cases: 1150
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 136
-            min-cases: 1161
+            min-binaries: 139
+            min-cases: 1190
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
