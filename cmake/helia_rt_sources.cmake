@@ -379,13 +379,13 @@ endfunction()
 #   - Zephyr module builds (CONFIG_HELIA_RT defined): the final Kconfig values
 #     CONFIG_NS_CMSIS_NN_ENABLE_F32 / _F16 are authoritative; an absent
 #     (disabled) symbol means OFF.
-#   - Otherwise: NSX/CMake option NSX_CMSIS_NN_ENABLE_F32 / _F16, falling back
-#     to the historical default of fp32 on, fp16 off.
+#   - Otherwise: CMake option ARM_NN_ENABLE_F32 / _F16, falling back to the
+#     historical default of fp32 on, fp16 off.
 #
 # These mirror the options that drive ns-cmsis-nn's own source selection. The
-# authoritative value is whatever the linked ns-cmsis-nn target exports as
-# ARM_NN_ENABLE_F32/F16; the root CMakeLists reconciles against it once the
-# target is resolved (see _helia_rt_sync_float_definitions).
+# authoritative value is what the resolved ns-cmsis-nn library reports through
+# helia_rt_query_float_support(); the root CMakeLists reconciles against it
+# once the target is resolved (see _helia_rt_sync_float_definitions).
 # ---------------------------------------------------------------------------
 function(helia_rt_float_feature_flags OUT_F32 OUT_F16)
     if(DEFINED CONFIG_HELIA_RT)
@@ -411,14 +411,14 @@ function(helia_rt_float_feature_flags OUT_F32 OUT_F16)
             set(_f16 OFF)
         endif()
     else()
-        if(DEFINED NSX_CMSIS_NN_ENABLE_F32)
-            set(_f32 "${NSX_CMSIS_NN_ENABLE_F32}")
+        if(DEFINED ARM_NN_ENABLE_F32)
+            set(_f32 "${ARM_NN_ENABLE_F32}")
         else()
             set(_f32 ON)
         endif()
 
-        if(DEFINED NSX_CMSIS_NN_ENABLE_F16)
-            set(_f16 "${NSX_CMSIS_NN_ENABLE_F16}")
+        if(DEFINED ARM_NN_ENABLE_F16)
+            set(_f16 "${ARM_NN_ENABLE_F16}")
         else()
             set(_f16 OFF)
         endif()
@@ -442,7 +442,8 @@ endfunction()
 # Reads ARM_NN_ENABLE_F32/F16 off a resolved ns-cmsis-nn target's
 # INTERFACE_COMPILE_DEFINITIONS: what it compiled, not what was requested.
 # A non-existent target yields OFF/OFF; for the option fallback use
-# helia_rt_resolve_float_flags().
+# helia_rt_resolve_float_flags(). Callers go through
+# helia_rt_query_float_support(), which prefers ns-cmsis-nn's own query.
 # ---------------------------------------------------------------------------
 function(helia_rt_float_flags_from_target dep OUT_F32 OUT_F16)
     set(_dep_defs "")
@@ -471,24 +472,65 @@ function(helia_rt_float_flags_from_target dep OUT_F32 OUT_F16)
 endfunction()
 
 # ---------------------------------------------------------------------------
+# helia_rt_query_float_support(OUT_F32 OUT_F16 [TARGET <t>])
+#
+# Asks the resolved ns-cmsis-nn library which float kernels it shipped, rather
+# than re-deriving it from cache variables. see AmbiqAI/ns-cmsis-nn#420
+# Without TARGET there is no library to ask, so the option/Kconfig answer
+# stands in; that is a request, not what was compiled.
+# A TARGET that names no target yields OFF/OFF, as helia_rt_float_flags_from_target() does.
+# ---------------------------------------------------------------------------
+function(helia_rt_query_float_support OUT_F32 OUT_F16)
+    cmake_parse_arguments(_ARG "" "TARGET" "" ${ARGN})
+    if(_ARG_UNPARSED_ARGUMENTS)
+        message(FATAL_ERROR
+            "helia_rt_query_float_support: unexpected argument(s): "
+            "${_ARG_UNPARSED_ARGUMENTS}")
+    endif()
+
+    if(NOT _ARG_TARGET)
+        helia_rt_float_feature_flags(_q_f32 _q_f16)
+    elseif(NOT TARGET "${_ARG_TARGET}")
+        set(_q_f32 OFF)
+        set(_q_f16 OFF)
+    elseif(COMMAND ns_cmsis_nn_float_support)
+        ns_cmsis_nn_float_support(F32 _q_f32 F16 _q_f16 TARGET "${_ARG_TARGET}")
+    else()
+        # Libraries before ns-cmsis-nn 7.32.0 have no query; read their exported definitions. see AmbiqAI/ns-cmsis-nn#420
+        helia_rt_float_flags_from_target("${_ARG_TARGET}" _q_f32 _q_f16)
+    endif()
+
+    if(_q_f32)
+        set(${OUT_F32} ON PARENT_SCOPE)
+    else()
+        set(${OUT_F32} OFF PARENT_SCOPE)
+    endif()
+    if(_q_f16)
+        set(${OUT_F16} ON PARENT_SCOPE)
+    else()
+        set(${OUT_F16} OFF PARENT_SCOPE)
+    endif()
+endfunction()
+
+# ---------------------------------------------------------------------------
 # helia_rt_resolve_float_flags(OUT_F32 OUT_F16 OUT_SOURCE [DEP <target>])
 #
 # Shared by the nsx module, the root CMakeLists and Zephyr so they cannot
-# disagree. Order: DEP <target> when it exists, else
-# helia_rt_float_feature_flags(). OUT_SOURCE reports which one answered.
+# disagree. Order: the ns-cmsis-nn float query on DEP <target> when it exists,
+# else helia_rt_float_feature_flags(). OUT_SOURCE reports which one answered.
 # ---------------------------------------------------------------------------
 function(helia_rt_resolve_float_flags OUT_F32 OUT_F16 OUT_SOURCE)
     cmake_parse_arguments(_ARG "" "DEP" "" ${ARGN})
 
     if(_ARG_DEP AND TARGET "${_ARG_DEP}")
-        helia_rt_float_flags_from_target("${_ARG_DEP}" _rf_f32 _rf_f16)
+        helia_rt_query_float_support(_rf_f32 _rf_f16 TARGET "${_ARG_DEP}")
         set(_rf_source "ns-cmsis-nn target")
     else()
         helia_rt_float_feature_flags(_rf_f32 _rf_f16)
         if(DEFINED CONFIG_HELIA_RT)
             set(_rf_source "Zephyr Kconfig")
         else()
-            set(_rf_source "NSX option")
+            set(_rf_source "ARM_NN_ENABLE option")
         endif()
     endif()
 

@@ -31,7 +31,7 @@ permissions:
 env:
   # Pin CI to the tested ns-cmsis-nn release, shared by every job that
   # clones it so the cross-compile legs cannot drift apart.
-  NS_CMSIS_NN_REF: v7.31.0
+  NS_CMSIS_NN_REF: v7.32.0
 
 jobs:
   manifest:
@@ -143,7 +143,7 @@ jobs:
                     | grep -Ev '^tensorflow/lite/micro/(helia_rt_version|heliart_version)\.h$' \
                     | grep -Ev '^tensorflow/lite/micro/tools/ci_build/(package_helia_bundle|release_asset_helpers)\.sh$' \
                     | grep -Ev '^tensorflow/lite/micro/tools/ci_build/(build|test)_helia\.sh$' \
-                    | grep -Ev '^tensorflow/lite/micro/tools/make/ext_libs/(helia\.inc|ns_cmsis_nn_download\.sh)$' \
+                    | grep -Ev '^tensorflow/lite/micro/tools/make/ext_libs/(helia\.inc|helia_tests\.inc|ns_cmsis_nn_download\.sh)$' \
                     | grep -Ev '^tensorflow/lite/micro/tools/make/ext_libs/(cmsis|cmsis_nn|xtensa)_download\.sh$' \
                     | grep -Ev '^tensorflow/lite/micro/kernels/helia/' \
                     | grep -Ev '^tensorflow/lite/micro/kernels/(activations|add|batch_matmul|concatenation|conv|depthwise_conv|fully_connected|logistic|maximum_minimum|mul|pad|pooling|reshape|softmax|svdf|tanh|transpose|transpose_conv|unidirectional_sequence_lstm)_test\.cc$' \
@@ -315,9 +315,10 @@ jobs:
           # export ARM_NN_ENABLE_F32/F16 — while its own CMakeLists is
           # processed. These options MUST therefore be set by the parent build
           # BEFORE add_subdirectory(<ns-cmsis-nn>/nsx). Setting them later
-          # (e.g. from nsx-helia-rt) is a no-op. Requires ns-cmsis-nn v7.28.0+.
-          set(NSX_CMSIS_NN_ENABLE_F32 ON CACHE BOOL "" FORCE)
-          set(NSX_CMSIS_NN_ENABLE_F16 ON CACHE BOOL "" FORCE)
+          # (e.g. from nsx-helia-rt) is a no-op. Requires ns-cmsis-nn 7.32.0+
+          # on the NSX path (see AmbiqAI/helia-rt#272).
+          set(ARM_NN_ENABLE_F32 ON CACHE BOOL "" FORCE)
+          set(ARM_NN_ENABLE_F16 ON CACHE BOOL "" FORCE)
 
           add_subdirectory(${NS_CMSIS_NN_DIR}/nsx ns_cmsis_nn EXCLUDE_FROM_ALL)
           add_subdirectory(${HELIA_RT_DIR}/nsx   nsx_helia_rt   EXCLUDE_FROM_ALL)
@@ -783,8 +784,8 @@ jobs:
           add_library(nsx_soc_hal INTERFACE)
 
           # An int8-only consumer that never turns the float kernels on.
-          set(NSX_CMSIS_NN_ENABLE_F32 OFF CACHE BOOL "" FORCE)
-          set(NSX_CMSIS_NN_ENABLE_F16 OFF CACHE BOOL "" FORCE)
+          set(ARM_NN_ENABLE_F32 OFF CACHE BOOL "" FORCE)
+          set(ARM_NN_ENABLE_F16 OFF CACHE BOOL "" FORCE)
 
           add_subdirectory(${NS_CMSIS_NN_DIR}/nsx ns_cmsis_nn EXCLUDE_FROM_ALL)
           add_subdirectory(${HELIA_RT_DIR}/nsx   nsx_helia_rt   EXCLUDE_FROM_ALL)
