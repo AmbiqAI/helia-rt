@@ -41,7 +41,8 @@ MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
 # reference and exercises the fallback. see AmbiqAI/helia-rt#275
 MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_hard_swish_test.cc \
-  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_reduce_test.cc
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_reduce_test.cc \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_elementwise_broadcast_test.cc
 
 # Two-source test; the kernels/Makefile.inc simple-test loop takes one file per
 # target. kernel_ prefix keeps it in the FVP kernel tally. see AmbiqAI/helia-rt#272

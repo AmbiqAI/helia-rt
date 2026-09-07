@@ -21,6 +21,7 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/reference/process_broadcast_shapes.h"
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_broadcast.h"
 #include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/mul.h"
@@ -29,6 +30,19 @@ limitations under the License.
 
 namespace tflite {
 namespace {
+
+// MUL shares OpDataMul with the reference backend, so the broadcast class the
+// helia Eval needs rides in a wrapper whose first member stays layout
+// compatible with what MulPrepare() writes through node->user_data.
+struct HeliaOpDataMul {
+  OpDataMul base;
+  HeliaBroadcastClass broadcast_class;
+};
+
+void* HeliaMulInit(TfLiteContext* context, const char* buffer, size_t length) {
+  TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
+  return context->AllocatePersistentBuffer(context, sizeof(HeliaOpDataMul));
+}
 
 void ArmPopulateCommonParams(const RuntimeShape& unextended_input1_shape,
                              const RuntimeShape& unextended_input2_shape,
@@ -157,7 +171,9 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
   auto* params = reinterpret_cast<TfLiteMulParams*>(node->builtin_data);
 
   TFLITE_DCHECK(node->user_data != nullptr);
-  const OpDataMul* data = static_cast<const OpDataMul*>(node->user_data);
+  const HeliaOpDataMul* helia_data =
+      static_cast<const HeliaOpDataMul*>(node->user_data);
+  const OpDataMul* data = &helia_data->base;
 
   const TfLiteEvalTensor* input1 =
       tflite::micro::GetEvalInput(context, node, kMulInput1Tensor);
@@ -176,25 +192,46 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
     case kTfLiteInt32:
       EvalMulQuantizedReference(context, node, data, input1, input2, output);
       break;
-    case kTfLiteFloat16:
+    case kTfLiteFloat16: {
 #if ARM_NN_ENABLE_F16
-      if (tflite::micro::HaveSameShapes(input1, input2) &&
-          arm_elementwise_mul_f16(
-              tflite::micro::GetTensorData<float16_t>(input1),
-              tflite::micro::GetTensorData<float16_t>(input2),
-              tflite::micro::GetTensorData<float16_t>(output),
-              HeliaFloat16ActivationBound(data->output_activation_min_f32),
-              HeliaFloat16ActivationBound(data->output_activation_max_f32),
-              tflite::micro::GetTensorShape(output).FlatSize()) ==
-          ARM_CMSIS_NN_SUCCESS) {
-        break;
+      const float16_t activation_min_f16 =
+          HeliaFloat16ActivationBound(data->output_activation_min_f32);
+      const float16_t activation_max_f16 =
+          HeliaFloat16ActivationBound(data->output_activation_max_f32);
+      if (helia_data->broadcast_class == HeliaBroadcastClass::kSameShape) {
+        if (arm_elementwise_mul_f16(
+                tflite::micro::GetTensorData<float16_t>(input1),
+                tflite::micro::GetTensorData<float16_t>(input2),
+                tflite::micro::GetTensorData<float16_t>(output),
+                activation_min_f16, activation_max_f16,
+                tflite::micro::GetTensorShape(output).FlatSize()) ==
+            ARM_CMSIS_NN_SUCCESS) {
+          break;
+        }
+      } else if (HeliaBroadcastNeedsWalk(helia_data->broadcast_class)) {
+        cmsis_nn_dims input1_dims;
+        cmsis_nn_dims input2_dims;
+        cmsis_nn_dims output_dims;
+        ArmPopulateCommonParams(tflite::micro::GetTensorShape(input1),
+                                tflite::micro::GetTensorShape(input2),
+                                tflite::micro::GetTensorShape(output),
+                                &input1_dims, &input2_dims, &output_dims);
+        if (arm_elementwise_mul_broadcast_f16(
+                tflite::micro::GetTensorData<float16_t>(input1), &input1_dims,
+                tflite::micro::GetTensorData<float16_t>(input2), &input2_dims,
+                tflite::micro::GetTensorData<float16_t>(output), &output_dims,
+                activation_min_f16, activation_max_f16) ==
+            ARM_CMSIS_NN_SUCCESS) {
+          break;
+        }
       }
 #endif
       MicroPrintf("Float16 MUL: optimized kernel rejected the configuration.");
       return kTfLiteError;
-    case kTfLiteFloat32:
+    }
+    case kTfLiteFloat32: {
 #if ARM_NN_ENABLE_F32
-      if (tflite::micro::HaveSameShapes(input1, input2)) {
+      if (helia_data->broadcast_class == HeliaBroadcastClass::kSameShape) {
         const int size = tflite::micro::GetTensorShape(output).FlatSize();
         if (arm_elementwise_mul_f32(
                 tflite::micro::GetTensorData<float>(input1),
@@ -205,11 +242,27 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
             ARM_CMSIS_NN_SUCCESS) {
           break;
         }
+      } else if (HeliaBroadcastNeedsWalk(helia_data->broadcast_class)) {
+        cmsis_nn_dims input1_dims;
+        cmsis_nn_dims input2_dims;
+        cmsis_nn_dims output_dims;
+        ArmPopulateCommonParams(tflite::micro::GetTensorShape(input1),
+                                tflite::micro::GetTensorShape(input2),
+                                tflite::micro::GetTensorShape(output),
+                                &input1_dims, &input2_dims, &output_dims);
+        if (arm_elementwise_mul_broadcast_f32(
+                tflite::micro::GetTensorData<float>(input1), &input1_dims,
+                tflite::micro::GetTensorData<float>(input2), &input2_dims,
+                tflite::micro::GetTensorData<float>(output), &output_dims,
+                data->output_activation_min_f32,
+                data->output_activation_max_f32) == ARM_CMSIS_NN_SUCCESS) {
+          break;
+        }
       }
 #endif
       EvalMulFloatReference(context, node, params, data, input1, input2,
                             output);
-      break;
+    } break;
     default:
       MicroPrintf("Type %s (%d) not supported.",
                   TfLiteTypeGetName(input1->type), input1->type);
@@ -255,10 +308,10 @@ TfLiteStatus EvalInt16(TfLiteContext* context, TfLiteNode* node) {
   return kTfLiteOk;
 }
 
-// Wraps the shared MulPrepare with the float16 constraints of the helia
-// backend: the optimized kernel is the only float16 implementation (no
-// reference fallback) and does not broadcast, so surface both limitations at
-// Prepare time instead of failing mid-inference.
+// Wraps the shared MulPrepare to classify the shape pair against the heliaCORE
+// broadcast walk and to surface the float16 limitations at Prepare time: the
+// optimized kernel is the only float16 implementation, so a shape pair the walk
+// cannot express has nowhere to fall back to.
 TfLiteStatus PrepareMul(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_OK(context, MulPrepare(context, node));
 
@@ -269,22 +322,34 @@ TfLiteStatus PrepareMul(TfLiteContext* context, TfLiteNode* node) {
   TfLiteTensor* input2 =
       micro_context->AllocateTempInputTensor(node, kMulInput2Tensor);
   TF_LITE_ENSURE(context, input2 != nullptr);
+  TfLiteTensor* output =
+      micro_context->AllocateTempOutputTensor(node, kMulOutputTensor);
+  TF_LITE_ENSURE(context, output != nullptr);
+
+  TFLITE_DCHECK(node->user_data != nullptr);
+  HeliaOpDataMul* helia_data =
+      static_cast<HeliaOpDataMul*>(node->user_data);
+  helia_data->broadcast_class = HeliaClassifyBroadcast(
+      tflite::GetTensorShape(input1), tflite::GetTensorShape(input2),
+      tflite::GetTensorShape(output));
 
   if (input1->type == kTfLiteFloat16) {
     TF_LITE_ENSURE_MSG(context, kHeliaFloat16Enabled,
                        "Float16 MUL requires ARM_NN_ENABLE_F16.");
     TF_LITE_ENSURE_MSG(
-        context, HaveSameShapes(input1, input2),
-        "Float16 MUL does not support broadcasting between input shapes.");
+        context,
+        helia_data->broadcast_class != HeliaBroadcastClass::kUnsupported,
+        "Float16 MUL does not support these input shapes.");
   }
 
   micro_context->DeallocateTempTfLiteTensor(input1);
   micro_context->DeallocateTempTfLiteTensor(input2);
+  micro_context->DeallocateTempTfLiteTensor(output);
   return kTfLiteOk;
 }
 
 TFLMRegistration Register_MUL() {
-  return tflite::micro::RegisterOp(MulInit, PrepareMul, Eval);
+  return tflite::micro::RegisterOp(HeliaMulInit, PrepareMul, Eval);
 }
 
 TFLMRegistration Register_MUL_INT8() {
