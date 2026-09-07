@@ -262,9 +262,10 @@ generated modules do not have to re-derive it:
 
 Both values come from asking the resolved ns-cmsis-nn library what it built:
 its float query where the pinned revision exports one, otherwise the compile
-definitions on its target. heliaAOT's generated module is tracked to read the
-same query ([helia-aot#384](https://github.com/AmbiqAI/helia-aot/issues/384)),
-so the two engines resolve one answer once that lands. heliaRT does not write the
+definitions on its target. heliaAOT's generated module reads the same query
+([helia-aot#386](https://github.com/AmbiqAI/helia-aot/pull/386)), landed on its
+`main` and shipping in the next heliaAOT release, so the two engines resolve one
+answer. heliaRT does not write the
 `ARM_NN_ENABLE_F32` / `ARM_NN_ENABLE_F16` cache entries: those are your
 request, and a request the library did not ship is reported as a `WARNING`.
 

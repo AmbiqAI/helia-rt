@@ -646,10 +646,11 @@ TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMFloat16) {
   // interpolation term below 2.4e-5, about 2.4e-4 per activation:
   //   (4 + 1 + 1 + 1 + 1) * 2^-11 + 2 * 2.4e-4 = 4.4e-3 per time step
   //   three time steps -> 1.4e-2
-#if NS_CMSIS_NN_VERSION >= 7032000
+#if defined(NS_CMSIS_NN_VERSION) && NS_CMSIS_NN_VERSION >= 7032000
   constexpr float kFirstInvokeTolerance = 1.4e-2f;
 #else
-  // Pre-LUT scalar tanh (see AmbiqAI/ns-cmsis-nn#407) needs the wider bound.
+  // Every current f16 build is MVE and already on the LUT tanh; the wider
+  // bound covers a future non-MVE f16 target on a pin before AmbiqAI/ns-cmsis-nn#407.
   constexpr float kFirstInvokeTolerance = 4e-2f;
 #endif
   for (int i = 0; i < 12; ++i) {
@@ -658,7 +659,7 @@ TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMFloat16) {
   }
 
 // Derived goldens hold from the LUT scalar tanh onward. see AmbiqAI/ns-cmsis-nn#407
-#if NS_CMSIS_NN_VERSION >= 7032000
+#if defined(NS_CMSIS_NN_VERSION) && NS_CMSIS_NN_VERSION >= 7032000
   // Derived by evaluating the LSTM recurrence in double precision across both
   // invokes and rounding to float16; see the generator named above.
   constexpr float kExpectedSecondOutput[] = {
