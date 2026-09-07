@@ -35,34 +35,26 @@ const int kMaxNumberOfReducedAxis = 2;
 constexpr int kCmsisRank = 4;
 
 /**
- * Populate the CMSIS NN parameters from the TFLite tensors and axis information.
- * This function extracts the input and output dimensions, builds the axis
- * mask, and computes the output multiplier and shift based on the number of
- * elements in the reduced axis for mean.
+ * Populate the CMSIS NN 4D shapes and axis mask from the TFLite input tensor
+ * and axis information. The input shape is padded at the end, so a TFLite axis
+ * index selects the same cmsis_nn_dims member; the output shape is derived
+ * from the mask rather than read from the output tensor.
  *
  * @param input_t The input tensor to the reduce operation.
- * @param output_t The output tensor from the reduce operation.
  * @param axis_data Pointer to the axis data array.
  * @param axis_count The number of axes to reduce.
  * @param in_dims Pointer to the cmsis_nn_dims structure for input dimensions.
  * @param axis_dims Pointer to the cmsis_nn_dims structure for axis dimensions.
  * @param out_dims Pointer to the cmsis_nn_dims structure for output dimensions.
- * @param output_mult Pointer to the output multiplier.
- * @param output_shift Pointer to the output shift value.
- * @param compute_sum Boolean indicating whether to compute the sum (true) or mean (false).
+ *
+ * @return The number of input elements per output element.
  */
-static void PopulateCmsisParams(const TfLiteEvalTensor* input_t,
-                                const TfLiteEvalTensor* output_t,
-                                const int32_t* axis_data,
-                                int axis_count,
-                                cmsis_nn_dims* in_dims,
-                                cmsis_nn_dims* axis_dims,
-                                cmsis_nn_dims* out_dims,
-                                int32_t *output_mult,
-                                int32_t *output_shift,
-                                bool compute_sum) {
-
-  (void)output_t;  // Unused in this function, but may be used later.
+static int64_t PopulateCmsisShapeAndAxis(const TfLiteEvalTensor* input_t,
+                                         const int32_t* axis_data,
+                                         int axis_count,
+                                         cmsis_nn_dims* in_dims,
+                                         cmsis_nn_dims* axis_dims,
+                                         cmsis_nn_dims* out_dims) {
 
   // --- 1) Pad input shape at end ---
   int32_t in_shape[kCmsisRank] = {1, 1, 1, 1};
@@ -118,6 +110,34 @@ static void PopulateCmsisParams(const TfLiteEvalTensor* input_t,
   out_dims->h = axis_dims->h ? 1 : in_dims->h;
   out_dims->w = axis_dims->w ? 1 : in_dims->w;
   out_dims->c = axis_dims->c ? 1 : in_dims->c;
+
+  return num_elements_in_axis;
+}
+
+/**
+ * As PopulateCmsisShapeAndAxis, and additionally folds 1/count into the output
+ * multiplier and shift for the quantized MEAN path.
+ *
+ * @param output_t The output tensor from the reduce operation.
+ * @param output_mult Pointer to the output multiplier.
+ * @param output_shift Pointer to the output shift value.
+ * @param compute_sum Boolean indicating whether to compute the sum (true) or mean (false).
+ */
+static void PopulateCmsisParams(const TfLiteEvalTensor* input_t,
+                                const TfLiteEvalTensor* output_t,
+                                const int32_t* axis_data,
+                                int axis_count,
+                                cmsis_nn_dims* in_dims,
+                                cmsis_nn_dims* axis_dims,
+                                cmsis_nn_dims* out_dims,
+                                int32_t *output_mult,
+                                int32_t *output_shift,
+                                bool compute_sum) {
+
+  (void)output_t;  // Unused in this function, but may be used later.
+
+  const int64_t num_elements_in_axis = PopulateCmsisShapeAndAxis(
+      input_t, axis_data, axis_count, in_dims, axis_dims, out_dims);
 
   // Fold 1/count into output multiplier & shift (only for MEAN)
   if (!compute_sum) {
@@ -179,6 +199,28 @@ void ResolveAxis(const int* axis_data, int axis_count,
     op_params->axis[i] = 1;
   }
   op_params->axis_count = axis_count;
+}
+
+// heliaCORE's float reductions take a 4-D NHWC shape and a 4-D axis mask, so
+// they cover any axis-mask combination and either keep_dims setting at rank up
+// to 4; a higher rank, or an axis outside the input rank, has no such spelling.
+// see AmbiqAI/ns-cmsis-nn#428
+bool HeliaFloatReduceSupported(const TfLiteEvalTensor* input,
+                               const int32_t* axis_data, int axis_count) {
+  const int input_rank = input->dims->size;
+  if (input_rank > kCmsisRank) {
+    return false;
+  }
+  for (int i = 0; i < axis_count; ++i) {
+    int axis = axis_data[i];
+    if (axis < 0) {
+      axis += input_rank;
+    }
+    if (axis < 0 || axis >= input_rank) {
+      return false;
+    }
+  }
+  return true;
 }
 
 template <typename T>
@@ -463,7 +505,40 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
   int resolved_axis[kMaxNumberOfReducedAxis];
 
   switch (input->type) {
+    case kTfLiteFloat16: {
+#if ARM_NN_ENABLE_F16
+      if (HeliaFloatReduceSupported(
+              input, tflite::micro::GetTensorData<int32_t>(axis), num_axis)) {
+        cmsis_nn_dims in_d, ax_d, out_d;
+        PopulateCmsisShapeAndAxis(input,
+                                  tflite::micro::GetTensorData<int32_t>(axis),
+                                  num_axis, &in_d, &ax_d, &out_d);
+        if (arm_nn_mean_f16(tflite::micro::GetTensorData<float16_t>(input),
+                            &in_d, &ax_d,
+                            tflite::micro::GetTensorData<float16_t>(output),
+                            &out_d) == ARM_CMSIS_NN_SUCCESS) {
+          break;
+        }
+      }
+#endif
+      MicroPrintf("Float16 MEAN: optimized kernel rejected the configuration.");
+      return kTfLiteError;
+    }
     case kTfLiteFloat32: {
+#if ARM_NN_ENABLE_F32
+      if (HeliaFloatReduceSupported(
+              input, tflite::micro::GetTensorData<int32_t>(axis), num_axis)) {
+        cmsis_nn_dims in_d, ax_d, out_d;
+        PopulateCmsisShapeAndAxis(input,
+                                  tflite::micro::GetTensorData<int32_t>(axis),
+                                  num_axis, &in_d, &ax_d, &out_d);
+        if (arm_nn_mean_f32(tflite::micro::GetTensorData<float>(input), &in_d,
+                            &ax_d, tflite::micro::GetTensorData<float>(output),
+                            &out_d) == ARM_CMSIS_NN_SUCCESS) {
+          break;
+        }
+      }
+#endif
       tflite::MeanParams op_params;
       ResolveAxis(tflite::micro::GetTensorData<int>(axis), num_axis,
                   &op_params);
@@ -559,8 +634,8 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
     } break;
     default:
       TF_LITE_ENSURE_MSG(context, false,
-                         "Currently, only float32, int8 or int16 input type "
-                         "is supported.");
+                         "Currently, only float16, float32, int8 or int16 "
+                         "input type is supported.");
   }
   return kTfLiteOk;
 }
@@ -590,7 +665,41 @@ TfLiteStatus EvalSumHelper(TfLiteContext* context, TfLiteNode* node,
   int resolved_axis[kMaxNumberOfReducedAxis];
 
   switch (input->type) {
+    case kTfLiteFloat16: {
+#if ARM_NN_ENABLE_F16
+      if (HeliaFloatReduceSupported(
+              input, tflite::micro::GetTensorData<int32_t>(axis), num_axis)) {
+        cmsis_nn_dims in_d, ax_d, out_d;
+        PopulateCmsisShapeAndAxis(input,
+                                  tflite::micro::GetTensorData<int32_t>(axis),
+                                  num_axis, &in_d, &ax_d, &out_d);
+        if (arm_reduce_sum_f16(tflite::micro::GetTensorData<float16_t>(input),
+                               &in_d, &ax_d,
+                               tflite::micro::GetTensorData<float16_t>(output),
+                               &out_d) == ARM_CMSIS_NN_SUCCESS) {
+          break;
+        }
+      }
+#endif
+      MicroPrintf("Float16 SUM: optimized kernel rejected the configuration.");
+      return kTfLiteError;
+    }
     case kTfLiteFloat32: {
+#if ARM_NN_ENABLE_F32
+      if (HeliaFloatReduceSupported(
+              input, tflite::micro::GetTensorData<int32_t>(axis), num_axis)) {
+        cmsis_nn_dims in_d, ax_d, out_d;
+        PopulateCmsisShapeAndAxis(input,
+                                  tflite::micro::GetTensorData<int32_t>(axis),
+                                  num_axis, &in_d, &ax_d, &out_d);
+        if (arm_reduce_sum_f32(tflite::micro::GetTensorData<float>(input),
+                               &in_d, &ax_d,
+                               tflite::micro::GetTensorData<float>(output),
+                               &out_d) == ARM_CMSIS_NN_SUCCESS) {
+          break;
+        }
+      }
+#endif
       TF_LITE_ENSURE(
           context,
           reference_ops::ReduceGeneric<float>(
@@ -674,7 +783,8 @@ TfLiteStatus EvalSumHelper(TfLiteContext* context, TfLiteNode* node,
                                   temp_sum, op_data, /*compute_sum=*/true);
     } break;
     default:
-      MicroPrintf("Only float32, int8, and int16 types are supported.");
+      MicroPrintf(
+          "Only float16, float32, int8, and int16 types are supported.");
       return kTfLiteError;
   }
   return kTfLiteOk;
