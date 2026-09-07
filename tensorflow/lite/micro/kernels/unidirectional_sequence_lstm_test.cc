@@ -628,26 +628,43 @@ TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMFloat16) {
   const int output_tensor_index = source.KernelOutputs()->data[0];
   const auto* out_f16 =
       reinterpret_cast<float16_t*>(tensors[output_tensor_index].data.raw);
-  // The fp16 pipeline deviates from the float32 goldens by up to ~2.7e-2 on
-  // this data; 4e-2 leaves headroom for toolchain-dependent fp16 fma /
-  // reduction ordering without loosening the check materially.
+  // Derived by evaluating the LSTM recurrence in double precision and rounding
+  // to float16; see kernels/helia/tests/gen_lstm_f16_goldens.py.
+  constexpr float kExpectedFirstOutput[] = {
+      0.26464844f, 0.26879883f, 0.47924805f, 0.47949219f,
+      0.58007812f, 0.58007812f, -0.00141144f, -0.00001431f,
+      0.46875000f, 0.46899414f, 0.50048828f, 0.50048828f};
+  // Bounds below come from float16 arithmetic, not from measured drift. Per
+  // time step the chain from the incoming state to the hidden output rounds
+  // five times (gate accumulator, gate activation, cell store, tanh(cell),
+  // hidden store) and evaluates two float16 table activations. Only the
+  // accumulator can exceed 1, and |acc| <= 4 for the cell and output gates;
+  // the forget and input gates saturate here and pass nothing through.
+  // arm_nn_tanh_lut_f16 (ns-cmsis-nn v7.32.0) documents only its geometry --
+  // [0, 4] in 256 linearly interpolated segments -- so its error is a half-ulp
+  // of the float16 node plus max|tanh''|/8 * (1/64)^2 < 2.4e-5:
+  //   (4 + 1 + 1 + 1 + 1) * 2^-11 + 2 * 2.4e-4 = 4.4e-3 per time step
+  //   three time steps -> 1.4e-2
+  constexpr float kFirstInvokeTolerance = 1.4e-2f;
   for (int i = 0; i < 12; ++i) {
-    EXPECT_NEAR(kernel_eval_data.expected_output[i], static_cast<float>(out_f16[i]),
-                4e-2f);
+    EXPECT_NEAR(kExpectedFirstOutput[i], static_cast<float>(out_f16[i]),
+                kFirstInvokeTolerance);
   }
 
 #if NS_CMSIS_NN_VERSION >= 7029000
+  // Derived by evaluating the LSTM recurrence in double precision across both
+  // invokes and rounding to float16; see the generator named above.
   constexpr float kExpectedSecondOutput[] = {
-      0.64306641f, 0.64306641f, 0.65332031f, 0.65332031f,
-      0.65625000f, 0.65625000f, 0.36450195f, 0.36450195f,
-      0.64550781f, 0.64550781f, 0.60107422f, 0.60107422f};
+      0.61376953f, 0.61376953f, 0.62402344f, 0.62402344f,
+      0.62646484f, 0.62646484f, 0.33593750f, 0.33544922f,
+      0.61572266f, 0.61572266f, 0.56884766f, 0.56884766f};
   constexpr float kExpectedSecondHidden[] = {
-      0.65625000f, 0.65625000f, 0.60107422f, 0.60107422f};
+      0.62646484f, 0.62646484f, 0.56884766f, 0.56884766f};
   constexpr float kExpectedSecondCell[] = {
-      0.97021484f, 0.97021484f, 0.92089844f, 0.92089844f};
-  // TODO(AmbiqAI/helia-rt#242): interim 2.5e-2 bound, captured not derived;
-  // do not loosen further. see AmbiqAI/ns-cmsis-nn#324.
-  constexpr float kSecondInvokeTolerance = 2.5e-2f;
+      0.94091797f, 0.94091797f, 0.88574219f, 0.88574219f};
+  // The second invoke starts from the first invoke's state, so six time steps
+  // of the per-step budget above accumulate: 6 * 4.4e-3 = 2.7e-2.
+  constexpr float kSecondInvokeTolerance = 2.7e-2f;
 
   const auto* hidden_f16 = reinterpret_cast<const float16_t*>(
       tensors[kLstmOutputStateTensor].data.raw);
