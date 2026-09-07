@@ -19,12 +19,13 @@ limitations under the License.
 // helia_broadcast.h maps a TFLite shape pair onto one of the legs of the
 // heliaCORE NHWC broadcast walk, and each leg gets a case here:
 //   kSameShape     both operands identical      -> flat elementwise kernel
-//   kScalarInput1  operand 1 is one element     -> scalar kernel, operands as given
-//   kScalarInput2  operand 2 is one element     -> scalar kernel, operands swapped
+//   kScalarInput1  operand 1 is one element     -> scalar kernel
+//   kScalarInput2  operand 2 is one element     -> scalar kernel
 //   kGeneral       any other 4-D compatible pair -> strided per-run walk
 //   kUnsupported   rank above 4                 -> reference (float32) / rejected (float16)
-// The scalar and general cases matter most for SUB, which is not commutative:
-// the walk hands the swapped legs to the kernel in reversed order.
+// Every case calls the kernel with the operands in the order given; heliaCORE
+// resolves the SUB asymmetry internally, which is what the scalar and general
+// cases are here to pin down.
 
 #include <algorithm>
 #include <cmath>

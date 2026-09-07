@@ -80,7 +80,7 @@ heliaRT provides three kernel backends. Every operator has a **Reference** imple
 
 | Operator | REF | CMSIS | HELIA | Notes |
 |---|:---:|:---:|:---:|---|
-| `MEAN` / `REDUCE_MAX` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive. `MEAN` and `SUM` add FP32/FP16 |
+| `MEAN` / `REDUCE_MAX` / `SUM` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive. `MEAN` and `SUM` (REDUCE_SUM) add FP32/FP16 |
 
 ## Floating-Point Coverage
 

@@ -39,7 +39,8 @@ struct HeliaOpDataMul {
   HeliaBroadcastClass broadcast_class;
 };
 
-void* HeliaMulInit(TfLiteContext* context, const char* buffer, size_t length) {
+void* HeliaMulInit(TfLiteContext* context, const char* /*buffer*/,
+                   size_t /*length*/) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
   return context->AllocatePersistentBuffer(context, sizeof(HeliaOpDataMul));
 }

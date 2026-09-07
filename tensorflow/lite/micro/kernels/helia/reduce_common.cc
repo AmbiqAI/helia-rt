@@ -468,12 +468,26 @@ TfLiteStatus PrepareMeanOrSumHelper(TfLiteContext* context, TfLiteNode* node,
 
   // The float16 MEAN and REDUCE_SUM paths are optimized-only (TFLM has no
   // float16 reference to fall back to) and heliaCore takes 4-D NHWC dims;
-  // reject the rest here so AllocateTensors fails rather than Invoke.
+  // reject the rest here so AllocateTensors fails rather than Invoke. A
+  // non-constant axis tensor holds no data until Invoke, so the axis range is
+  // only checked here when it is constant; Eval re-checks it either way.
   if (input->type == kTfLiteFloat16) {
     TF_LITE_ENSURE_MSG(context, kHeliaFloat16Enabled,
                        "Float16 MEAN/REDUCE_SUM requires ARM_NN_ENABLE_F16.");
-    TF_LITE_ENSURE_MSG(context, NumDimensions(input) <= kCmsisRank,
+    const int input_rank = NumDimensions(input);
+    TF_LITE_ENSURE_MSG(context, input_rank <= kCmsisRank,
                        "Float16 MEAN/REDUCE_SUM supports rank 4 and below.");
+    if (IsConstantTensor(axis)) {
+      const int32_t* axis_data = GetTensorData<int32_t>(axis);
+      for (int i = 0; i < NumElements(axis); ++i) {
+        const int32_t reduce_axis =
+            axis_data[i] < 0 ? axis_data[i] + input_rank : axis_data[i];
+        TF_LITE_ENSURE_MSG(
+            context, reduce_axis >= 0 && reduce_axis < input_rank,
+            "Float16 MEAN/REDUCE_SUM requires every axis, after normalizing a "
+            "negative value against the rank, to be inside [0, rank).");
+      }
+    }
   }
 
   if (input->type == kTfLiteInt8 || input->type == kTfLiteInt16) {
@@ -533,7 +547,9 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
         }
       }
 #endif
-      MicroPrintf("Float16 MEAN: optimized kernel rejected the configuration.");
+      MicroPrintf(
+          "Float16 MEAN: optimized kernel rejected the configuration; it "
+          "requires rank <= 4, axes inside the rank, and ARM_NN_ENABLE_F16.");
       return kTfLiteError;
     }
     case kTfLiteFloat32: {
@@ -693,7 +709,9 @@ TfLiteStatus EvalSumHelper(TfLiteContext* context, TfLiteNode* node,
         }
       }
 #endif
-      MicroPrintf("Float16 SUM: optimized kernel rejected the configuration.");
+      MicroPrintf(
+          "Float16 REDUCE_SUM: optimized kernel rejected the configuration; it "
+          "requires rank <= 4, axes inside the rank, and ARM_NN_ENABLE_F16.");
       return kTfLiteError;
     }
     case kTfLiteFloat32: {
