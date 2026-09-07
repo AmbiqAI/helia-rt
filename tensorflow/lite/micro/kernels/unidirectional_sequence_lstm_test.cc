@@ -640,9 +640,9 @@ TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMFloat16) {
   // hidden store) and evaluates two float16 table activations. Only the
   // accumulator can exceed 1, and |acc| <= 4 for the cell and output gates;
   // the forget and input gates saturate here and pass nothing through.
-  // arm_nn_tanh_lut_f16 (ns-cmsis-nn v7.32.0) documents only its geometry --
-  // [0, 4] in 256 linearly interpolated segments -- so its error is a half-ulp
-  // of the float16 node plus max|tanh''|/8 * (1/64)^2 < 2.4e-5:
+  // arm_nn_tanh_lut_f16 (see AmbiqAI/ns-cmsis-nn#407) documents only its
+  // geometry -- [0, 4] in 256 linearly interpolated segments -- so its error
+  // is a half-ulp of the float16 node plus max|tanh''|/8 * (1/64)^2 < 2.4e-5:
   //   (4 + 1 + 1 + 1 + 1) * 2^-11 + 2 * 2.4e-4 = 4.4e-3 per time step
   //   three time steps -> 1.4e-2
   constexpr float kFirstInvokeTolerance = 1.4e-2f;
@@ -651,7 +651,8 @@ TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMFloat16) {
                 kFirstInvokeTolerance);
   }
 
-#if NS_CMSIS_NN_VERSION >= 7029000
+// Derived goldens hold from the LUT scalar tanh onward. see AmbiqAI/ns-cmsis-nn#407
+#if NS_CMSIS_NN_VERSION >= 7032000
   // Derived by evaluating the LSTM recurrence in double precision across both
   // invokes and rounding to float16; see the generator named above.
   constexpr float kExpectedSecondOutput[] = {
