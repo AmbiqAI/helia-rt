@@ -49,3 +49,7 @@ MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
 $(eval $(call microlite_test,kernel_model_hard_swish_depthwise_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/model_hard_swish_depthwise_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/model_hard_swish_depthwise_data.cc))
+
+# see AmbiqAI/helia-rt#280
+MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_data_movement_test.cc

@@ -141,30 +141,31 @@ jobs:
         # flatbuffer_utils_test filter as cortex-m4+fp. Observed on the same
         # run 34078955826, after the scalar float16 tanh fix in ns-cmsis-nn
         # 7.32.0 ended the hangs. see AmbiqAI/helia-rt#239
+        # Data-movement adds one binary, four cases without F16 and eight with it. see AmbiqAI/helia-rt#280
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 139
-            min-cases: 1151
+            min-binaries: 140
+            min-cases: 1155
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 139
-            min-cases: 1151
+            min-binaries: 140
+            min-cases: 1155
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and one case fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 138
-            min-cases: 1150
+            min-binaries: 139
+            min-cases: 1154
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 139
-            min-cases: 1190
+            min-binaries: 140
+            min-cases: 1198
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 138
-            min-cases: 1189
+            min-binaries: 139
+            min-cases: 1197
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
