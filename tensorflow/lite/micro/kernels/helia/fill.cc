@@ -146,7 +146,10 @@ TfLiteStatus FillEval(TfLiteContext* context, TfLiteNode* node) {
           data->elements);
       TF_LITE_ENSURE_EQ(context, status, ARM_CMSIS_NN_SUCCESS);
 #else
-      FillImpl<float>(value, output);
+      RuntimeShape flat_shape(1);
+      flat_shape.SetDim(0, data->elements);
+      reference_ops::Fill(RuntimeShape(), micro::GetTensorData<float>(value),
+                          flat_shape, micro::GetTensorData<float>(output));
 #endif
       return kTfLiteOk;
     }

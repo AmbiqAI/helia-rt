@@ -351,19 +351,23 @@ TEST(HeliaFloatDataMovementTest, EveryHalfEncodingThroughFill) {
   tensors[0].allocation_type = kTfLiteMmapRo;
   int inputs[] = {2, 0, 1};
   int outputs[] = {1, 2};
-  tflite::micro::KernelRunner runner(tflite::Register_FILL(), tensors, 3,
-                                     IntArrayFromInts(inputs),
-                                     IntArrayFromInts(outputs), nullptr);
-  const auto status = runner.InitAndPrepare();
-  EXPECT_EQ(kTfLiteOk, status);
-  if (status != kTfLiteOk) return;
-  for (uint32_t bits = 0; bits < 65536; ++bits) {
-    value = bits;
-    memset(output, 0x5a, sizeof(output));
-    EXPECT_EQ(kTfLiteOk, runner.Invoke());
-    EXPECT_EQ(0x5a5a, output[0]);
-    EXPECT_EQ(0x5a5a, output[10]);
-    for (int i = 1; i <= 9; ++i) EXPECT_EQ(bits, output[i]);
+  // KernelRunner's fake context retains Eval tensors between invocations.
+  for (uint32_t base = 0; base < 65536; base += 128) {
+    const auto registration = tflite::Register_FILL();
+    tflite::micro::KernelRunner runner(registration, tensors, 3,
+                                       IntArrayFromInts(inputs),
+                                       IntArrayFromInts(outputs), nullptr);
+    const auto status = runner.InitAndPrepare();
+    EXPECT_EQ(kTfLiteOk, status);
+    if (status != kTfLiteOk) return;
+    for (uint32_t bits = base; bits < base + 128; ++bits) {
+      value = bits;
+      memset(output, 0x5a, sizeof(output));
+      EXPECT_EQ(kTfLiteOk, runner.Invoke());
+      EXPECT_EQ(0x5a5a, output[0]);
+      EXPECT_EQ(0x5a5a, output[10]);
+      for (int i = 1; i <= 9; ++i) EXPECT_EQ(bits, output[i]);
+    }
   }
 }
 #else
