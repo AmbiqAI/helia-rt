@@ -15,6 +15,8 @@ limitations under the License.
 #include "Include/arm_nnsupportfunctions.h"
 #include "Include/arm_nnfunctions.h"
 
+#include "tensorflow/lite/micro/kernels/helia/helia_data_movement.h"
+
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
@@ -144,6 +146,53 @@ static TfLiteStatus PackImplConcatS16(TfLiteContext* context, TfLiteNode* node,
   return (st == ARM_CMSIS_NN_SUCCESS) ? kTfLiteOk : kTfLiteError;
 }
 
+TfLiteStatus PackPrepare(TfLiteContext* context, TfLiteNode* node) {
+  TF_LITE_ENSURE(context, NumInputs(node) > 0);
+  TF_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
+  const auto* input = micro::GetEvalInput(context, node, 0);
+  const auto* output = micro::GetEvalOutput(context, node, 0);
+  if (!IsHeliaDataMovementFloat(input->type) &&
+      !IsHeliaDataMovementFloat(output->type)) return kTfLiteOk;
+  TF_LITE_ENSURE(context, IsHeliaDataMovementFloat(input->type));
+  TF_LITE_ENSURE_OK(context, CheckHeliaDataMovementType(context, input->type));
+  auto* data = static_cast<HeliaDataMovementData*>(node->user_data);
+  TF_LITE_ENSURE(context, data != nullptr && node->builtin_data != nullptr);
+  const auto* params = static_cast<const TfLitePackParams*>(node->builtin_data);
+  data->count = NumInputs(node);
+  TF_LITE_ENSURE_EQ(context, params->values_count, data->count);
+  int32_t input_elements;
+  TF_LITE_ENSURE_OK(context, HeliaDataMovementElements(
+                                 context, input->dims, input->type, &input_elements));
+  TF_LITE_ENSURE_EQ(context, output->type, input->type);
+  TF_LITE_ENSURE_OK(context, HeliaDataMovementElements(
+                                 context, output->dims, output->type, &data->elements));
+  const int rank = input->dims->size;
+  TF_LITE_ENSURE(context, rank < INT32_MAX);
+  TF_LITE_ENSURE_EQ(context, output->dims->size, rank + 1);
+  data->axis = params->axis;
+  if (data->axis < 0) data->axis += rank + 1;
+  TF_LITE_ENSURE(context, data->axis >= 0 && data->axis <= rank);
+  for (int d = 0; d <= rank; ++d) {
+    TF_LITE_ENSURE_EQ(context, output->dims->data[d], d == data->axis
+                                 ? data->count
+                                 : input->dims->data[d < data->axis ? d : d - 1]);
+  }
+  for (int i = 0; i < data->count; ++i) {
+    const auto* next = micro::GetEvalInput(context, node, i);
+    TF_LITE_ENSURE_EQ(context, next->type, input->type);
+    TF_LITE_ENSURE(context, next->dims != nullptr);
+    TF_LITE_ENSURE_EQ(context, next->dims->size, rank);
+    for (int d = 0; d < rank; ++d) {
+      TF_LITE_ENSURE_EQ(context, next->dims->data[d], input->dims->data[d]);
+    }
+  }
+#if ARM_NN_ENABLE_F32 || ARM_NN_ENABLE_F16
+  TF_LITE_ENSURE_OK(context, HeliaDataMovementShape(context, input->dims, data));
+  TF_LITE_ENSURE_OK(context, HeliaDataMovementPointers(context, data));
+#endif
+  return kTfLiteOk;
+}
+
 TfLiteStatus PackEval(TfLiteContext* context, TfLiteNode* node) {
   const TfLitePackParams* data =
       reinterpret_cast<TfLitePackParams*>(node->builtin_data);
@@ -160,8 +209,46 @@ TfLiteStatus PackEval(TfLiteContext* context, TfLiteNode* node) {
         return kTfLiteOk;
       return PackImpl<int16_t>(context, node, output, data->values_count, data->axis);
     }
-    case kTfLiteFloat32:
-      return PackImpl<float>(context, node, output, data->values_count, data->axis);
+    case kTfLiteFloat32: {
+      const auto* op_data = static_cast<const HeliaDataMovementData*>(node->user_data);
+      if (op_data->elements == 0) return kTfLiteOk;
+#if ARM_NN_ENABLE_F32
+      auto** inputs = static_cast<const float**>(
+          context->GetScratchBuffer(context, op_data->pointer_scratch));
+      TF_LITE_ENSURE(context, inputs != nullptr);
+      for (int i = 0; i < op_data->count; ++i) {
+        inputs[i] = micro::GetTensorData<float>(micro::GetEvalInput(context, node, i));
+      }
+      const auto* input = micro::GetEvalInput(context, node, 0);
+      const auto status = arm_pack_f32(
+          inputs, op_data->count, input->dims->size, op_data->shape,
+          op_data->axis, micro::GetTensorData<float>(output));
+      TF_LITE_ENSURE_EQ(context, status, ARM_CMSIS_NN_SUCCESS);
+      return kTfLiteOk;
+#else
+      return PackImpl<float>(context, node, output, op_data->count, op_data->axis);
+#endif
+    }
+    case kTfLiteFloat16: {
+      const auto* op_data = static_cast<const HeliaDataMovementData*>(node->user_data);
+      if (op_data->elements == 0) return kTfLiteOk;
+#if ARM_NN_ENABLE_F16
+      auto** inputs = static_cast<const float16_t**>(
+          context->GetScratchBuffer(context, op_data->pointer_scratch));
+      TF_LITE_ENSURE(context, inputs != nullptr);
+      for (int i = 0; i < op_data->count; ++i) {
+        inputs[i] = micro::GetTensorData<float16_t>(micro::GetEvalInput(context, node, i));
+      }
+      const auto* input = micro::GetEvalInput(context, node, 0);
+      const auto status = arm_pack_f16(
+          inputs, op_data->count, input->dims->size, op_data->shape,
+          op_data->axis, micro::GetTensorData<float16_t>(output));
+      TF_LITE_ENSURE_EQ(context, status, ARM_CMSIS_NN_SUCCESS);
+      return kTfLiteOk;
+#else
+      return kTfLiteError;
+#endif
+    }
     case kTfLiteInt32:
       return PackImpl<int32_t>(context, node, output, data->values_count, data->axis);
     case kTfLiteInt64:
@@ -175,7 +262,7 @@ TfLiteStatus PackEval(TfLiteContext* context, TfLiteNode* node) {
 }  // namespace
 
 TFLMRegistration Register_PACK() {
-  return tflite::micro::RegisterOp(nullptr, nullptr, PackEval);
+  return tflite::micro::RegisterOp(InitHeliaDataMovement, PackPrepare, PackEval);
 }
 
 }  // namespace tflite

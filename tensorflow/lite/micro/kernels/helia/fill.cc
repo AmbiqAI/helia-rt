@@ -24,6 +24,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/micro_log.h"
 
 #include "Include/arm_nnsupportfunctions.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_data_movement.h"
 
 namespace tflite {
 
@@ -42,9 +43,11 @@ TfLiteStatus EnsureEqImpl(TfLiteContext* context, const TfLiteIntArray* array,
 // one-dimensional and of an integer type.
 TfLiteStatus EnsureEq(TfLiteContext* context, const TfLiteIntArray* array,
                       const TfLiteTensor* tensor) {
+  TF_LITE_ENSURE(context, tensor->dims != nullptr);
   TF_LITE_ENSURE_EQ(context, NumDimensions(tensor), 1);
   const auto tensor_len = tensor->dims->data[0];
   TF_LITE_ENSURE_EQ(context, array->size, tensor_len);
+  TF_LITE_ENSURE(context, tensor_len == 0 || tensor->data.raw != nullptr);
 
   switch (tensor->type) {
     case kTfLiteInt8:
@@ -67,37 +70,31 @@ constexpr int kValueTensor = 1;
 constexpr int kOutputTensor = 0;
 
 TfLiteStatus FillPrepare(TfLiteContext* context, TfLiteNode* node) {
-  MicroContext* micro_context = GetMicroContext(context);
-
-  // Ensure inputs and outputs exist.
-  TfLiteTensor* dims =
-      micro_context->AllocateTempInputTensor(node, kDimsTensor);
-  TF_LITE_ENSURE(context, dims != nullptr);
-  TfLiteTensor* value =
-      micro_context->AllocateTempInputTensor(node, kValueTensor);
-  TF_LITE_ENSURE(context, value != nullptr);
-  TfLiteTensor* output =
-      micro_context->AllocateTempOutputTensor(node, kOutputTensor);
-  TF_LITE_ENSURE(context, output != nullptr);
-
-  // The value tensor must be a scalar.
-  TF_LITE_ENSURE_EQ(context, NumDimensions(value), 0);
-
-  // The value type and output type must match.
+  TF_LITE_ENSURE_EQ(context, NumInputs(node), 2);
+  TF_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
+  const auto* value = micro::GetEvalInput(context, node, kValueTensor);
+  const auto* output = micro::GetEvalOutput(context, node, kOutputTensor);
+  TF_LITE_ENSURE(context, value->dims != nullptr && output->dims != nullptr);
+  TF_LITE_ENSURE_EQ(context, value->dims->size, 0);
   TF_LITE_ENSURE_EQ(context, value->type, output->type);
-
-  // The dimension of the output tensor is known in model already.
-  TFLITE_DCHECK(output->dims != nullptr);
-
-  TF_LITE_ENSURE_MSG(context, IsConstantTensor(dims),
-                     "Non-constant >dims< tensor is not supported");
-  // The dims tensor must match the output tensor shape.
-  // As a byproduct, ensures the dims tensor is of an integer type.
-  TF_LITE_ENSURE_OK(context, EnsureEq(context, output->dims, dims));
-
+  if (IsHeliaDataMovementFloat(value->type)) {
+    TF_LITE_ENSURE_OK(context, CheckHeliaDataMovementType(context, value->type));
+    auto* data = static_cast<HeliaDataMovementData*>(node->user_data);
+    TF_LITE_ENSURE(context, data != nullptr);
+    TF_LITE_ENSURE_OK(context, HeliaDataMovementElements(
+                                   context, output->dims, value->type,
+                                   &data->elements));
+  }
+  MicroContext* micro_context = GetMicroContext(context);
+  TfLiteTensor* dims = micro_context->AllocateTempInputTensor(node, kDimsTensor);
+  TF_LITE_ENSURE(context, dims != nullptr);
+  const bool constant_dims = IsConstantTensor(dims);
+  const TfLiteStatus shape_status =
+      constant_dims ? EnsureEq(context, output->dims, dims) : kTfLiteError;
   micro_context->DeallocateTempTfLiteTensor(dims);
-  micro_context->DeallocateTempTfLiteTensor(value);
-  micro_context->DeallocateTempTfLiteTensor(output);
+  TF_LITE_ENSURE_MSG(context, constant_dims,
+                     "Non-constant >dims< tensor is not supported");
+  TF_LITE_ENSURE_OK(context, shape_status);
   return kTfLiteOk;
 }
 
@@ -139,9 +136,37 @@ TfLiteStatus FillEval(TfLiteContext* context, TfLiteNode* node) {
   TfLiteEvalTensor* output = micro::GetEvalOutput(context, node, kOutputTensor);
 
   switch (value->type) {
-    case kTfLiteFloat32:
-      FillImpl<float>(value, output);
-      break;
+    case kTfLiteFloat32: {
+      const auto* data = static_cast<const HeliaDataMovementData*>(node->user_data);
+      if (data->elements == 0) return kTfLiteOk;
+      TF_LITE_ENSURE(context, value->data.raw != nullptr);
+#if ARM_NN_ENABLE_F32
+      const auto status = arm_nn_fill_f32(
+          *micro::GetTensorData<float>(value), micro::GetTensorData<float>(output),
+          data->elements);
+      TF_LITE_ENSURE_EQ(context, status, ARM_CMSIS_NN_SUCCESS);
+#else
+      RuntimeShape flat_shape(1);
+      flat_shape.SetDim(0, data->elements);
+      reference_ops::Fill(RuntimeShape(), micro::GetTensorData<float>(value),
+                          flat_shape, micro::GetTensorData<float>(output));
+#endif
+      return kTfLiteOk;
+    }
+    case kTfLiteFloat16: {
+      const auto* data = static_cast<const HeliaDataMovementData*>(node->user_data);
+      if (data->elements == 0) return kTfLiteOk;
+      TF_LITE_ENSURE(context, value->data.raw != nullptr);
+#if ARM_NN_ENABLE_F16
+      const auto status = arm_nn_fill_f16(
+          *micro::GetTensorData<float16_t>(value), micro::GetTensorData<float16_t>(output),
+          data->elements);
+      TF_LITE_ENSURE_EQ(context, status, ARM_CMSIS_NN_SUCCESS);
+#else
+      return kTfLiteError;
+#endif
+      return kTfLiteOk;
+    }
     case kTfLiteInt32:
       FillImpl<int32_t>(value, output);
       break;
@@ -163,7 +188,7 @@ TfLiteStatus FillEval(TfLiteContext* context, TfLiteNode* node) {
 }  // namespace
 
 TFLMRegistration Register_FILL() {
-  return tflite::micro::RegisterOp(nullptr, FillPrepare, FillEval);
+  return tflite::micro::RegisterOp(InitHeliaDataMovement, FillPrepare, FillEval);
 }
 
 }  // namespace tflite
