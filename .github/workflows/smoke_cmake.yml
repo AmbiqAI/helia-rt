@@ -379,6 +379,10 @@ jobs:
               reinterpret_cast<void*>(&tflite::Register_AVERAGE_POOL_2D),
               reinterpret_cast<void*>(&tflite::Register_MAX_POOL_2D),
               reinterpret_cast<void*>(&tflite::Register_SOFTMAX),
+              reinterpret_cast<void*>(&tflite::Register_SPLIT),
+              reinterpret_cast<void*>(&tflite::Register_PACK),
+              reinterpret_cast<void*>(&tflite::Register_UNPACK),
+              reinterpret_cast<void*>(&tflite::Register_FILL),
           };
           }  // namespace
 
@@ -433,7 +437,9 @@ jobs:
           # that `!` inverts into a spurious "symbol missing" error.
           probe_syms=$(arm-none-eabi-nm -C "${PROBE}")
           for sym in arm_convolve_wrapper_f32 arm_avg_pool_f32 arm_softmax_f32 \
-                     arm_convolve_wrapper_f16 arm_avg_pool_f16 arm_softmax_f16; do
+                     arm_convolve_wrapper_f16 arm_avg_pool_f16 arm_softmax_f16 \
+                     arm_split_f32 arm_pack_f32 arm_unpack_f32 arm_nn_fill_f32 \
+                     arm_split_f16 arm_pack_f16 arm_unpack_f16 arm_nn_fill_f16; do
             if ! grep -qE " (T|t|W|w) ${sym}$" <<<"${probe_syms}"; then
               echo "::error::${sym} missing from link probe image"
               exit 1
@@ -823,6 +829,10 @@ jobs:
               reinterpret_cast<void*>(&tflite::Register_QUANTIZE),
               reinterpret_cast<void*>(&tflite::Register_DEQUANTIZE),
               reinterpret_cast<void*>(&tflite::Register_CONV_2D),
+              reinterpret_cast<void*>(&tflite::Register_SPLIT),
+              reinterpret_cast<void*>(&tflite::Register_PACK),
+              reinterpret_cast<void*>(&tflite::Register_UNPACK),
+              reinterpret_cast<void*>(&tflite::Register_FILL),
           };
           }  // namespace
 
