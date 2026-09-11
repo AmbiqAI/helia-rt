@@ -144,7 +144,7 @@ Known-good versions:
 
     - name: ns-cmsis-nn
       url: https://github.com/AmbiqAI/ns-cmsis-nn
-      revision: <ns-cmsis-nn-version>  # e.g. v7.28.0 (min for fp32/fp16)
+      revision: <ns-cmsis-nn-version>  # v7.33.0+ for current HELIA float adapters
       path: modules/ns-cmsis-nn
     ```
 
