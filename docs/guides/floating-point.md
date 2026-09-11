@@ -177,7 +177,7 @@ Notes and version boundary:
 
 ## Make builds
 
-The Make integration pins ns-cmsis-nn v7.32.0 and configures the float features
+The Make integration pins ns-cmsis-nn v7.33.0 and configures the float features
 from `TARGET_ARCH`:
 
 - FP32 is enabled for the HELIA backend.
