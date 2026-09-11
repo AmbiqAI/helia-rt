@@ -54,7 +54,8 @@ TfLiteStatus SplitVPrepare(TfLiteContext* context, TfLiteNode* node) {
   data->count = NumOutputs(node);
   const auto* params =
       static_cast<const TfLiteSplitVParams*>(node->builtin_data);
-  if (params != nullptr) {
+  // ParseSplitV uses zero for legacy models without SplitVOptions.
+  if (params != nullptr && params->num_splits != 0) {
     TF_LITE_ENSURE_EQ(context, params->num_splits, data->count);
   }
   // The shared shape check conservatively budgets four bytes for integers.

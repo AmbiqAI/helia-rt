@@ -28,9 +28,8 @@ namespace {
 using tflite::testing::CreateTensor;
 using tflite::testing::IntArrayFromInts;
 
-// Count 17 crosses the former adapter's local pointer/size capacity.
 template <typename T>
-void Count17(TfLiteType type) {
+void Count17(TfLiteType type, bool legacy_options = false) {
   T input[17], output[17] = {};
   int32_t sizes[17];
   int in_dims[] = {1, 17}, out_dims[] = {1, 1};
@@ -49,7 +48,7 @@ void Count17(TfLiteType type) {
   tensors[1] = CreateTensor(sizes, IntArrayFromInts(sizes_dims));
   tensors[2] = CreateTensor(&axis, IntArrayFromInts(scalar));
   tensors[1].allocation_type = tensors[2].allocation_type = kTfLiteMmapRo;
-  TfLiteSplitVParams params = {17};
+  TfLiteSplitVParams params = {legacy_options ? 0 : 17};
   const auto reg = tflite::Register_SPLIT_V();
   tflite::micro::KernelRunner runner(reg, tensors, 20, IntArrayFromInts(inputs),
                                      IntArrayFromInts(outputs), &params);
@@ -325,6 +324,9 @@ void Invalid(TfLiteType type) {
 }  // namespace
 
 TEST(HeliaSplitVTest, Int8SeventeenOutputs) { Count17<int8_t>(kTfLiteInt8); }
+TEST(HeliaSplitVTest, LegacyModelWithoutSplitVOptions) {
+  Count17<int8_t>(kTfLiteInt8, true);
+}
 TEST(HeliaSplitVTest, Int16SeventeenOutputs) { Count17<int16_t>(kTfLiteInt16); }
 TEST(HeliaSplitVTest, Float32SeventeenOutputs) {
   Count17<float>(kTfLiteFloat32);
