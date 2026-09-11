@@ -452,7 +452,8 @@ against earlier heliaRT releases:
   `NS_CMSIS_NN_ENABLE_F32/F16`. If your west workspace pins an ns-cmsis-nn
   module older than v7.28.0, those Kconfig symbols do not exist and the
   configuration step emits undefined-symbol warnings; update the module
-  revision to silence them and to get the float kernels.
+  revision to silence them and to get the float kernels. The data-movement
+  adapters listed under [Feature contract](#feature-contract) require v7.33.0.
 - **Library size**: Make-based helia builds now always compile the FP32
   kernels (and FP16 on `cortex-m55`) into the combined archive. Integer-only
   models still reference them transitively through the operator wrappers, so

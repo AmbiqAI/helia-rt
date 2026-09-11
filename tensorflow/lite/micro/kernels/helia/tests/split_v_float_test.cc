@@ -110,7 +110,9 @@ uint32_t Bits(T value) {
 template <typename T>
 void Run(TfLiteType type, std::initializer_list<int> dimensions, int32_t axis,
          std::initializer_list<int32_t> pieces, Fault fault = Fault::kNone,
-         uint32_t base = 0, const uint32_t* golden = nullptr) {
+         uint32_t base = 0, const uint32_t* golden = nullptr,
+         const int (*golden_shapes)[3] = nullptr,
+         const int* golden_counts = nullptr) {
   constexpr int kCapacity = 512;
   static T input[kCapacity];
   static T output[2][20][kCapacity + 2];
@@ -264,6 +266,13 @@ void Run(TfLiteType type, std::initializer_list<int> dimensions, int32_t axis,
     for (i = 0; i < count; ++i) {
       int out_count = 1;
       for (d = 1; d <= shape[0]; ++d) out_count *= output_shapes[i][d];
+      if (golden_shapes != nullptr) {
+        EXPECT_EQ(3, shape[0]);
+        for (d = 0; d < 3; ++d) {
+          EXPECT_EQ(golden_shapes[i][d], output_shapes[i][d + 1]);
+        }
+        EXPECT_EQ(golden_counts[i], out_count);
+      }
       for (int j = 0; j < out_count; ++j) {
         int remainder = j, coordinate[8] = {};
         for (d = shape[0] - 1; d >= 0; --d) {
@@ -337,17 +346,23 @@ TEST(HeliaSplitVTest, MalformedMetadata) {
 }
 TEST(HeliaSplitVTest, LiteRtReferenceGoldens) {
   Run<float>(kTfLiteFloat32, {2, 5, 3}, -2, {1, -1, 2}, Fault::kNone, 8,
-             kSplitVInferredFloatGolden);
+             kSplitVInferredFloatGolden, kSplitVInferredFloatShapes,
+             kSplitVInferredFloatCounts);
   Run<float>(kTfLiteFloat32, {2, 5, 3}, -2, {0, 2, 0, 3, 0}, Fault::kNone, 8,
-             kSplitVMixedZeroFloatGolden);
+             kSplitVMixedZeroFloatGolden, kSplitVMixedZeroFloatShapes,
+             kSplitVMixedZeroFloatCounts);
   Run<float>(kTfLiteFloat32, {2, 5, 0}, -2, {1, -1, 2}, Fault::kNone, 8,
-             kSplitVTotalEmptyFloatGolden);
+             kSplitVTotalEmptyFloatGolden, kSplitVTotalEmptyFloatShapes,
+             kSplitVTotalEmptyFloatCounts);
   Run<int32_t>(kTfLiteInt32, {2, 5, 3}, -2, {1, -1, 2}, Fault::kNone, 8,
-               kSplitVInferredInt32Golden);
+               kSplitVInferredInt32Golden, kSplitVInferredInt32Shapes,
+               kSplitVInferredInt32Counts);
   Run<int32_t>(kTfLiteInt32, {2, 5, 3}, -2, {0, 2, 0, 3, 0}, Fault::kNone, 8,
-               kSplitVMixedZeroInt32Golden);
+               kSplitVMixedZeroInt32Golden, kSplitVMixedZeroInt32Shapes,
+               kSplitVMixedZeroInt32Counts);
   Run<int32_t>(kTfLiteInt32, {2, 5, 0}, -2, {1, -1, 2}, Fault::kNone, 8,
-               kSplitVTotalEmptyInt32Golden);
+               kSplitVTotalEmptyInt32Golden, kSplitVTotalEmptyInt32Shapes,
+               kSplitVTotalEmptyInt32Counts);
 }
 #if ARM_NN_ENABLE_F16
 TEST(HeliaSplitVTest, Float16SeventeenOutputs) {
