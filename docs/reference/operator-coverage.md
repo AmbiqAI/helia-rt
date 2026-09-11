@@ -62,7 +62,7 @@ heliaRT provides three kernel backends. Every operator has a **Reference** imple
 | `CONCATENATION` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
 | `RESHAPE` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
 | `SPLIT` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
-| `SPLIT_V` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
+| `SPLIT_V` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA adds FP16; see [float feature gates](../guides/floating-point.md#feature-contract) |
 | `PACK` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
 | `SQUEEZE` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
 | `STRIDED_SLICE` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |

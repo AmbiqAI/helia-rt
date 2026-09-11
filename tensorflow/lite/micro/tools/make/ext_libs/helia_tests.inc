@@ -53,3 +53,7 @@ $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/model_hard_swish_dep
 # see AmbiqAI/helia-rt#280
 MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_data_movement_test.cc
+
+# see AmbiqAI/helia-rt#283
+MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/split_v_float_test.cc

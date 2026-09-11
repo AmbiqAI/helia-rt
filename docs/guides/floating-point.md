@@ -9,13 +9,13 @@ APIs are available.
 ## Feature contract
 
 HELIA float builds require ns-cmsis-nn **v7.33.0 or later** for the
-`SPLIT`, `PACK`, `UNPACK`, and `FILL` adapters. These operators support
+`SPLIT`, `SPLIT_V`, `PACK`, `UNPACK`, and `FILL` adapters. These operators support
 FP16 and call the corresponding CORE APIs for FP32 when enabled. FP32
 still uses the existing reference implementation when `ARM_NN_ENABLE_F32=0`;
 FP16 is rejected during `AllocateTensors()` when `ARM_NN_ENABLE_F16=0`.
 Update separately supplied CORE source targets or archives along with RT.
 
-These four operations preserve storage bits, including NaN payloads, signed
+These operations preserve storage bits, including NaN payloads, signed
 zero and subnormals. They accept negative axes after normalization, scalar
 PACK inputs and FILL outputs, and valid empty tensors. Float shapes, counts,
 and types are checked during preparation. Shapes must fit the CORE int32
@@ -23,6 +23,10 @@ element-count and target address-size limits; pointer arrays and shape metadata
 use the tensor arena rather than fixed rank or tensor-count limits. Empty
 outputs perform no data access. This adoption makes no performance guarantee.
 
+`SPLIT_V` accepts constant split sizes, including one inferred `-1` size and
+zero-length pieces. Preparation checks axes, size sums, output counts, shapes
+and dtypes for integer and float inputs. Resolved sizes and output pointers
+use the arena, including when there are more than 16 outputs or rank exceeds 6.
 
 ns-cmsis-nn v7.28.0 or later exports these definitions from its CMake target;
 from v7.32.0 they are also the only names it accepts as CMake inputs,
