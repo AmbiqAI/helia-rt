@@ -57,14 +57,19 @@ inline TfLiteStatus HeliaDataMovementElements(TfLiteContext* context,
                                               const TfLiteIntArray* dims,
                                               TfLiteType type, int32_t* count) {
   TF_LITE_ENSURE(context, dims != nullptr && dims->size >= 0);
-  int64_t elements = 1;
+  uint64_t elements = 1;
   const size_t width = type == kTfLiteFloat16 ? 2 : 4;
+  const uint64_t max_elements_by_width =
+      std::numeric_limits<size_t>::max() / width;
+  const uint64_t max_elements =
+      max_elements_by_width < static_cast<uint64_t>(INT32_MAX)
+          ? max_elements_by_width
+          : static_cast<uint64_t>(INT32_MAX);
   for (int i = 0; i < dims->size; ++i) {
     TF_LITE_ENSURE(context, dims->data[i] >= 0);
-    elements *= dims->data[i];
-    TF_LITE_ENSURE(context, elements <= INT32_MAX);
-    TF_LITE_ENSURE(context, static_cast<uint64_t>(elements) <=
-                                std::numeric_limits<size_t>::max() / width);
+    const uint64_t extent = dims->data[i];
+    TF_LITE_ENSURE(context, extent == 0 || elements <= max_elements / extent);
+    elements *= extent;
   }
   *count = static_cast<int32_t>(elements);
   return kTfLiteOk;
