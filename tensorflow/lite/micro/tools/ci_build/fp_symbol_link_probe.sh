@@ -164,6 +164,8 @@ make_var() {
     TARGET_ARCH="${ARCH}" \
     TOOLCHAIN="${TOOLCHAIN}" \
     OPTIMIZED_KERNEL_DIR=helia \
+    ${DOWNLOADS_DIR:+DOWNLOADS_DIR="${DOWNLOADS_DIR}"} \
+    ${NS_CMSIS_NN_PATH:+NS_CMSIS_NN_PATH="${NS_CMSIS_NN_PATH}"} \
     ${TARGET_TOOLCHAIN_ROOT:+TARGET_TOOLCHAIN_ROOT="${TARGET_TOOLCHAIN_ROOT}"} \
     "helia_fp_probe_print_$1" 2>/dev/null | tail -1
 }
