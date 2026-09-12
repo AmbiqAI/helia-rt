@@ -53,6 +53,7 @@ heliaRT provides three kernel backends. Every operator has a **Reference** imple
 | `ADD` | :white_check_mark: | :white_check_mark: | :white_check_mark: | |
 | `MUL` | :white_check_mark: | :white_check_mark: | :white_check_mark: | |
 | `SUB` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
+| `SQRT` / `RSQRT` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA adds native FP16; see [float feature gates](../guides/floating-point.md#feature-contract) |
 | `EQUAL` / `NOT_EQUAL` / `GREATER` / `LESS` / etc. | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
 
 ## Data Movement
@@ -126,6 +127,7 @@ resolves them.
 | `MAXIMUM` / `MINIMUM` | :white_check_mark: | :white_check_mark: | Optimized for rank ≤ 4; higher ranks use Reference (FP32) |
 | `ADD` / `SUB` / `MUL` | :white_check_mark: | :white_check_mark: | Identical input shapes are optimized at any rank; broadcasting is optimized for rank ≤ 4 with every dimension pair equal or 1, and a higher-rank broadcast uses Reference (FP32) or is rejected at prepare (FP16) |
 | `HARD_SWISH` | :white_check_mark: | :white_check_mark: | FP16 requires `ARM_NN_ENABLE_F16`; without it there is no reference to fall back to, so it is rejected at prepare |
+| `SQRT` / `RSQRT` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.33.0; FP16 requires `ARM_NN_ENABLE_F16`; FP32 keeps the TFLM reference path |
 | `MEAN` / `SUM` | :white_check_mark: | :white_check_mark: | Optimized for rank ≤ 4 with any axis set; higher ranks use Reference (FP32). FP16 requires `ARM_NN_ENABLE_F16` and rank ≤ 4, both enforced at prepare |
 | `CONCATENATION` | :white_check_mark: | :white_check_mark: | Optimized for rank ≤ 4; higher ranks use the Reference path (FP32 and FP16) |
 | `SPLIT` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.33.0; constant axis, equal output extents; rank ≥ 1 |
