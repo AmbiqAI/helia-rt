@@ -62,7 +62,7 @@ heliaRT provides three kernel backends. Every operator has a **Reference** imple
 | `CONCATENATION` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
 | `RESHAPE` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
 | `SPLIT` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
-| `SPLIT_V` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
+| `SPLIT_V` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA adds FP16; see [float feature gates](../guides/floating-point.md#feature-contract) |
 | `PACK` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
 | `SQUEEZE` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
 | `STRIDED_SLICE` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
@@ -127,6 +127,7 @@ resolves them.
 | `MEAN` / `SUM` | :white_check_mark: | :white_check_mark: | Optimized for rank ≤ 4 with any axis set; higher ranks use Reference (FP32). FP16 requires `ARM_NN_ENABLE_F16` and rank ≤ 4, both enforced at prepare |
 | `CONCATENATION` | :white_check_mark: | :white_check_mark: | Optimized for rank ≤ 4; higher ranks use the Reference path (FP32 and FP16) |
 | `SPLIT` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.33.0; constant axis, equal output extents; rank ≥ 1 |
+| `SPLIT_V` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.33.0; constant axis and split sizes; one inferred `-1`; zero-length pieces |
 | `PACK` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.33.0; equal input shapes, including scalars |
 | `UNPACK` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.33.0; one output per selected axis element |
 | `FILL` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.33.0; constant dimensions, scalar fill value |
