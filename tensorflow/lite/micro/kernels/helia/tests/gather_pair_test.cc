@@ -231,9 +231,9 @@ TfLiteStatus RunGather(const T* input, int* input_dims, const int32_t* indices,
   int outputs_data[] = {1, 2};
   TfLiteGatherParams params = {axis, batch_dims};
   TfLiteIntArray* declared_output_dims = tensors[2].dims;
+  const TFLMRegistration registration = tflite::Register_GATHER();
   tflite::micro::KernelRunner runner(
-      tflite::Register_GATHER(), tensors, 3,
-      tflite::testing::IntArrayFromInts(inputs_data),
+      registration, tensors, 3, tflite::testing::IntArrayFromInts(inputs_data),
       tflite::testing::IntArrayFromInts(outputs_data), &params);
   const TfLiteStatus prepared = runner.InitAndPrepare();
   if (prepare_status != nullptr) *prepare_status = prepared;
@@ -285,9 +285,9 @@ TfLiteStatus RunGatherNd(const T* input, int* input_dims,
   int inputs_data[] = {2, 0, 1};
   int outputs_data[] = {1, 2};
   TfLiteIntArray* declared_output_dims = tensors[2].dims;
+  const TFLMRegistration registration = tflite::Register_GATHER_ND();
   tflite::micro::KernelRunner runner(
-      tflite::Register_GATHER_ND(), tensors, 3,
-      tflite::testing::IntArrayFromInts(inputs_data),
+      registration, tensors, 3, tflite::testing::IntArrayFromInts(inputs_data),
       tflite::testing::IntArrayFromInts(outputs_data), nullptr);
   const TfLiteStatus prepared = runner.InitAndPrepare();
   if (prepare_status != nullptr) *prepare_status = prepared;
@@ -920,8 +920,9 @@ TEST(HeliaGatherPairTest, PrepareRejectsInvalidMetadata) {
   int oversized_inputs_data[] = {2, 0, 1};
   int oversized_outputs_data[] = {1, 2};
   TfLiteGatherParams oversized_params = {0, 0};
+  const TFLMRegistration oversized_registration = tflite::Register_GATHER();
   tflite::micro::KernelRunner oversized_runner(
-      tflite::Register_GATHER(), oversized_tensors, 3,
+      oversized_registration, oversized_tensors, 3,
       tflite::testing::IntArrayFromInts(oversized_inputs_data),
       tflite::testing::IntArrayFromInts(oversized_outputs_data),
       &oversized_params);
@@ -1018,8 +1019,9 @@ TEST(HeliaGatherPairTest, EvalRefreshesAllTensorPointers) {
   int inputs_data[] = {2, 0, 1};
   int outputs_data[] = {1, 2};
   TfLiteGatherParams params = {0, 0};
+  const TFLMRegistration gather_registration = tflite::Register_GATHER();
   tflite::micro::KernelRunner runner(
-      tflite::Register_GATHER(), tensors, 3,
+      gather_registration, tensors, 3,
       tflite::testing::IntArrayFromInts(inputs_data),
       tflite::testing::IntArrayFromInts(outputs_data), &params);
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
@@ -1064,8 +1066,9 @@ TEST(HeliaGatherPairTest, EvalRefreshesAllTensorPointers) {
           tflite::testing::IntArrayFromInts(nd_output_dims_data), false,
           kTfLiteFloat32),
   };
+  const TFLMRegistration gather_nd_registration = tflite::Register_GATHER_ND();
   tflite::micro::KernelRunner nd_runner(
-      tflite::Register_GATHER_ND(), nd_tensors, 3,
+      gather_nd_registration, nd_tensors, 3,
       tflite::testing::IntArrayFromInts(inputs_data),
       tflite::testing::IntArrayFromInts(outputs_data), nullptr);
   EXPECT_EQ(kTfLiteOk, nd_runner.InitAndPrepare());
