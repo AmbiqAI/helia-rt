@@ -133,8 +133,8 @@ resolves them.
 | `PACK` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.33.0; equal input shapes, including scalars |
 | `UNPACK` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.33.0; one output per selected axis element |
 | `FILL` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.33.0; constant dimensions, scalar fill value |
-| `GATHER` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.34.0; optimized when input, indices and output ranks are ≤ 4, including scalar indices. Higher ranks use Reference for FP32 and are rejected for FP16 |
-| `GATHER_ND` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.34.0; optimized when params, indices and output ranks are ≤ 4 and tuple width is positive. Higher ranks and zero-width tuples use Reference for FP32 and are rejected for FP16 |
+| `GATHER` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.34.0; native ranks are ≤ 4. Scalar indices are native for floats, use Reference for int8, and are rejected for int16. Higher ranks use Reference for FP32/int8 and are rejected for FP16/int16 |
+| `GATHER_ND` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.34.0; native ranks are ≤ 4 with positive tuple width. Higher ranks and zero-width tuples use Reference for FP32/int8 and are rejected for FP16/int16 |
 | `RESHAPE` | :white_check_mark: | :white_check_mark: | Pure data movement; FP16 works even without `ARM_NN_ENABLE_F16` via a bitwise copy |
 | `DEQUANTIZE` | :white_check_mark: | :white_check_mark: | FP16 is an input storage type widened to an FP32 output, not FP16 arithmetic; works even without `ARM_NN_ENABLE_F16` |
 | `RELU` / `RELU6` | :white_check_mark: | :white_check_mark: | |

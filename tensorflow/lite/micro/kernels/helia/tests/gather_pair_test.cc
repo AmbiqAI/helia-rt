@@ -734,6 +734,55 @@ TEST(HeliaGatherPairTest, FloatErrorsAreAtomicAndPropagated) {
 #endif
 }
 
+TEST(HeliaGatherPairTest, IntegerNativeLateInvalidIndicesAreAtomic) {
+  ResetRoutes();
+  int input_dims[] = {1, 4};
+  int indices_dims[] = {1, 2};
+  int output_dims[] = {1, 0};
+  int32_t invalid_indices[] = {1, 4};
+
+  const int8_t input_s8[] = {10, 20, 30, 40};
+  int8_t output_s8[] = {77, 88};
+  EXPECT_EQ(kTfLiteError,
+            RunGather(input_s8, input_dims, invalid_indices, indices_dims,
+                      output_s8, output_dims, kTfLiteInt8));
+  const int8_t sentinel_s8[] = {77, 88};
+  ExpectArray(sentinel_s8, output_s8, 2);
+  ExpectCalls(Route::kGatherS8, 0);
+
+  const int16_t input_s16[] = {10, 20, 30, 40};
+  int16_t output_s16[] = {77, 88};
+  int output_s16_dims[] = {1, 0};
+  EXPECT_EQ(kTfLiteError,
+            RunGather(input_s16, input_dims, invalid_indices, indices_dims,
+                      output_s16, output_s16_dims, kTfLiteInt16));
+  const int16_t sentinel_s16[] = {77, 88};
+  ExpectArray(sentinel_s16, output_s16, 2);
+  ExpectCalls(Route::kGatherS16, 0);
+
+  int nd_input_dims[] = {2, 2, 2};
+  int nd_indices_dims[] = {2, 2, 2};
+  int nd_output_dims[] = {1, 0};
+  int32_t invalid_nd_indices[] = {0, 0, 0, 2};
+
+  int8_t nd_output_s8[] = {77, 88};
+  EXPECT_EQ(
+      kTfLiteError,
+      RunGatherNd(input_s8, nd_input_dims, invalid_nd_indices, nd_indices_dims,
+                  nd_output_s8, nd_output_dims, kTfLiteInt8));
+  ExpectArray(sentinel_s8, nd_output_s8, 2);
+  ExpectCalls(Route::kGatherNdS8, 0);
+
+  int16_t nd_output_s16[] = {77, 88};
+  int nd_output_s16_dims[] = {1, 0};
+  EXPECT_EQ(
+      kTfLiteError,
+      RunGatherNd(input_s16, nd_input_dims, invalid_nd_indices, nd_indices_dims,
+                  nd_output_s16, nd_output_s16_dims, kTfLiteInt16));
+  ExpectArray(sentinel_s16, nd_output_s16, 2);
+  ExpectCalls(Route::kGatherNdS16, 0);
+}
+
 TEST(HeliaGatherPairTest, EmptyAndNullBufferContracts) {
   ResetRoutes();
   int input_dims[] = {2, 0, 2};
@@ -744,7 +793,7 @@ TEST(HeliaGatherPairTest, EmptyAndNullBufferContracts) {
                                  static_cast<const int32_t*>(nullptr),
                                  indices_dims, static_cast<float*>(nullptr),
                                  output_dims, kTfLiteFloat32));
-  ExpectCalls(Route::kGatherF32, 1);
+  ExpectCalls(Route::kGatherF32, 0);
 
   int int8_output_dims[] = {2, 0, 0};
   EXPECT_EQ(
@@ -755,12 +804,12 @@ TEST(HeliaGatherPairTest, EmptyAndNullBufferContracts) {
   ExpectCalls(Route::kGatherS8, 0);
 
   int int16_output_dims[] = {2, 0, 0};
-  EXPECT_EQ(kTfLiteError,
+  EXPECT_EQ(kTfLiteOk,
             RunGather(static_cast<const int16_t*>(nullptr), input_dims,
                       static_cast<const int32_t*>(nullptr), indices_dims,
                       static_cast<int16_t*>(nullptr), int16_output_dims,
                       kTfLiteInt16));
-  ExpectCalls(Route::kGatherS16, 1);
+  ExpectCalls(Route::kGatherS16, 0);
 
   int nd_indices_dims[] = {2, 0, 1};
   int nd_output_dims[] = {2, 0, 0};
@@ -769,7 +818,7 @@ TEST(HeliaGatherPairTest, EmptyAndNullBufferContracts) {
                         static_cast<const int32_t*>(nullptr), nd_indices_dims,
                         static_cast<float*>(nullptr), nd_output_dims,
                         kTfLiteFloat32));
-  ExpectCalls(Route::kGatherNdF32, 1);
+  ExpectCalls(Route::kGatherNdF32, 0);
 
   int nd_int8_output_dims[] = {2, 0, 0};
   EXPECT_EQ(kTfLiteOk,
@@ -780,12 +829,12 @@ TEST(HeliaGatherPairTest, EmptyAndNullBufferContracts) {
   ExpectCalls(Route::kGatherNdS8, 0);
 
   int nd_int16_output_dims[] = {2, 0, 0};
-  EXPECT_EQ(kTfLiteError,
+  EXPECT_EQ(kTfLiteOk,
             RunGatherNd(static_cast<const int16_t*>(nullptr), input_dims,
                         static_cast<const int32_t*>(nullptr), nd_indices_dims,
                         static_cast<int16_t*>(nullptr), nd_int16_output_dims,
                         kTfLiteInt16));
-  ExpectCalls(Route::kGatherNdS16, 1);
+  ExpectCalls(Route::kGatherNdS16, 0);
 
   const float nonempty_input[] = {1, 2};
   int nonempty_input_dims[] = {1, 2};
@@ -796,7 +845,7 @@ TEST(HeliaGatherPairTest, EmptyAndNullBufferContracts) {
             RunGather(nonempty_input, nonempty_input_dims, nonempty_indices,
                       nonempty_indices_dims, static_cast<float*>(nullptr),
                       nonempty_output_dims, kTfLiteFloat32));
-  ExpectCalls(Route::kGatherF32, 2);
+  ExpectCalls(Route::kGatherF32, 1);
 
   int empty_trailing_input_dims[] = {2, 2, 0};
   int invalid_output_dims[] = {2, 0, 0};
@@ -806,7 +855,7 @@ TEST(HeliaGatherPairTest, EmptyAndNullBufferContracts) {
                       empty_trailing_input_dims, invalid_index,
                       nonempty_indices_dims, static_cast<float*>(nullptr),
                       invalid_output_dims, kTfLiteFloat32));
-  ExpectCalls(Route::kGatherF32, 3);
+  ExpectCalls(Route::kGatherF32, 1);
 
   int32_t valid_index[] = {1};
   int valid_empty_output_dims[] = {2, 0, 0};
@@ -815,7 +864,7 @@ TEST(HeliaGatherPairTest, EmptyAndNullBufferContracts) {
                       empty_trailing_input_dims, valid_index,
                       nonempty_indices_dims, static_cast<float*>(nullptr),
                       valid_empty_output_dims, kTfLiteFloat32));
-  ExpectCalls(Route::kGatherF32, 4);
+  ExpectCalls(Route::kGatherF32, 1);
 
   int valid_empty_int8_output_dims[] = {2, 0, 0};
   EXPECT_EQ(kTfLiteOk,
@@ -824,6 +873,24 @@ TEST(HeliaGatherPairTest, EmptyAndNullBufferContracts) {
                       nonempty_indices_dims, static_cast<int8_t*>(nullptr),
                       valid_empty_int8_output_dims, kTfLiteInt8));
   ExpectCalls(Route::kGatherS8, 0);
+
+  int valid_empty_int16_output_dims[] = {2, 0, 0};
+  EXPECT_EQ(kTfLiteOk,
+            RunGather(static_cast<const int16_t*>(nullptr),
+                      empty_trailing_input_dims, valid_index,
+                      nonempty_indices_dims, static_cast<int16_t*>(nullptr),
+                      valid_empty_int16_output_dims, kTfLiteInt16));
+  ExpectCalls(Route::kGatherS16, 0);
+
+#if ARM_NN_ENABLE_F16
+  int valid_empty_f16_output_dims[] = {2, 0, 0};
+  EXPECT_EQ(kTfLiteOk,
+            RunGather(static_cast<const uint16_t*>(nullptr),
+                      empty_trailing_input_dims, valid_index,
+                      nonempty_indices_dims, static_cast<uint16_t*>(nullptr),
+                      valid_empty_f16_output_dims, kTfLiteFloat16));
+  ExpectCalls(Route::kGatherF16, 0);
+#endif
 
   int nd_empty_trailing_input_dims[] = {3, 2, 2, 0};
   int nd_nonempty_indices_dims[] = {2, 1, 1};
@@ -843,13 +910,39 @@ TEST(HeliaGatherPairTest, EmptyAndNullBufferContracts) {
                         nd_valid_int8_output_dims, kTfLiteInt8));
   ExpectCalls(Route::kGatherNdS8, 0);
 
+  int nd_valid_int16_output_dims[] = {3, 0, 0, 0};
+  EXPECT_EQ(kTfLiteOk, RunGatherNd(static_cast<const int16_t*>(nullptr),
+                                   nd_empty_trailing_input_dims, valid_index,
+                                   nd_nonempty_indices_dims,
+                                   static_cast<int16_t*>(nullptr),
+                                   nd_valid_int16_output_dims, kTfLiteInt16));
+  ExpectCalls(Route::kGatherNdS16, 0);
+
   int nd_valid_float_output_dims[] = {3, 0, 0, 0};
   EXPECT_EQ(kTfLiteError,
             RunGatherNd(static_cast<const float*>(nullptr),
-                        nd_empty_trailing_input_dims, valid_index,
+                        nd_empty_trailing_input_dims, invalid_index,
                         nd_nonempty_indices_dims, static_cast<float*>(nullptr),
                         nd_valid_float_output_dims, kTfLiteFloat32));
-  ExpectCalls(Route::kGatherNdF32, 2);
+  ExpectCalls(Route::kGatherNdF32, 0);
+
+  int nd_valid_float_output_dims_2[] = {3, 0, 0, 0};
+  EXPECT_EQ(kTfLiteOk,
+            RunGatherNd(static_cast<const float*>(nullptr),
+                        nd_empty_trailing_input_dims, valid_index,
+                        nd_nonempty_indices_dims, static_cast<float*>(nullptr),
+                        nd_valid_float_output_dims_2, kTfLiteFloat32));
+  ExpectCalls(Route::kGatherNdF32, 0);
+
+#if ARM_NN_ENABLE_F16
+  int nd_valid_f16_output_dims[] = {3, 0, 0, 0};
+  EXPECT_EQ(kTfLiteOk, RunGatherNd(static_cast<const uint16_t*>(nullptr),
+                                   nd_empty_trailing_input_dims, valid_index,
+                                   nd_nonempty_indices_dims,
+                                   static_cast<uint16_t*>(nullptr),
+                                   nd_valid_f16_output_dims, kTfLiteFloat16));
+  ExpectCalls(Route::kGatherNdF16, 0);
+#endif
 }
 
 TEST(HeliaGatherPairTest, PrepareRejectsInvalidMetadata) {

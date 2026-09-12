@@ -144,6 +144,27 @@ TfLiteStatus CoreStatus(const char* operation, arm_cmsis_nn_status status) {
   return kTfLiteError;
 }
 
+TfLiteStatus ValidateGatherIndices(const TfLiteEvalTensor* coords,
+                                   int axis_size) {
+  if (HasZeroExtent(coords->dims)) {
+    return kTfLiteOk;
+  }
+  size_t coords_count = 1;
+  for (int i = 0; i < coords->dims->size; ++i) {
+    coords_count *= static_cast<size_t>(coords->dims->data[i]);
+  }
+  const int32_t* coords_data = tflite::micro::GetTensorData<int32_t>(coords);
+  if (coords_data == nullptr) {
+    return kTfLiteError;
+  }
+  for (size_t i = 0; i < coords_count; ++i) {
+    if (coords_data[i] < 0 || coords_data[i] >= axis_size) {
+      return kTfLiteError;
+    }
+  }
+  return kTfLiteOk;
+}
+
 template <typename InputT, typename CoordsT = int32_t>
 TfLiteStatus GatherReference(const TfLiteGatherParams* params,
                              const TfLiteEvalTensor* input,
@@ -176,21 +197,8 @@ TfLiteStatus GatherReference(const TfLiteGatherParams* params,
   }
 
   const int axis_size = input_dims->data[axis];
-  if (HasZeroExtent(coords_dims)) {
-    return kTfLiteOk;
-  }
-
-  size_t coords_count = 1;
-  for (int i = 0; i < coords_dims_size; ++i) {
-    coords_count *= static_cast<size_t>(coords_dims->data[i]);
-  }
-  if (coords_data == nullptr) {
+  if (ValidateGatherIndices(coords, axis_size) != kTfLiteOk) {
     return kTfLiteError;
-  }
-  for (size_t i = 0; i < coords_count; ++i) {
-    if (coords_data[i] < 0 || coords_data[i] >= axis_size) {
-      return kTfLiteError;
-    }
   }
 
   if (HasZeroExtent(output->dims)) {
@@ -382,6 +390,14 @@ TfLiteStatus GatherEval(TfLiteContext* context, TfLiteNode* node) {
     output_dims = MakeCoreDims(output->dims);
   }
   const int32_t* coords_data = tflite::micro::GetTensorData<int32_t>(coords);
+  int axis = params->axis;
+  if (axis < 0) {
+    axis += input->dims->size;
+  }
+  const int axis_size = input->dims->data[axis];
+  if (HasZeroExtent(output->dims)) {
+    return ValidateGatherIndices(coords, axis_size);
+  }
 
   switch (input->type) {
     case kTfLiteFloat32:
@@ -398,6 +414,9 @@ TfLiteStatus GatherEval(TfLiteContext* context, TfLiteNode* node) {
       return GatherReference<float>(params, input, coords, output);
     case kTfLiteInt8:
       if (integer_contract && integer_nonempty) {
+        if (ValidateGatherIndices(coords, axis_size) != kTfLiteOk) {
+          return kTfLiteError;
+        }
         return CoreStatus(
             "arm_gather_s8",
             arm_gather_s8(tflite::micro::GetTensorData<int8_t>(input),
@@ -407,6 +426,9 @@ TfLiteStatus GatherEval(TfLiteContext* context, TfLiteNode* node) {
       }
       return GatherReference<int8_t>(params, input, coords, output);
     case kTfLiteInt16:
+      if (ValidateGatherIndices(coords, axis_size) != kTfLiteOk) {
+        return kTfLiteError;
+      }
       return CoreStatus(
           "arm_gather_s16",
           arm_gather_s16(tflite::micro::GetTensorData<int16_t>(input),

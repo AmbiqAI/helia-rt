@@ -142,6 +142,33 @@ TfLiteStatus CoreStatus(const char* operation, arm_cmsis_nn_status status) {
   return kTfLiteError;
 }
 
+TfLiteStatus ValidateGatherNdIndices(const TfLiteEvalTensor* params,
+                                     const TfLiteEvalTensor* indices) {
+  const int indices_rank = indices->dims->size;
+  const int indices_nd = indices->dims->data[indices_rank - 1];
+  if (RangeHasZero(indices->dims, 0, indices_rank - 1) || indices_nd == 0) {
+    return kTfLiteOk;
+  }
+
+  size_t n_slices = 1;
+  for (int i = 0; i < indices_rank - 1; ++i) {
+    n_slices *= static_cast<size_t>(indices->dims->data[i]);
+  }
+  const int32_t* indices_data = tflite::micro::GetTensorData<int32_t>(indices);
+  if (indices_data == nullptr) {
+    return kTfLiteError;
+  }
+  for (size_t i = 0; i < n_slices; ++i) {
+    for (int j = 0; j < indices_nd; ++j) {
+      const int32_t index = indices_data[i * indices_nd + j];
+      if (index < 0 || index >= params->dims->data[j]) {
+        return kTfLiteError;
+      }
+    }
+  }
+  return kTfLiteOk;
+}
+
 template <typename ParamsT, typename IndicesT>
 TfLiteStatus GatherNdReference(const TfLiteEvalTensor* params,
                                const TfLiteEvalTensor* indices,
@@ -333,6 +360,9 @@ TfLiteStatus GatherNdEval(TfLiteContext* context, TfLiteNode* node) {
     output_dims = MakeCoreDims(output->dims);
   }
   const int32_t* indices_data = tflite::micro::GetTensorData<int32_t>(indices);
+  if (HasZeroExtent(output->dims)) {
+    return ValidateGatherNdIndices(params, indices);
+  }
 
   switch (params->type) {
     case kTfLiteFloat32:
@@ -349,6 +379,9 @@ TfLiteStatus GatherNdEval(TfLiteContext* context, TfLiteNode* node) {
       return GatherNdReference<float, int32_t>(params, indices, output);
     case kTfLiteInt8:
       if (native_contract && integer_nonempty) {
+        if (ValidateGatherNdIndices(params, indices) != kTfLiteOk) {
+          return kTfLiteError;
+        }
         return CoreStatus(
             "arm_gather_nd_s8",
             arm_gather_nd_s8(
@@ -358,6 +391,9 @@ TfLiteStatus GatherNdEval(TfLiteContext* context, TfLiteNode* node) {
       }
       return GatherNdReference<int8_t, int32_t>(params, indices, output);
     case kTfLiteInt16:
+      if (ValidateGatherNdIndices(params, indices) != kTfLiteOk) {
+        return kTfLiteError;
+      }
       return CoreStatus(
           "arm_gather_nd_s16",
           arm_gather_nd_s16(
@@ -376,7 +412,7 @@ TfLiteStatus GatherNdEval(TfLiteContext* context, TfLiteNode* node) {
       return kTfLiteError;
 #endif
     default:
-      MicroPrintf("Params type '%s' are not supported by gather_nd.",
+      MicroPrintf("Params of type '%s' are not supported by gather_nd.",
                   TfLiteTypeGetName(params->type));
       return kTfLiteError;
   }
