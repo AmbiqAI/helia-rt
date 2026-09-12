@@ -22,7 +22,7 @@ your west manifest has to pull in.
 ```yaml
 - name: ns-cmsis-nn
   url: https://github.com/AmbiqAI/ns-cmsis-nn
-  revision: v7.33.0
+  revision: v7.34.0
   path: modules/ns-cmsis-nn
 ```
 

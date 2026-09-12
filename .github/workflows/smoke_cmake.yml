@@ -31,7 +31,7 @@ permissions:
 env:
   # Pin CI to the tested ns-cmsis-nn release, shared by every job that
   # clones it so the cross-compile legs cannot drift apart.
-  NS_CMSIS_NN_REF: v7.33.0
+  NS_CMSIS_NN_REF: v7.34.0
 
 jobs:
   manifest:
