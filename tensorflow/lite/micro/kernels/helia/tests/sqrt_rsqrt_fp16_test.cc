@@ -84,13 +84,22 @@ void CheckBits(const uint16_t* actual, const uint16_t* expected, int count) {
 #endif
 
 void RunModel(const unsigned char* model_data, tflite::BuiltinOperator op,
-              const uint16_t* expected) {
+              const uint16_t* input_bits, const uint16_t* expected, int count,
+              bool scalar) {
   const tflite::Model* model = tflite::GetModel(model_data);
   ASSERT_EQ(model->subgraphs()->size(), 1u);
   const auto* subgraph = model->subgraphs()->Get(0);
   ASSERT_EQ(subgraph->operators()->size(), 1u);
   ASSERT_EQ(subgraph->tensors()->Get(0)->type(), tflite::TensorType_FLOAT16);
   ASSERT_EQ(subgraph->tensors()->Get(1)->type(), tflite::TensorType_FLOAT16);
+  const auto* input_shape = subgraph->tensors()->Get(0)->shape();
+  const auto* output_shape = subgraph->tensors()->Get(1)->shape();
+  ASSERT_EQ(input_shape->size(), scalar ? 0u : 1u);
+  ASSERT_EQ(output_shape->size(), scalar ? 0u : 1u);
+  if (!scalar) {
+    ASSERT_EQ(input_shape->Get(0), count);
+    ASSERT_EQ(output_shape->Get(0), count);
+  }
   const int opcode = subgraph->operators()->Get(0)->opcode_index();
   ASSERT_EQ(model->operator_codes()->Get(opcode)->builtin_code(), op);
 
@@ -102,23 +111,35 @@ void RunModel(const unsigned char* model_data, tflite::BuiltinOperator op,
   tflite::MicroInterpreter interpreter(model, resolver, arena, sizeof(arena));
 #if ARM_NN_ENABLE_F16
   ASSERT_EQ(interpreter.AllocateTensors(), kTfLiteOk);
-  ASSERT_EQ(interpreter.input(0)->bytes, sizeof(kSqrtRsqrtModelInputBits));
-  std::memcpy(interpreter.input(0)->data.raw, kSqrtRsqrtModelInputBits,
-              sizeof(kSqrtRsqrtModelInputBits));
+  const TfLiteIntArray* runtime_input_shape = interpreter.input(0)->dims;
+  ASSERT_EQ(runtime_input_shape->size, scalar ? 0 : 1);
+  if (!scalar) {
+    ASSERT_EQ(runtime_input_shape->data[0], count);
+  }
+  ASSERT_EQ(interpreter.input(0)->bytes,
+            static_cast<size_t>(count) * sizeof(uint16_t));
+  std::memcpy(interpreter.input(0)->data.raw, input_bits,
+              count * sizeof(uint16_t));
   ASSERT_EQ(interpreter.Invoke(), kTfLiteOk);
+  const TfLiteIntArray* runtime_output_shape = interpreter.output(0)->dims;
+  ASSERT_EQ(runtime_output_shape->size, scalar ? 0 : 1);
+  if (!scalar) ASSERT_EQ(runtime_output_shape->data[0], count);
   CheckBits(reinterpret_cast<const uint16_t*>(interpreter.output(0)->data.raw),
-            expected, sizeof(kSqrtRsqrtModelInputBits) / sizeof(uint16_t));
+            expected, count);
 #else
+  (void)input_bits;
   (void)expected;
+  (void)count;
   EXPECT_EQ(interpreter.AllocateTensors(), kTfLiteError);
 #endif
 }
 
-void RunBits(const TFLMRegistration& registration, const uint16_t* expected) {
+void RunBits(const TFLMRegistration& registration, const uint16_t* expected,
+             uint16_t in_place_expected, bool is_sqrt) {
   uint16_t input[17];
   std::memcpy(input, kInputBits, sizeof(input));
   uint16_t in_place[17];
-  std::memcpy(in_place, kInputBits, sizeof(in_place));
+  for (auto& value : in_place) value = 0x4400;
   uint16_t guarded[19];
   std::memset(guarded, 0x5a, sizeof(guarded));
   int dims_data[] = {1, 17};
@@ -133,16 +154,36 @@ void RunBits(const TFLMRegistration& registration, const uint16_t* expected) {
                                      IntArrayFromInts(outputs), nullptr);
 #if ARM_NN_ENABLE_F16
   ASSERT_EQ(runner.InitAndPrepare(), kTfLiteOk);
+#if HELIA_SQRT_RSQRT_LINK_WRAP
+  const int calls_before = is_sqrt ? g_sqrt_calls : g_rsqrt_calls;
+#endif
   ASSERT_EQ(runner.Invoke(), kTfLiteOk);
+#if HELIA_SQRT_RSQRT_LINK_WRAP
+  EXPECT_EQ(is_sqrt ? g_sqrt_calls : g_rsqrt_calls, calls_before + 1);
+#endif
   CheckBits(guarded + 1, expected, 17);
   EXPECT_EQ(guarded[0], 0x5a5a);
   EXPECT_EQ(guarded[18], 0x5a5a);
+  uint16_t first_output[17];
+  std::memcpy(first_output, guarded + 1, sizeof(first_output));
 
   tensors[0].data.raw = reinterpret_cast<char*>(in_place);
   tensors[1].data.raw = tensors[0].data.raw;
   ASSERT_EQ(runner.Invoke(), kTfLiteOk);
-  CheckBits(in_place, expected, 17);
+#if HELIA_SQRT_RSQRT_LINK_WRAP
+  EXPECT_EQ(is_sqrt ? g_sqrt_calls : g_rsqrt_calls, calls_before + 2);
+#endif
+  for (const auto value : in_place) EXPECT_EQ(value, in_place_expected);
+  CheckBits(guarded + 1, first_output, 17);
+
+  tensors[0].data.raw = nullptr;
+  tensors[1].data.raw = reinterpret_cast<char*>(guarded + 1);
+  EXPECT_EQ(runner.Invoke(), kTfLiteError);
+  tensors[0].data.raw = reinterpret_cast<char*>(input);
+  tensors[1].data.raw = nullptr;
+  EXPECT_EQ(runner.Invoke(), kTfLiteError);
 #else
+  (void)is_sqrt;
   EXPECT_EQ(runner.InitAndPrepare(), kTfLiteError);
 #endif
   EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
@@ -172,18 +213,40 @@ TfLiteStatus PrepareWithShapes(const TFLMRegistration& registration,
   return runner.Invoke();
 }
 
+void ExpectPrepareThenInvokeError(const TFLMRegistration& registration,
+                                  uint16_t* input, uint16_t* output,
+                                  int* dims) {
+  TfLiteTensor tensors[] = {
+      CreateTensor(input, IntArrayFromInts(dims), false, kTfLiteFloat16),
+      CreateTensor(output, IntArrayFromInts(dims), false, kTfLiteFloat16),
+  };
+  int inputs[] = {1, 0}, outputs[] = {1, 1};
+  tflite::micro::KernelRunner runner(registration, tensors, 2,
+                                     IntArrayFromInts(inputs),
+                                     IntArrayFromInts(outputs), nullptr);
+  ASSERT_EQ(runner.InitAndPrepare(), kTfLiteOk);
+  ASSERT_TRUE(runner.ValidateTempBufferDeallocated());
+  EXPECT_EQ(runner.Invoke(), kTfLiteError);
+}
+
 }  // namespace
 
 TEST(HeliaSqrtRsqrtFp16Test, ActualModelsUseFp16Registrations) {
   RunModel(kSqrtF16ModelData, tflite::BuiltinOperator_SQRT,
-           kSqrtF16ModelExpectedBits);
+           kSqrtRsqrtModelInputBits, kSqrtF16ModelExpectedBits, 9, false);
   RunModel(kRsqrtF16ModelData, tflite::BuiltinOperator_RSQRT,
-           kRsqrtF16ModelExpectedBits);
+           kSqrtRsqrtModelInputBits, kRsqrtF16ModelExpectedBits, 9, false);
+  RunModel(kSqrtF16ScalarModelData, tflite::BuiltinOperator_SQRT,
+           kSqrtRsqrtScalarModelInputBits, kSqrtF16ScalarModelExpectedBits, 1,
+           true);
+  RunModel(kRsqrtF16ScalarModelData, tflite::BuiltinOperator_RSQRT,
+           kSqrtRsqrtScalarModelInputBits, kRsqrtF16ScalarModelExpectedBits, 1,
+           true);
 }
 
 TEST(HeliaSqrtRsqrtFp16Test, FiniteSpecialTailAndInPlace) {
-  RunBits(tflite::Register_SQRT(), kSqrtBits);
-  RunBits(tflite::Register_RSQRT(), kRsqrtBits);
+  RunBits(tflite::Register_SQRT(), kSqrtBits, 0x4000, true);
+  RunBits(tflite::Register_RSQRT(), kRsqrtBits, 0x3800, false);
 }
 
 TEST(HeliaSqrtRsqrtFp16Test, ScalarAndMultiRank) {
@@ -217,7 +280,11 @@ TEST(HeliaSqrtRsqrtFp16Test, MetadataEmptyAndNull) {
   int two[] = {1, 2};
   int negative[] = {1, -1};
   int overflow[] = {2, 46341, 46341};
+  int two_by_two[] = {2, 2, 2};
+  int one_by_four[] = {2, 1, 4};
+  int scalar[] = {0};
   int empty_after_large_prefix[] = {3, INT_MAX, INT_MAX, 0};
+  int empty_with_negative[] = {2, 0, -1};
   for (const auto registration :
        {tflite::Register_SQRT(), tflite::Register_RSQRT()}) {
     EXPECT_EQ(PrepareWithShapes(registration, one, two, &value, &value),
@@ -228,6 +295,14 @@ TEST(HeliaSqrtRsqrtFp16Test, MetadataEmptyAndNull) {
     EXPECT_EQ(
         PrepareWithShapes(registration, overflow, overflow, &value, &value),
         kTfLiteError);
+    EXPECT_EQ(PrepareWithShapes(registration, two_by_two, one_by_four, &value,
+                                &value),
+              kTfLiteError);
+    EXPECT_EQ(PrepareWithShapes(registration, scalar, one, &value, &value),
+              kTfLiteError);
+    EXPECT_EQ(PrepareWithShapes(registration, empty_with_negative,
+                                empty_with_negative, nullptr, nullptr),
+              kTfLiteError);
     EXPECT_EQ(PrepareWithShapes(registration, one, one, &value, &value,
                                 kTfLiteFloat32),
               kTfLiteError);
@@ -282,12 +357,9 @@ TEST(HeliaSqrtRsqrtFp16Test, SiblingAdmissionAndLegacyRoutes) {
   uint16_t input = 0x3c00;
   uint16_t output = 0;
   int dims[] = {1, 1};
-  EXPECT_EQ(PrepareWithShapes(tflite::Register_SQUARE(), dims, dims, &input,
-                              &output, kTfLiteFloat16, true),
-            kTfLiteError);
-  EXPECT_EQ(PrepareWithShapes(tflite::Register_ABS(), dims, dims, &input,
-                              &output, kTfLiteFloat16, true),
-            kTfLiteError);
+  ExpectPrepareThenInvokeError(tflite::Register_SQUARE(), &input, &output,
+                               dims);
+  ExpectPrepareThenInvokeError(tflite::Register_ABS(), &input, &output, dims);
 
   float f32_input = 4.0f;
   float f32_output = 0.0f;

@@ -149,8 +149,8 @@ differs by target, so it is stated here per case rather than as a single rule.
 | `RSQRT` | +0 / −0 / +Inf | +Inf / −Inf / +0 | +Inf / −Inf / +0 |
 
 FP16 `SQRT` and `RSQRT` quiet NaNs while preserving their sign and payload.
-Negative inputs, including negative infinity, produce the canonical quiet NaN
-bit pattern `0x7e00`.
+Negative nonzero inputs, including negative infinity, produce the canonical
+quiet NaN bit pattern `0x7e00`.
 
 Notes and version boundary:
 
