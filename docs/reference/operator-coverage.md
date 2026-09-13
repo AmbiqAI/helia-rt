@@ -153,14 +153,14 @@ ship FP32 kernels for Cortex-M4+FP and both FP32 and FP16 for Cortex-M55.
 
 ## Summary
 
-| Backend | Optimized kernels | Coverage |
-|---|:---:|---|
-| Reference | 109 | All operators (generic C) |
-| CMSIS-NN | 14 | Core compute-heavy ops |
-| **HELIA** | **38** | **Superset of CMSIS-NN + 24 additional** |
+| Backend | Coverage |
+|---|---|
+| Reference | All operators (generic C) |
+| CMSIS-NN | Core compute-heavy ops |
+| **HELIA** | **Superset of CMSIS-NN with additional optimized operators** |
 
 !!! success "HELIA advantage"
-    HELIA covers **every** operator that CMSIS-NN does, plus 24 additional operators that would otherwise fall back to slow Reference kernels. This means fewer "silent fallbacks" and more consistent performance across your entire model.
+    HELIA covers **every** operator that CMSIS-NN does, plus additional operators that would otherwise fall back to slow Reference kernels. This means fewer "silent fallbacks" and more consistent performance across your entire model.
 
 ## Next Steps
 
