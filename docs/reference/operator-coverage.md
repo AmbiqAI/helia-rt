@@ -69,6 +69,8 @@ heliaRT provides three kernel backends. Every operator has a **Reference** imple
 | `FILL` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
 | `ZEROS_LIKE` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
 | `DEQUANTIZE` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive; int8 / int16 / uint8 / float16 input, float32 output |
+| `GATHER` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive; int8/int16 and FP32/FP16 with CORE ≥ 7.34.0 |
+| `GATHER_ND` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive; int8/int16 and FP32/FP16 with CORE ≥ 7.34.0 |
 
 ## Quantization
 
@@ -131,6 +133,8 @@ resolves them.
 | `PACK` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.33.0; equal input shapes, including scalars |
 | `UNPACK` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.33.0; one output per selected axis element |
 | `FILL` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.33.0; constant dimensions, scalar fill value |
+| `GATHER` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.34.0; native ranks are ≤ 4. Scalar indices are native for floats, use Reference for int8, and are rejected for int16. Higher ranks use Reference for FP32/int8 and are rejected for FP16/int16 |
+| `GATHER_ND` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.34.0; native ranks are ≤ 4 with positive tuple width. Higher ranks and zero-width tuples use Reference for FP32/int8 and are rejected for FP16/int16 |
 | `RESHAPE` | :white_check_mark: | :white_check_mark: | Pure data movement; FP16 works even without `ARM_NN_ENABLE_F16` via a bitwise copy |
 | `DEQUANTIZE` | :white_check_mark: | :white_check_mark: | FP16 is an input storage type widened to an FP32 output, not FP16 arithmetic; works even without `ARM_NN_ENABLE_F16` |
 | `RELU` / `RELU6` | :white_check_mark: | :white_check_mark: | |
@@ -151,10 +155,10 @@ ship FP32 kernels for Cortex-M4+FP and both FP32 and FP16 for Cortex-M55.
 |---|:---:|---|
 | Reference | 109 | All operators (generic C) |
 | CMSIS-NN | 14 | Core compute-heavy ops |
-| **HELIA** | **36** | **Superset of CMSIS-NN + 22 additional** |
+| **HELIA** | **38** | **Superset of CMSIS-NN + 24 additional** |
 
 !!! success "HELIA advantage"
-    HELIA covers **every** operator that CMSIS-NN does, plus 22 additional operators that would otherwise fall back to slow Reference kernels. This means fewer "silent fallbacks" and more consistent performance across your entire model.
+    HELIA covers **every** operator that CMSIS-NN does, plus 24 additional operators that would otherwise fall back to slow Reference kernels. This means fewer "silent fallbacks" and more consistent performance across your entire model.
 
 ## Next Steps
 

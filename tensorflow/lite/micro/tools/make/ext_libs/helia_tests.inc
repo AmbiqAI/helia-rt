@@ -57,3 +57,25 @@ MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
 # see AmbiqAI/helia-rt#283
 MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/split_v_float_test.cc
+
+# Paired GATHER/GATHER_ND heliaCORE routing and adapter-contract coverage.
+# GNU links wrap each CORE entry point so eligible and fallback cases prove
+# their route without adding test hooks to production code.
+$(eval $(call microlite_test,kernel_gather_pair_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/gather_pair_test.cc))
+
+ifeq ($(TOOLCHAIN),gcc)
+$(kernel_gather_pair_test_BINARY): CXXFLAGS += -DHELIA_GATHER_LINK_WRAP=1
+$(kernel_gather_pair_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_gather_f32 \
+  -Wl,--wrap=arm_gather_s8 \
+  -Wl,--wrap=arm_gather_s16 \
+  -Wl,--wrap=arm_gather_nd_f32 \
+  -Wl,--wrap=arm_gather_nd_s8 \
+  -Wl,--wrap=arm_gather_nd_s16
+ifneq (,$(filter cortex-m55,$(TARGET_ARCH)))
+$(kernel_gather_pair_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_gather_f16 \
+  -Wl,--wrap=arm_gather_nd_f16
+endif
+endif
