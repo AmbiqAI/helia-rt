@@ -411,16 +411,18 @@ TEST(HeliaArgExtremaFp16Test, FiniteAxesAndRankPadding) {
                                  0x4200, 0x4400, 0x4800};
   uint16_t rank_three_input[30];
   for (int i = 0; i < 30; ++i) {
-    rank_three_input[i] = finite[(i * 5 + i / 5) % 13];
+    rank_three_input[i] = finite[(i * 7 + i / 5) % 13];
   }
   int rank_three_dims[] = {3, 2, 3, 5};
   int rank_three_output_dims[] = {2, 2, 5};
   int32_t axis = 1;
-  int32_t output[10] = {};
+  int32_t output[10];
+  for (int32_t& value : output) value = -77;
   CheckDirect(tflite::Register_ARG_MIN(), false, rank_three_input,
               rank_three_dims, &axis, rank_three_output_dims, output, 10,
               cmsis_nn_dims{1, 2, 3, 5}, 2);
   axis = -2;
+  for (int32_t& value : output) value = -77;
   CheckDirect(tflite::Register_ARG_MAX(), true, rank_three_input,
               rank_three_dims, &axis, rank_three_output_dims, output, 10,
               cmsis_nn_dims{1, 2, 3, 5}, 2);
@@ -454,6 +456,10 @@ TEST(HeliaArgExtremaFp16Test, SpecialValuesAndTies) {
       {{0x0000, 0x8000, 0, 0}, 2, 0, 0},
       {{0x8000, 0x0000, 0, 0}, 2, 0, 0},
       {{0xfc00, 0x8001, 0x0001, 0x7c00}, 4, 0, 3},
+      {{0x0000, 0x0001, 0, 0}, 2, 0, 1},
+      {{0x0000, 0x8001, 0, 0}, 2, 1, 0},
+      {{0x0001, 0x0002, 0, 0}, 2, 0, 1},
+      {{0x8001, 0x8002, 0, 0}, 2, 1, 0},
   };
   int32_t axis = 0;
   int scalar_output_dims[] = {0};
@@ -607,12 +613,44 @@ TEST(HeliaArgExtremaFp16Test, BoundariesStatusAndPointerRefresh) {
   for (int i = 1; i <= 3; ++i) EXPECT_EQ(second_guarded[i], 0x5a5a5a5a);
 
   second_axis = 1;
-  matrix_dims[1] = 4;
-  vector_dims[1] = 4;
+  uint16_t growth_input[] = {0x5200, 0x5000, 0x4c00, 0x4a00, 0x4800, 0x4400,
+                             0x4200, 0x4000, 0x3c00, 0x3800, 0x3400, 0x0000};
+  int32_t input_growth_guarded[] = {0x13572468, 0x5a5a5a5a, 0x5a5a5a5a,
+                                    0x5a5a5a5a, 0x24681357};
+  tensors[0].data.raw = reinterpret_cast<char*>(growth_input);
+  tensors[2].data.i32 = input_growth_guarded + 1;
+  matrix_dims[2] = 4;
   EXPECT_EQ(runner.Invoke(), kTfLiteError);
   EXPECT_EQ(CallCount(false), calls_before_invalid);
+  EXPECT_EQ(input_growth_guarded[0], 0x13572468);
+  EXPECT_EQ(input_growth_guarded[4], 0x24681357);
+  for (int i = 1; i <= 3; ++i) {
+    EXPECT_EQ(input_growth_guarded[i], 0x5a5a5a5a);
+  }
+
+  int32_t output_growth_guarded[11];
+  output_growth_guarded[0] = 0x13572468;
+  output_growth_guarded[10] = 0x24681357;
+  for (int i = 1; i <= 9; ++i) {
+    output_growth_guarded[i] = 0x5a5a5a5a;
+  }
+  tensors[0].data.raw = reinterpret_cast<char*>(second_input);
+  tensors[2].data.i32 = output_growth_guarded + 1;
+  matrix_dims[1] = 9;
+  matrix_dims[2] = 1;
+  vector_dims[1] = 9;
+  EXPECT_EQ(runner.Invoke(), kTfLiteError);
+  EXPECT_EQ(CallCount(false), calls_before_invalid);
+  EXPECT_EQ(output_growth_guarded[0], 0x13572468);
+  EXPECT_EQ(output_growth_guarded[10], 0x24681357);
+  for (int i = 1; i <= 9; ++i) {
+    EXPECT_EQ(output_growth_guarded[i], 0x5a5a5a5a);
+  }
+
   matrix_dims[1] = 3;
+  matrix_dims[2] = 3;
   vector_dims[1] = 3;
+  tensors[2].data.i32 = second_guarded + 1;
   tensors[0].data.raw = nullptr;
   EXPECT_EQ(runner.Invoke(), kTfLiteError);
   EXPECT_EQ(CallCount(false), calls_before_invalid);
