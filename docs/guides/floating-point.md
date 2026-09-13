@@ -9,10 +9,11 @@ APIs are available.
 ## Feature contract
 
 HELIA float builds require ns-cmsis-nn **v7.33.0 or later** for the
-`SPLIT`, `SPLIT_V`, `PACK`, `UNPACK`, and `FILL` adapters. These operators support
-FP16 and call the corresponding CORE APIs for FP32 when enabled. FP32
-still uses the existing reference implementation when `ARM_NN_ENABLE_F32=0`;
-FP16 is rejected during `AllocateTensors()` when `ARM_NN_ENABLE_F16=0`.
+`SPLIT`, `SPLIT_V`, `PACK`, `UNPACK`, `FILL`, `SQRT`, and `RSQRT` adapters.
+The data-movement operators call the corresponding CORE APIs for FP32 when
+enabled. `SQRT` and `RSQRT` keep their existing FP32 reference paths and call
+CORE for FP16. FP16 is rejected during `AllocateTensors()` when
+`ARM_NN_ENABLE_F16=0`.
 Update separately supplied CORE source targets or archives along with RT.
 
 The five data-movement operations above preserve storage bits, including NaN
@@ -144,6 +145,12 @@ differs by target, so it is stated here per case rather than as a single rule.
 | `LOGISTIC` | NaN, all targets | Finite, at the upper saturation bound (1) | NaN |
 | `LOGISTIC` | +Inf / −Inf | 1 / 0 | 1 / 0 |
 | `ADD`, `MUL` | NaN | NaN | NaN |
+| `SQRT` | +0 / −0 / +Inf | +0 / −0 / +Inf | +0 / −0 / +Inf |
+| `RSQRT` | +0 / −0 / +Inf | +Inf / −Inf / +0 | +Inf / −Inf / +0 |
+
+FP16 `SQRT` and `RSQRT` quiet NaNs while preserving their sign and payload.
+Negative nonzero inputs, including negative infinity, produce the canonical
+quiet NaN bit pattern `0x7e00`.
 
 Notes and version boundary:
 

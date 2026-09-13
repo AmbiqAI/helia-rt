@@ -143,31 +143,32 @@ jobs:
         # 7.32.0 ended the hangs. see AmbiqAI/helia-rt#239
         # Data-movement adds one binary, four cases without F16 and eight with it. see AmbiqAI/helia-rt#280
         # SPLIT_V tests. see AmbiqAI/helia-rt#283
-        # GATHER/GATHER_ND adds one binary, ten cases without F16 and twelve with it.
+        # GATHER/GATHER_ND adds one binary, ten cases without F16 and twelve with it. see AmbiqAI/helia-rt#286
+        # SQRT/RSQRT adds one binary and six cases on every leg. see AmbiqAI/helia-rt#285
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 142
-            min-cases: 1175
+            min-binaries: 143
+            min-cases: 1181
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 142
-            min-cases: 1175
+            min-binaries: 143
+            min-cases: 1181
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and one case fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 141
-            min-cases: 1174
+            min-binaries: 142
+            min-cases: 1180
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 142
-            min-cases: 1223
+            min-binaries: 143
+            min-cases: 1229
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 141
-            min-cases: 1222
+            min-binaries: 142
+            min-cases: 1228
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}

@@ -23,7 +23,7 @@ heliaRT is Ambiq's silicon-adjacent runtime layer for LiteRT for Micro. It keeps
 
 <div class="why-stat-strip" markdown>
 <div><strong>Drop-in</strong><span>same API surface</span></div>
-<div><strong>36</strong><span>HELIA operators</span></div>
+<div><strong>HELIA</strong><span>optimized backend</span></div>
 <div><strong>230+</strong><span>kernel variants</span></div>
 <div><strong>3</strong><span>toolchain paths</span></div>
 </div>

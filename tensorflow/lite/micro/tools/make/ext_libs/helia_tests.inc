@@ -79,3 +79,15 @@ $(kernel_gather_pair_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_gather_nd_f16
 endif
 endif
+
+# see AmbiqAI/helia-rt#285
+$(eval $(call microlite_test,kernel_sqrt_rsqrt_fp16_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/sqrt_rsqrt_fp16_test.cc))
+ifeq ($(TOOLCHAIN),gcc)
+ifneq (,$(filter cortex-m55,$(TARGET_ARCH)))
+$(kernel_sqrt_rsqrt_fp16_test_BINARY): CXXFLAGS += \
+  -DHELIA_SQRT_RSQRT_LINK_WRAP=1
+$(kernel_sqrt_rsqrt_fp16_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_nn_sqrt_f16 -Wl,--wrap=arm_rsqrt_f16
+endif
+endif
