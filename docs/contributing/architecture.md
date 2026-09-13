@@ -13,7 +13,7 @@ helia-rt/
 │   │       ├── helia_common.h
 │   │       ├── conv.cc
 │   │       ├── fully_connected.cc
-│   │       └── ...                 # 36 ops, 230+ kernel variants
+│   │       └── ...                 # Optimized kernels, 230+ variants
 │   ├── tools/make/
 │   │   └── ext_libs/
 │   │       └── helia.inc           # ★ Makefile backend wiring

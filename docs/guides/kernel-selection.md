@@ -53,10 +53,10 @@ For each operator, the build system checks whether an optimized implementation e
 
 ## HELIA Kernel Coverage
 
-The HELIA backend currently provides optimized implementations for **38 operators** — expanding to **230+ kernel variants** when counting per-dtype paths (int8 / int16 / FP32 / FP16):
+The HELIA backend provides optimized implementations across a broad operator set — expanding to **230+ kernel variants** when counting per-dtype paths (int8 / int16 / FP32 / FP16):
 
-??? info "Full list"
-    `activations` · `add` · `batch_matmul` · `comparisons` · `concatenation` · `conv` · `depthwise_conv` · `dequantize` · `fill` · `fully_connected` · `gather` · `gather_nd` · `hard_swish` · `leaky_relu` · `logistic` · `maximum_minimum` · `mul` · `pack` · `pad` · `pooling` · `quantize_common` · `reduce` · `reshape` · `softmax` · `split` · `split_v` · `squeeze` · `strided_slice` · `sub` · `svdf` · `tanh` · `transpose` · `transpose_conv` · `unidirectional_sequence_lstm` · `zeros_like`
+??? info "Kernel source groups"
+    `activations` · `add` · `batch_matmul` · `comparisons` · `concatenation` · `conv` · `depthwise_conv` · `dequantize` · `fill` · `fully_connected` · `gather` · `gather_nd` · `hard_swish` · `leaky_relu` · `logistic` · `maximum_minimum` · `mul` · `pack` · `pad` · `pooling` · `quantize_common` · `reduce` · `reshape` · `softmax` · `split` · `split_v` · `squeeze` · `strided_slice` · `sub` · `svdf` · `tanh` · `transpose` · `transpose_conv` · `unidirectional_sequence_lstm` · `unpack` · `zeros_like`
 
 [:octicons-arrow-right-24: Full operator coverage matrix](../reference/operator-coverage.md)
 
