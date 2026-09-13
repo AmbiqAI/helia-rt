@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.21.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.20.0...helia-rt-v1.21.0) (2026-09-13)
+
+
+### Features
+
+* **helia:** add gather and gather_nd adapters ([69fbb32](https://github.com/AmbiqAI/helia-rt/commit/69fbb325004114f68537bf9a9f007dfbc3c0543e)), closes [#286](https://github.com/AmbiqAI/helia-rt/issues/286)
+* **helia:** support FP16 split, pack, unpack and fill via CORE 7.33 ([#281](https://github.com/AmbiqAI/helia-rt/issues/281)) ([481cd53](https://github.com/AmbiqAI/helia-rt/commit/481cd53a7789d90f18cf3880c36225d073589a47)), closes [#280](https://github.com/AmbiqAI/helia-rt/issues/280)
+* **helia:** validate SPLIT_V metadata and support FP16 ([#284](https://github.com/AmbiqAI/helia-rt/issues/284)) ([c44be87](https://github.com/AmbiqAI/helia-rt/commit/c44be87344f05c49da84d15e576c053a873731ca)), closes [#283](https://github.com/AmbiqAI/helia-rt/issues/283)
+
 ## [1.20.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.19.0...helia-rt-v1.20.0) (2026-09-07)
 
 
