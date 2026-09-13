@@ -30,7 +30,7 @@ heliaRT is Ambiq's optimized LiteRT runtime: the same `.tflite` models and Micro
 
 <div class="metric-grid">
   <div><strong>230+</strong><span>kernel variants</span></div>
-  <div><strong>36</strong><span>operators</span></div>
+  <div><strong>38</strong><span>operators</span></div>
   <div><strong>18</strong><span>CI build combos</span></div>
   <div><strong>3</strong><span>toolchains</span></div>
 </div>
@@ -81,7 +81,7 @@ heliaRT sits between your LiteRT application and Ambiq silicon. It keeps the ups
 <a class="takeaway-card" href="reference/operator-coverage/">
   <span class="card-icon">02</span>
   <strong>More fast paths</strong>
-  <span>36 HELIA operators expand into 230+ kernel variants when int8, int16, FP32, FP16, and specialized code paths are counted separately.</span>
+  <span>38 HELIA operators expand into 230+ kernel variants when int8, int16, FP32, FP16, and specialized code paths are counted separately.</span>
 </a>
 
 <a class="takeaway-card" href="reference/silicon-support/">

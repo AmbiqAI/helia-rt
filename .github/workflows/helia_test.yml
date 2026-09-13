@@ -143,7 +143,7 @@ jobs:
         # 7.32.0 ended the hangs. see AmbiqAI/helia-rt#239
         # Data-movement adds one binary, four cases without F16 and eight with it. see AmbiqAI/helia-rt#280
         # SPLIT_V tests. see AmbiqAI/helia-rt#283
-        # GATHER/GATHER_ND adds one binary, ten cases without F16 and twelve with it.
+        # GATHER/GATHER_ND adds one binary, ten cases without F16 and twelve with it. see AmbiqAI/helia-rt#286
         # SQRT/RSQRT adds one binary and six cases on every leg. see AmbiqAI/helia-rt#285
         include:
           - arch: "cortex-m3"
