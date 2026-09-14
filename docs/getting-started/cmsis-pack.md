@@ -88,7 +88,7 @@ The generated pack exposes these source-build variants:
 |---|---|---|
 | `Reference` | Portable TFLM kernels | No external NN library dependency. |
 | `CMSIS-NN` | Arm CMSIS-NN kernels | Uses the open CMSIS-NN backend source set. |
-| `HELIA` | Ambiq HELIA kernels | Requires the Ambiq `ns-cmsis-nn` / heliaCORE pack dependency. |
+| `HELIA` | Ambiq HELIA kernels | Its PDSC requires the Ambiq `ns-cmsis-nn` / heliaCORE `Source` component at v7.35.0 or later. |
 
 ## Current Recommendation
 
