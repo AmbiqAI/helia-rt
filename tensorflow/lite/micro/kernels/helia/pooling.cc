@@ -43,14 +43,15 @@ void PopulateCommonParams(
     cmsis_nn_context* const ctx, cmsis_nn_dims* const filter_dims,
     const OpData& data, const RuntimeShape& input_shape,
     const RuntimeShape& output_shape, const TfLitePoolParams* params) {
+  const int batches = MatchingDim(input_shape, 0, output_shape, 0);
   const int depth = MatchingDim(input_shape, 3, output_shape, 3);
 
-  input_dims->n = 1;
+  input_dims->n = batches;
   input_dims->h = input_shape.Dims(1);
   input_dims->w = input_shape.Dims(2);
   input_dims->c = depth;
 
-  output_dims->n = 1;
+  output_dims->n = batches;
   output_dims->h = output_shape.Dims(1);
   output_dims->w = output_shape.Dims(2);
   output_dims->c = depth;
@@ -144,10 +145,12 @@ bool EvalFloat(TfLiteContext* context, const TfLitePoolParams* params,
 }
 #endif
 
-void AverageEvalQuantized(TfLiteContext* context, const TfLiteNode* node,
-                          const TfLitePoolParams* params, const OpData& data,
-                          const TfLiteEvalTensor* input,
-                          TfLiteEvalTensor* output) {
+TfLiteStatus AverageEvalQuantized(TfLiteContext* context,
+                                  const TfLiteNode* node,
+                                  const TfLitePoolParams* params,
+                                  const OpData& data,
+                                  const TfLiteEvalTensor* input,
+                                  TfLiteEvalTensor* output) {
   TFLITE_DCHECK((input->type == kTfLiteInt8) || (input->type == kTfLiteInt16));
 
   RuntimeShape input_shape = micro::GetTensorShape(input);
@@ -166,18 +169,25 @@ void AverageEvalQuantized(TfLiteContext* context, const TfLiteNode* node,
                        &filter_dims, data, input_shape, output_shape, params);
 
   if (input->type == kTfLiteInt8) {
-    TFLITE_DCHECK_EQ(
-        arm_avgpool_s8(&ctx, &pool_params, &input_dims,
-                       micro::GetTensorData<int8_t>(input), &filter_dims,
-                       &output_dims, micro::GetTensorData<int8_t>(output)),
-        ARM_CMSIS_NN_SUCCESS);
+    const arm_cmsis_nn_status status = arm_avgpool_s8(
+        &ctx, &pool_params, &input_dims, micro::GetTensorData<int8_t>(input),
+        &filter_dims, &output_dims, micro::GetTensorData<int8_t>(output));
+    if (status != ARM_CMSIS_NN_SUCCESS) {
+      MicroPrintf("AVERAGE_POOL_2D: arm_avgpool_s8 failed (%d).",
+                  static_cast<int>(status));
+      return kTfLiteError;
+    }
   } else {
-    TFLITE_DCHECK_EQ(
-        arm_avgpool_s16(&ctx, &pool_params, &input_dims,
-                        micro::GetTensorData<int16_t>(input), &filter_dims,
-                        &output_dims, micro::GetTensorData<int16_t>(output)),
-        ARM_CMSIS_NN_SUCCESS);
+    const arm_cmsis_nn_status status = arm_avgpool_s16(
+        &ctx, &pool_params, &input_dims, micro::GetTensorData<int16_t>(input),
+        &filter_dims, &output_dims, micro::GetTensorData<int16_t>(output));
+    if (status != ARM_CMSIS_NN_SUCCESS) {
+      MicroPrintf("AVERAGE_POOL_2D: arm_avgpool_s16 failed (%d).",
+                  static_cast<int>(status));
+      return kTfLiteError;
+    }
   }
+  return kTfLiteOk;
 }
 
 TfLiteStatus MaxEvalQuantized(TfLiteContext* context, const TfLiteNode* node,
@@ -202,17 +212,23 @@ TfLiteStatus MaxEvalQuantized(TfLiteContext* context, const TfLiteNode* node,
                        &filter_dims, data, input_shape, output_shape, params);
 
   if (input->type == kTfLiteInt8) {
-    TFLITE_DCHECK_EQ(
-        arm_max_pool_s8(&ctx, &pool_params, &input_dims,
-                        micro::GetTensorData<int8_t>(input), &filter_dims,
-                        &output_dims, micro::GetTensorData<int8_t>(output)),
-        ARM_CMSIS_NN_SUCCESS);
+    const arm_cmsis_nn_status status = arm_max_pool_s8(
+        &ctx, &pool_params, &input_dims, micro::GetTensorData<int8_t>(input),
+        &filter_dims, &output_dims, micro::GetTensorData<int8_t>(output));
+    if (status != ARM_CMSIS_NN_SUCCESS) {
+      MicroPrintf("MAX_POOL_2D: arm_max_pool_s8 failed (%d).",
+                  static_cast<int>(status));
+      return kTfLiteError;
+    }
   } else {
-    TFLITE_DCHECK_EQ(
-        arm_max_pool_s16(&ctx, &pool_params, &input_dims,
-                         micro::GetTensorData<int16_t>(input), &filter_dims,
-                         &output_dims, micro::GetTensorData<int16_t>(output)),
-        ARM_CMSIS_NN_SUCCESS);
+    const arm_cmsis_nn_status status = arm_max_pool_s16(
+        &ctx, &pool_params, &input_dims, micro::GetTensorData<int16_t>(input),
+        &filter_dims, &output_dims, micro::GetTensorData<int16_t>(output));
+    if (status != ARM_CMSIS_NN_SUCCESS) {
+      MicroPrintf("MAX_POOL_2D: arm_max_pool_s16 failed (%d).",
+                  static_cast<int>(status));
+      return kTfLiteError;
+    }
   }
 
   return kTfLiteOk;
@@ -353,7 +369,7 @@ TfLiteStatus AverageEval(TfLiteContext* context, TfLiteNode* node) {
     AveragePoolingEvalFloat(context, node, params, &data.reference_op_data,
                             input, output);
   } else if (input->type == kTfLiteInt8 || input->type == kTfLiteInt16) {
-    AverageEvalQuantized(context, node, params, data, input, output);
+    return AverageEvalQuantized(context, node, params, data, input, output);
   } else {
     MicroPrintf("Input type %s is not currently supported",
                 TfLiteTypeGetName(input->type));
@@ -376,9 +392,7 @@ TfLiteStatus AverageEvalInt8(TfLiteContext* context, TfLiteNode* node) {
   TfLiteEvalTensor* output =
       micro::GetEvalOutput(context, node, kPoolingOutputTensor);
 
-  AverageEvalQuantized(context, node, params, data, input, output);
-
-  return kTfLiteOk;
+  return AverageEvalQuantized(context, node, params, data, input, output);
 }
 
 TfLiteStatus AverageEvalInt16(TfLiteContext* context, TfLiteNode* node) {
@@ -394,9 +408,7 @@ TfLiteStatus AverageEvalInt16(TfLiteContext* context, TfLiteNode* node) {
   TfLiteEvalTensor* output =
       micro::GetEvalOutput(context, node, kPoolingOutputTensor);
 
-  AverageEvalQuantized(context, node, params, data, input, output);
-
-  return kTfLiteOk;
+  return AverageEvalQuantized(context, node, params, data, input, output);
 }
 TfLiteStatus MaxEval(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->builtin_data != nullptr);
@@ -429,7 +441,7 @@ TfLiteStatus MaxEval(TfLiteContext* context, TfLiteNode* node) {
     MaxPoolingEvalFloat(context, node, params, &data.reference_op_data, input,
                         output);
   } else if (input->type == kTfLiteInt8 || input->type == kTfLiteInt16) {
-    MaxEvalQuantized(context, node, params, data, input, output);
+    return MaxEvalQuantized(context, node, params, data, input, output);
   } else {
     MicroPrintf("Input type %s is not currently supported",
                 TfLiteTypeGetName(input->type));
@@ -452,8 +464,7 @@ TfLiteStatus MaxEvalInt8(TfLiteContext* context, TfLiteNode* node) {
   TfLiteEvalTensor* output =
       micro::GetEvalOutput(context, node, kPoolingOutputTensor);
 
-  MaxEvalQuantized(context, node, params, data, input, output);
-  return kTfLiteOk;
+  return MaxEvalQuantized(context, node, params, data, input, output);
 }
 
 TfLiteStatus MaxEvalInt16(TfLiteContext* context, TfLiteNode* node) {
@@ -469,8 +480,7 @@ TfLiteStatus MaxEvalInt16(TfLiteContext* context, TfLiteNode* node) {
   TfLiteEvalTensor* output =
       micro::GetEvalOutput(context, node, kPoolingOutputTensor);
 
-  MaxEvalQuantized(context, node, params, data, input, output);
-  return kTfLiteOk;
+  return MaxEvalQuantized(context, node, params, data, input, output);
 }
 
 }  // namespace
