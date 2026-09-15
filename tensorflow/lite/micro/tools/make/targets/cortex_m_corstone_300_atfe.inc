@@ -84,7 +84,7 @@ ATFE_LINKER_SCRIPT := $(TENSORFLOW_ROOT)tensorflow/lite/micro/cortex_m_corstone_
 LDFLAGS += \
   -nostartfiles \
   -T $(ATFE_LINKER_SCRIPT) \
-  -Wl,-Map=gen/$(TARGET).map,--cref \
+  -Wl,-Map=$(GENDIR)$(TARGET).map,--cref \
   -Wl,--gc-sections \
   -Wl,--entry=Reset_Handler
 
