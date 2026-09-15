@@ -92,3 +92,14 @@ $(kernel_sqrt_rsqrt_fp16_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_nn_sqrt_f16 -Wl,--wrap=arm_rsqrt_f16
 endif
 endif
+
+$(eval $(call microlite_test,kernel_arg_extrema_fp16_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/arg_extrema_fp16_test.cc))
+ifeq ($(TOOLCHAIN),gcc)
+ifneq (,$(filter cortex-m55,$(TARGET_ARCH)))
+$(kernel_arg_extrema_fp16_test_BINARY): CXXFLAGS += \
+  -DHELIA_ARG_EXTREMA_LINK_WRAP=1
+$(kernel_arg_extrema_fp16_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_argmin_f16 -Wl,--wrap=arm_argmax_f16
+endif
+endif

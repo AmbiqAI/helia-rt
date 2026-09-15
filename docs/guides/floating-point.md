@@ -34,6 +34,12 @@ use the arena, including when there are more than 16 outputs or rank exceeds 6.
 rank-four optimized boundary and FP32 reference fallbacks are documented in
 [Operator Coverage](../reference/operator-coverage.md).
 
+FP16 `ARG_MIN` and `ARG_MAX` require ns-cmsis-nn **v7.35.0 or later**. They
+accept rank-one through rank-four FP16 inputs, a scalar or one-element INT32
+axis (including a normalized negative axis), and an INT32 output whose shape is
+the input shape with that axis removed. The reduced extent must be positive.
+FP32 and int8 retain their TFLM reference paths.
+
 ns-cmsis-nn v7.28.0 or later exports these definitions from its CMake target;
 from v7.32.0 they are also the only names it accepts as CMake inputs,
 including on the NSX path:
@@ -152,6 +158,10 @@ FP16 `SQRT` and `RSQRT` quiet NaNs while preserving their sign and payload.
 Negative nonzero inputs, including negative infinity, produce the canonical
 quiet NaN bit pattern `0x7e00`.
 
+FP16 `ARG_MIN` and `ARG_MAX` select the first NaN index when a reduction slice
+contains NaN. Otherwise they select the first occurrence of the numeric
+minimum or maximum, including equal signed zeros and repeated infinities.
+
 Notes and version boundary:
 
 - **`TANH` and `LOGISTIC` are by design.** ns-cmsis-nn documents NaN as
@@ -189,7 +199,7 @@ Notes and version boundary:
 
 ## Make builds
 
-The Make integration pins ns-cmsis-nn v7.34.0 and configures the float features
+The Make integration pins ns-cmsis-nn v7.35.0 and configures the float features
 from `TARGET_ARCH`:
 
 - FP32 is enabled for the HELIA backend.
@@ -466,7 +476,8 @@ against earlier heliaRT releases:
   configuration step emits undefined-symbol warnings; update the module
   revision to silence them and to get the float kernels. The data-movement
   adapters listed under [Feature contract](#feature-contract)
-  require v7.33.0; `GATHER` and `GATHER_ND` require v7.34.0.
+  require v7.33.0; `GATHER` and `GATHER_ND` require v7.34.0; FP16 `ARG_MIN`
+  and `ARG_MAX` require v7.35.0.
 - **Library size**: Make-based helia builds now always compile the FP32
   kernels (and FP16 on `cortex-m55`) into the combined archive. Integer-only
   models still reference them transitively through the operator wrappers, so

@@ -91,15 +91,14 @@ CSUB = "helia-rt"
 # consistent. Consumers who need the prebuilt heliaCORE for binary-size
 # reasons can override at integration time.
 #
-# 7.34.0 is the floor because the HELIA source component includes the GATHER
-# and GATHER_ND adapters and therefore requires the corresponding declarations
-# and internal shape contract first shipped in that release.
+# 7.35.0 is the floor because the HELIA source component includes the FP16
+# ARG_MIN and ARG_MAX adapter, which requires APIs first shipped in that release.
 NS_CMSIS_NN_VENDOR = "Ambiq"
 NS_CMSIS_NN_CCLASS = "Machine Learning"
 NS_CMSIS_NN_CGROUP = "NN Lib"
 NS_CMSIS_NN_CSUB = "heliaCORE"
 NS_CMSIS_NN_CVARIANT = "Source"
-NS_CMSIS_NN_MIN_VERSION = "7.34.0"
+NS_CMSIS_NN_MIN_VERSION = "7.35.0"
 
 
 # ---------------------------------------------------------------------------

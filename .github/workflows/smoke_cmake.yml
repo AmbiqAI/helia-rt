@@ -31,7 +31,7 @@ permissions:
 env:
   # Pin CI to the tested ns-cmsis-nn release, shared by every job that
   # clones it so the cross-compile legs cannot drift apart.
-  NS_CMSIS_NN_REF: v7.34.0
+  NS_CMSIS_NN_REF: v7.35.0
 
 jobs:
   manifest:
@@ -370,6 +370,8 @@ jobs:
               reinterpret_cast<void*>(&arm_avg_pool_f16),
               reinterpret_cast<void*>(&arm_max_pool_f16),
               reinterpret_cast<void*>(&arm_softmax_f16),
+              reinterpret_cast<void*>(&arm_argmin_f16),
+              reinterpret_cast<void*>(&arm_argmax_f16),
           };
 
           // heliaRT kernels that dispatch to them; pulls the archive members in.
@@ -383,6 +385,8 @@ jobs:
               reinterpret_cast<void*>(&tflite::Register_PACK),
               reinterpret_cast<void*>(&tflite::Register_UNPACK),
               reinterpret_cast<void*>(&tflite::Register_FILL),
+              reinterpret_cast<void*>(&tflite::Register_ARG_MIN),
+              reinterpret_cast<void*>(&tflite::Register_ARG_MAX),
           };
           }  // namespace
 
@@ -439,7 +443,8 @@ jobs:
           for sym in arm_convolve_wrapper_f32 arm_avg_pool_f32 arm_softmax_f32 \
                      arm_convolve_wrapper_f16 arm_avg_pool_f16 arm_softmax_f16 \
                      arm_split_f32 arm_pack_f32 arm_unpack_f32 arm_nn_fill_f32 \
-                     arm_split_f16 arm_pack_f16 arm_unpack_f16 arm_nn_fill_f16; do
+                     arm_split_f16 arm_pack_f16 arm_unpack_f16 arm_nn_fill_f16 \
+                     arm_argmin_f16 arm_argmax_f16; do
             if ! grep -qE " (T|t|W|w) ${sym}$" <<<"${probe_syms}"; then
               echo "::error::${sym} missing from link probe image"
               exit 1
@@ -833,6 +838,8 @@ jobs:
               reinterpret_cast<void*>(&tflite::Register_PACK),
               reinterpret_cast<void*>(&tflite::Register_UNPACK),
               reinterpret_cast<void*>(&tflite::Register_FILL),
+              reinterpret_cast<void*>(&tflite::Register_ARG_MIN),
+              reinterpret_cast<void*>(&tflite::Register_ARG_MAX),
           };
           }  // namespace
 
@@ -932,6 +939,12 @@ jobs:
           for sym in arm_quantize_f32_s8 arm_dequantize_s8_f32; do
             if ! grep -qE " (T|t|W|w) ${sym}$" <<<"${probe_syms}"; then
               echo "::error::${sym} missing from the int8 link probe image"
+              exit 1
+            fi
+          done
+          for sym in arm_argmin_f16 arm_argmax_f16; do
+            if grep -qE " [A-Za-z] ${sym}$" <<<"${probe_syms}"; then
+              echo "::error::${sym} present in the int8 link probe image"
               exit 1
             fi
           done

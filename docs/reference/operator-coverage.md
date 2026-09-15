@@ -84,6 +84,7 @@ heliaRT provides three kernel backends. Every operator has a **Reference** imple
 | Operator | REF | CMSIS | HELIA | Notes |
 |---|:---:|:---:|:---:|---|
 | `MEAN` / `REDUCE_MAX` / `SUM` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive. `MEAN` and `SUM` (REDUCE_SUM) add FP32/FP16 |
+| `ARG_MIN` / `ARG_MAX` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA adds native FP16 with CORE ≥ 7.35.0; FP32/int8 use Reference |
 
 ## Floating-Point Coverage
 
@@ -128,6 +129,7 @@ resolves them.
 | `ADD` / `SUB` / `MUL` | :white_check_mark: | :white_check_mark: | Identical input shapes are optimized at any rank; broadcasting is optimized for rank ≤ 4 with every dimension pair equal or 1, and a higher-rank broadcast uses Reference (FP32) or is rejected at prepare (FP16) |
 | `HARD_SWISH` | :white_check_mark: | :white_check_mark: | FP16 requires `ARM_NN_ENABLE_F16`; without it there is no reference to fall back to, so it is rejected at prepare |
 | `SQRT` / `RSQRT` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.33.0; FP16 requires `ARM_NN_ENABLE_F16`; FP32 keeps the TFLM reference path |
+| `ARG_MIN` / `ARG_MAX` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.35.0; FP16 supports rank 1..4, a scalar or one-element INT32 axis and an exact squeezed INT32 output. FP32/int8 keep the TFLM reference path |
 | `MEAN` / `SUM` | :white_check_mark: | :white_check_mark: | Optimized for rank ≤ 4 with any axis set; higher ranks use Reference (FP32). FP16 requires `ARM_NN_ENABLE_F16` and rank ≤ 4, both enforced at prepare |
 | `CONCATENATION` | :white_check_mark: | :white_check_mark: | Optimized for rank ≤ 4; higher ranks use the Reference path (FP32 and FP16) |
 | `SPLIT` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.33.0; constant axis, equal output extents; rank ≥ 1 |
