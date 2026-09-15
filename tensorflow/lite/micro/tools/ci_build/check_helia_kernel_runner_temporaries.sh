@@ -16,38 +16,27 @@
 #
 # Rejects `micro::KernelRunner runner(Register_X(), ...)`.
 #
-# Why (helia-rt #239): KernelRunner's constructor takes the registration by
-# `const TFLMRegistration&`. A temporary bound to a reference *member* through
-# a constructor is NOT lifetime-extended -- it dies at the end of the full
-# expression that builds the runner. Every later call then reads a dead stack
-# slot. Under ATfE clang 22 for cortex-m55 the compiler reuses that slot before
-# `InitAndPrepare()`, corrupting `registration.init`, and the following `blx`
-# takes a UsageFault (INVSTATE). GCC happened to lay the stack out differently,
-# so the bug was invisible on half the matrix for months.
-#
-# The member is stored by value as of #239, so this is belt and braces: the
-# check keeps the *source* idiom honest even if the by-value member is ever
-# reverted by an upstream sync (see helia/patches/inline_drift.md).
+# Why: a temporary bound to a reference *member* through a constructor is NOT
+# lifetime-extended, so every later call reads a dead stack slot. KernelRunner
+# stores the registration by value now, so this keeps the *source* idiom honest
+# across upstream syncs (see helia/patches/inline_drift.md).
+# see AmbiqAI/helia-rt#239
 #
 # The correct idiom, which every other test in these files already uses:
 #
 #   const TFLMRegistration registration = Register_X();
 #   micro::KernelRunner runner(registration, tensors, ...);
 #
-# What is flagged: a KernelRunner constructed from a *call expression*, whether
-# the call takes arguments or not (`Register_X()`, `GetRegistrationFor(kX)`),
-# on the constructor line or wrapped onto the next line. Comment lines are
-# skipped, and passing an existing object (`registration`, `*registration_ptr`)
-# is fine.
+# What is flagged: a KernelRunner constructed from a *call expression*, on the
+# constructor line or wrapped onto the next line. Comment lines are skipped,
+# and passing an existing object is fine.
 #
-# Opt-out: an accessor that returns a `const TFLMRegistration&` to an object
-# which outlives the runner (a function-local static, a file-scope constant) is
-# safe. Mark such a construction with a trailing
+# Opt-out: mark the constructor line with a trailing
 #
 #   // NOLINT(kernelrunner-temporary)
 #
-# on the constructor line and this check will skip it. Use it only when the
-# referent's lifetime is genuinely longer than the runner's.
+# when the referent genuinely outlives the runner (a function-local static, a
+# file-scope constant).
 #
 # Usage: check_helia_kernel_runner_temporaries.sh [root]
 #   root defaults to the repository root inferred from this script's location.

@@ -379,13 +379,13 @@ endfunction()
 #   - Zephyr module builds (CONFIG_HELIA_RT defined): the final Kconfig values
 #     CONFIG_NS_CMSIS_NN_ENABLE_F32 / _F16 are authoritative; an absent
 #     (disabled) symbol means OFF.
-#   - Otherwise: NSX/CMake option NSX_CMSIS_NN_ENABLE_F32 / _F16, falling back
-#     to the historical default of fp32 on, fp16 off.
+#   - Otherwise: CMake option ARM_NN_ENABLE_F32 / _F16, falling back to the
+#     historical default of fp32 on, fp16 off.
 #
 # These mirror the options that drive ns-cmsis-nn's own source selection. The
-# authoritative value is whatever the linked ns-cmsis-nn target exports as
-# ARM_NN_ENABLE_F32/F16; the root CMakeLists reconciles against it once the
-# target is resolved (see _helia_rt_sync_float_definitions).
+# authoritative value is what the resolved ns-cmsis-nn library reports through
+# helia_rt_query_float_support(); the root CMakeLists reconciles against it
+# once the target is resolved (see _helia_rt_sync_float_definitions).
 # ---------------------------------------------------------------------------
 function(helia_rt_float_feature_flags OUT_F32 OUT_F16)
     if(DEFINED CONFIG_HELIA_RT)
@@ -397,15 +397,28 @@ function(helia_rt_float_feature_flags OUT_F32 OUT_F16)
         # same Kconfig) never compiled, breaking the final link.
         set(_f32 "${CONFIG_NS_CMSIS_NN_ENABLE_F32}")
         set(_f16 "${CONFIG_NS_CMSIS_NN_ENABLE_F16}")
+    elseif(DEFINED HELIA_RT_FLOAT32_ENABLED OR DEFINED HELIA_RT_FLOAT16_ENABLED)
+        # Already resolved against the linked target by nsx/CMakeLists.txt;
+        # prefer it over the raw options, which are only a request.
+        if(DEFINED HELIA_RT_FLOAT32_ENABLED)
+            set(_f32 "${HELIA_RT_FLOAT32_ENABLED}")
+        else()
+            set(_f32 OFF)
+        endif()
+        if(DEFINED HELIA_RT_FLOAT16_ENABLED)
+            set(_f16 "${HELIA_RT_FLOAT16_ENABLED}")
+        else()
+            set(_f16 OFF)
+        endif()
     else()
-        if(DEFINED NSX_CMSIS_NN_ENABLE_F32)
-            set(_f32 "${NSX_CMSIS_NN_ENABLE_F32}")
+        if(DEFINED ARM_NN_ENABLE_F32)
+            set(_f32 "${ARM_NN_ENABLE_F32}")
         else()
             set(_f32 ON)
         endif()
 
-        if(DEFINED NSX_CMSIS_NN_ENABLE_F16)
-            set(_f16 "${NSX_CMSIS_NN_ENABLE_F16}")
+        if(DEFINED ARM_NN_ENABLE_F16)
+            set(_f16 "${ARM_NN_ENABLE_F16}")
         else()
             set(_f16 OFF)
         endif()
@@ -421,6 +434,109 @@ function(helia_rt_float_feature_flags OUT_F32 OUT_F16)
     else()
         set(${OUT_F16} OFF PARENT_SCOPE)
     endif()
+endfunction()
+
+# ---------------------------------------------------------------------------
+# helia_rt_float_flags_from_target(DEP OUT_F32 OUT_F16)
+#
+# Reads ARM_NN_ENABLE_F32/F16 off a resolved ns-cmsis-nn target's
+# INTERFACE_COMPILE_DEFINITIONS: what it compiled, not what was requested.
+# A non-existent target yields OFF/OFF; for the option fallback use
+# helia_rt_resolve_float_flags(). Callers go through
+# helia_rt_query_float_support(), which prefers ns-cmsis-nn's own query.
+# ---------------------------------------------------------------------------
+function(helia_rt_float_flags_from_target dep OUT_F32 OUT_F16)
+    set(_dep_defs "")
+    if(TARGET "${dep}")
+        get_target_property(_dep_prop "${dep}" INTERFACE_COMPILE_DEFINITIONS)
+        if(_dep_prop)
+            set(_dep_defs "${_dep_prop}")
+        endif()
+    endif()
+
+    # Regex per entry, not IN_LIST: a definition may be wrapped in a
+    # generator expression, which an exact match reads as absent.
+    set(_have_f32 OFF)
+    set(_have_f16 OFF)
+    foreach(_d IN LISTS _dep_defs)
+        if(_d MATCHES "(^|[^A-Za-z0-9_])ARM_NN_ENABLE_F32=1($|[^0-9])")
+            set(_have_f32 ON)
+        endif()
+        if(_d MATCHES "(^|[^A-Za-z0-9_])ARM_NN_ENABLE_F16=1($|[^0-9])")
+            set(_have_f16 ON)
+        endif()
+    endforeach()
+
+    set(${OUT_F32} ${_have_f32} PARENT_SCOPE)
+    set(${OUT_F16} ${_have_f16} PARENT_SCOPE)
+endfunction()
+
+# ---------------------------------------------------------------------------
+# helia_rt_query_float_support(OUT_F32 OUT_F16 [TARGET <t>])
+#
+# Asks the resolved ns-cmsis-nn library which float kernels it shipped, rather
+# than re-deriving it from cache variables. see AmbiqAI/ns-cmsis-nn#420
+# Without TARGET there is no library to ask, so the option/Kconfig answer
+# stands in; that is a request, not what was compiled.
+# A TARGET that names no target yields OFF/OFF, as helia_rt_float_flags_from_target() does.
+# ---------------------------------------------------------------------------
+function(helia_rt_query_float_support OUT_F32 OUT_F16)
+    cmake_parse_arguments(_ARG "" "TARGET" "" ${ARGN})
+    if(_ARG_UNPARSED_ARGUMENTS)
+        message(FATAL_ERROR
+            "helia_rt_query_float_support: unexpected argument(s): "
+            "${_ARG_UNPARSED_ARGUMENTS}")
+    endif()
+
+    if(NOT _ARG_TARGET)
+        helia_rt_float_feature_flags(_q_f32 _q_f16)
+    elseif(NOT TARGET "${_ARG_TARGET}")
+        set(_q_f32 OFF)
+        set(_q_f16 OFF)
+    elseif(COMMAND ns_cmsis_nn_float_support)
+        ns_cmsis_nn_float_support(F32 _q_f32 F16 _q_f16 TARGET "${_ARG_TARGET}")
+    else()
+        # Libraries before ns-cmsis-nn 7.32.0 have no query; read their exported definitions. see AmbiqAI/ns-cmsis-nn#420
+        helia_rt_float_flags_from_target("${_ARG_TARGET}" _q_f32 _q_f16)
+    endif()
+
+    if(_q_f32)
+        set(${OUT_F32} ON PARENT_SCOPE)
+    else()
+        set(${OUT_F32} OFF PARENT_SCOPE)
+    endif()
+    if(_q_f16)
+        set(${OUT_F16} ON PARENT_SCOPE)
+    else()
+        set(${OUT_F16} OFF PARENT_SCOPE)
+    endif()
+endfunction()
+
+# ---------------------------------------------------------------------------
+# helia_rt_resolve_float_flags(OUT_F32 OUT_F16 OUT_SOURCE [DEP <target>])
+#
+# Shared by the nsx module, the root CMakeLists and Zephyr so they cannot
+# disagree. Order: the ns-cmsis-nn float query on DEP <target> when it exists,
+# else helia_rt_float_feature_flags(). OUT_SOURCE reports which one answered.
+# ---------------------------------------------------------------------------
+function(helia_rt_resolve_float_flags OUT_F32 OUT_F16 OUT_SOURCE)
+    cmake_parse_arguments(_ARG "" "DEP" "" ${ARGN})
+
+    if(_ARG_DEP AND TARGET "${_ARG_DEP}")
+        helia_rt_query_float_support(_rf_f32 _rf_f16 TARGET "${_ARG_DEP}")
+        set(_rf_source "ns-cmsis-nn target")
+    else()
+        helia_rt_float_feature_flags(_rf_f32 _rf_f16)
+        if(DEFINED CONFIG_HELIA_RT)
+            set(_rf_source "Zephyr Kconfig")
+        else()
+            set(_rf_source "ARM_NN_ENABLE option")
+        endif()
+    endif()
+
+    set(${OUT_F32}    ${_rf_f32}     PARENT_SCOPE)
+    set(${OUT_F16}    ${_rf_f16}     PARENT_SCOPE)
+    set(${OUT_SOURCE} "${_rf_source}" PARENT_SCOPE)
 endfunction()
 
 # ---------------------------------------------------------------------------
@@ -525,4 +641,69 @@ function(helia_rt_build_type_compile_definitions OUT_VAR)
             "'${_ARG_BUILD_TYPE}'. Supported: debug | release_with_logs | release")
     endif()
     set(${OUT_VAR} ${_defs} PARENT_SCOPE)
+endfunction()
+
+# ---------------------------------------------------------------------------
+# helia_rt_collect_interface_compile_flags(OUT_VAR TARGET <name>)
+#
+# Collects the compile flags a target imposes on consumers, walking
+# INTERFACE_LINK_LIBRARIES transitively: boards reach -mcpu through a linked
+# SoC flags target, and try_compile()'s LINK_LIBRARIES does not propagate
+# usage requirements for a non-IMPORTED target. Generator expressions cannot
+# be evaluated at configure time and are skipped.
+# see AmbiqAI/helia-rt#254
+# ---------------------------------------------------------------------------
+function(helia_rt_collect_interface_compile_flags OUT_VAR)
+    cmake_parse_arguments(_ARG "" "TARGET" "" ${ARGN})
+
+    set(_flags "")
+    set(_seen "")
+    set(_queue "${_ARG_TARGET}")
+
+    while(_queue)
+        list(POP_FRONT _queue _t)
+        if(NOT _t OR NOT TARGET "${_t}")
+            continue()
+        endif()
+        if("${_t}" IN_LIST _seen)
+            continue()
+        endif()
+        list(APPEND _seen "${_t}")
+
+        get_target_property(_alias "${_t}" ALIASED_TARGET)
+        if(_alias)
+            list(APPEND _queue "${_alias}")
+            continue()
+        endif()
+
+        get_target_property(_opts "${_t}" INTERFACE_COMPILE_OPTIONS)
+        if(_opts)
+            foreach(_o IN LISTS _opts)
+                if(NOT _o MATCHES "\\$<")
+                    string(APPEND _flags " ${_o}")
+                endif()
+            endforeach()
+        endif()
+
+        get_target_property(_defs "${_t}" INTERFACE_COMPILE_DEFINITIONS)
+        if(_defs)
+            foreach(_d IN LISTS _defs)
+                if(NOT _d MATCHES "\\$<")
+                    string(APPEND _flags " -D${_d}")
+                endif()
+            endforeach()
+        endif()
+
+        get_target_property(_deps "${_t}" INTERFACE_LINK_LIBRARIES)
+        if(_deps)
+            foreach(_dep IN LISTS _deps)
+                if(NOT _dep MATCHES "\\$<")
+                    list(APPEND _queue "${_dep}")
+                endif()
+            endforeach()
+        endif()
+    endwhile()
+
+    string(STRIP "${_flags}" _flags)
+    set(${OUT_VAR} "${_flags}" PARENT_SCOPE)
 endfunction()

@@ -3,9 +3,9 @@ ifneq (,$(filter $(TARGET_ARCH), x86_64))
   # NS-CMSIS-NN optimizations not supported
 endif
 
-# Tracks AmbiqAI/ns-cmsis-nn tag v7.31.0. Consumed by ns_cmsis_nn_download.sh
+# Tracks AmbiqAI/ns-cmsis-nn tag v7.35.0. Consumed by ns_cmsis_nn_download.sh
 # via the environment.
-NS_CMSIS_NN_COMMIT ?= 9884d5fccab884c90c3d5e8865d5babbb1cabc63
+NS_CMSIS_NN_COMMIT ?= cad3c8fa0cc2f7b13d6ff750bfc9744af0d621a6
 export NS_CMSIS_NN_COMMIT
 
 ifneq (,$(NS_CMSIS_NN_LIBS))
@@ -100,38 +100,16 @@ CXXFLAGS += -DARM_NN_ENABLE_F32=1
 
 # The fp16 API requires ARMv8.1-M MVEF toolchain support. Keep it disabled for
 # other targets because heliaCore rejects ARM_NN_ENABLE_F16 without float16_t.
+# see AmbiqAI/helia-rt#253, AmbiqAI/helia-rt#254, AmbiqAI/helia-rt#256
 ifneq (,$(filter cortex-m55,$(TARGET_ARCH)))
   CCFLAGS  += -DARM_NN_ENABLE_F16=1
   CXXFLAGS += -DARM_NN_ENABLE_F16=1
 
-  # No FP16 build workaround is needed here. GCC PR target/118460 ("[14
-  # Regression] ICE on armv8.1-m.main with -mfloat-abi=hard") makes GCC 14
-  # ICE on scalar _Float16 conditional selects for Armv8.1-M+MVE.FP
-  # hard-float, and heliaRT used to compile the ns-cmsis-nn %_f16.c/%_fp16.c
-  # translation units with -fno-ssa-phiopt to dodge it. That is now handled
-  # at the source: ns-cmsis-nn routes the affected scalar FP16
-  # min/max/clamp/abs paths through the guarded helpers in
-  # Include/arm_nnsupportfunctions.h (arm_nn_{min,max,clamp,abs}_f16h and
-  # friends, gated on __GNUC__ >= 14 && __GNUC__ < 16), so the offending
-  # HFmode conditional move is never emitted.
-  #
-  # The pin this removal depends on is v7.31.0, not the v7.30.0 that first
-  # carried the ICE fix (ns PR 221). Those helpers replaced compare-selects
-  # with min/max primitives that suppress NaN, and the NaN-propagating
-  # behaviour was only restored in ns PR 380, which first shipped in
-  # v7.31.0. Dropping the flag against v7.30.0 would buy ICE-freedom at the
-  # cost of the float NaN contract that docs/guides/floating-point.md and
-  # kernels/helia/tests/float_elementwise_edge_test.cc assert.
-  #
-  # Verified with the pinned Arm GNU Toolchain 14.3.Rel1 at the -O3 these
-  # TUs are built with: pre-helper v7.29.2 ICEs on 7 of 45 FP16 TUs, while
-  # the pinned v7.31.0 builds all of them clean with no extra flag.
-  #
-  # The GCC bug itself is unfixed on the gcc-14 branch (fixed on master via
-  # r16-4445/r16-5119 and backported to releases/gcc-15 as r15-10491/2, so
-  # Arm GNU Toolchain 15.2.Rel1+ is clean). Keep using those ns-cmsis-nn
-  # helpers in any new scalar FP16 code rather than reintroducing a
-  # build-flag workaround.
+  # ns-cmsis-nn routes the scalar FP16 min/max/clamp/abs paths through
+  # guarded helpers, so GCC 14 never emits the HFmode conditional move that
+  # ICEs (GCC PR target/118460) and no build-flag workaround is needed here.
+  # Keep new scalar FP16 code on those helpers.
+  # see AmbiqAI/ns-cmsis-nn#221, AmbiqAI/helia-rt#193
 endif
 
 # helia per-kernel optimization knobs.

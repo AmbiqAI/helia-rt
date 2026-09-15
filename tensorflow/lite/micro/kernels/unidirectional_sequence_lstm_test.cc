@@ -27,21 +27,10 @@ limitations under the License.
 #include "arm_nnfunctions_flt.h"
 #endif
 
-// The reference kernels and the heliaCORE kernels
-// (OPTIMIZED_KERNEL_DIR=helia, backed by ns-cmsis-nn) keep the quantized
-// hidden and cell state in the TFLite variable tensors, so a second invocation
-// continues from the state of the first one. The upstream CMSIS-NN release
-// pinned by this repository still evaluates the quantized LSTM statelessly
-// (arm_lstm_unidirectional_s8/s16 force a NULL initial hidden state and clear
-// the cell state), so the state assertions are skipped for those builds.
-//
-// The persistent-state contract for the *quantized* kernels
-// (cmsis_nn_lstm_context::hidden_state) landed in ns-cmsis-nn v7.28.0.  A HELIA
-// build against anything older compiles the stateless fallback in
-// kernels/helia/unidirectional_sequence_lstm.cc, so the version has to be part
-// of the gate -- otherwise the stateless kernel would be run against stateful
-// assertions and fail by construction.  Keep this threshold in sync with the
-// quantized NS_CMSIS_NN_VERSION fences in that kernel.
+// The stateful quantized-LSTM assertions below need the persistent-state
+// contract, which upstream CMSIS-NN lacks and ns-cmsis-nn added in v7.28.0.
+// Keep this threshold in sync with the quantized NS_CMSIS_NN_VERSION fences in
+// kernels/helia/unidirectional_sequence_lstm.cc.
 #if defined(HELIA)
 #include "Include/arm_nn_types.h"  // NS_CMSIS_NN_VERSION
 #endif
@@ -639,36 +628,51 @@ TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMFloat16) {
   const int output_tensor_index = source.KernelOutputs()->data[0];
   const auto* out_f16 =
       reinterpret_cast<float16_t*>(tensors[output_tensor_index].data.raw);
-  // The fp16 pipeline deviates from the float32 goldens by up to ~2.7e-2 on
-  // this data; 4e-2 leaves headroom for toolchain-dependent fp16 fma /
-  // reduction ordering without loosening the check materially.
+  // Derived by evaluating the LSTM recurrence in double precision and rounding
+  // to float16; see kernels/helia/tests/gen_lstm_f16_goldens.py.
+  constexpr float kExpectedFirstOutput[] = {
+      0.26464844f, 0.26879883f, 0.47924805f, 0.47949219f,
+      0.58007812f, 0.58007812f, -0.00141144f, -0.00001431f,
+      0.46875000f, 0.46899414f, 0.50048828f, 0.50048828f};
+  // Bounds below come from float16 arithmetic, not from measured drift. Per
+  // time step the chain from the incoming state to the hidden output rounds
+  // five times (gate accumulator, gate activation, cell store, tanh(cell),
+  // hidden store) and evaluates two float16 table activations. Only the
+  // accumulator can exceed 1, and |acc| <= 4 for the cell and output gates;
+  // the forget and input gates saturate here and pass nothing through.
+  // arm_nn_tanh_lut_f16 (see AmbiqAI/ns-cmsis-nn#407) documents only its
+  // geometry, [0, 4] in 256 linearly interpolated segments, so its error is
+  // the float16 node's half-ulp (2.4e-4 for |tanh| <= 1) plus an
+  // interpolation term below 2.4e-5, about 2.4e-4 per activation:
+  //   (4 + 1 + 1 + 1 + 1) * 2^-11 + 2 * 2.4e-4 = 4.4e-3 per time step
+  //   three time steps -> 1.4e-2
+#if defined(NS_CMSIS_NN_VERSION) && NS_CMSIS_NN_VERSION >= 7032000
+  constexpr float kFirstInvokeTolerance = 1.4e-2f;
+#else
+  // Every current f16 build is MVE and already on the LUT tanh; the wider
+  // bound covers a future non-MVE f16 target on a pin before AmbiqAI/ns-cmsis-nn#407.
+  constexpr float kFirstInvokeTolerance = 4e-2f;
+#endif
   for (int i = 0; i < 12; ++i) {
-    EXPECT_NEAR(kernel_eval_data.expected_output[i], static_cast<float>(out_f16[i]),
-                4e-2f);
+    EXPECT_NEAR(kExpectedFirstOutput[i], static_cast<float>(out_f16[i]),
+                kFirstInvokeTolerance);
   }
 
-#if NS_CMSIS_NN_VERSION >= 7029000
+// Derived goldens hold from the LUT scalar tanh onward. see AmbiqAI/ns-cmsis-nn#407
+#if defined(NS_CMSIS_NN_VERSION) && NS_CMSIS_NN_VERSION >= 7032000
+  // Derived by evaluating the LSTM recurrence in double precision across both
+  // invokes and rounding to float16; see the generator named above.
   constexpr float kExpectedSecondOutput[] = {
-      0.64306641f, 0.64306641f, 0.65332031f, 0.65332031f,
-      0.65625000f, 0.65625000f, 0.36450195f, 0.36450195f,
-      0.64550781f, 0.64550781f, 0.60107422f, 0.60107422f};
+      0.61376953f, 0.61376953f, 0.62402344f, 0.62402344f,
+      0.62646484f, 0.62646484f, 0.33593750f, 0.33544922f,
+      0.61572266f, 0.61572266f, 0.56884766f, 0.56884766f};
   constexpr float kExpectedSecondHidden[] = {
-      0.65625000f, 0.65625000f, 0.60107422f, 0.60107422f};
+      0.62646484f, 0.62646484f, 0.56884766f, 0.56884766f};
   constexpr float kExpectedSecondCell[] = {
-      0.97021484f, 0.97021484f, 0.92089844f, 0.92089844f};
-  // The f16 goldens above were captured from a v7.29.x ns-cmsis-nn build, not
-  // derived: the float32 goldens in this file document an independent
-  // derivation, these do not.  ns-cmsis-nn PR 324 (first shipped in v7.30.0)
-  // tail predicates arm_nn_lstm_step_f16 so every lane, tail lanes included,
-  // takes the vector LUT tanh instead of the scalar rational approximation,
-  // and documents that as moving f16 results by up to ~2.4e-2.  This bound
-  // sits just above that documented shift and stays tighter than the 4e-2
-  // first-invoke bound above.  It is an interim bound, not a licence to
-  // loosen a failing check: the tolerance-free lane-uniformity test in
-  // kernels/helia/tests/float_lstm_tail_lane_test.cc is the strong guard on
-  // this kernel, and deriving these goldens from a double-precision reference
-  // so this bound can be tightened again is tracked as a follow-up.
-  constexpr float kSecondInvokeTolerance = 2.5e-2f;
+      0.94091797f, 0.94091797f, 0.88574219f, 0.88574219f};
+  // The second invoke starts from the first invoke's state, so six time steps
+  // of the per-step budget above accumulate: 6 * 4.4e-3 = 2.7e-2.
+  constexpr float kSecondInvokeTolerance = 2.7e-2f;
 
   const auto* hidden_f16 = reinterpret_cast<const float16_t*>(
       tensors[kLstmOutputStateTensor].data.raw);

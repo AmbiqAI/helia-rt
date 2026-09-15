@@ -300,13 +300,24 @@ TfLiteStatus EvalIntegerSVDF(TfLiteContext* context, TfLiteNode* node,
   TFLITE_DCHECK(context != nullptr);
   TFLITE_DCHECK(context->GetScratchBuffer != nullptr);
 
+  // .size mirrors the Prepare-time RequestScratchBufferInArena requests; an
+  // indeterminate size disables the kernel's opt-in scratch check.
+  // See AmbiqAI/ns-cmsis-nn#312.
+  const int32_t batch_size = input_dims.n;
+  const int32_t num_filters = weights_feature_dims.n;
+  const int32_t num_units = output_dims.h;
+
   cmsis_nn_context scratch_ctx;
   scratch_ctx.buf = static_cast<int32_t*>(
       context->GetScratchBuffer(context, data.scratch_tensor_index));
+  scratch_ctx.size =
+      static_cast<int32_t>(batch_size * num_filters * sizeof(int32_t));
 
   cmsis_nn_context scratch_output_ctx;
   scratch_output_ctx.buf = static_cast<int32_t*>(
       context->GetScratchBuffer(context, data.scratch_output_tensor_index));
+  scratch_output_ctx.size =
+      static_cast<int32_t>(batch_size * num_units * sizeof(int32_t));
 
   int8_t* output_data = tflite::micro::GetTensorData<int8_t>(output_tensor);
 
@@ -322,7 +333,6 @@ TfLiteStatus EvalIntegerSVDF(TfLiteContext* context, TfLiteNode* node,
           context->GetScratchBuffer(context, data.scratch_weight_tensor_index));
 
       const int input_size = input_tensor->dims->data[1];
-      const int num_filters = weights_feature_tensor->dims->data[0];
 
       arm_vector_sum_s8(
           static_cast<int32_t*>(ctx.buf), input_size, num_filters,
@@ -330,32 +340,38 @@ TfLiteStatus EvalIntegerSVDF(TfLiteContext* context, TfLiteNode* node,
           -data.input_zero_point, -data.activation_state_zero_point, nullptr);
 #endif
 
-      arm_svdf_s8(
-          &ctx, &scratch_ctx, &scratch_output_ctx, &svdf_params,
-          &in_quant_params, &out_quant_params, &input_dims,
-          tflite::micro::GetTensorData<int8_t>(input_tensor), &state_dims,
-          tflite::micro::GetTensorData<int8_t>(activation_state_tensor),
-          &weights_feature_dims,
-          tflite::micro::GetTensorData<int8_t>(weights_feature_tensor),
-          &weights_time_dims,
-          tflite::micro::GetTensorData<int8_t>(weights_time_tensor), &bias_dims,
-          tflite::micro::GetTensorData<int32_t>(bias_tensor), &output_dims,
-          output_data);
+      TF_LITE_ENSURE_EQ(
+          context,
+          arm_svdf_s8(
+              &ctx, &scratch_ctx, &scratch_output_ctx, &svdf_params,
+              &in_quant_params, &out_quant_params, &input_dims,
+              tflite::micro::GetTensorData<int8_t>(input_tensor), &state_dims,
+              tflite::micro::GetTensorData<int8_t>(activation_state_tensor),
+              &weights_feature_dims,
+              tflite::micro::GetTensorData<int8_t>(weights_feature_tensor),
+              &weights_time_dims,
+              tflite::micro::GetTensorData<int8_t>(weights_time_tensor),
+              &bias_dims, tflite::micro::GetTensorData<int32_t>(bias_tensor),
+              &output_dims, output_data),
+          ARM_CMSIS_NN_SUCCESS);
       return kTfLiteOk;
     }
 
     case kTfLiteInt16: {
-      arm_svdf_state_s16_s8(
-          &scratch_ctx, &scratch_output_ctx, &svdf_params, &in_quant_params,
-          &out_quant_params, &input_dims,
-          tflite::micro::GetTensorData<int8_t>(input_tensor), &state_dims,
-          tflite::micro::GetTensorData<int16_t>(activation_state_tensor),
-          &weights_feature_dims,
-          tflite::micro::GetTensorData<int8_t>(weights_feature_tensor),
-          &weights_time_dims,
-          tflite::micro::GetTensorData<int16_t>(weights_time_tensor),
-          &bias_dims, tflite::micro::GetTensorData<int32_t>(bias_tensor),
-          &output_dims, output_data);
+      TF_LITE_ENSURE_EQ(
+          context,
+          arm_svdf_state_s16_s8(
+              &scratch_ctx, &scratch_output_ctx, &svdf_params, &in_quant_params,
+              &out_quant_params, &input_dims,
+              tflite::micro::GetTensorData<int8_t>(input_tensor), &state_dims,
+              tflite::micro::GetTensorData<int16_t>(activation_state_tensor),
+              &weights_feature_dims,
+              tflite::micro::GetTensorData<int8_t>(weights_feature_tensor),
+              &weights_time_dims,
+              tflite::micro::GetTensorData<int16_t>(weights_time_tensor),
+              &bias_dims, tflite::micro::GetTensorData<int32_t>(bias_tensor),
+              &output_dims, output_data),
+          ARM_CMSIS_NN_SUCCESS);
       return kTfLiteOk;
     }
 

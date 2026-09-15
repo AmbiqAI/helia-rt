@@ -183,20 +183,41 @@ TfLiteStatus CmsisNnPrepareSvdf(TfLiteContext* context, TfLiteNode* node) {
 
     TFLITE_DCHECK(context->RequestScratchBufferInArena != nullptr);
 
+    cmsis_nn_dims input_dims = {};
+    input_dims.n = batch_size;
+    input_dims.h = input_size;
+
+    cmsis_nn_dims weights_feature_dims = {};
+    weights_feature_dims.n = num_filters;
+    weights_feature_dims.h = input_size;
+
+    cmsis_nn_svdf_params sizer_svdf_params = {};
+    sizer_svdf_params.rank = params->rank;
+
+    // Request exactly what the published input_ctx/output_ctx sizers report;
+    // Eval declares the same figures in ctx.size (AmbiqAI/ns-cmsis-nn#312).
+    const bool state_s16 = weights_time->type == kTfLiteInt16;
+    const int32_t scratch_size =
+        state_s16 ? arm_svdf_state_s16_s8_input_ctx_get_buffer_size(
+                        &input_dims, &weights_feature_dims)
+                  : arm_svdf_s8_input_ctx_get_buffer_size(
+                        &input_dims, &weights_feature_dims);
+    const int32_t scratch_output_size =
+        state_s16 ? arm_svdf_state_s16_s8_output_ctx_get_buffer_size(
+                        &sizer_svdf_params, &input_dims, &weights_feature_dims)
+                  : arm_svdf_s8_output_ctx_get_buffer_size(
+                        &sizer_svdf_params, &input_dims, &weights_feature_dims);
+    TF_LITE_ENSURE(context, scratch_size >= 0);
+    TF_LITE_ENSURE(context, scratch_output_size >= 0);
+
     const TfLiteStatus scratch_status = context->RequestScratchBufferInArena(
-        context, batch_size * num_filters * sizeof(int32_t),
-        &(data->scratch_tensor_index));
+        context, scratch_size, &(data->scratch_tensor_index));
     TF_LITE_ENSURE_OK(context, scratch_status);
 
     const TfLiteStatus scratch_output_status =
         context->RequestScratchBufferInArena(
-            context, batch_size * num_units * sizeof(int32_t),
-            &(data->scratch_output_tensor_index));
+            context, scratch_output_size, &(data->scratch_output_tensor_index));
     TF_LITE_ENSURE_OK(context, scratch_output_status);
-
-    cmsis_nn_dims weights_feature_dims;
-    weights_feature_dims.n = num_filters;
-    weights_feature_dims.h = input_size;
 
     const int32_t buf_size = arm_svdf_s8_get_buffer_size(&weights_feature_dims);
     TF_LITE_ENSURE_MSG(context, buf_size >= 0,
@@ -323,22 +344,29 @@ TfLiteStatus EvalIntegerSVDF(TfLiteContext* context, TfLiteNode* node,
 
   // .size must describe the buffer actually behind .buf: leaving it
   // indeterminate (or defaulting it to 0) disables the kernel's own
-  // under-allocation check. These two are the arm_svdf_s8 /
-  // arm_svdf_state_s16_s8 input_ctx and output_ctx, and Prepare requested them
-  // as batch * num_filters * sizeof(int32_t) and batch * num_units *
-  // sizeof(int32_t) respectively. Prepare enforces
-  // output->dims == {batch_size, num_units}, so output_dims carries both.
-  const int32_t batch_size = input_dims.n;
-  const int32_t num_filters = weights_feature_dims.n;
-  const int32_t num_units = output_dims.h;
+  // under-allocation check. Both figures come from the same published sizers
+  // Prepare used for its arena requests (AmbiqAI/ns-cmsis-nn#312).
+  const bool state_s16 = weights_time_tensor->type == kTfLiteInt16;
+  const int32_t scratch_size =
+      state_s16 ? arm_svdf_state_s16_s8_input_ctx_get_buffer_size(
+                      &input_dims, &weights_feature_dims)
+                : arm_svdf_s8_input_ctx_get_buffer_size(&input_dims,
+                                                        &weights_feature_dims);
+  const int32_t scratch_output_size =
+      state_s16 ? arm_svdf_state_s16_s8_output_ctx_get_buffer_size(
+                      &svdf_params, &input_dims, &weights_feature_dims)
+                : arm_svdf_s8_output_ctx_get_buffer_size(
+                      &svdf_params, &input_dims, &weights_feature_dims);
+  TF_LITE_ENSURE(context, scratch_size >= 0);
+  TF_LITE_ENSURE(context, scratch_output_size >= 0);
 
   cmsis_nn_context scratch_ctx = {
       context->GetScratchBuffer(context, data.scratch_tensor_index),
-      static_cast<int32_t>(batch_size * num_filters * sizeof(int32_t))};
+      scratch_size};
 
   cmsis_nn_context scratch_output_ctx = {
       context->GetScratchBuffer(context, data.scratch_output_tensor_index),
-      static_cast<int32_t>(batch_size * num_units * sizeof(int32_t))};
+      scratch_output_size};
 
   int8_t* output_data = tflite::micro::GetTensorData<int8_t>(output_tensor);
 
@@ -359,6 +387,7 @@ TfLiteStatus EvalIntegerSVDF(TfLiteContext* context, TfLiteNode* node,
                                             data.scratch_weight_tensor_index);
 
         const int input_size = input_tensor->dims->data[1];
+        const int32_t num_filters = weights_feature_dims.n;
 
         const arm_cmsis_nn_status vector_sum_status = arm_vector_sum_s8(
             static_cast<int32_t*>(ctx.buf), input_size, num_filters,

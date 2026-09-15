@@ -75,6 +75,26 @@ TfLiteStatus DequantizeEval(TfLiteContext* context, TfLiteNode* node) {
                                 tflite::micro::GetTensorShape(output),
                                 tflite::micro::GetTensorData<float>(output));
       break;
+    // Storage widening, not float16 arithmetic, so it is not gated on
+    // kHeliaFloat16Enabled; see AmbiqAI/helia-rt#255.
+    case kTfLiteFloat16: {
+      float* output_data = tflite::micro::GetTensorData<float>(output);
+      const int flat_size = ElementCount(*input->dims);
+#if ARM_NN_ENABLE_F16
+      const float16_t* input_data =
+          tflite::micro::GetTensorData<float16_t>(input);
+      for (int i = 0; i < flat_size; ++i) {
+        output_data[i] = static_cast<float>(input_data[i]);
+      }
+#else
+      const TfLiteFloat16* input_data =
+          tflite::micro::GetTensorData<TfLiteFloat16>(input);
+      for (int i = 0; i < flat_size; ++i) {
+        output_data[i] = Float16BitsToFloat32(input_data[i].data);
+      }
+#endif
+      break;
+    }
     default:
       MicroPrintf("Input %s, output %s not supported.",
                   TfLiteTypeGetName(input->type),

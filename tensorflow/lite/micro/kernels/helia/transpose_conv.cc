@@ -258,13 +258,9 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     cmsis_nn_transpose_conv_params conv_params = {};
     conv_params.stride.w = params->stride_width;
     conv_params.stride.h = params->stride_height;
-    // The SPEED-path weight-sum precompute below folds
-    // lhs_offset * sum(weights) into the buffer, so it needs the real input
-    // offset. data->params.input_offset is not derived until after
-    // CalculateOpData() runs, well below this point, and it lands in a
-    // different struct -- so reading conv_params.input_offset here without
-    // setting it fed stack garbage to arm_convolve_weight_sum(). Same source
-    // as the assignment further down and as the Eval path.
+    // The SPEED-path weight-sum precompute below needs the real input offset,
+    // which CalculateOpData() does not derive until further down.
+    // see AmbiqAI/helia-rt#222
     conv_params.input_offset = -input->params.zero_point;
 
     cmsis_nn_dims input_dims;
@@ -326,15 +322,9 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
         &conv_params, &input_dims, &filter_dims, &output_dims);
     TF_LITE_ENSURE_MSG(context, buf_size >= 0,
                        "TRANSPOSE_CONV: invalid scratch buffer size.");
-    // Requested unconditionally, unlike the `if (size > 0)` guard used by
-    // conv.cc / pooling.cc. arm_transpose_conv_wrapper_s8() rejects a NULL
-    // ctx->buf up front, unconditionally, and the reverse-conv sizer below
-    // genuinely returns 0 whenever reverse-conv is unused (stride > 2 or
-    // input_c <= 16, which is the common case), so that buffer would be a
-    // skipped request on most models and the kernel would then reject the
-    // call. Zero-byte requests are safe: the arena records them and the
-    // planner still assigns an offset, so GetScratchBuffer() returns non-NULL.
-    // Kept on both requests so the two stay symmetrical.
+    // Requested unconditionally, not under an `if (size > 0)` guard:
+    // arm_transpose_conv_wrapper_s8() rejects a NULL ctx->buf, and a zero-byte
+    // request still gets an arena offset. Both requests below do the same.
     TF_LITE_ENSURE_OK(context,
                       context->RequestScratchBufferInArena(
                           context, buf_size, &(data->scratch_buffer_index)));
@@ -500,10 +490,10 @@ TfLiteStatus EvalQuantizedPerChannel(TfLiteContext* context, TfLiteNode* node,
   else {
     if (data.weight_buffer_idx > -1) {
       weight_sum_ctx.buf = context->GetScratchBuffer(context, data.weight_buffer_idx);
-      //now need to redo the weight sum because we didn't precompute
-      // Status checked: on MVE a failure here leaves the weight-sum buffer
-      // unwritten and arm_transpose_conv_wrapper_s8() would then compute over
-      // it and still report success.
+      // Now need to redo the weight sum because we didn't precompute.
+      // Status checked: a failure leaves the weight-sum buffer unwritten and
+      // the wrapper below would still report success.
+      // see AmbiqAI/helia-rt#233, AmbiqAI/helia-rt#237
       const arm_cmsis_nn_status weight_sum_status = arm_convolve_weight_sum(
           (int32_t*)weight_sum_ctx.buf,
           tflite::micro::GetTensorData<const int8_t>(filter), &input_dims,

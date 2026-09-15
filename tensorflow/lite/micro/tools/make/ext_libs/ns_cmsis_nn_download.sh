@@ -82,7 +82,7 @@ NS_CMSIS_NN_URL="https://github.com/AmbiqAI/ns-cmsis-nn.git"
 # local-scope rules are not part of the threat model either way.
 
 # Set GIT_COMMIT to NS_CMSIS_NN_COMMIT if set, otherwise use default.
-# Default tracks AmbiqAI/ns-cmsis-nn tag v7.31.0. Keep in sync with
+# Default tracks AmbiqAI/ns-cmsis-nn tag v7.35.0. Keep in sync with
 # NS_CMSIS_NN_COMMIT in ext_libs/helia.inc, which is what make actually passes;
 # this fallback only applies when the script is run directly.
 #
@@ -92,7 +92,7 @@ NS_CMSIS_NN_URL="https://github.com/AmbiqAI/ns-cmsis-nn.git"
 # into extra argv words for `git checkout` (option injection, not shell
 # injection -- there is no eval here). The canary also validates the input
 # against ^[A-Za-z0-9._/-]+$ before it gets this far; this is the second layer.
-GIT_COMMIT=${NS_CMSIS_NN_COMMIT:-9884d5fccab884c90c3d5e8865d5babbb1cabc63}
+GIT_COMMIT=${NS_CMSIS_NN_COMMIT:-cad3c8fa0cc2f7b13d6ff750bfc9744af0d621a6}
 
 # clone_ns_cmsis_nn: attempt git clone and surface a clear error on failure.
 clone_ns_cmsis_nn() {
@@ -152,7 +152,7 @@ checkout_ref() {
   if ! git checkout "${ref}" >&2; then
     echo >&2 "ERROR: ns-cmsis-nn ref '${ref}' did not resolve to a commit in AmbiqAI/ns-cmsis-nn."
     echo >&2 "       Check the ref passed via NS_CMSIS_NN_COMMIT (or the ns_cmsis_nn_canary"
-    echo >&2 "       dispatch input). A valid full SHA, tag (e.g. v7.31.0), or branch is required."
+    echo >&2 "       dispatch input). A valid full SHA, tag (e.g. v7.35.0), or branch is required."
     exit 1
   fi
 }

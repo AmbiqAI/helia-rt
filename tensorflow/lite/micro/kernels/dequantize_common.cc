@@ -42,7 +42,9 @@ TfLiteStatus DequantizePrepare(TfLiteContext* context, TfLiteNode* node) {
 
   TF_LITE_ENSURE(context, input->type == kTfLiteInt8 ||
                               input->type == kTfLiteInt16 ||
-                              input->type == kTfLiteUInt8);
+                              input->type == kTfLiteUInt8 ||
+                              // helia: f16 input, see AmbiqAI/helia-rt#255
+                              input->type == kTfLiteFloat16);
   TF_LITE_ENSURE(context, output->type == kTfLiteFloat32);
 
   data->quantization_params.zero_point = input->params.zero_point;

@@ -9,6 +9,7 @@
 # patching the upstream test files for purely additive coverage.
 MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/hard_swish_int16_test.cc \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/pooling_status_test.cc \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/quantize_zero_point_test.cc \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/transpose_conv_optional_bias_test.cc
 
@@ -36,3 +37,69 @@ MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_activation_edge_test.cc \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_elementwise_edge_test.cc \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_lstm_tail_lane_test.cc
+
+# heliaCORE float routing tests; each compares the kernel against the TFLM
+# reference and exercises the fallback. see AmbiqAI/helia-rt#275
+MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_hard_swish_test.cc \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_reduce_test.cc \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_elementwise_broadcast_test.cc
+
+# Two-source test; the kernels/Makefile.inc simple-test loop takes one file per
+# target. kernel_ prefix keeps it in the FVP kernel tally. see AmbiqAI/helia-rt#272
+$(eval $(call microlite_test,kernel_model_hard_swish_depthwise_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/model_hard_swish_depthwise_test.cc \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/model_hard_swish_depthwise_data.cc))
+
+# see AmbiqAI/helia-rt#280
+MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_data_movement_test.cc
+
+# see AmbiqAI/helia-rt#283
+MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/split_v_float_test.cc
+
+# Paired GATHER/GATHER_ND heliaCORE routing and adapter-contract coverage.
+# GNU links wrap each CORE entry point so eligible and fallback cases prove
+# their route without adding test hooks to production code.
+$(eval $(call microlite_test,kernel_gather_pair_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/gather_pair_test.cc))
+
+ifeq ($(TOOLCHAIN),gcc)
+$(kernel_gather_pair_test_BINARY): CXXFLAGS += -DHELIA_GATHER_LINK_WRAP=1
+$(kernel_gather_pair_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_gather_f32 \
+  -Wl,--wrap=arm_gather_s8 \
+  -Wl,--wrap=arm_gather_s16 \
+  -Wl,--wrap=arm_gather_nd_f32 \
+  -Wl,--wrap=arm_gather_nd_s8 \
+  -Wl,--wrap=arm_gather_nd_s16
+ifneq (,$(filter cortex-m55,$(TARGET_ARCH)))
+$(kernel_gather_pair_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_gather_f16 \
+  -Wl,--wrap=arm_gather_nd_f16
+endif
+endif
+
+# see AmbiqAI/helia-rt#285
+$(eval $(call microlite_test,kernel_sqrt_rsqrt_fp16_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/sqrt_rsqrt_fp16_test.cc))
+ifeq ($(TOOLCHAIN),gcc)
+ifneq (,$(filter cortex-m55,$(TARGET_ARCH)))
+$(kernel_sqrt_rsqrt_fp16_test_BINARY): CXXFLAGS += \
+  -DHELIA_SQRT_RSQRT_LINK_WRAP=1
+$(kernel_sqrt_rsqrt_fp16_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_nn_sqrt_f16 -Wl,--wrap=arm_rsqrt_f16
+endif
+endif
+
+$(eval $(call microlite_test,kernel_arg_extrema_fp16_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/arg_extrema_fp16_test.cc))
+ifeq ($(TOOLCHAIN),gcc)
+ifneq (,$(filter cortex-m55,$(TARGET_ARCH)))
+$(kernel_arg_extrema_fp16_test_BINARY): CXXFLAGS += \
+  -DHELIA_ARG_EXTREMA_LINK_WRAP=1
+$(kernel_arg_extrema_fp16_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_argmin_f16 -Wl,--wrap=arm_argmax_f16
+endif
+endif

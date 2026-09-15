@@ -74,6 +74,51 @@ infrastructure used by every kernel test.
 Drop condition: upstream tflite-micro adopts a by-value member (or otherwise
 lifetime-extends the registration) in `kernel_runner.h`.
 
+## `tensorflow/lite/micro/kernels/dequantize.h`, `tensorflow/lite/micro/kernels/dequantize.cc`, `tensorflow/lite/micro/kernels/dequantize_common.cc`, `tensorflow/lite/micro/kernels/dequantize_test.cc`, `tensorflow/lite/micro/kernels/xtensa/dequantize.cc`
+
+Widens DEQUANTIZE to accept a `kTfLiteFloat16` input with a float32 output,
+the form the LiteRT converter emits for fp16-PTQ weights (see
+AmbiqAI/helia-rt#255). Five inline changes:
+
+- `dequantize_common.cc`: `DequantizePrepare` admits `kTfLiteFloat16`. The
+  scale/zero-point read stays unconditional; an f16 tensor carries `{0, 0}`
+  params, which the widening path never uses.
+- `dequantize.h`: adds the shared `Float16BitsToFloat32()` bit-expansion
+  helper.
+- `dequantize.cc`: adds the `kTfLiteFloat16` case to the reference Eval.
+- `xtensa/dequantize.cc`: adds the same case to the xtensa Eval, using the
+  same portable helper (there is no HiFi f16 widening primitive to call).
+- `dequantize_test.cc`: adds the float16 golden and Prepare-rejection tests.
+
+Prepare is shared with `kernels/helia/dequantize.cc`, so the type admission
+cannot live under `kernels/helia/`; the helper and the reference Eval case
+are kept inline so the helia kernel and the reference kernel produce
+identical bits for every finite value, zero, infinity and NaN (signalling
+NaNs are quieted on both paths), on hosts and on cores without f16
+arithmetic. With `ARM_NN_ENABLE_F16` the helia kernel uses the hardware
+convert instead, whose NaN and subnormal results follow FPSCR; the float16
+golden test pins it on the cortex-m55 leg.
+
+Drop condition: upstream TFLM accepts float16 DEQUANTIZE input.
+
+## `tensorflow/lite/micro/kernels/cmsis_nn/svdf.cc`
+
+First inline drift in `kernels/cmsis_nn/` (AmbiqAI/ns-cmsis-nn#312). Two
+edits: `.size` is populated on the two SVDF scratch contexts with the exact
+byte counts Prepare requested (upstream leaves the field indeterminate;
+upstream ARM CMSIS-NN never reads it, an ns-cmsis-nn-backed build would),
+and the `arm_svdf_s8` / `arm_svdf_state_s16_s8` calls are wrapped in
+`TF_LITE_ENSURE_EQ(..., ARM_CMSIS_NN_SUCCESS)` instead of discarding the
+status. The status half matches upstream's own `cmsis_nn/fully_connected.cc`
+idiom, so on a sync conflict prefer keeping it and offering it upstream.
+
+Cannot be moved to `kernels/helia/` because helia builds never compile this
+directory; the caller-side fix has to live in the cmsis_nn kernel itself.
+
+Drop condition: upstream tflite-micro takes an equivalent fix (the status
+half is upstream-idiomatic today; the `.size` half matters upstream only if
+ARM CMSIS-NN adopts a `ctx->size` contract).
+
 ## `tensorflow/lite/micro/tools/make/Makefile`
 
 Three minimal hooks (~34 lines of inline drift, down from ~80):

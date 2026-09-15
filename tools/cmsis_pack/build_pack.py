@@ -79,10 +79,11 @@ CSUB = "helia-rt"
 
 # Identity of the cross-pack dependency (Ambiq ns-cmsis-nn / heliaCORE).
 # Pinned to the ns-cmsis-nn release that aligned its CMake / Zephyr / NSX /
-# CMSIS-Pack surfaces with heliaRT. Bump the lower bound when a newer
-# ns-cmsis-nn release introduces a breaking contract change; widen to a
-# range (e.g. "7.25.0:8.0.0") once the next-major compatibility window is
-# known. The CI guard at tools/cmsis_pack/check_pdsc.py asserts this value.
+# CMSIS-Pack surfaces with heliaRT. Bump the lower bound when a source adapter
+# requires a newer API or a newer release introduces a breaking contract
+# change; widen to a range (e.g. "7.25.0:8.0.0") once the next-major
+# compatibility window is known. The CI guard at tools/cmsis_pack/check_pdsc.py
+# asserts this value.
 #
 # 7.25.0 introduced a Cvariant split ("Source" vs "Prebuilt") on the
 # heliaCORE component. heliaRT itself ships as source via CMSIS-Pack, so
@@ -90,16 +91,14 @@ CSUB = "helia-rt"
 # consistent. Consumers who need the prebuilt heliaCORE for binary-size
 # reasons can override at integration time.
 #
-# 7.28.0 is the floor because it is the first release that bridges
-# NSX_CMSIS_NN_ENABLE_F32/F16 into fp32/fp16 source selection and exports
-# ARM_NN_ENABLE_F32/F16 as public compile definitions. The helia backend's
-# float kernels do not link against anything older.
+# 7.35.0 is the floor because the HELIA source component includes the FP16
+# ARG_MIN and ARG_MAX adapter, which requires APIs first shipped in that release.
 NS_CMSIS_NN_VENDOR = "Ambiq"
 NS_CMSIS_NN_CCLASS = "Machine Learning"
 NS_CMSIS_NN_CGROUP = "NN Lib"
 NS_CMSIS_NN_CSUB = "heliaCORE"
 NS_CMSIS_NN_CVARIANT = "Source"
-NS_CMSIS_NN_MIN_VERSION = "7.28.0"
+NS_CMSIS_NN_MIN_VERSION = "7.35.0"
 
 
 # ---------------------------------------------------------------------------

@@ -44,7 +44,7 @@ heliaRT provides three kernel backends. Every operator has a **Reference** imple
 | `LOGISTIC` (sigmoid) | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive. NaN is not a supported input on the optimized float path; see [Non-finite inputs](../guides/floating-point.md#non-finite-inputs-nan-and-infinities) |
 | `TANH` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive. NaN is not a supported input on the optimized float path; see [Non-finite inputs](../guides/floating-point.md#non-finite-inputs-nan-and-infinities) |
 | `LEAKY_RELU` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
-| `HARD_SWISH` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA adds int16 path |
+| `HARD_SWISH` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA adds int16 path, and FP32/FP16 |
 
 ## Arithmetic
 
@@ -53,6 +53,7 @@ heliaRT provides three kernel backends. Every operator has a **Reference** imple
 | `ADD` | :white_check_mark: | :white_check_mark: | :white_check_mark: | |
 | `MUL` | :white_check_mark: | :white_check_mark: | :white_check_mark: | |
 | `SUB` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
+| `SQRT` / `RSQRT` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA adds native FP16; see [float feature gates](../guides/floating-point.md#feature-contract) |
 | `EQUAL` / `NOT_EQUAL` / `GREATER` / `LESS` / etc. | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
 
 ## Data Movement
@@ -62,13 +63,15 @@ heliaRT provides three kernel backends. Every operator has a **Reference** imple
 | `CONCATENATION` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
 | `RESHAPE` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
 | `SPLIT` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
-| `SPLIT_V` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
+| `SPLIT_V` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA adds FP16; see [float feature gates](../guides/floating-point.md#feature-contract) |
 | `PACK` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
 | `SQUEEZE` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
 | `STRIDED_SLICE` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
 | `FILL` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
 | `ZEROS_LIKE` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
-| `DEQUANTIZE` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
+| `DEQUANTIZE` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive; int8 / int16 / uint8 / float16 input, float32 output |
+| `GATHER` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive; int8/int16 and FP32/FP16 with CORE ≥ 7.34.0 |
+| `GATHER_ND` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive; int8/int16 and FP32/FP16 with CORE ≥ 7.34.0 |
 
 ## Quantization
 
@@ -80,15 +83,17 @@ heliaRT provides three kernel backends. Every operator has a **Reference** imple
 
 | Operator | REF | CMSIS | HELIA | Notes |
 |---|:---:|:---:|:---:|---|
-| `MEAN` / `REDUCE_MAX` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive |
+| `MEAN` / `REDUCE_MAX` / `SUM` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA-exclusive. `MEAN` and `SUM` (REDUCE_SUM) add FP32/FP16 |
+| `ARG_MIN` / `ARG_MAX` | :white_check_mark: | :material-minus: | :white_check_mark: | HELIA adds native FP16 with CORE ≥ 7.35.0; FP32/int8 use Reference |
 
 ## Floating-Point Coverage
 
 The HELIA backend also dispatches FP32 and FP16 operators to heliaCORE. These
 paths are gated at build time by `ARM_NN_ENABLE_F32` / `ARM_NN_ENABLE_F16`.
 The Make build and the published static libraries always enable FP32 (plus
-FP16 on Cortex-M55), NSX requires FP32, and Zephyr implies both from the
-target; only standalone CMake is fully opt-in. See the
+FP16 on Cortex-M55) and Zephyr implies both from the target; NSX and
+standalone CMake are fully opt-in, and an int8-only build carries neither.
+See the
 [FP16 and FP32 guide](../guides/floating-point.md) for how each build system
 resolves them.
 
@@ -96,13 +101,16 @@ resolves them.
     **FP32** falls back to the Reference kernel whenever the optimized kernel
     is disabled or rejects a configuration — results stay correct, only slower.
     **Most FP16 operators have no TFLM Reference implementation** (pure data
-    movement such as `TRANSPOSE` and `RESHAPE` is the exception). Where a
+    movement such as `TRANSPOSE` and `RESHAPE`, and the f16-to-f32 widening
+    in `DEQUANTIZE`, are the exceptions). Where a
     limitation is known at graph preparation the operator fails
     `AllocateTensors()`; otherwise it returns `kTfLiteError` from `Invoke()`,
     in most cases with a logged diagnostic.
 
-    FP16 additionally requires Armv8.1-M with MVE floating point (Cortex-M55).
-    It is not available on Cortex-M4+FP.
+    FP16 *arithmetic* additionally requires Armv8.1-M with MVE floating point
+    (Cortex-M55) and is not available on Cortex-M4+FP. Operators that only
+    move or widen f16 storage, `TRANSPOSE`, `RESHAPE` and `DEQUANTIZE`, run
+    on any supported core.
 
 | Operator | FP32 | FP16 | Constraints |
 |---|:---:|:---:|---|
@@ -118,30 +126,43 @@ resolves them.
 | `PAD` / `PADV2` | :white_check_mark: | :white_check_mark: | FP16 requires 4-D tensors, enforced at prepare |
 | `TRANSPOSE` | :white_check_mark: | :white_check_mark: | Optimized for rank ≤ 4; higher ranks use Reference (float path for FP32, bitwise 16-bit path for FP16). FP16 works even without `ARM_NN_ENABLE_F16` |
 | `MAXIMUM` / `MINIMUM` | :white_check_mark: | :white_check_mark: | Optimized for rank ≤ 4; higher ranks use Reference (FP32) |
-| `ADD` | :white_check_mark: | :white_check_mark: | FP16 requires matching input shapes; broadcasting is rejected at prepare |
-| `MUL` | :white_check_mark: | :white_check_mark: | FP16 requires matching input shapes; broadcasting is rejected at prepare |
+| `ADD` / `SUB` / `MUL` | :white_check_mark: | :white_check_mark: | Identical input shapes are optimized at any rank; broadcasting is optimized for rank ≤ 4 with every dimension pair equal or 1, and a higher-rank broadcast uses Reference (FP32) or is rejected at prepare (FP16) |
+| `HARD_SWISH` | :white_check_mark: | :white_check_mark: | FP16 requires `ARM_NN_ENABLE_F16`; without it there is no reference to fall back to, so it is rejected at prepare |
+| `SQRT` / `RSQRT` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.33.0; FP16 requires `ARM_NN_ENABLE_F16`; FP32 keeps the TFLM reference path |
+| `ARG_MIN` / `ARG_MAX` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.35.0; FP16 supports rank 1..4, a scalar or one-element INT32 axis and an exact squeezed INT32 output. FP32/int8 keep the TFLM reference path |
+| `MEAN` / `SUM` | :white_check_mark: | :white_check_mark: | Optimized for rank ≤ 4 with any axis set; higher ranks use Reference (FP32). FP16 requires `ARM_NN_ENABLE_F16` and rank ≤ 4, both enforced at prepare |
 | `CONCATENATION` | :white_check_mark: | :white_check_mark: | Optimized for rank ≤ 4; higher ranks use the Reference path (FP32 and FP16) |
+| `SPLIT` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.33.0; constant axis, equal output extents; rank ≥ 1 |
+| `SPLIT_V` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.33.0; constant axis and split sizes; one inferred `-1`; zero-length pieces |
+| `PACK` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.33.0; equal input shapes, including scalars |
+| `UNPACK` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.33.0; one output per selected axis element |
+| `FILL` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.33.0; constant dimensions, scalar fill value |
+| `GATHER` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.34.0; native ranks are ≤ 4. Scalar indices are native for floats, use Reference for int8, and are rejected for int16. Higher ranks use Reference for FP32/int8 and are rejected for FP16/int16 |
+| `GATHER_ND` | :white_check_mark: | :white_check_mark: | CORE ≥ 7.34.0; native ranks are ≤ 4 with positive tuple width. Higher ranks and zero-width tuples use Reference for FP32/int8 and are rejected for FP16/int16 |
 | `RESHAPE` | :white_check_mark: | :white_check_mark: | Pure data movement; FP16 works even without `ARM_NN_ENABLE_F16` via a bitwise copy |
+| `DEQUANTIZE` | :white_check_mark: | :white_check_mark: | FP16 is an input storage type widened to an FP32 output, not FP16 arithmetic; works even without `ARM_NN_ENABLE_F16` |
 | `RELU` / `RELU6` | :white_check_mark: | :white_check_mark: | |
 | `LOGISTIC` (sigmoid) | :white_check_mark: | :white_check_mark: | NaN is not a supported input on the optimized float path; see [Non-finite inputs](../guides/floating-point.md#non-finite-inputs-nan-and-infinities) |
 | `TANH` | :white_check_mark: | :white_check_mark: | NaN is not a supported input on the optimized float path; see [Non-finite inputs](../guides/floating-point.md#non-finite-inputs-nan-and-infinities) |
 
 Other operators use the Reference implementation for FP32, with one
-exception: `QUANTIZE` and `DEQUANTIZE` always convert through optimized
-heliaCORE kernels on their float32 side, independent of `ARM_NN_ENABLE_F32`.
-The published static libraries ship FP32 kernels for Cortex-M4+FP and both
-FP32 and FP16 for Cortex-M55.
+exception: on their quantized-integer side, `QUANTIZE` and `DEQUANTIZE`
+always convert through optimized heliaCORE kernels, independent of
+`ARM_NN_ENABLE_F32`. `DEQUANTIZE` with a FLOAT16 input is the one path that
+does not: it widens f16 storage to float32 in the kernel itself, so it needs
+neither heliaCORE nor `ARM_NN_ENABLE_F16`. The published static libraries
+ship FP32 kernels for Cortex-M4+FP and both FP32 and FP16 for Cortex-M55.
 
 ## Summary
 
-| Backend | Optimized kernels | Coverage |
-|---|:---:|---|
-| Reference | 109 | All operators (generic C) |
-| CMSIS-NN | 14 | Core compute-heavy ops |
-| **HELIA** | **36** | **Superset of CMSIS-NN + 22 additional** |
+| Backend | Coverage |
+|---|---|
+| Reference | All operators (generic C) |
+| CMSIS-NN | Core compute-heavy ops |
+| **HELIA** | **Superset of CMSIS-NN with additional optimized operators** |
 
 !!! success "HELIA advantage"
-    HELIA covers **every** operator that CMSIS-NN does, plus 22 additional operators that would otherwise fall back to slow Reference kernels. This means fewer "silent fallbacks" and more consistent performance across your entire model.
+    HELIA covers **every** operator that CMSIS-NN does, plus additional operators that would otherwise fall back to slow Reference kernels. This means fewer "silent fallbacks" and more consistent performance across your entire model.
 
 ## Next Steps
 

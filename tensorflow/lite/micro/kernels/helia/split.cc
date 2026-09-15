@@ -15,6 +15,7 @@ limitations under the License.
 
 #include "Include/arm_nnsupportfunctions.h"
 #include "Include/arm_nnfunctions.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_data_movement.h"
 
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
@@ -157,15 +158,62 @@ static TfLiteStatus SplitImplCmsisS16(TfLiteContext* context, TfLiteNode* node,
 // -------- Prepare / Eval ----------
 
 TfLiteStatus SplitPrepare(TfLiteContext* context, TfLiteNode* node) {
+  TF_LITE_ENSURE_EQ(context, NumInputs(node), 2);
+  TF_LITE_ENSURE(context, NumOutputs(node) > 0);
   MicroContext* micro_context = GetMicroContext(context);
   TfLiteTensor* axis = micro_context->AllocateTempInputTensor(node, kAxisTensor);
   TF_LITE_ENSURE(context, axis != nullptr);
-
-  // Micro requires constant axis
-  TF_LITE_ENSURE_MSG(context, IsConstantTensor(axis),
-                     "Non constant axis tensor not supported");
-
+  const bool constant_axis = IsConstantTensor(axis);
   micro_context->DeallocateTempTfLiteTensor(axis);
+  TF_LITE_ENSURE_MSG(context, constant_axis,
+                     "Non constant axis tensor not supported");
+  const auto* input = micro::GetEvalInput(context, node, kInputTensor);
+  if (!IsHeliaDataMovementFloat(input->type)) return kTfLiteOk;
+  TF_LITE_ENSURE_OK(context, CheckHeliaDataMovementType(context, input->type));
+  auto* data = static_cast<HeliaDataMovementData*>(node->user_data);
+  TF_LITE_ENSURE(context, data != nullptr);
+  const auto* params = static_cast<const TfLiteSplitParams*>(node->builtin_data);
+  data->count = NumOutputs(node);
+  if (params != nullptr) {
+    TF_LITE_ENSURE_EQ(context, params->num_splits, data->count);
+  }
+  TF_LITE_ENSURE_OK(context, HeliaDataMovementElements(
+                                 context, input->dims, input->type, &data->elements));
+  const auto* axis_t = micro::GetEvalInput(context, node, kAxisTensor);
+  TF_LITE_ENSURE_EQ(context, axis_t->type, kTfLiteInt32);
+  int32_t axis_elements;
+  TF_LITE_ENSURE_OK(context, HeliaDataMovementElements(
+                                 context, axis_t->dims, kTfLiteInt32, &axis_elements));
+  TF_LITE_ENSURE_EQ(context, axis_elements, 1);
+  TF_LITE_ENSURE(context, axis_t->data.raw != nullptr);
+  data->axis = micro::GetTensorData<int32_t>(axis_t)[0];
+  const int rank = input->dims->size;
+  if (data->axis < 0) data->axis += rank;
+  TF_LITE_ENSURE(context, data->axis >= 0 && data->axis < rank);
+  TF_LITE_ENSURE_EQ(context, input->dims->data[data->axis] % data->count, 0);
+  const int piece = input->dims->data[data->axis] / data->count;
+  for (int i = 0; i < data->count; ++i) {
+    const auto* output = micro::GetEvalOutput(context, node, i);
+    TF_LITE_ENSURE_EQ(context, output->type, input->type);
+    TF_LITE_ENSURE(context, output->dims != nullptr);
+    TF_LITE_ENSURE_EQ(context, output->dims->size, rank);
+    for (int d = 0; d < rank; ++d) {
+      TF_LITE_ENSURE_EQ(context, output->dims->data[d],
+                       d == data->axis ? piece : input->dims->data[d]);
+    }
+  }
+#if ARM_NN_ENABLE_F32 || ARM_NN_ENABLE_F16
+  TF_LITE_ENSURE_OK(context, HeliaDataMovementShape(context, input->dims, data));
+  if (data->elements != 0) {
+    TF_LITE_ENSURE(context, static_cast<size_t>(data->count) <=
+                                std::numeric_limits<size_t>::max() / sizeof(int32_t));
+    data->split_sizes = static_cast<int32_t*>(context->AllocatePersistentBuffer(
+        context, static_cast<size_t>(data->count) * sizeof(int32_t)));
+    TF_LITE_ENSURE(context, data->split_sizes != nullptr);
+    for (int i = 0; i < data->count; ++i) data->split_sizes[i] = piece;
+    TF_LITE_ENSURE_OK(context, HeliaDataMovementPointers(context, data));
+  }
+#endif
   return kTfLiteOk;
 }
 
@@ -185,8 +233,44 @@ TfLiteStatus SplitEval(TfLiteContext* context, TfLiteNode* node) {
       if (SplitImplCmsisS16(context, node, input, axis_value) == kTfLiteOk) return kTfLiteOk;
       return SplitImplRef<int16_t>(context, node, input, axis_value);
     }
-    case kTfLiteFloat32:
-      return SplitImplRef<float>(context, node, input, axis_value);
+    case kTfLiteFloat32: {
+      const auto* data = static_cast<const HeliaDataMovementData*>(node->user_data);
+      if (data->elements == 0) return kTfLiteOk;
+#if ARM_NN_ENABLE_F32
+      auto** outputs = static_cast<float**>(
+          context->GetScratchBuffer(context, data->pointer_scratch));
+      TF_LITE_ENSURE(context, outputs != nullptr);
+      for (int i = 0; i < data->count; ++i) {
+        outputs[i] = micro::GetTensorData<float>(micro::GetEvalOutput(context, node, i));
+      }
+      const auto status = arm_split_f32(
+          micro::GetTensorData<float>(input), input->dims->size,
+          data->shape, data->axis, data->count, data->split_sizes, outputs);
+      TF_LITE_ENSURE_EQ(context, status, ARM_CMSIS_NN_SUCCESS);
+      return kTfLiteOk;
+#else
+      return SplitImplRef<float>(context, node, input, data->axis);
+#endif
+    }
+    case kTfLiteFloat16: {
+      const auto* data = static_cast<const HeliaDataMovementData*>(node->user_data);
+      if (data->elements == 0) return kTfLiteOk;
+#if ARM_NN_ENABLE_F16
+      auto** outputs = static_cast<float16_t**>(
+          context->GetScratchBuffer(context, data->pointer_scratch));
+      TF_LITE_ENSURE(context, outputs != nullptr);
+      for (int i = 0; i < data->count; ++i) {
+        outputs[i] = micro::GetTensorData<float16_t>(micro::GetEvalOutput(context, node, i));
+      }
+      const auto status = arm_split_f16(
+          micro::GetTensorData<float16_t>(input), input->dims->size,
+          data->shape, data->axis, data->count, data->split_sizes, outputs);
+      TF_LITE_ENSURE_EQ(context, status, ARM_CMSIS_NN_SUCCESS);
+      return kTfLiteOk;
+#else
+      return kTfLiteError;
+#endif
+    }
     case kTfLiteInt32:
       return SplitImplRef<int32_t>(context, node, input, axis_value);
     default:
@@ -199,7 +283,7 @@ TfLiteStatus SplitEval(TfLiteContext* context, TfLiteNode* node) {
 }  // namespace
 
 TFLMRegistration Register_SPLIT() {
-  return tflite::micro::RegisterOp(nullptr, SplitPrepare, SplitEval);
+  return tflite::micro::RegisterOp(InitHeliaDataMovement, SplitPrepare, SplitEval);
 }
 
 }  // namespace tflite

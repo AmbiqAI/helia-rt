@@ -8,7 +8,41 @@ APIs are available.
 
 ## Feature contract
 
-ns-cmsis-nn v7.28.0 or later exports these definitions from its CMake target:
+HELIA float builds require ns-cmsis-nn **v7.33.0 or later** for the
+`SPLIT`, `SPLIT_V`, `PACK`, `UNPACK`, `FILL`, `SQRT`, and `RSQRT` adapters.
+The data-movement operators call the corresponding CORE APIs for FP32 when
+enabled. `SQRT` and `RSQRT` keep their existing FP32 reference paths and call
+CORE for FP16. FP16 is rejected during `AllocateTensors()` when
+`ARM_NN_ENABLE_F16=0`.
+Update separately supplied CORE source targets or archives along with RT.
+
+The five data-movement operations above preserve storage bits, including NaN
+payloads, signed zero and subnormals. They accept negative axes after
+normalization, scalar PACK inputs and FILL outputs, and valid empty tensors.
+Float shapes, counts, and types are checked during preparation. Shapes must fit
+the CORE int32 element-count and target address-size limits; pointer arrays and
+shape metadata use the tensor arena rather than fixed rank or tensor-count
+limits. Empty outputs perform no data access. This adoption makes no
+performance guarantee.
+
+`SPLIT_V` accepts constant split sizes, including one inferred `-1` size and
+zero-length pieces. Preparation checks axes, size sums, output counts, shapes
+and dtypes for integer and float inputs. Resolved sizes and output pointers
+use the arena, including when there are more than 16 outputs or rank exceeds 6.
+
+`GATHER` and `GATHER_ND` require ns-cmsis-nn **v7.34.0 or later**. Their
+rank-four optimized boundary and FP32 reference fallbacks are documented in
+[Operator Coverage](../reference/operator-coverage.md).
+
+FP16 `ARG_MIN` and `ARG_MAX` require ns-cmsis-nn **v7.35.0 or later**. They
+accept rank-one through rank-four FP16 inputs, a scalar or one-element INT32
+axis (including a normalized negative axis), and an INT32 output whose shape is
+the input shape with that axis removed. The reduced extent must be positive.
+FP32 and int8 retain their TFLM reference paths.
+
+ns-cmsis-nn v7.28.0 or later exports these definitions from its CMake target;
+from v7.32.0 they are also the only names it accepts as CMake inputs,
+including on the NSX path:
 
 ```text
 ARM_NN_ENABLE_F32=0|1
@@ -82,9 +116,10 @@ parameters are supported by the optimized kernel.
 - Grouped `CONV_2D` (input channels a multiple of filter channels) is outside
   the optimized float kernels' support: FP32 uses the reference kernel, FP16
   is rejected at `AllocateTensors()`.
-- Pure data-movement operators (`TRANSPOSE`, `RESHAPE`) handle FP16 tensors
-  bitwise through their 16-bit reference paths, so they work even without
-  `ARM_NN_ENABLE_F16`.
+- Pure data-movement operators (`TRANSPOSE`, `RESHAPE`) copy FP16 tensors
+  bitwise, and the FLOAT16 input path of `DEQUANTIZE` widens f16 storage to
+  float32 without f16 arithmetic, so all three work even without
+  `ARM_NN_ENABLE_F16` and on Cortex-M4+FP.
 - HELIA softmax supports only unit beta. FP32 softmax falls back to reference
   for non-unit beta; FP16 non-unit beta is unsupported.
 - HELIA FP16/FP32 `UNIDIRECTIONAL_SEQUENCE_LSTM` preserves the TFLite hidden and
@@ -116,6 +151,16 @@ differs by target, so it is stated here per case rather than as a single rule.
 | `LOGISTIC` | NaN, all targets | Finite, at the upper saturation bound (1) | NaN |
 | `LOGISTIC` | +Inf / −Inf | 1 / 0 | 1 / 0 |
 | `ADD`, `MUL` | NaN | NaN | NaN |
+| `SQRT` | +0 / −0 / +Inf | +0 / −0 / +Inf | +0 / −0 / +Inf |
+| `RSQRT` | +0 / −0 / +Inf | +Inf / −Inf / +0 | +Inf / −Inf / +0 |
+
+FP16 `SQRT` and `RSQRT` quiet NaNs while preserving their sign and payload.
+Negative nonzero inputs, including negative infinity, produce the canonical
+quiet NaN bit pattern `0x7e00`.
+
+FP16 `ARG_MIN` and `ARG_MAX` select the first NaN index when a reduction slice
+contains NaN. Otherwise they select the first occurrence of the numeric
+minimum or maximum, including equal signed zeros and repeated infinities.
 
 Notes and version boundary:
 
@@ -144,9 +189,9 @@ Notes and version boundary:
   v7.30.0 the output activation clamp discarded NaN through compare-select
   ordering, returning an activation bound instead. ns-cmsis-nn PR 380
   reclassifies NaN on the integer bit pattern, which holds at every
-  optimization level. **PR 380 first shipped in v7.31.0**, which is the version
-  heliaRT now pins, so `ADD` and `MUL` propagate NaN on the optimized path as
-  of that pin. On v7.30.0 and earlier they did not.
+  optimization level. **PR 380 first shipped in v7.31.0**, which the heliaRT
+  pin includes, so `ADD` and `MUL` propagate NaN on the optimized path. On
+  v7.30.0 and earlier they did not.
 - **The FP32 fallback softens this in practice.** Where an operator has a TFLM
   reference implementation, HELIA falls back to it when the optimized kernel
   declines the configuration, and the reference implementation propagates NaN
@@ -154,7 +199,7 @@ Notes and version boundary:
 
 ## Make builds
 
-The Make integration pins ns-cmsis-nn v7.31.0 and configures the float features
+The Make integration pins ns-cmsis-nn v7.35.0 and configures the float features
 from `TARGET_ARCH`:
 
 - FP32 is enabled for the HELIA backend.
@@ -193,9 +238,10 @@ must be set in the application `CMakeLists.txt` **before** the bootstrap call:
 ```cmake
 # ns-cmsis-nn reads these while its own CMakeLists is processed, and they drive
 # both its source selection and the ARM_NN_ENABLE_F32/F16 definitions it
-# exports. nsx-helia-rt is added afterwards, so it can only validate them.
-set(NSX_CMSIS_NN_ENABLE_F32 ON CACHE BOOL "" FORCE)
-set(NSX_CMSIS_NN_ENABLE_F16 ON CACHE BOOL "" FORCE)  # MVEF-capable targets only
+# exports. nsx-helia-rt is added afterwards, so it can only observe them.
+# Omit either line to build without that float set.
+set(ARM_NN_ENABLE_F32 ON CACHE BOOL "" FORCE)
+set(ARM_NN_ENABLE_F16 ON CACHE BOOL "" FORCE)  # MVEF-capable targets only
 
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/nsx/modules.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/nsx/nsx_app_bootstrap.cmake)
@@ -210,18 +256,78 @@ target_link_libraries(app PRIVATE nsx::helia_rt)
 nsx_finalize_app(app)
 ```
 
-The NSX HELIA backend **requires** FP32. NSX does not enable it for you, so
-omitting the `set()` above is a configure-time `FATAL_ERROR` from
-`nsx-helia-rt`, not a silent fallback. FP16 is optional; `nsx-helia-rt` emits a
-warning when `CMAKE_SYSTEM_PROCESSOR` is `cortex-m55` and FP16 is left off,
-because that target can use the optimized kernels.
+Both float sets are **opt-in**. NSX does not enable either for you, and
+omitting the `set()` lines above is a supported configuration, not an error:
+
+- **FP32 off.** No `arm_*_f32` kernel is linked. FLOAT32 operators still run,
+  on the reference float path, so a float32 model keeps working — it just
+  loses the optimized kernels. `nsx-helia-rt` prints a `NOTICE` saying so.
+  This is what an int8-only image wants: carrying the FP32 kernels cost
+  **+31 KB of `.text` (+11 %)** on a KWS DS-CNN with no measurable cycle
+  change ([helia-rt#253](https://github.com/AmbiqAI/helia-rt/issues/253)).
+- **FP16 off.** Most helia kernels have no reference float16 path, so a
+  FLOAT16 operator fails at run time with `kTfLiteError` and a message naming
+  the type. `nsx-helia-rt` emits a `NOTICE` — but only when the target
+  actually has MVE floating point. It is a `NOTICE` rather than a `WARNING`
+  because the module cannot see whether your model contains a FLOAT16
+  operator, and int8-only on an MVE-F part is an ordinary configuration.
+
+`nsx-helia-rt` decides "this target has MVE-F" by **compiling a probe with the
+active toolchain and board flags** (`__ARM_FEATURE_MVE & 2`), not by matching
+`CMAKE_SYSTEM_PROCESSOR`. A processor name says nothing about whether the
+build's `-mcpu` / `-mfpu` / `+nomve` flags left MVE floating point enabled. The
+result is cached as `HELIA_RT_TARGET_HAS_MVE_FP` (an `INTERNAL` entry, so it
+does not appear in `cmake -LAH`; read it from `CMakeCache.txt`).
+
+Every helia configure prints one line naming the resolved set and where it
+came from:
+
+```text
+-- nsx-helia-rt: float kernels: fp32=ON fp16=OFF (source: ns-cmsis-nn target)
+```
+
+`source:` is `ns-cmsis-nn target` when the resolved library itself answered
+(the normal case, and the ground truth: it reports what was actually
+compiled), or `ARM_NN_ENABLE option` / `Zephyr Kconfig` when the target is
+not available yet.
+
+#### Published values
+
+`nsx-helia-rt` writes the resolved set into the cache so consumers and
+generated modules do not have to re-derive it:
+
+| Cache entry | Meaning |
+|---|---|
+| `HELIA_RT_FLOAT32_ENABLED` | `BOOL`. Effective FP32 availability. Output, not a knob. |
+| `HELIA_RT_FLOAT16_ENABLED` | `BOOL`. Effective FP16 availability. Output, not a knob. |
+| `HELIA_RT_TARGET_HAS_MVE_FP` | `INTERNAL`. Result of the MVE-F compile probe. Hidden from `cmake -LAH`; grep `CMakeCache.txt` for it. |
+
+Both values come from asking the resolved ns-cmsis-nn library what it built:
+its float query where the pinned revision exports one, otherwise the compile
+definitions on its target. heliaAOT's generated module reads the same query
+([helia-aot#386](https://github.com/AmbiqAI/helia-aot/pull/386)), landed on its
+`main` and shipping in the next heliaAOT release, so the two engines resolve one
+answer. heliaRT does not write the
+`ARM_NN_ENABLE_F32` / `ARM_NN_ENABLE_F16` cache entries: those are your
+request, and a request the library did not ship is reported as a `WARNING`.
 
 !!! warning "ns-cmsis-nn revision"
-    `NSX_CMSIS_NN_ENABLE_F32/F16` only exist, and only bridge to
-    `ARM_NN_ENABLE_F32/F16`, in ns-cmsis-nn v7.28.0 or later. NSX registries
-    that still pin an older `nsx-cmsis-nn` must be overridden in the app's
-    `nsx.yml` (via a `module_registry` revision override, or `source.path` for
-    a local working tree) before the float features can be enabled.
+    `ARM_NN_ENABLE_F32/F16` are the only float switches from ns-cmsis-nn
+    v7.32.0 on: the earlier `NSX_CMSIS_NN_ENABLE_F32/F16` spelling was
+    removed there. An NSX registry that still pins an `nsx-cmsis-nn` older
+    than v7.32.0 does not read `ARM_NN_ENABLE_*` in its NSX module, so
+    override the module revision in the app's `nsx.yml` (a `module_registry`
+    revision override, or `source.path` for a local working tree) before
+    enabling the float features.
+
+!!! note "GCC 14 and the FP16 sources"
+    GCC 14 hits an internal compiler error on ns-cmsis-nn's FP16 sources
+    (GCC PR 118460). ns-cmsis-nn v7.30.0 fixed this at the source, and every
+    build path relies on that fix: use v7.30.0 or later on GCC 14. heliaRT
+    carried a `-fno-ssa-phiopt` workaround in
+    `tools/make/ext_libs/helia.inc` for the Make path while older revisions
+    were still supported; it was removed once the pin moved past v7.30.0 and
+    there is nothing to set on any build path today.
 
 Because a static-archive build cannot reveal a missing kernel, verify the final
 executable rather than the library:
@@ -266,8 +372,8 @@ nsx-cmsis-nn module is processed:
 ```cmake
 set(NSX_CMSIS_NN_LIB      "/path/to/libns-cmsis-nn.a" CACHE FILEPATH "" FORCE)
 set(NSX_CMSIS_NN_MANIFEST "/path/to/manifest.json"    CACHE FILEPATH "" FORCE)
-set(NSX_CMSIS_NN_ENABLE_F32 ON CACHE BOOL "" FORCE)
-set(NSX_CMSIS_NN_ENABLE_F16 ON CACHE BOOL "" FORCE)
+set(ARM_NN_ENABLE_F32 ON CACHE BOOL "" FORCE)
+set(ARM_NN_ENABLE_F16 ON CACHE BOOL "" FORCE)
 ```
 
 The manifest records which float kernels were compiled into the archive.
@@ -327,17 +433,45 @@ point ABI, toolchain, and build variant.
 Enabling the float feature contract changes behavior for integrations built
 against earlier heliaRT releases:
 
-- **NSX apps**: the helia backend now fails configuration with a
-  `FATAL_ERROR` unless `NSX_CMSIS_NN_ENABLE_F32` is set before
-  `nsx_bootstrap_app()` **and** the resolved `nsx-cmsis-nn` module is
-  v7.28.0 or newer. Every existing NSX helia application needs the two
-  `set(... CACHE BOOL "" FORCE)` lines shown above plus a registry or
-  `nsx.yml` revision bump.
+- **Float switch names**: `NSX_CMSIS_NN_ENABLE_F32/F16` were removed in
+  ns-cmsis-nn v7.32.0 and in this heliaRT release. Set
+  `ARM_NN_ENABLE_F32/F16` instead, in the same place and with the same
+  values. Below ns-cmsis-nn 7.32.0 the old names keep working as before;
+  from 7.32.0 the library rejects them at configure, so rename before you
+  bump the pin. A build directory configured with the old names keeps them
+  in `CMakeCache.txt`, and the pre-rename NSX module also wrote the new names
+  into the cache, where 7.32.0's `option()` keeps whatever value it finds.
+  Clear all six with
+  `cmake -U NSX_CMSIS_NN_ENABLE_F32 -U NSX_CMSIS_NN_ENABLE_F16 -U ARM_NN_ENABLE_F32 -U ARM_NN_ENABLE_F16 -U HELIA_RT_ARM_NN_MIRROR_F32 -U HELIA_RT_ARM_NN_MIRROR_F16 <build-dir>`.
+  Configuring a fresh build directory is the reliable route, since it leaves
+  no stale cache entry to override the new defaults. The Zephyr symbols
+  `CONFIG_NS_CMSIS_NN_ENABLE_F32/F16` are unchanged.
+- **NSX apps**: the helia backend no longer requires FP32. An app that never
+  set `ARM_NN_ENABLE_F32` configures and builds int8-only, and pays
+  none of the float code size. Apps that want the optimized float kernels
+  still need the `set(... CACHE BOOL "" FORCE)` lines shown above before
+  `nsx_bootstrap_app()`, plus an ns-cmsis-nn of v7.32.0 or newer, the first
+  revision whose NSX module reads `ARM_NN_ENABLE_F32/F16`. That floor also
+  covers the GCC 14 FP16 ICE fixed in v7.30.0 (GCC PR 118460). Releases
+  1.19.0 and earlier failed configure with a `FATAL_ERROR` in this
+  situation.
+- **Recovering the size on an int8 app.** `ARM_NN_ENABLE_F32/F16`
+  default to `OFF` in ns-cmsis-nn's NSX module from v7.32.0, so nothing
+  enables them for you. If you added
+  `set(NSX_CMSIS_NN_ENABLE_F32 ON CACHE BOOL "" FORCE)` only to clear the
+  1.19.0 configure error, replace it with
+  `set(ARM_NN_ENABLE_F32 OFF CACHE BOOL "" FORCE)` or drop it: on an int8
+  model that line is what is costing the ~31 KB. Keep the switch `ON` if you
+  run float32 models and want the optimized kernels. Nothing else in the app
+  needs to change.
 - **Zephyr**: `CONFIG_HELIA_RT_BACKEND_HELIA` now `imply`s
   `NS_CMSIS_NN_ENABLE_F32/F16`. If your west workspace pins an ns-cmsis-nn
   module older than v7.28.0, those Kconfig symbols do not exist and the
   configuration step emits undefined-symbol warnings; update the module
-  revision to silence them and to get the float kernels.
+  revision to silence them and to get the float kernels. The data-movement
+  adapters listed under [Feature contract](#feature-contract)
+  require v7.33.0; `GATHER` and `GATHER_ND` require v7.34.0; FP16 `ARG_MIN`
+  and `ARG_MAX` require v7.35.0.
 - **Library size**: Make-based helia builds now always compile the FP32
   kernels (and FP16 on `cortex-m55`) into the combined archive. Integer-only
   models still reference them transitively through the operator wrappers, so
@@ -363,11 +497,24 @@ FP32 unexpectedly uses reference code
 
 Changing `CFLAGS` has no effect
 : Source selection happens during CMake configuration. Set the CMake option
-  (`NSX_CMSIS_NN_ENABLE_F16` for NSX, `ARM_NN_ENABLE_F16` standalone) before
+  (`ARM_NN_ENABLE_F16`, the same name on every CMake path) before
   ns-cmsis-nn is added. For NSX apps this means a `set(... CACHE BOOL "" FORCE)`
   in the app `CMakeLists.txt` above `nsx_bootstrap_app()` — `nsx build` does not
   forward `-D` options.
 
-`nsx-helia-rt: ... NSX_CMSIS_NN_ENABLE_F32 is not enabled`
-: The NSX app did not set the float options before `nsx_bootstrap_app()`, or
-  the resolved `nsx-cmsis-nn` predates v7.28.0 and does not define them.
+`nsx-helia-rt: fp32 helia kernels are OFF`
+: Informational (`NOTICE`), not an error. The app did not set
+  `ARM_NN_ENABLE_F32` before `nsx_bootstrap_app()`, or the resolved
+  `nsx-cmsis-nn` predates v7.32.0 and does not read it. FLOAT32 operators
+  run on the reference path. Set the option to get the optimized kernels.
+
+`nsx-helia-rt: this target has MVE floating point but the fp16 helia kernels are OFF`
+: The MVE-F probe succeeded and FP16 is off. FLOAT16 operators will fail at
+  run time. Set `ARM_NN_ENABLE_F16` before `nsx_bootstrap_app()`.
+
+`nsx-helia-rt: ARM_NN_ENABLE_F32=... was ignored`
+: You asked for a float set the linked ns-cmsis-nn target did not compile,
+  usually because the option was set after ns-cmsis-nn was added, or on a
+  build directory that had already configured it. heliaRT follows what the
+  target shipped. Set the option before ns-cmsis-nn is added, in a fresh
+  build directory.

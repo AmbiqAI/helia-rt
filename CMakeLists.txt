@@ -11,7 +11,7 @@
 #     include(FetchContent)
 #     FetchContent_Declare(helia_rt
 #         GIT_REPOSITORY https://github.com/AmbiqAI/helia-rt.git
-#         GIT_TAG        helia-rt-v1.19.0) # x-release-please-version
+#         GIT_TAG        helia-rt-v1.20.0) # x-release-please-version
 #     FetchContent_MakeAvailable(helia_rt)
 #
 # It exposes one STATIC library per backend, depending on what external
@@ -42,7 +42,7 @@ if(NOT _helia_rt_languages)
         # X.Y.Z[.W]; a prerelease or build-metadata form (X.Y.Z-rc.N) is NOT
         # valid and would hard-fail configure. This repo cuts no prereleases
         # through release-please today -- see issue #200 before changing that.
-        VERSION 1.19.0 # x-release-please-version
+        VERSION 1.20.0 # x-release-please-version
         DESCRIPTION "heliaRT — Ambiq's TensorFlow Lite for Microcontrollers (TFLM) runtime"
         LANGUAGES C CXX)
 endif()
@@ -119,18 +119,8 @@ option(HELIA_RT_ENABLE_ETHOSU
 # We therefore adopt the dependency's values and warn on any mismatch.
 # ---------------------------------------------------------------------------
 function(_helia_rt_sync_float_definitions target dep)
-    get_target_property(_dep_defs ${dep} INTERFACE_COMPILE_DEFINITIONS)
-    if(NOT _dep_defs)
-        set(_dep_defs "")
-    endif()
-
-    foreach(_feature F32 F16)
-        if("ARM_NN_ENABLE_${_feature}=1" IN_LIST _dep_defs)
-            set(_dep_${_feature} ON)
-        else()
-            set(_dep_${_feature} OFF)
-        endif()
-    endforeach()
+    # Shared resolver; see cmake/helia_rt_sources.cmake.
+    helia_rt_query_float_support(_dep_F32 _dep_F16 TARGET ${dep})
 
     foreach(_prop COMPILE_DEFINITIONS INTERFACE_COMPILE_DEFINITIONS)
         get_target_property(_cur ${target} ${_prop})
@@ -158,11 +148,11 @@ function(_helia_rt_sync_float_definitions target dep)
                 "helia_rt_helia: requested ARM_NN_ENABLE_${_feature}="
                 "${_want_${_feature}} but the linked target '${dep}' exports "
                 "${_dep_${_feature}}. Using the dependency's value. Configure "
-                "NSX_CMSIS_NN_ENABLE_${_feature} (NSX module), "
-                "ARM_NN_ENABLE_${_feature} (ns-cmsis-nn root CMakeLists), or "
+                "ARM_NN_ENABLE_${_feature} (CMake) or "
                 "CONFIG_NS_CMSIS_NN_ENABLE_${_feature} (Zephyr) *before* "
                 "ns-cmsis-nn is added — it selects its sources at that point. "
-                "Requires ns-cmsis-nn v7.28.0 or later.")
+                "ARM_NN_ENABLE_* is the only CMake spelling from "
+                "ns-cmsis-nn v7.32.0 on.")
         endif()
     endforeach()
 endfunction()

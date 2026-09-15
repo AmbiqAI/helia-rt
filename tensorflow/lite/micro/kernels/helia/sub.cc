@@ -25,6 +25,8 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/op_macros.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_broadcast.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_log.h"
 
@@ -60,6 +62,7 @@ struct OpData {
   // Used only for float evals:
   float output_activation_min_f32;
   float output_activation_max_f32;
+  HeliaBroadcastClass broadcast_class;
 };
 
 TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteSubParams* params,
@@ -67,6 +70,9 @@ TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteSubParams* params,
                              const TfLiteTensor* input2, TfLiteTensor* output,
                              OpData* data) {
   data->requires_broadcast = !HaveSameShapes(input1, input2);
+  data->broadcast_class = HeliaClassifyBroadcast(
+      tflite::GetTensorShape(input1), tflite::GetTensorShape(input2),
+      tflite::GetTensorShape(output));
 
   if (output->type == kTfLiteInt8 || output->type == kTfLiteInt16) {
     // 8bit -> 8bit general quantized path, with general rescalings
@@ -97,7 +103,7 @@ TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteSubParams* params,
     TF_LITE_ENSURE_STATUS(CalculateActivationRangeQuantized(
         context, params->activation, output, &data->output_activation_min,
         &data->output_activation_max));
-  } else if (output->type == kTfLiteFloat32) {
+  } else if (output->type == kTfLiteFloat32 || output->type == kTfLiteFloat16) {
     CalculateActivationRange(params->activation,
                              &data->output_activation_min_f32,
                              &data->output_activation_max_f32);
@@ -249,10 +255,77 @@ TfLiteStatus EvalSub(TfLiteContext* context, TfLiteNode* node,
                      const TfLiteEvalTensor* input1,
                      const TfLiteEvalTensor* input2, TfLiteEvalTensor* output) {
   switch (output->type) {
+    case kTfLiteFloat16: {
+#if ARM_NN_ENABLE_F16
+      const float16_t activation_min_f16 =
+          HeliaFloat16ActivationBound(data->output_activation_min_f32);
+      const float16_t activation_max_f16 =
+          HeliaFloat16ActivationBound(data->output_activation_max_f32);
+      if (data->broadcast_class == HeliaBroadcastClass::kSameShape) {
+        if (arm_elementwise_sub_f16(
+                tflite::micro::GetTensorData<float16_t>(input1),
+                tflite::micro::GetTensorData<float16_t>(input2),
+                tflite::micro::GetTensorData<float16_t>(output),
+                activation_min_f16, activation_max_f16,
+                tflite::micro::GetTensorShape(output).FlatSize()) ==
+            ARM_CMSIS_NN_SUCCESS) {
+          break;
+        }
+      } else if (HeliaBroadcastNeedsWalk(data->broadcast_class)) {
+        cmsis_nn_dims input1_dims;
+        cmsis_nn_dims input2_dims;
+        cmsis_nn_dims output_dims;
+        ArmPopulateCommonParams(tflite::micro::GetTensorShape(input1),
+                                tflite::micro::GetTensorShape(input2),
+                                tflite::micro::GetTensorShape(output),
+                                &input1_dims, &input2_dims, &output_dims);
+        if (arm_elementwise_sub_broadcast_f16(
+                tflite::micro::GetTensorData<float16_t>(input1), &input1_dims,
+                tflite::micro::GetTensorData<float16_t>(input2), &input2_dims,
+                tflite::micro::GetTensorData<float16_t>(output), &output_dims,
+                activation_min_f16, activation_max_f16) ==
+            ARM_CMSIS_NN_SUCCESS) {
+          break;
+        }
+      }
+#endif
+      MicroPrintf("Float16 SUB: optimized kernel rejected the configuration.");
+      return kTfLiteError;
+    }
     case kTfLiteFloat32: {
       tflite::ArithmeticParams op_params;
       SetActivationParams(data->output_activation_min_f32,
                           data->output_activation_max_f32, &op_params);
+#if ARM_NN_ENABLE_F32
+      if (data->broadcast_class == HeliaBroadcastClass::kSameShape) {
+        const int size = tflite::micro::GetTensorShape(output).FlatSize();
+        if (arm_elementwise_sub_f32(
+                tflite::micro::GetTensorData<float>(input1),
+                tflite::micro::GetTensorData<float>(input2),
+                tflite::micro::GetTensorData<float>(output),
+                data->output_activation_min_f32,
+                data->output_activation_max_f32, size) ==
+            ARM_CMSIS_NN_SUCCESS) {
+          break;
+        }
+      } else if (HeliaBroadcastNeedsWalk(data->broadcast_class)) {
+        cmsis_nn_dims input1_dims;
+        cmsis_nn_dims input2_dims;
+        cmsis_nn_dims output_dims;
+        ArmPopulateCommonParams(tflite::micro::GetTensorShape(input1),
+                                tflite::micro::GetTensorShape(input2),
+                                tflite::micro::GetTensorShape(output),
+                                &input1_dims, &input2_dims, &output_dims);
+        if (arm_elementwise_sub_broadcast_f32(
+                tflite::micro::GetTensorData<float>(input1), &input1_dims,
+                tflite::micro::GetTensorData<float>(input2), &input2_dims,
+                tflite::micro::GetTensorData<float>(output), &output_dims,
+                data->output_activation_min_f32,
+                data->output_activation_max_f32) == ARM_CMSIS_NN_SUCCESS) {
+          break;
+        }
+      }
+#endif
       if (data->requires_broadcast) {
         reference_ops::BroadcastSubSlow(
             op_params, tflite::micro::GetTensorShape(input1),
@@ -352,8 +425,10 @@ TfLiteStatus PrepareSub(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, input1->type, output->type);
   TF_LITE_ENSURE_MSG(
       context,
-      input1->type == kTfLiteFloat32 || input1->type == kTfLiteInt32 ||
-          input1->type == kTfLiteInt16 || input1->type == kTfLiteInt8,
+      input1->type == kTfLiteFloat32 ||
+          (kHeliaFloat16Enabled && input1->type == kTfLiteFloat16) ||
+          input1->type == kTfLiteInt32 || input1->type == kTfLiteInt16 ||
+          input1->type == kTfLiteInt8,
       "Input data type not supported");
   TF_LITE_ENSURE_MSG(context, input1->type == input2->type,
                      "Hybrid models are not supported on TFLite Micro.");
@@ -369,6 +444,14 @@ TfLiteStatus PrepareSub(TfLiteContext* context, TfLiteNode* node) {
 
   TF_LITE_ENSURE_STATUS(
       CalculateOpData(context, params, input1, input2, output, data));
+
+  // float16 has no reference fallback, so a shape pair the heliaCORE broadcast
+  // walk cannot express fails here rather than at Invoke time.
+  TF_LITE_ENSURE_MSG(
+      context,
+      output->type != kTfLiteFloat16 ||
+          data->broadcast_class != HeliaBroadcastClass::kUnsupported,
+      "Float16 SUB does not support these input shapes.");
 
   micro_context->DeallocateTempTfLiteTensor(input1);
   micro_context->DeallocateTempTfLiteTensor(input2);
@@ -390,7 +473,8 @@ TfLiteStatus EvalSub(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
   const OpData* data = static_cast<const OpData*>(node->user_data);
 
-  if (output->type == kTfLiteFloat32 || output->type == kTfLiteInt32) {
+  if (output->type == kTfLiteFloat32 || output->type == kTfLiteFloat16 ||
+      output->type == kTfLiteInt32) {
     TF_LITE_ENSURE_OK(
         context, EvalSub(context, node, params, data, input1, input2, output));
   } else if (output->type == kTfLiteInt8 || output->type == kTfLiteInt16) {
