@@ -105,18 +105,11 @@ ifneq (,$(filter cortex-m55,$(TARGET_ARCH)))
   CCFLAGS  += -DARM_NN_ENABLE_F16=1
   CXXFLAGS += -DARM_NN_ENABLE_F16=1
 
-  # GCC 14 ICEs on scalar _Float16 conditional selects for Armv8.1-M
-  # hard-float (GCC PR target/118460); -fno-ssa-phiopt avoids the broken
-  # expander. Clang-based toolchains neither have the bug nor take the flag.
-  # TODO(AmbiqAI/helia-rt#193): drop when arm_gcc_download.sh pins >=
-  # 15.2.Rel1 (fix not backported to gcc-14).
-  ifeq ($(TOOLCHAIN), gcc)
-    NS_CMSIS_NN_FP16_OBJS := \
-        $(patsubst %.c,$(THIRD_PARTY_KERNEL_OBJDIR)%.o, \
-          $(filter %_f16.c %_fp16.c,$(NS_CMSIS_NN_SOURCE_FILES)))
-    NS_CMSIS_NN_FP16_OPT_LEVEL ?= $(THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL) -fno-ssa-phiopt
-    $(NS_CMSIS_NN_FP16_OBJS): THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := $(NS_CMSIS_NN_FP16_OPT_LEVEL)
-  endif
+  # ns-cmsis-nn routes the scalar FP16 min/max/clamp/abs paths through
+  # guarded helpers, so GCC 14 never emits the HFmode conditional move that
+  # ICEs (GCC PR target/118460) and no build-flag workaround is needed here.
+  # Keep new scalar FP16 code on those helpers.
+  # see AmbiqAI/ns-cmsis-nn#221, AmbiqAI/helia-rt#193
 endif
 
 # helia per-kernel optimization knobs.

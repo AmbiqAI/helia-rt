@@ -373,9 +373,7 @@ int main(void){return 0;}
             "add_subdirectory(<ns-cmsis-nn>/nsx ...). Requires ns-cmsis-nn "
             "7.32.0 or later on the NSX path. On GCC 14 this needs "
             "ns-cmsis-nn v7.30.0 or later, which fixed the fp16 sources that "
-            "ICE the compiler (GCC PR 118460); the -fno-ssa-phiopt workaround "
-            "in tools/make/ext_libs/helia.inc covers the Make path only and "
-            "has no effect on this build.")
+            "ICE the compiler (GCC PR 118460).")
     endif()
 
     # Outputs, not knobs: what the build actually has, for consumers to
