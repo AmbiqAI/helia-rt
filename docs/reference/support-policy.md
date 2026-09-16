@@ -19,9 +19,9 @@ bug fixes and are the versions Ambiq expects to reproduce reports against.
 
 | Track | Version | Status |
 |---|---|---|
-| Current minor | `v1.20.x` | Supported |
-| Previous minor | `v1.19.x` | Supported |
-| Older minors | `v1.17.x` and earlier | Not supported |
+| Current minor | `v1.21.x` | Supported |
+| Previous minor | `v1.20.x` | Supported |
+| Older minors | `v1.19.x` and earlier | Not supported |
 
 `v1.18.0` is **withdrawn** and does not count as a supported minor: its
 heliaCORE pin is defective for the float32 and float16 kernels (NaN handling
@@ -100,8 +100,9 @@ supported toolchains and targets.
 released.** The change landed on `main` in
 [#197](https://github.com/AmbiqAI/helia-rt/pull/197) after `v1.17.0` was cut and
 first shipped in `v1.18.0`, where it is listed in the release notes. It is
-carried forward in `v1.19.0`. Because `v1.18.0` is withdrawn (see
-[Supported Releases](#supported-releases)), take this fix from `v1.19.0`.
+carried forward in `v1.19.0` and later. Because `v1.18.0` is withdrawn (see
+[Supported Releases](#supported-releases)), take this fix from a supported
+release.
 
 Releases up to and including `v1.17.0` do not contain it. On those releases,
 treat quantized `UNIDIRECTIONAL_SEQUENCE_LSTM` as single-shot.

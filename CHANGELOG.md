@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.21.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.20.0...helia-rt-v1.21.0) (2026-09-15)
+
+
+### Features
+
+* **helia:** add FP16 arg min and max adapters ([#291](https://github.com/AmbiqAI/helia-rt/issues/291)) ([92ab654](https://github.com/AmbiqAI/helia-rt/commit/92ab654006259cc316126d47dec0c4b85615429e))
+* **helia:** add FP16 sqrt and rsqrt adapters ([0180b3b](https://github.com/AmbiqAI/helia-rt/commit/0180b3b086022b359169411b9fe3c5553e1d7164)), closes [#285](https://github.com/AmbiqAI/helia-rt/issues/285)
+* **helia:** add gather and gather_nd adapters ([69fbb32](https://github.com/AmbiqAI/helia-rt/commit/69fbb325004114f68537bf9a9f007dfbc3c0543e)), closes [#286](https://github.com/AmbiqAI/helia-rt/issues/286)
+* **helia:** support FP16 split, pack, unpack and fill via CORE 7.33 ([#281](https://github.com/AmbiqAI/helia-rt/issues/281)) ([481cd53](https://github.com/AmbiqAI/helia-rt/commit/481cd53a7789d90f18cf3880c36225d073589a47)), closes [#280](https://github.com/AmbiqAI/helia-rt/issues/280)
+* **helia:** validate SPLIT_V metadata and support FP16 ([#284](https://github.com/AmbiqAI/helia-rt/issues/284)) ([c44be87](https://github.com/AmbiqAI/helia-rt/commit/c44be87344f05c49da84d15e576c053a873731ca)), closes [#283](https://github.com/AmbiqAI/helia-rt/issues/283)
+
+
+### Bug Fixes
+
+* **helia:** propagate quantized pooling failures ([#289](https://github.com/AmbiqAI/helia-rt/issues/289)) ([bcd6928](https://github.com/AmbiqAI/helia-rt/commit/bcd6928452ea60e4b82f5ca43eae8b1ebd70fb83))
+* **make:** isolate linker map outputs ([#294](https://github.com/AmbiqAI/helia-rt/issues/294)) ([7cc551c](https://github.com/AmbiqAI/helia-rt/commit/7cc551c69a4d6a9f190e6e8305a011d2cffcf374)), closes [#292](https://github.com/AmbiqAI/helia-rt/issues/292)
+
 ## [1.20.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.19.0...helia-rt-v1.20.0) (2026-09-07)
 
 
