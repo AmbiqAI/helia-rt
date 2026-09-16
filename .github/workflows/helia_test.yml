@@ -147,30 +147,32 @@ jobs:
         # SQRT/RSQRT adds one binary and six cases on every leg. see AmbiqAI/helia-rt#285
         # Pooling status adds one binary and ten cases. see AmbiqAI/helia-rt#238
         # ARG_MIN/MAX adds one binary and six cases. see AmbiqAI/ns-cmsis-nn#503
+        # CONV/DEPTHWISE status/context adds one binary and 23 cases.
+        # see AmbiqAI/helia-rt#238
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 145
-            min-cases: 1197
+            min-binaries: 146
+            min-cases: 1220
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 145
-            min-cases: 1197
+            min-binaries: 146
+            min-cases: 1220
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and one case fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 144
-            min-cases: 1196
+            min-binaries: 145
+            min-cases: 1219
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 145
-            min-cases: 1245
+            min-binaries: 146
+            min-cases: 1268
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 144
-            min-cases: 1244
+            min-binaries: 145
+            min-cases: 1267
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
