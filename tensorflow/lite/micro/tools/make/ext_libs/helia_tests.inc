@@ -81,6 +81,31 @@ $(kernel_gather_pair_test_BINARY): LDFLAGS += \
 endif
 endif
 
+# Quantized CONV_2D and DEPTHWISE_CONV_2D status/context contracts.
+# see AmbiqAI/helia-rt#238
+$(eval $(call microlite_test,kernel_convolution_status_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/convolution_status_test.cc))
+
+ifeq ($(TOOLCHAIN),gcc)
+$(kernel_convolution_status_test_BINARY): CXXFLAGS += \
+  -DHELIA_CONV_LINK_WRAP=1
+$(kernel_convolution_status_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_convolve_wrapper_s8 \
+  -Wl,--wrap=arm_convolve_wrapper_s4 \
+  -Wl,--wrap=arm_convolve_wrapper_s16 \
+  -Wl,--wrap=arm_depthwise_conv_wrapper_s8 \
+  -Wl,--wrap=arm_depthwise_conv_wrapper_s4 \
+  -Wl,--wrap=arm_depthwise_conv_s16 \
+  -Wl,--wrap=arm_convolve_weight_sum \
+  -Wl,--wrap=arm_depthwise_convolve_weight_sum \
+  -Wl,--wrap=arm_convolve_s8_get_weights_sum_size \
+  -Wl,--wrap=arm_convolve_wrapper_s8_get_buffer_size \
+  -Wl,--wrap=arm_convolve_wrapper_s4_get_buffer_size \
+  -Wl,--wrap=arm_convolve_wrapper_s16_get_buffer_size \
+  -Wl,--wrap=arm_depthwise_conv_wrapper_s8_get_buffer_size \
+  -Wl,--wrap=arm_depthwise_conv_wrapper_s4_get_buffer_size
+endif
+
 # see AmbiqAI/helia-rt#285
 $(eval $(call microlite_test,kernel_sqrt_rsqrt_fp16_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/sqrt_rsqrt_fp16_test.cc))
