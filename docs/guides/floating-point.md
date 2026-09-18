@@ -320,20 +320,14 @@ request, and a request the library did not ship is reported as a `WARNING`.
     revision override, or `source.path` for a local working tree) before
     enabling the float features.
 
-!!! note "Two different GCC 14 fixes, one for each build path"
+!!! note "GCC 14 and the FP16 sources"
     GCC 14 hits an internal compiler error on ns-cmsis-nn's FP16 sources
-    (GCC PR 118460). The two build paths fix it in different places, and
-    neither helps the other:
-
-    - **Make**: `tools/make/ext_libs/helia.inc` passes `-fno-ssa-phiopt`,
-      which works around the ICE with any ns-cmsis-nn revision, because Make
-      compiles the ns-cmsis-nn sources itself.
-    - **CMake / NSX / Zephyr**: ns-cmsis-nn compiles its own sources, so the
-      workaround is not ours to apply. Use ns-cmsis-nn v7.30.0 or later,
-      which fixed the sources outright.
-
-    They are not alternatives to pick between: use whichever belongs to the
-    build path you are on.
+    (GCC PR 118460). ns-cmsis-nn v7.30.0 fixed this at the source, and every
+    build path relies on that fix: use v7.30.0 or later on GCC 14. heliaRT
+    carried a `-fno-ssa-phiopt` workaround in
+    `tools/make/ext_libs/helia.inc` for the Make path while older revisions
+    were still supported; it was removed once the pin moved past v7.30.0 and
+    there is nothing to set on any build path today.
 
 Because a static-archive build cannot reveal a missing kernel, verify the final
 executable rather than the library:

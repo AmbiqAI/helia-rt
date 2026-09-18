@@ -41,7 +41,7 @@ on:
   workflow_dispatch:
     inputs:
       ns_cmsis_nn_ref:
-        description: "ns-cmsis-nn commit SHA, tag (e.g. v7.30.1) or branch to build against"
+        description: "ns-cmsis-nn commit SHA, tag (e.g. v7.35.0) or branch to build against"
         required: true
         # Current repository pin: AmbiqAI/ns-cmsis-nn v7.35.0. Dispatching with
         # the default is a no-op control run that should match the normal
