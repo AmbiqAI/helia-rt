@@ -135,7 +135,7 @@ ifeq ($(TOOLCHAIN), armclang)
   ARMC6_LDFLAGS += -Wl,--strict,--summary_stderr,--info,summarysizes,--map
   ARMC6_LDFLAGS += -Wl,--load_addr_map_info,--xref,--callgraph,--symbols
   ARMC6_LDFLAGS += -Wl,--info,sizes,--info,totals,--info,unused,--info,veneers
-  ARMC6_LDFLAGS += -Wl,--list=gen/$(TARGET).map
+  ARMC6_LDFLAGS += -Wl,--list=$(GENDIR)$(TARGET).map
   ARMC6_LDFLAGS += -Wl,--entry=Reset_Handler --verbose
   ARMC6_LDFLAGS += -Wl,--scatter=$(ETHOS_U_CORE_PLATFORM)/platform.scatter
 
@@ -193,7 +193,7 @@ else ifeq ($(TOOLCHAIN), gcc)
   LDFLAGS += \
     --specs=nosys.specs \
     -T $(GCC_LINKER_SCRIPT) \
-    -Wl,-Map=gen/$(TARGET).map,--cref \
+    -Wl,-Map=$(GENDIR)$(TARGET).map,--cref \
     -Wl,--gc-sections \
     --entry Reset_Handler
 
