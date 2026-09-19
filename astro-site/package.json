@@ -24,7 +24,7 @@
     "check:reference": "node scripts/check-reference-output.mjs"
   },
   "dependencies": {
-    "@ambiqai/helia-ui": "github:AmbiqAI/helia-ui#v0.1.0-alpha.13",
+    "@ambiqai/helia-ui": "github:AmbiqAI/helia-ui#v0.1.0-alpha.14",
     "@astrojs/starlight": "^0.41.5",
     "@fontsource-variable/inter": "5.3.0",
     "astro": "^7.0.2",

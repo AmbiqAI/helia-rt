@@ -115,7 +115,7 @@ jobs:
           base="${{ github.event.pull_request.base.sha }}"
           head="${{ github.event.pull_request.head.sha }}"
           range="$base...$head"
-          # SSoT branches (those that touch cmake/ or root CMakeLists.txt) MUST NOT
+          # SSoT branches (those that touch build inputs under cmake/ or root CMakeLists.txt) MUST NOT
           # also touch upstream-managed paths. PRs that legitimately need to do so
           # should be split.
           # Use the PR merge-base diff so branches cut from older tags do not
@@ -124,7 +124,8 @@ jobs:
           # still writing, so the pipe form makes git take SIGPIPE and
           # `set -o pipefail` turn 141 into a failure of the invariant check
           # itself -- for a PR that merely touches enough SSoT files.
-          ssot_touched=$(git diff --name-only "$range" -- cmake/ CMakeLists.txt)
+          # The directory readme changes documentation links, not build inputs.
+          ssot_touched=$(git diff --name-only "$range" -- cmake/ CMakeLists.txt ':(exclude)cmake/README.md')
           if [ -n "${ssot_touched}" ]; then
               echo "PR touches SSoT files — verifying upstream paths are untouched..."
               # Allow the small set of upstream-owned paths that currently need

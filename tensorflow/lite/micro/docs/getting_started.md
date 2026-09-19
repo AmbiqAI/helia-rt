@@ -5,7 +5,7 @@ Welcome to the heliaRT getting-started guide. heliaRT keeps the familiar TensorF
 ## Recommended Setup Paths
 
 - [Zephyr setup](https://ambiqai.github.io/helia-rt/getting-started/zephyr/): integrate heliaRT into a west workspace using either the raw module or a prebuilt release bundle
-- [neuralSPOT setup](https://ambiqai.github.io/helia-rt/getting-started/neuralspot-x/): use `ns_autodeploy` for quick profiling and deployment
+- [neuralSPOT-X setup](https://ambiqai.github.io/helia-rt/getting-started/neuralspot-x/): add the runtime source module to an NSX application
 - [Source builds](https://ambiqai.github.io/helia-rt/getting-started/source/): build heliaRT directly from source
 - [Features](https://ambiqai.github.io/helia-rt/guide/model-compatibility/): see how heliaRT maps onto familiar TFLM concepts
 
@@ -27,7 +27,7 @@ For direct archive generation and lower-level integration, use the dedicated [So
 
 ## Next Steps
 
-- use [neuralSPOT setup](https://ambiqai.github.io/helia-rt/getting-started/neuralspot-x/) for quick model profiling
+- use [neuralSPOT-X setup](https://ambiqai.github.io/helia-rt/getting-started/neuralspot-x/) for NSX application integration
 - use [Zephyr setup](https://ambiqai.github.io/helia-rt/getting-started/zephyr/) for west-workspace integration
 - use [Source builds](https://ambiqai.github.io/helia-rt/getting-started/source/) for direct archive generation
 - use [Examples](https://ambiqai.github.io/helia-rt/getting-started/) for applied integration patterns
