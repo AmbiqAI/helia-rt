@@ -21,7 +21,8 @@
     "check:operators": "node scripts/check-operators.mjs",
     "check:output": "node scripts/check-output.mjs && helia-ui-check-discoverability --root .",
     "reference:build": "node scripts/build-reference.mjs",
-    "check:reference": "node scripts/check-reference-output.mjs"
+    "check:reference": "node scripts/check-reference-output.mjs",
+    "postbuild": "node scripts/publish-reference-markdown.mjs"
   },
   "dependencies": {
     "@ambiqai/helia-ui": "github:AmbiqAI/helia-ui#v0.1.0-alpha.14",

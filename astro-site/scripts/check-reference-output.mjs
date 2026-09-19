@@ -23,4 +23,28 @@ for (const page of report.routes) {
   if (bytes > largest.html) largest = {route: page.route, html: bytes, gzip: compressed};
 }
 if (anchors !== report.symbols) throw new Error(`Rendered ${anchors} anchors for ${report.symbols} symbols.`);
+const bundle = fs.readFileSync(path.join(site, 'dist/llms-full.txt'), 'utf8');
+for (const page of report.routes) {
+  const route = page.route.replace(/^\/helia-rt\//, '');
+  const markdown = fs.readFileSync(path.join(site, 'dist', route, 'index.md'), 'utf8');
+  for (const anchor of page.anchors) {
+    if (!markdown.includes(` ${anchor}\n`)) throw new Error(`Markdown lost API symbol: ${anchor}`);
+  }
+  if (!bundle.includes(markdown.trimEnd())) throw new Error(`Site agent bundle lost API page: ${route}`);
+}
+const contracts = {
+  microinterpreter: [
+    'tflite::MicroInterpreter::MicroInterpreter(',
+    '| tensor_arena | uint8_t * | Required |',
+    'ownership remains with the caller',
+    'template <class T>',
+  ],
+  tflitestatus: ['kTfLiteOk = 0', 'kTfLiteError = 1'],
+};
+for (const [route, required] of Object.entries(contracts)) {
+  const markdown = fs.readFileSync(path.join(site, 'dist/reference/api', route, 'index.md'), 'utf8');
+  for (const text of required) {
+    if (!markdown.includes(text)) throw new Error(`Markdown contract missing from ${route}: ${text}`);
+  }
+}
 console.log(`Checked ${report.pages} static API pages and ${anchors} unique rendered anchors. Largest: ${JSON.stringify(largest)}`);
