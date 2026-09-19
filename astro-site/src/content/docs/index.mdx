@@ -1,0 +1,84 @@
+---
+title: heliaRT
+description: A familiar LiteRT runtime, backed by Ambiq's optimized neural network kernels.
+tableOfContents: false
+prev: false
+next: false
+helia:
+  pageTitle: false
+---
+
+import RuntimeHero from '../../components/RuntimeHero.astro';
+import Band from '@ambiqai/helia-ui/astro/Band';
+import CardGrid from '@ambiqai/helia-ui/astro/CardGrid';
+import LinkCard from '@ambiqai/helia-ui/astro/LinkCard';
+import HomeLayout from '../../components/HomeLayout.astro';
+import RuntimeFlow from '../../components/RuntimeFlow.astro';
+import RuntimeCapabilities from '../../components/RuntimeCapabilities.astro';
+
+<HomeLayout>
+<RuntimeHero />
+
+<Band density="compact">
+<div class="section-heading">
+<h2 id="why-heliart">Keep your LiteRT surface. Swap the backend underneath.</h2>
+<p>Your model and application stay at the center. heliaRT manages graph execution, while the selected backend supplies the operator implementations.</p>
+</div>
+<RuntimeFlow />
+</Band>
+
+<Band tone="muted" density="compact">
+<RuntimeCapabilities />
+</Band>
+
+<Band density="compact">
+<div class="section-heading">
+<h2>Start with the tools you use.</h2>
+<p>CMake, Zephyr, neuralSPOT-X source builds and CMSIS-Pack share one source manifest and backend-selection rules. Choose the integration that fits your application.</p>
+</div>
+<CardGrid columns={2}>
+<LinkCard title="Zephyr" eyebrow="RTOS integration" href="/helia-rt/getting-started/choose-your-path/#zephyr">Add the module to your west workspace and configure the backend through Kconfig.</LinkCard>
+<LinkCard title="neuralSPOT-X" eyebrow="Ambiq development" href="/helia-rt/getting-started/choose-your-path/#neuralspot-x">Integrate the runtime with your neuralSPOT-X application's build.</LinkCard>
+<LinkCard title="CMSIS-Pack" eyebrow="Arm ecosystem" href="/helia-rt/getting-started/choose-your-path/#cmsis-pack">Package runtime sources for a CMSIS-based project.</LinkCard>
+<LinkCard title="Source and CMake" eyebrow="Custom firmware" href="/helia-rt/getting-started/choose-your-path/#source-and-cmake">Build the runtime or link a compatible release archive into your own application.</LinkCard>
+</CardGrid>
+</Band>
+
+<Band tone="muted" density="compact">
+<div class="build-choices">
+<div class="section-heading">
+<span class="section-eyebrow">Build choices</span>
+<h2>Choose what your firmware needs.</h2>
+<p>Use a matching release archive for a fixed configuration, or build from source to select the backend, floating-point features and kernel profiles.</p>
+<a class="section-link" href="/helia-rt/guide/build-configuration/">Configure your build →</a>
+</div>
+<dl class="build-decisions">
+<div><dt>Source or prebuilt</dt><dd>Own the build configuration, or link an archive whose settings match your application.</dd></div>
+<div><dt>SPEED or SIZE</dt><dd>Select the HELIA kernel profile in source builds, with per-family overrides where available.</dd></div>
+<div><dt>GCC · Arm Compiler 6 · ATfE</dt><dd>Match the library and application toolchain. Compiler choice and kernel profile are separate decisions.</dd></div>
+</dl>
+</div>
+</Band>
+
+<Band density="compact">
+<div class="section-heading">
+<h2>Choose the inference path that fits.</h2>
+<p>For supported models, heliaAOT is the recommended option when targeting latency, power and memory efficiency. Use heliaRT when your application calls for the LiteRT interpreter and its runtime integration.</p>
+</div>
+<CardGrid columns={2}>
+<LinkCard title="heliaAOT" eyebrow="Ahead-of-time compilation" href="https://ambiqai.github.io/helia-aot/">Compile a supported model into standalone inference code. Check model compatibility in the heliaAOT documentation.</LinkCard>
+<LinkCard title="heliaRT" eyebrow="LiteRT runtime integration" href="/helia-rt/guide/runtime/">Load a model, register its operators and manage the tensor arena through the familiar MicroInterpreter API.</LinkCard>
+</CardGrid>
+</Band>
+<Band tone="muted" density="compact">
+<div class="section-heading">
+<h2>Take the next step.</h2>
+<p>Bring an existing application across, run a checked first inference, or understand a model's requirements before integrating it.</p>
+</div>
+<CardGrid columns={3}>
+<LinkCard title="First inference" href="/helia-rt/getting-started/first-inference/">Follow model validation, operator registration, tensor allocation and invocation in order.</LinkCard>
+<LinkCard title="Migrate from LiteRT" href="/helia-rt/getting-started/migrate-from-litert/">Keep a known model baseline and verify the runtime, build and output contracts together.</LinkCard>
+<LinkCard title="Check compatibility" href="/helia-rt/guide/model-compatibility/">Understand tensor types, floating-point features and allocation versus invocation failures.</LinkCard>
+</CardGrid>
+</Band>
+</HomeLayout>

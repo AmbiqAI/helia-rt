@@ -1,0 +1,25 @@
+---
+title: Runtime API
+description: Generated application-facing C++ contracts for model loading, execution, allocation and profiling.
+tableOfContents: false
+---
+
+import ApiIndex from '../../../components/ApiIndex.astro';
+
+The application-facing C++ reference is generated from the same source commit as this documentation. Each entry includes its directly declared public and protected members, template parameters, overloads, source comments and links to the exact header revision.
+
+The scope covers model loading, execution, operator registration, memory planning, profiling, resource variables and platform initialization. Internal kernel helpers, test utilities and FlatBuffer builders are outside this application reference. Extraction uses `TF_LITE_STATIC_MEMORY=1` and the default uncompressed runtime configuration; declarations guarded by `USE_TFLM_COMPRESSION` are not included. Inherited members are documented on their declaring base class. For supported operations and data types, use the [operator explorer](/helia-rt/guide/operators/).
+
+`MicroMutableOpResolver` registration methods are split alphabetically so each page stays manageable. Where an upstream declaration has no contract comment, the reference shows its signature without inventing parameter descriptions.
+
+<ApiIndex />
+
+## Version
+
+Include `tensorflow/lite/micro/helia_rt_version.h` and read `HELIA_RT_VERSION` for the runtime source release string. This macro does not report the linked heliaCORE version or the compiler configuration.
+
+## Invocation contract
+
+The interpreter has constructors accepting either an arena or an existing allocator. Both borrow resources from the caller. `AllocateTensors()` and `Invoke()` return `TfLiteStatus`; check the returned status before proceeding.
+
+Tensor accessors expose memory associated with the interpreter. Typed accessors require the requested C++ type to match the tensor type and can return null. See the header for each accessor's index requirements.

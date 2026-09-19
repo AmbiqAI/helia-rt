@@ -1,0 +1,14 @@
+---
+import build from '../data/build-info.json';
+---
+<dl>
+  <dt>Runtime header version</dt><dd><code>{build.runtimeVersion}</code></dd>
+  <dt>Documentation source</dt><dd><a href={build.sourceUrl}><code>{build.commit}</code></a></dd>
+  <dt>Source commit time</dt><dd><time datetime={build.commitTime}>{build.commitTime}</time></dd>
+  <dt>Checkout</dt><dd>{build.releaseTag ? `Release tag ${build.releaseTag}` : 'Development commit'}{build.modified ? ' with local modifications' : ''}</dd>
+</dl>
+<p><a href={`${import.meta.env.BASE_URL}/build-info.json`}>Download build metadata</a></p>
+<style>
+  dt { font-weight: 700; margin-top: 1rem; }
+  dd { margin-left: 0; overflow-wrap: anywhere; }
+</style>

@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.astro/
+.cache/
+
+src/content/docs/reference/api/
+public/reference/api/

@@ -1,0 +1,25 @@
+---
+title: Operator explorer
+description: Search HELIA adapter operators by name, family, input data type and constraints.
+tableOfContents: false
+---
+
+import OperatorBrowser from '../../../components/OperatorBrowser.astro';
+
+Search the HELIA adapter inventory by operator, family or **input data type**. Each result lists important constraints and links to the adapter at this documentation's source revision.
+
+A listed type can use an optimized, reference or storage-only path. Shape, weight/output types and build settings still determine whether your model is supported.
+
+<details>
+<summary>How to read type support</summary>
+
+- **FP16 arithmetic** needs the matching heliaCORE feature and target support. Storage operations such as `DEQUANTIZE` are different.
+- **int4 weights** appear in compute-operator notes. They do not imply int4 activations.
+- **Fallback is operator-specific.** Check both allocation and invocation status. See [Model compatibility](/helia-rt/guide/model-compatibility/) and [Floating point](/helia-rt/guide/floating-point/).
+- Operators outside this inventory may come from upstream Reference sources. Registering an operator does not prove that all its types and options are supported.
+
+</details>
+
+<OperatorBrowser />
+
+[Download the complete operator inventory as Markdown](/helia-rt/operators.md), including input types, constraints and source links.

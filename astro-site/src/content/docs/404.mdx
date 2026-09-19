@@ -1,0 +1,27 @@
+---
+title: Page not found
+description: Find the heliaRT documentation you need.
+template: splash
+tableOfContents: false
+prev: false
+next: false
+head:
+  - tag: meta
+    attrs:
+      name: robots
+      content: noindex
+  - tag: meta
+    attrs:
+      http-equiv: refresh
+      content: '5;url=/helia-rt/'
+---
+
+import Button from '@ambiqai/helia-ui/astro/Button';
+
+We could not find that page. You will return to the heliaRT home page in five seconds.
+
+Use search to find a topic, or continue below.
+
+<Button href="/helia-rt/">Go to Home</Button>
+{' '}
+<Button href="/helia-rt/reference/" variant="secondary">API reference</Button>

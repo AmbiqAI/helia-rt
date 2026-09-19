@@ -4,10 +4,10 @@ Welcome to the heliaRT getting-started guide. heliaRT keeps the familiar TensorF
 
 ## Recommended Setup Paths
 
-- [Zephyr setup](../../../../docs/usage/zephyr.md): integrate heliaRT into a west workspace using either the raw module or a prebuilt release bundle
-- [neuralSPOT setup](../../../../docs/usage/neuralspot.md): use `ns_autodeploy` for quick profiling and deployment
-- [Source builds](../../../../docs/usage/source.md): build heliaRT directly from source
-- [Features](../../../../docs/features/index.md): see how heliaRT maps onto familiar TFLM concepts
+- [Zephyr setup](https://ambiqai.github.io/helia-rt/getting-started/zephyr/): integrate heliaRT into a west workspace using either the raw module or a prebuilt release bundle
+- [neuralSPOT-X setup](https://ambiqai.github.io/helia-rt/getting-started/neuralspot-x/): add the runtime source module to an NSX application
+- [Source builds](https://ambiqai.github.io/helia-rt/getting-started/source/): build heliaRT directly from source
+- [Features](https://ambiqai.github.io/helia-rt/guide/model-compatibility/): see how heliaRT maps onto familiar TFLM concepts
 
 ## Core Concepts
 
@@ -23,11 +23,11 @@ The main heliaRT additions are Ambiq-focused optimization, supported packaging f
 
 ## Source Build Overview
 
-For direct archive generation and lower-level integration, use the dedicated [Source builds](../../../../docs/usage/source.md) guide.
+For direct archive generation and lower-level integration, use the dedicated [Source builds](https://ambiqai.github.io/helia-rt/getting-started/source/) guide.
 
 ## Next Steps
 
-- use [neuralSPOT setup](../../../../docs/usage/neuralspot.md) for quick model profiling
-- use [Zephyr setup](../../../../docs/usage/zephyr.md) for west-workspace integration
-- use [Source builds](../../../../docs/usage/source.md) for direct archive generation
-- use [Examples](../../../../docs/examples/index.md) for applied integration patterns
+- use [neuralSPOT-X setup](https://ambiqai.github.io/helia-rt/getting-started/neuralspot-x/) for NSX application integration
+- use [Zephyr setup](https://ambiqai.github.io/helia-rt/getting-started/zephyr/) for west-workspace integration
+- use [Source builds](https://ambiqai.github.io/helia-rt/getting-started/source/) for direct archive generation
+- use [Examples](https://ambiqai.github.io/helia-rt/getting-started/) for applied integration patterns

@@ -33,7 +33,7 @@
 #             ns-cmsis-nn reads them. Publishes what it observed as
 #             HELIA_RT_FLOAT32_ENABLED / HELIA_RT_FLOAT16_ENABLED.
 #             see AmbiqAI/helia-rt#253, AmbiqAI/ns-cmsis-nn#420,
-#             docs/guides/floating-point.md
+#             astro-site/src/content/docs/guide/floating-point.md
 #   cmsis_nn: User-supplied upstream CMSIS-NN target. ns-cmsis-nn is NOT
 #             compatible (modified API signatures). Supply the target via
 #             -DHELIA_RT_CMSISNN_TARGET=<name> (e.g. CMSIS::NN from an

@@ -3,94 +3,139 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
-  # Validate the docs build on pull requests too. Without this the --strict
-  # build only ran after merge, so a broken or unreachable page failed the
-  # Pages deploy on main instead of the PR that introduced it.
   pull_request:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      source_ref:
+        type: string
+        default: ''
+      release_publish:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-# Scope concurrency per ref so pull-request validation runs do not queue
-# behind (or against) the single shared Pages deploy lane on main.
-concurrency:
-  group: "pages-${{ github.ref }}"
-  cancel-in-progress: false
-
-# Default to bash
-defaults:
-  run:
-    shell: bash
 
 jobs:
-  # Pull-request validation. Deliberately does not touch the Pages API or
-  # upload an artifact, so it needs no pages permissions and works for
-  # fork pull requests.
-  validate:
+  build:
     name: Validate docs build (strict)
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    # This job builds pull-request-controlled code (mkdocs config can execute
-    # arbitrary Python), so do not inherit the workflow-level pages/id-token
-    # write grants — it only needs to read the repository.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      ASTRO_DOXYGEN_VERSION: "1.17.0"
+      ASTRO_DOXYGEN_SHA256: "75419ef4f446fc1c24ef12514b574e66e898ee6f527c6ae2ad84f91a905823c2"
+    outputs:
+      source_commit: ${{ steps.source.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
+          fetch-depth: 0
+      - name: Record source checkout
+        id: source
+        run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: astro-site/package-lock.json
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+      - name: Cache Doxygen tarball
+        uses: actions/cache@v6
+        with:
+          path: /tmp/doxygen-${{ env.ASTRO_DOXYGEN_VERSION }}.linux.bin.tar.gz
+          key: doxygen-tarball-${{ runner.os }}-${{ env.ASTRO_DOXYGEN_VERSION }}
+
+      - name: Install Doxygen
+        run: |
+          set -euo pipefail
+          archive="/tmp/doxygen-${ASTRO_DOXYGEN_VERSION}.linux.bin.tar.gz"
+          tag="Release_${ASTRO_DOXYGEN_VERSION//./_}"
+          if ! echo "${ASTRO_DOXYGEN_SHA256}  ${archive}" | sha256sum -c - >/dev/null 2>&1; then
+            for url in \
+              "https://github.com/doxygen/doxygen/releases/download/${tag}/doxygen-${ASTRO_DOXYGEN_VERSION}.linux.bin.tar.gz" \
+              "https://www.doxygen.nl/files/doxygen-${ASTRO_DOXYGEN_VERSION}.linux.bin.tar.gz"; do
+              curl -fsSL --retry 3 -o "${archive}" "${url}" && break
+            done
+            echo "${ASTRO_DOXYGEN_SHA256}  ${archive}" | sha256sum -c -
+          fi
+          tar -C /tmp -xzf "${archive}"
+          echo "/tmp/doxygen-${ASTRO_DOXYGEN_VERSION}/bin" >> "${GITHUB_PATH}"
+          "/tmp/doxygen-${ASTRO_DOXYGEN_VERSION}/bin/doxygen" --version
+
+      - name: Install locked site dependencies
+        working-directory: astro-site
+        run: npm ci
+      - name: Build the documentation artifact
+        working-directory: astro-site
+        run: npm run build
+      - name: Validate site and source contracts
+        working-directory: astro-site
+        run: |
+          npm run check
+          npm run check:links
+          npm run check:operators
+          npm run check:output
+          npm run check:reference
+      - name: Upload tested site
+        uses: actions/upload-artifact@v7
+        with:
+          name: heliart-docs-site
+          path: astro-site/dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  deploy:
+    name: Deploy tested Astro site
+    needs: build
+    if: >-
+      github.repository == 'AmbiqAI/helia-rt' &&
+      github.ref == 'refs/heads/main' &&
+      (inputs.release_publish || github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' &&
+      !contains(github.event.head_commit.message, 'chore(main): release')))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
     permissions:
       contents: read
-
-    steps:
-      - name: Checkout 🛎️
-        uses: actions/checkout@v7
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-        with:
-            enable-cache: true
-      - name: Build docs 🔧
-        env:
-          CI: ""
-        run: |
-          uv sync --locked
-          uv run mkdocs build --strict
-
-  # Build job
-  build:
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout 🛎️
-        uses: actions/checkout@v7
-      - name: Setup Pages
-        id: pages
-        uses: actions/configure-pages@v6
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-        with:
-            enable-cache: true
-      - name: Install and Build 🔧
-        env:
-          CI: ""
-          PUBLIC_URL: "${{ steps.pages.outputs.base_url }}/"
-        run: |
-          uv sync
-          # --strict turns the validation warnings configured in mkdocs.yaml
-          # (pages missing from nav, broken internal links) into build
-          # failures, so documentation cannot land unreachable or broken.
-          uv run mkdocs build --strict
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          path: ./site
-
-  # Deployment job
-  deploy:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
     steps:
-      - name: Deploy to Pages 🚀
+      - name: Keep the public site on the latest main commit
+        id: freshness
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          DOCS_SOURCE_COMMIT: ${{ needs.build.outputs.source_commit }}
+        run: |
+          latest=$(gh api "repos/$GH_REPO/branches/main" --jq .commit.sha)
+          if [[ "$latest" == "$DOCS_SOURCE_COMMIT" ]]; then
+            echo 'publish=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'A newer main commit owns the public documentation.'
+            echo 'publish=false' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/download-artifact@v8
+        if: steps.freshness.outputs.publish == 'true'
+        with:
+          name: heliart-docs-site
+          path: tested-site
+      - uses: actions/configure-pages@v6
+        if: steps.freshness.outputs.publish == 'true'
+      - uses: actions/upload-pages-artifact@v5
+        if: steps.freshness.outputs.publish == 'true'
+        with:
+          path: tested-site
+      - name: Deploy Pages artifact
         id: deployment
+        if: steps.freshness.outputs.publish == 'true'
         uses: actions/deploy-pages@v5

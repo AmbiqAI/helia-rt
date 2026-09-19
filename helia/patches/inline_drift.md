@@ -392,7 +392,7 @@ under "Other approved helia-only locations".
 - `nsx/` — heliaRT NSX module manifest (see repository_layout.md).
 - `zephyr/` (top level) — Zephyr module manifest (see repository_layout.md).
 - `zephyr_static_export.sh` — top-level Zephyr export driver.
-- `pyproject.toml`, `uv.lock`, `mkdocs.yaml`, `release-please-config.json`, `.release-please-manifest.json`.
+- `pyproject.toml`, `uv.lock`, `astro-site/`, `release-please-config.json`, `.release-please-manifest.json`.
 - `.devcontainer/`, `.github/stale.yml`.
 - `ci/install_qemu.sh`, `ci/check_tflite_files.py`, `ci/issue_on_error.py`.
 

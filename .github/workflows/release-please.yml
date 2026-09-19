@@ -41,31 +41,8 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
-      # The release PR is authored by the default GITHUB_TOKEN, and that is a
-      # deliberate choice. See docs/contributing/release-process.md ->
-      # "Why the release PR starts with no checks".
-      #
-      # GitHub parks CI for anything a bot set in motion: a `pull_request` run
-      # whose triggering event came from GITHUB_TOKEN is created as
-      # `conclusion: action_required` and publishes no check runs until someone
-      # clicks "Approve workflows to run" on the PR. All 11 required contexts
-      # come from `pull_request` workflows, so the release PR starts with none of
-      # them reported.
-      #
-      # That is the intended flow, not a defect to route around. Releasing is a
-      # deliberate act: review the changelog, click the button, watch the eleven
-      # checks go green, merge. Two properties fall out of it -- the click is
-      # needed only at merge time (the force-pushes release-please makes as
-      # `main` moves reset the checks, but nobody is merging then, so it costs
-      # one click per release rather than one per push), and the ten-job matrix
-      # stays off every intermediate force-push.
-      #
-      # A GitHub App installation token would remove the click, because a
-      # separate actor is exempt from the gate. That was implemented in #199 and
-      # deliberately reverted: it trades a recurring click for a private key that
-      # never expires. Note that granting this workflow more permissions does not
-      # help -- the gate keys on who raised the event, not on what the token may
-      # do.
+      # GITHUB_TOKEN preserves the maintainer approval gate for release PR checks.
+      # see AmbiqAI/helia-rt#199
       - name: Release Please (manifest)
         id: release
         uses: googleapis/release-please-action@v5
@@ -83,3 +60,15 @@ jobs:
       tag: ${{ needs.release.outputs.tag_name }}
       upload_to_release: true
     secrets: inherit
+
+  docs-release:
+    needs: release
+    if: ${{ needs.release.outputs.release_created == 'true' }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/docs.yml
+    with:
+      source_ref: ${{ needs.release.outputs.tag_name }}
+      release_publish: true

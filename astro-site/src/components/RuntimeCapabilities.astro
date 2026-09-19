@@ -1,0 +1,35 @@
+---
+const families = [
+  { name: 'Compute', ops: 'Convolution · Fully connected · Pooling', label: '01' },
+  { name: 'Activation & math', ops: 'Softmax · Tanh · Sqrt / Rsqrt', label: '02' },
+  { name: 'Arithmetic & reduction', ops: 'Add / Sub / Mul · Mean · Arg min / max', label: '03' },
+  { name: 'Data movement', ops: 'Gather · Split · Pack / Unpack · Fill', label: '04' },
+];
+---
+<div class="capability-layout">
+  <div class="capability-copy">
+    <span class="eyebrow">Operator coverage</span>
+    <h2>Look beyond the convolution.</h2>
+    <p>HELIA adapters also connect activation, arithmetic, reduction and data-movement operations to heliaCORE. Check the tensor types and shapes your model uses, not just the operator names.</p>
+    <a href={`${import.meta.env.BASE_URL}/guide/model-compatibility/`}>Explore model compatibility <span aria-hidden="true">→</span></a>
+    <p class="coverage-note">FP32 and FP16 paths have their own build requirements and support limits. Kernel availability alone does not establish model compatibility.</p>
+  </div>
+  <ul class="family-list" aria-label="Representative HELIA adapter families">
+    {families.map(family => <li><span class="family-number" aria-hidden="true">{family.label}</span><div><h3>{family.name}</h3><p>{family.ops}</p></div></li>)}
+  </ul>
+</div>
+<style>
+  .capability-layout { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(2rem, 5vw, 5rem); align-items: center; }
+  .eyebrow { display: block; margin-bottom: 1rem; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--sl-color-text-accent); }
+  .capability-copy h2 { margin-bottom: 1.2rem; }
+  .capability-copy p { color: var(--sl-color-gray-2); }
+  .capability-copy a { display: inline-block; margin-top: 1.3rem; font-weight: 650; color: var(--sl-color-text-accent); text-underline-offset: 0.25em; }
+  .capability-copy .coverage-note { margin-top: 1.4rem; font-size: 0.85rem; }
+  .family-list { list-style: none; padding: 0; margin: 0; border: 1px solid var(--sl-color-gray-5); border-radius: 1.25rem; background: var(--sl-color-bg); overflow: hidden; }
+  li { display: flex; gap: 1.2rem; padding: 1.4rem; align-items: center; }
+  li + li { border-top: 1px solid var(--sl-color-gray-5); }
+  .family-number { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; flex-shrink: 0; border-radius: 0.75rem; background: var(--sl-color-gray-6); color: var(--sl-color-text-accent); font-size: 0.8rem; font-weight: 700; }
+  h3 { margin: 0 0 0.3rem; font-size: 1rem; }
+  li p { color: var(--sl-color-gray-2); font-size: 0.85rem; }
+  @media (max-width: 52rem) { .capability-layout { grid-template-columns: 1fr; } }
+</style>

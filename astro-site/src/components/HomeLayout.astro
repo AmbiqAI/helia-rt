@@ -1,0 +1,17 @@
+<div class="heliart-home not-content"><slot /></div>
+
+<style is:global>
+  .heliart-home .section-heading { display: grid; gap: var(--helia-space-4); margin-bottom: var(--helia-space-6); max-width: 58rem; }
+  .heliart-home h2 { font-size: var(--helia-text-section); line-height: 1.2; letter-spacing: -0.025em; margin: 0; }
+  .heliart-home p { margin: 0; line-height: 1.65; }
+  .heliart-home .section-heading p { color: var(--sl-color-gray-2); }
+  .heliart-home .section-eyebrow { color: var(--sl-color-text-accent); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; }
+  .heliart-home .section-link { color: var(--sl-color-text-accent); font-weight: 650; text-underline-offset: 0.25em; }
+  .heliart-home .build-choices { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(2rem, 5vw, 5rem); align-items: start; }
+  .heliart-home .build-decisions { margin: 0; }
+  .heliart-home .build-decisions > div { padding: 1.2rem 0; border-bottom: 1px solid var(--sl-color-gray-5); }
+  .heliart-home .build-decisions > div:first-child { padding-top: 0; }
+  .heliart-home dt { font-weight: 700; margin-bottom: 0.4rem; }
+  .heliart-home dd { margin: 0; color: var(--sl-color-gray-2); font-size: 0.95rem; line-height: 1.65; }
+  @media (max-width: 52rem) { .heliart-home .build-choices { grid-template-columns: 1fr; } }
+</style>
