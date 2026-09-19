@@ -1,0 +1,71 @@
+---
+title: heliaRT
+description: A familiar LiteRT runtime, backed by Ambiq's optimized neural network kernels.
+tableOfContents: false
+prev: false
+next: false
+helia:
+  pageTitle: false
+---
+
+import Hero from '@ambiqai/helia-ui/astro/Hero';
+import Band from '@ambiqai/helia-ui/astro/Band';
+import Button from '@ambiqai/helia-ui/astro/Button';
+import CardGrid from '@ambiqai/helia-ui/astro/CardGrid';
+import LinkCard from '@ambiqai/helia-ui/astro/LinkCard';
+import CodeBlock from '@ambiqai/helia-ui/astro/CodeBlock';
+import HomeLayout from '../../components/HomeLayout.astro';
+import RuntimeFlow from '../../components/RuntimeFlow.astro';
+
+<HomeLayout>
+<Hero variant="contrast" eyebrow="heliaRT · LiteRT for Microcontrollers">
+<Fragment>Familiar runtime.<br /><em>Ambiq-tuned kernels.</em></Fragment>
+<Fragment slot="summary">Run your .tflite models through the MicroInterpreter API, with supported operations powered by heliaCORE. Keep the runtime workflow your application already uses.</Fragment>
+<Button slot="actions" href="/helia-rt/getting-started/">Get started</Button>
+<Button slot="actions" href="/helia-rt/reference/" variant="secondary">Explore the API</Button>
+<div slot="media" class="runtime-code">
+<CodeBlock language="cpp" label="The inference lifecycle" code={`tflite::MicroInterpreter interpreter(
+    model, resolver, arena, arena_size);
+
+if (interpreter.AllocateTensors() != kTfLiteOk) {
+  return kTfLiteError;
+}
+
+// Populate input tensors before invoking.
+return interpreter.Invoke();`} />
+<p class="hero-note">The model, resolver and arena belong to your application. <a href="/helia-rt/getting-started/first-inference/">Follow the complete inference sequence →</a></p>
+</div>
+</Hero>
+
+<Band density="compact">
+<div class="section-heading">
+<h2>Your model. A familiar runtime. Optimized kernels.</h2>
+<p>heliaRT connects LiteRT for Microcontrollers applications to heliaCORE. Model compatibility depends on the runtime adapters, data types and backend selected for your build.</p>
+</div>
+<RuntimeFlow />
+</Band>
+
+<Band tone="muted" density="compact">
+<div class="section-heading">
+<h2>Start with the tools you use.</h2>
+<p>Choose an integration path, then select source builds or a matching prebuilt library for your application.</p>
+</div>
+<CardGrid columns={2}>
+<LinkCard title="Zephyr" eyebrow="RTOS integration" href="/helia-rt/getting-started/choose-your-path/#zephyr">Add the module to your west workspace and configure the backend through Kconfig.</LinkCard>
+<LinkCard title="neuralSPOT-X" eyebrow="Ambiq development" href="/helia-rt/getting-started/choose-your-path/#neuralspot-x">Integrate the runtime with your neuralSPOT-X application's build.</LinkCard>
+<LinkCard title="CMSIS-Pack" eyebrow="Arm ecosystem" href="/helia-rt/getting-started/choose-your-path/#cmsis-pack">Package runtime sources for a CMSIS-based project.</LinkCard>
+<LinkCard title="Source and CMake" eyebrow="Custom firmware" href="/helia-rt/getting-started/choose-your-path/#source-and-cmake">Build the runtime or link a compatible release archive into your own application.</LinkCard>
+</CardGrid>
+</Band>
+
+<Band density="compact">
+<div class="section-heading">
+<h2>Choose the inference path that fits.</h2>
+<p>For supported models, heliaAOT is the recommended option when targeting latency, power and memory efficiency. Use heliaRT when your application calls for the LiteRT interpreter and its runtime integration.</p>
+</div>
+<CardGrid columns={2}>
+<LinkCard title="heliaAOT" eyebrow="Ahead-of-time compilation" href="https://ambiqai.github.io/helia-aot/">Compile a supported model into standalone inference code. Check model compatibility in the heliaAOT documentation.</LinkCard>
+<LinkCard title="heliaRT" eyebrow="LiteRT runtime integration" href="/helia-rt/guide/runtime/">Load a model, register its operators and manage the tensor arena through the familiar MicroInterpreter API.</LinkCard>
+</CardGrid>
+</Band>
+</HomeLayout>

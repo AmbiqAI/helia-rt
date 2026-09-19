@@ -1,0 +1,22 @@
+<ol class="runtime-flow" aria-label="Model execution path">
+  <li><strong>Your model</strong><span>A .tflite FlatBuffer and application-owned tensors.</span></li>
+  <li><strong>heliaRT</strong><span>The interpreter schedules the operators registered by your application.</span></li>
+  <li><strong>heliaCORE</strong><span>Optimized kernels execute the operations supported by the selected HELIA adapters.</span></li>
+</ol>
+
+<style>
+  .runtime-flow {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--helia-space-6);
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    counter-reset: stage;
+  }
+  li { border-top: 1px solid var(--sl-color-hairline); padding-top: var(--helia-space-5); }
+  li::before { counter-increment: stage; content: '0' counter(stage); color: var(--sl-color-text-accent); }
+  strong { display: block; margin-block: var(--helia-space-3); font-size: var(--helia-text-card-title); }
+  span { color: var(--sl-color-gray-2); line-height: 1.65; }
+  @media (max-width: 48rem) { .runtime-flow { grid-template-columns: 1fr; } }
+</style>
