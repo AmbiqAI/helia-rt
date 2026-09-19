@@ -15,7 +15,8 @@ const run = (command, args) => {
   if (result.error || result.status !== 0) throw new Error(result.error?.message || result.stderr);
   return result.stdout.trim();
 };
-if (run('doxygen', ['--version']) !== '1.17.0') throw new Error('Reference generation requires Doxygen 1.17.0.');
+const doxygenVersion = run('doxygen', ['--version']);
+if (doxygenVersion.split(/\s+/)[0] !== '1.17.0') throw new Error(`Reference generation requires Doxygen 1.17.0; found ${doxygenVersion}.`);
 fs.mkdirSync(cache, { recursive: true });
 const quote = value => `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
 const headers = [...new Set(manifest.map(entry => entry.header))];

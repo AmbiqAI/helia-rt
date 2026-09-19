@@ -15,7 +15,7 @@ const headers = [
 ];
 fs.mkdirSync(cache, { recursive: true });
 const doxygen = spawnSync('doxygen', ['--version'], { encoding: 'utf8' });
-if (doxygen.status !== 0 || doxygen.stdout.trim() !== '1.17.0') {
+if (doxygen.status !== 0 || doxygen.stdout.trim().split(/\s+/)[0] !== '1.17.0') {
   throw new Error('The reference trial requires Doxygen 1.17.0.');
 }
 const quoted = (value) => `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;

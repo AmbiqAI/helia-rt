@@ -64,6 +64,7 @@ jobs:
           fi
           tar -C /tmp -xzf "${archive}"
           echo "/tmp/doxygen-${ASTRO_DOXYGEN_VERSION}/bin" >> "${GITHUB_PATH}"
+          "/tmp/doxygen-${ASTRO_DOXYGEN_VERSION}/bin/doxygen" --version
 
       - name: Install locked site dependencies
         working-directory: astro-site
