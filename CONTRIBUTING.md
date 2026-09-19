@@ -322,7 +322,7 @@ Below are some tips that might be useful and improve the development experience.
 
 ## Python notes
 
-*   [TFLM Python guide](docs/python.md)
+*   [TFLM Python guide](https://ambiqai.github.io/helia-rt/guide/maintenance/testing/)
 
 # Continuous Integration System
-  * Some [additional documentation](docs/continuous_integration.md) on the TFLM CI.
+  * Some [additional documentation](https://ambiqai.github.io/helia-rt/guide/maintenance/testing/) on the TFLM CI.

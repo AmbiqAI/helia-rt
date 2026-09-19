@@ -3,7 +3,7 @@ import manifest from '../data/api-manifest.json';
 import build from '../data/build-info.json';
 const groups = [...new Set(manifest.map(entry => entry.group))];
 ---
-{groups.map(group => <section><h2>{group}</h2><dl>{manifest.filter(entry => entry.group === group).map(entry => <div><dt><a href={`https://github.com/AmbiqAI/helia-rt/blob/${build.commit}/tensorflow/lite/${entry.header}`}><code>{entry.name}</code></a></dt><dd>{entry.role}<br /><small>{entry.header}</small></dd></div>)}</dl></section>)}
+{groups.map(group => <section><h2>{group}</h2><dl>{manifest.filter(entry => entry.group === group).map(entry => <div><dt><a href={`/helia-rt/${entry.route}/`}><code>{entry.name}</code></a></dt><dd>{entry.role}<br /><small><a href={`https://github.com/AmbiqAI/helia-rt/blob/${build.commit}/${entry.header}`}>{entry.header}</a></small></dd></div>)}</dl></section>)}
 <style>
   dl > div { border-bottom: 1px solid var(--sl-color-gray-5); padding: 1rem 0; }
   dt { font-weight: 650; }

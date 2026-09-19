@@ -46,6 +46,8 @@ target_link_libraries(my_firmware PRIVATE helia_rt_prebuilt)
 
 Replace `my_firmware` with your existing application target. Its toolchain file and board support must already supply startup code, linker placement, CPU/FPU flags and compatible C/C++ runtime libraries. Match the archive's floating-point ABI and compiler ABI, including enum sizing. The generated Zephyr prebuilt integration applies `-fshort-enums`; consult the selected compiler's [release build flags](https://github.com/AmbiqAI/helia-rt/blob/main/tensorflow/lite/micro/tools/make/targets/cortex_m_generic_makefile.inc) when integrating outside Zephyr.
 
+For Zephyr consumers, see the [GCC prebuilt enum ABI caution](/helia-rt/getting-started/zephyr/#gcc-prebuilt-enum-abi). The bundled Zephyr template applies an enum-width flag that the GCC archive build does not explicitly request; do not copy that flag into a custom CMake integration without checking the archive ABI.
+
 :::caution[Keep the tensor layout consistent]
 `TF_LITE_STATIC_MEMORY` affects public tensor structures. Compile application code including LiteRT headers with the same definition as the archive. Use the headers delivered with that archive, rather than headers from another runtime checkout.
 :::

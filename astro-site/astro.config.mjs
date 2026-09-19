@@ -2,6 +2,7 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import redirects from './src/data/redirects.json' with { type: 'json' };
+import apiManifest from './src/data/api-manifest.json' with { type: 'json' };
 import buildInfo from './src/data/build-info.json' with { type: 'json' };
 import { heliaStarlight } from '@ambiqai/helia-ui/starlight';
 
@@ -76,6 +77,16 @@ export default defineConfig({
             sidebar: [
               { label: 'Overview', slug: 'reference' },
               { label: 'Runtime API', slug: 'reference/runtime' },
+              ...Array.from(new Set(apiManifest.map(entry => entry.group))).map(group => ({
+                label: group,
+                collapsed: true,
+                items: apiManifest.filter(entry => entry.group === group).map(entry => ({
+                  label: entry.name, slug: entry.route,
+                })),
+              })),
+              { label: 'Builtin registrations', collapsed: true, items: ['a-f', 'g-p', 'q-z'].map(range => ({
+                label: range.toUpperCase(), slug: `reference/api/micromutableopresolver/${range}`,
+              })) },
               { label: 'Documentation version', slug: 'reference/build' },
             ],
           },

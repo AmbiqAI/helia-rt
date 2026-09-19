@@ -1,10 +1,10 @@
 # heliaRT documentation
 
-Astro/Starlight site for AmbiqAI/helia-rt#297. The migration is a draft. The proposed workflow builds and validates one Astro artifact, then deploys that artifact for eligible main or release builds. Keep the PR in draft until generated C++ reference coverage and retirement of superseded MkDocs instructions are complete.
+Astro/Starlight documentation for heliaRT. Authored pages live in `src/content/docs`; generated API pages and build metadata are ignored. Edit source headers for API contracts and authored pages for product guidance.
 
 ## Local development
 
-Use Node 24 or later and npm 11 or later.
+Use Node 24 or later, npm 11 or later, Python 3.11 or later, and Doxygen 1.17.0.
 
 ```sh
 cd astro-site
@@ -12,31 +12,31 @@ npm ci
 npm run dev
 ```
 
-The development URL is printed by Astro. The site uses the `/helia-rt/` base path.
+The site uses `/helia-rt/`. Preparation validates the operator/header inventories, records the actual checkout commit and runtime header version, and generates the application C++ reference. The extraction-only comment filter preserves header line numbers without editing upstream files.
 
 ```sh
 npm run build
 npm run check
 npm run check:links
 npm run check:output
+npm run check:reference
+npm run preview
 ```
 
-Site-wide search uses the Pagefind index created by `npm run build`. Use `npm run preview` to test it; the development server does not build that index. Reload an open preview after rebuilding. Operator filters also work in development.
+Site-wide search uses the Pagefind index created by the production build. Test it in preview, and reload an open tab after rebuilding. Operator filters also work in development.
 
-The prepare step checks the 59-entry operator inventory and public header index against source, and generates commit/version metadata. `check:output` verifies authored redirects, metadata and reference-page payload budgets. Source links use the actual build commit.
+## Reference scope and checks
 
-## C++ extraction trial
+`src/data/api-manifest.json` selects application-facing declarations for execution, model loading, registration, allocation, planning, profiling and platform initialization. Internal kernel helpers, test utilities and FlatBuffer builders are excluded. Add a manifest entry when expanding that scope.
 
-Install Doxygen 1.17.0, then run:
+The generator requires complete constructor/ownership/template contracts and no extraction warnings. An independent XML pass compares selected class members and overload counts. The output check verifies every generated symbol anchor and limits each page to 250 KB HTML and 40 KB gzip. Resolver registrations are split alphabetically to stay within that budget. API data is rendered statically; no browser-side parser loads the complete reference model.
 
-```sh
-npm run reference:trial
-```
+For shared-tooling development, `npm run reference:build -- --candidate-package /absolute/path/to/helia-ui` produces diagnostic output under `.cache/reference`. Add `--emit-site` only for local rendered validation. This option does not change the production dependency. Production consumes a released helia-ui tag and lockfile; do not patch installed files.
 
-The trial writes Doxygen XML, the extracted model warnings and a pass/gap report under `.cache/reference-trial/`. It uses the pinned helia-ui package and selected RT headers without modifying the headers. An extraction-only filter promotes adjacent ordinary header comments without changing source files or line counts. These artifacts are diagnostic and are not published.
+`npm run reference:trial` runs the smaller representative extraction check. Both diagnostic paths require Doxygen 1.17.0.
 
-To evaluate a local shared-tooling candidate, pass `--candidate-package /absolute/path/to/helia-ui`. This diagnostic option does not change the released dependency pin or production build.
+## Delivery
 
-The authored runtime API map remains a source-linked guide until the C++ extraction contract is complete. Migration acceptance and remaining scope are tracked in issue #297 and the draft PR.
+`.github/workflows/docs.yml` builds and validates one artifact, then deploys that artifact on eligible main updates. Release automation invokes the same workflow with the release tag. The deployment freshness guard prevents an older queued artifact from replacing a newer main build. Pull requests validate without deploying.
 
-Use `npm run reference:trial -- --require-complete` to return a failing status when a representative contract is missing. This is not part of the site build until the extraction gaps are resolved.
+Authored redirects live in `src/data/redirects.json`. Keep one current public site and retain useful old routes when reorganizing content. `public/build-info.json` records the exact source revision; it does not redefine the contents of an older runtime archive.

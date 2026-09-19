@@ -7,7 +7,7 @@ const names = new Set();
 for (const entry of manifest) {
   if (names.has(entry.name)) throw new Error(`Duplicate API entry ${entry.name}`);
   names.add(entry.name);
-  const source = fs.readFileSync(path.join(site, '../tensorflow/lite', entry.header), 'utf8');
+  const source = fs.readFileSync(path.join(site, '..', entry.header), 'utf8');
   if (!new RegExp(`\\b${entry.name}\\b`).test(source)) throw new Error(`Missing API declaration ${entry.name}`);
 }
 console.log(`Checked ${names.size} API index entries against source headers.`);

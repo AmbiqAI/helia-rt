@@ -98,6 +98,14 @@ The module selects the archive from the board CPU, toolchain and flavor. It acce
 
 Do not add a separate heliaCORE module for the prebuilt archive. Its kernel objects are already included. Source-only backend and SPEED/SIZE options do not configure a prebuilt library. The module supplies `TF_LITE_STATIC_MEMORY` and applies `-fshort-enums`. Confirm that the selected archive was produced with matching enum-width and floating-point ABI settings; a successful link alone does not establish matching tensor layouts.
 
+### GCC prebuilt enum ABI
+
+:::caution[Prefer source integration with GCC]
+The [prebuilt module template](https://github.com/AmbiqAI/helia-rt/blob/main/tensorflow/lite/micro/tools/ci_build/templates/zephyr_prebuilt/zephyr/CMakeLists.txt) applies `-fshort-enums` to application compilation. The GCC branch of the [archive build rules](https://github.com/AmbiqAI/helia-rt/blob/main/tensorflow/lite/micro/tools/make/targets/cortex_m_generic_makefile.inc) does not explicitly set that flag; the Arm Compiler 6 and ATfE branches do.
+
+Use [source modules](#add-helia-source-modules) with GCC unless you have verified the selected archive's enum ABI attributes and the application's public tensor layouts agree. A matching archive filename or successful link does not establish that compatibility. Do not suppress an enum-size linker warning without resolving the mismatch.
+:::
+
 ## Add inference, build and run
 
 Implement `src/main.cpp` and `src/model_data.cpp` using [First inference](/helia-rt/getting-started/first-inference/). Select a board identifier supported by your Zephyr checkout:

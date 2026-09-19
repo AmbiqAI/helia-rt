@@ -15,11 +15,13 @@
     "check": "astro check",
     "reference:trial": "node scripts/reference-trial.mjs",
     "check:links": "python3 scripts/check-site-links.py",
-    "prepare:docs": "node scripts/build-info.mjs && node scripts/check-operators.mjs && node scripts/check-api-index.mjs",
+    "prepare:docs": "node scripts/build-info.mjs && node scripts/check-operators.mjs && node scripts/check-api-index.mjs && node scripts/build-reference.mjs",
     "predev": "npm run prepare:docs",
     "prebuild": "npm run prepare:docs",
     "check:operators": "node scripts/check-operators.mjs",
-    "check:output": "node scripts/check-output.mjs"
+    "check:output": "node scripts/check-output.mjs",
+    "reference:build": "node scripts/build-reference.mjs",
+    "check:reference": "node scripts/check-reference-output.mjs"
   },
   "dependencies": {
     "@ambiqai/helia-ui": "github:AmbiqAI/helia-ui#v0.1.0-alpha.13",

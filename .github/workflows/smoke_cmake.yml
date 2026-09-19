@@ -906,7 +906,7 @@ jobs:
           rc=0
           # The only float entry points an int8-only build may reference:
           # QUANTIZE/DEQUANTIZE convert through them unconditionally.
-          # see docs/reference/operator-coverage.md
+          # see astro-site/src/content/docs/guide/operators.mdx
           ALLOWED='^(arm_dequantize_s8_f32|arm_dequantize_s16_f32|arm_quantize_f32_s8|arm_quantize_f32_s16)$'
           # Not anchored on _f32$: helpers carry the type mid-name.
           for suffix in f32 f16; do

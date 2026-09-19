@@ -132,11 +132,11 @@ helia-specific files:
 | `nsx/` | heliaRT NSX module manifest (`nsx-module.yaml`, `CMakeLists.txt`) consumed by neuralSPOT and bumped by `release-please-config.json`. |
 | `zephyr/` | Top-level Zephyr module (`CMakeLists.txt`, `Kconfig`, `module.yml`) so the heliaRT repo can be west-imported as a Zephyr module. Distinct from `tensorflow/lite/micro/tools/ci_build/templates/zephyr_prebuilt/`, which is the prebuilt-asset template used by `zephyr_tflm_rt_assets.yml`. |
 | `zephyr_static_export.sh` | Top-level helper that drives the static Zephyr export flow. |
-| `pyproject.toml`, `uv.lock` | Python tooling (uv) for docs / release scripts. The lock file is committed so CI builds are reproducible. |
-| `mkdocs.yaml` | MkDocs site configuration consumed by `.github/workflows/docs.yml`. |
+| `pyproject.toml`, `uv.lock` | Python lint tooling managed with uv. Runtime Python utilities retain their own dependency manifests. |
+| `astro-site/` | Astro/Starlight documentation source, locked site dependencies and reference generation consumed by `.github/workflows/docs.yml`. |
 | `release-please-config.json`, `.release-please-manifest.json` | release-please config + state. The `extra-files` block bumps `tensorflow/lite/micro/helia_rt_version.h` and `nsx/nsx-module.yaml`. |
 | `ci/install_qemu.sh`, `ci/check_tflite_files.py`, `ci/issue_on_error.py` | helia-rt-only files in an upstream-owned directory; do not rename or move (referenced by helia workflows and by `ci/Dockerfile.micro`). |
-| `codegen/`, `gen/`, `neuralspot/`, `data/`, `docs/`, `site/` | helia-rt-only top-level directories (not present upstream). New helia-only directories at the repo root must be approved here before being added. |
+| `codegen/`, `gen/`, `neuralspot/`, `data/`, `astro-site/` | helia-rt-only top-level directories (not present upstream). New helia-only directories at the repo root must be approved here before being added. |
 
 ## Where you must NOT put helia-specific code
 

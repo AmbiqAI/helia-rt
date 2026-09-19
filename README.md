@@ -7,79 +7,29 @@
 [![License](https://img.shields.io/badge/license-Ambiq%20Apollo%20SDK-blue)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-ambiqai.github.io%2Fhelia--rt-cyan)](https://ambiqai.github.io/helia-rt/)
 
-heliaRT is Ambiq's optimized LiteRT for Micro runtime for Apollo platforms, compatible with TensorFlow Lite for Microcontrollers / TFLM. It adds heliaCORE — a set of Ambiq-tuned kernel implementations — on top of the standard LiteRT for Micro API so you get faster inference without changing your application code.
+heliaRT is Ambiq's optimized LiteRT for Micro runtime for Apollo platforms, compatible with TensorFlow Lite for Microcontrollers / TFLM. It adds heliaCORE, a set of Ambiq-tuned kernel implementations, on top of the standard LiteRT for Micro API so you get faster inference without changing your application code.
 
-## Why heliaRT?
+## Start building
 
-| | |
+Choose an integration path, then select source builds or a compatible prebuilt archive. Match the runtime headers, compiler ABI, architecture and float settings to your application.
+
+| Path | Guide |
 |---|---|
-| **Drop-in** | Same `MicroInterpreter` / `Model` / `OpResolver` API. Swap the dependency, rebuild, ship. |
-| **More kernels** | heliaCORE adds optimized paths for activations, reduce, concat, reshape, and more — where upstream only offers Reference. |
-| **Open-source toolchains** | GCC, Arm Compiler 6, and **ATfE** (LLVM-Embedded for Arm, ~10–20 % faster than GCC). |
-| **Kernel profiles** | Source HELIA builds can choose **SPEED** for latency or **SIZE** for footprint. |
-
-## Supported Silicon
-
-| SoC | Core | DSP | MVE / Helium |
-|---|---|---|---|
-| Apollo3 / Apollo3p | Cortex-M4F | ✓ | — |
-| Apollo4 / Apollo4p | Cortex-M4F | ✓ | — |
-| Apollo510 | Cortex-M55 | ✓ | ✓ |
-| Atomiq | _(planned)_ | | |
-
-## Quick Start — Zephyr
-
-Add heliaRT to your west workspace and build:
-
-```yaml
-# west.yml — add under projects:
-- name: helia-rt
-  url: https://github.com/AmbiqAI/helia-rt
-  revision: main
-  path: modules/lib/helia-rt
-```
-
-```cfg
-# prj.conf
-CONFIG_HELIA_RT=y
-CONFIG_HELIA_RT_BACKEND_HELIA=y   # or CMSIS_NN / REFERENCE
-```
-
-```bash
-west build -b apollo510_evb app
-west flash
-```
-
-See the full [Zephyr getting-started guide](https://ambiqai.github.io/helia-rt/getting-started/zephyr/) for module variants, backend selection, and prebuilt bundles.
-
-## Integration Paths
-
-| Path | Best for | Guide |
-|---|---|---|
-| **Zephyr module** | Product integration via `west` | [Getting Started — Zephyr](https://ambiqai.github.io/helia-rt/getting-started/zephyr/) |
-| **CMSIS-Pack** | Local source pack for Keil / CMSIS-Toolbox | [Getting Started — CMSIS-Pack](https://ambiqai.github.io/helia-rt/getting-started/cmsis-pack/) |
-| **neuralSPOT** | Fast model profiling with `ns_autodeploy` | [Getting Started — neuralSPOT](https://ambiqai.github.io/helia-rt/getting-started/neuralspot/) |
-| **Source / CMake** | Full control over build and link | [Getting Started — Source](https://ambiqai.github.io/helia-rt/getting-started/source/) |
-
-## Kernel Backends
-
-| Backend | Description | Requires |
-|---|---|---|
-| **Reference** | Generic TFLM C kernels | Nothing extra |
-| **CMSIS-NN** | Open-source Arm CMSIS-NN | Cortex-M |
-| **HELIA** | Ambiq heliaCORE (ns-cmsis-nn) | Cortex-M + Ambiq module |
-
-The full operator coverage matrix is in the [docs](https://ambiqai.github.io/helia-rt/reference/operator-coverage/).
+| Zephyr / west | [Zephyr integration](https://ambiqai.github.io/helia-rt/getting-started/zephyr/) |
+| neuralSPOT-X | [NSX integration](https://ambiqai.github.io/helia-rt/getting-started/neuralspot-x/) |
+| Make / CMake source builds | [Build from source](https://ambiqai.github.io/helia-rt/getting-started/source/) |
+| Prebuilt static libraries | [Use a release archive](https://ambiqai.github.io/helia-rt/getting-started/cmake/) |
+| CMSIS-Pack | [Create and consume a source pack](https://ambiqai.github.io/helia-rt/getting-started/cmsis-pack/) |
 
 ## Documentation
 
-| | |
-|---|---|
-| [Why heliaRT](https://ambiqai.github.io/helia-rt/why-helia-rt/) | The pitch — drop-in upgrade, kernel coverage, perf gains |
-| [Guides](https://ambiqai.github.io/helia-rt/guides/) | Static vs source, SPEED vs SIZE, toolchains, memory placement, troubleshooting |
-| [Examples](https://ambiqai.github.io/helia-rt/examples/) | Per-target app walkthroughs |
-| [Reference](https://ambiqai.github.io/helia-rt/reference/) | Operator matrix, silicon support, benchmarks, CI |
-| [Contributing](https://ambiqai.github.io/helia-rt/contributing/) | Architecture, upstream sync process, releases |
+- [Getting started](https://ambiqai.github.io/helia-rt/getting-started/): integration choices and first inference.
+- [User guide](https://ambiqai.github.io/helia-rt/guide/): backends, SPEED/SIZE profiles, build flags, memory, profiling and troubleshooting.
+- [Operators and data types](https://ambiqai.github.io/helia-rt/guide/operators/): searchable adapter coverage and input-type constraints.
+- [API reference](https://ambiqai.github.io/helia-rt/reference/): runtime contracts and source declarations.
+- [Maintenance](https://ambiqai.github.io/helia-rt/guide/maintenance/architecture/): repository structure, testing, upstream sync and releases.
+
+The documentation source and authoring instructions live in [astro-site](astro-site/README.md). Edit those pages instead of duplicating integration instructions in the repository readme. The site records the source commit used for each build.
 
 ## License
 
