@@ -9,25 +9,25 @@ Choose the path that matches the project you already have. Keep the runtime sour
 
 Use the repository's west module and Kconfig integration when your application builds with Zephyr. The module supports selecting a backend and using source or prebuilt libraries.
 
-Read the [Zephyr setup guide in the repository](https://github.com/AmbiqAI/helia-rt/blob/main/docs/getting-started/zephyr.md) and inspect [the module configuration](https://github.com/AmbiqAI/helia-rt/tree/main/zephyr).
+Follow [Zephyr setup](/helia-rt/getting-started/zephyr/) for source and prebuilt modules, backend settings, and the application build flow.
 
 ## neuralSPOT-X
 
 Use the `nsx` module when your firmware is built with neuralSPOT-X. It integrates the runtime with the SDK's CMake build.
 
-Start with [the neuralSPOT-X module contract](https://github.com/AmbiqAI/helia-rt/tree/main/nsx). Confirm the SDK/runtime version pairing before copying options from a different release.
+Follow [neuralSPOT-X setup](/helia-rt/getting-started/neuralspot-x/) to add the source module, configure its features and link the runtime target.
 
 ## CMSIS-Pack
 
 Use the source pack generator for a project managed through CMSIS tooling. Pack generation and validation do not by themselves establish that a particular IDE or board application has been tested.
 
-Follow the [CMSIS-Pack build and validation instructions](https://github.com/AmbiqAI/helia-rt/blob/main/docs/getting-started/cmsis-pack.md).
+Follow [CMSIS-Pack setup](/helia-rt/getting-started/cmsis-pack/) to generate, validate and install a local source pack.
 
 ## Source and CMake
 
 Build from source when you need to control compiler options, kernel selection or debugging. Use a prebuilt release archive when its architecture, toolchain and configuration match your firmware.
 
-The [source build guide](https://github.com/AmbiqAI/helia-rt/blob/main/docs/getting-started/source.md) covers the make build. The [CMake source integration](https://github.com/AmbiqAI/helia-rt/blob/main/CMakeLists.txt) and [prebuilt CMake example](https://github.com/AmbiqAI/helia-rt/blob/main/docs/examples/cmake.md) cover different integration paths.
+[Build from source](/helia-rt/getting-started/source/) covers Make archives and CMake source targets. [Link a prebuilt archive](/helia-rt/getting-started/cmake/) covers consuming a released library with matching headers and ABI settings.
 
 ## Runtime or ahead-of-time compilation
 

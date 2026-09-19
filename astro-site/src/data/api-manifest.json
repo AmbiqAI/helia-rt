@@ -1,0 +1,19 @@
+[
+  {"name":"MicroInterpreter","header":"micro/micro_interpreter.h","group":"Execution","role":"Allocate tensors, invoke a model and access inputs/outputs."},
+  {"name":"Model","header":"schema/schema_generated.h","group":"Execution","role":"FlatBuffer model view; GetModel returns a view into caller-owned bytes."},
+  {"name":"MicroOpResolver","header":"micro/micro_op_resolver.h","group":"Operator registration","role":"Interface for builtin and custom operator lookup."},
+  {"name":"MicroMutableOpResolver","header":"micro/micro_mutable_op_resolver.h","group":"Operator registration","role":"Fixed-capacity registration template; capacity counts registrations, not model nodes."},
+  {"name":"MicroAllocator","header":"micro/micro_allocator.h","group":"Memory","role":"Arena allocation and memory-planner integration."},
+  {"name":"RecordingMicroAllocator","header":"micro/recording_micro_allocator.h","group":"Memory","role":"Allocation accounting for memory diagnostics."},
+  {"name":"RecordedAllocation","header":"micro/recording_micro_allocator.h","group":"Memory","role":"Byte and allocation-count recording result."},
+  {"name":"RecordingMicroInterpreter","header":"micro/recording_micro_interpreter.h","group":"Memory","role":"Interpreter variant exposing the recording allocator."},
+  {"name":"MicroMemoryPlanner","header":"micro/memory_planner/micro_memory_planner.h","group":"Memory","role":"Interface for planning reusable buffers."},
+  {"name":"GreedyMemoryPlanner","header":"micro/memory_planner/greedy_memory_planner.h","group":"Memory","role":"Plan buffers using lifetimes and sizes."},
+  {"name":"LinearMemoryPlanner","header":"micro/memory_planner/linear_memory_planner.h","group":"Memory","role":"Sequential buffer placement without reuse."},
+  {"name":"MicroProfilerInterface","header":"micro/micro_profiler_interface.h","group":"Profiling and state","role":"Profiling callback interface."},
+  {"name":"MicroProfiler","header":"micro/micro_profiler.h","group":"Profiling and state","role":"Record and report runtime profiling events."},
+  {"name":"ScopedMicroProfiler","header":"micro/micro_profiler.h","group":"Profiling and state","role":"Scope-based profiling event lifetime."},
+  {"name":"MicroResourceVariables","header":"micro/micro_resource_variable.h","group":"Profiling and state","role":"Allocate, read, assign and reset resource variables."},
+  {"name":"InitializeTarget","header":"micro/system_setup.h","group":"Platform and version","role":"Platform initialization hook; use the implementation matching the application."},
+  {"name":"HELIA_RT_VERSION","header":"micro/helia_rt_version.h","group":"Platform and version","role":"Runtime header version string; does not identify linked kernel or compiler settings."}
+]

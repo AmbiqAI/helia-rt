@@ -9,6 +9,14 @@ heliaRT is Ambiq's optimized fork of LiteRT for Microcontrollers. It keeps the m
 
 [Choose your path](/helia-rt/getting-started/choose-your-path/) to connect heliaRT to Zephyr, neuralSPOT-X, a CMSIS-Pack project or your own firmware build.
 
+| Your project | Start here |
+|---|---|
+| Zephyr / west | [Zephyr](/helia-rt/getting-started/zephyr/) |
+| neuralSPOT-X application | [neuralSPOT-X](/helia-rt/getting-started/neuralspot-x/) |
+| Custom source build | [Make and CMake source](/helia-rt/getting-started/source/) |
+| Custom firmware using release libraries | [Prebuilt archive](/helia-rt/getting-started/cmake/) |
+| CMSIS-based project | [CMSIS-Pack](/helia-rt/getting-started/cmsis-pack/) |
+
 Have a runtime library integrated already? Follow [First inference](/helia-rt/getting-started/first-inference/) for the sequence from model loading to output handling.
 
 ## What you need

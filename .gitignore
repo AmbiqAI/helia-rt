@@ -53,3 +53,7 @@ tensorflow/lite/micro/models/**/*_model_data.h
 
 # Local NSX-module packaging test extractions
 heliaRT-test-*/
+
+# Documentation metadata is derived from the source checkout.
+astro-site/src/data/build-info.json
+astro-site/public/build-info.json

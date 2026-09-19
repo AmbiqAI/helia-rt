@@ -5,6 +5,25 @@ description: Model loading, operator registration, tensor allocation and inferen
 
 Once heliaRT is linked into your firmware, inference follows the LiteRT for Microcontrollers sequence. The example below illustrates a model containing one fully connected operator. Replace the resolver registrations and tensor handling with those required by your model.
 
+## Embed a model
+
+The repository includes an array generator. From the heliaRT checkout, with Python, NumPy and Pillow installed in your environment, convert a trusted `model.tflite` file:
+
+```bash
+python3 tensorflow/lite/micro/tools/generate_cc_arrays.py genfiles model.tflite
+```
+
+This produces `genfiles/model_model_data.cc` and `.h`. The source defines `g_model_model_data` with `alignas(16)`; the header declares the array and `g_model_model_data_size`. Add the generated `.cc` to your application target and `genfiles` to its include directories:
+
+```cmake
+target_sources(my_firmware PRIVATE genfiles/model_model_data.cc)
+target_include_directories(my_firmware PRIVATE genfiles)
+```
+
+Replace `my_firmware` with your application's executable target. Include `model_model_data.h` and pass `g_model_model_data` to the inference function below. Renaming the input file changes the generated symbols. Keep the array in memory accessible to the runtime; [memory placement](/helia-rt/guide/memory-and-profiling/) remains a firmware/linker decision.
+
+The [generator](https://github.com/AmbiqAI/helia-rt/blob/main/tensorflow/lite/micro/tools/generate_cc_arrays.py) embeds bytes; it does not validate model operators or prove compatibility.
+
 ## Keep the inputs alive
 
 The interpreter borrows its model, resolver and tensor arena. Keep them alive for the entire interpreter lifetime. The same applies to optional resource variables and profiler objects. Supply an appropriately aligned arena and measure the required size for your model and build; a fixed example size is not a requirement for every model.

@@ -1,0 +1,780 @@
+[
+  {
+    "name": "ABS",
+    "family": "Arithmetic",
+    "source": "elementwise.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32"
+    ],
+    "path": "Reference",
+    "notes": "Reference implementation in the HELIA adapter source. Quantized scaling requirements apply."
+  },
+  {
+    "name": "ADD",
+    "family": "Arithmetic",
+    "source": "add.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16",
+      "int32"
+    ],
+    "path": "Mixed",
+    "notes": "Float identical-shape inputs support arbitrary rank. Optimized broadcasting supports rank <= 4; higher-rank FP32 uses Reference and FP16 is rejected. int32 follows the adapter reference path."
+  },
+  {
+    "name": "ARG_MAX",
+    "family": "Reduction",
+    "source": "arg_min_max.cc",
+    "types": [
+      "int8",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "FP16 requires CORE >= 7.35.0, rank 1..4, INT32 axis/output and positive reduced extent. FP32/int8 use Reference."
+  },
+  {
+    "name": "ARG_MIN",
+    "family": "Reduction",
+    "source": "arg_min_max.cc",
+    "types": [
+      "int8",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "FP16 requires CORE >= 7.35.0, rank 1..4, INT32 axis/output and positive reduced extent. FP32/int8 use Reference."
+  },
+  {
+    "name": "AVERAGE_POOL_2D",
+    "family": "Compute",
+    "source": "pooling.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "Four-dimensional tensors; check filter/stride/padding and output dimensions. Kernel failure is returned to the application."
+  },
+  {
+    "name": "BATCH_MATMUL",
+    "family": "Compute",
+    "source": "batch_matmul.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "Check batch broadcasting, adjoint flags and quantized weight/activation combinations against the adapter."
+  },
+  {
+    "name": "CONCATENATION",
+    "family": "Data movement",
+    "source": "concatenation.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16",
+      "int32",
+      "int64",
+      "bool"
+    ],
+    "path": "Mixed",
+    "notes": "Optimized float paths support rank <= 4; higher-rank float inputs use Reference. Input/output type and quantization must agree."
+  },
+  {
+    "name": "CONV_2D",
+    "family": "Compute",
+    "source": "conv.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "Quantized weight/bias combinations are constrained. int4 weights use int8 activations. Float grouped convolution uses Reference for FP32 and is rejected for FP16."
+  },
+  {
+    "name": "COS",
+    "family": "Arithmetic",
+    "source": "elementwise.cc",
+    "types": [
+      "float32"
+    ],
+    "path": "Reference",
+    "notes": "Reference implementation in the HELIA adapter source; Float32 input/output."
+  },
+  {
+    "name": "DEPTHWISE_CONV_2D",
+    "family": "Compute",
+    "source": "depthwise_conv.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "Quantized weight/bias combinations and depth multiplier are constrained. int4 is a weight type with int8 activations; it is not a general activation type."
+  },
+  {
+    "name": "DEQUANTIZE",
+    "family": "Quantization",
+    "source": "dequantize.cc",
+    "types": [
+      "int8",
+      "int16",
+      "uint8",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "Output is FP32. FP16 means weight-storage widening, not FP16 computation; it works without ARM_NN_ENABLE_F16."
+  },
+  {
+    "name": "EQUAL",
+    "family": "Comparison",
+    "source": "comparisons.cc",
+    "types": [
+      "bool",
+      "float32",
+      "int8",
+      "int16",
+      "int32",
+      "int64"
+    ],
+    "path": "Mixed",
+    "notes": "Boolean output. Supported input types depend on the comparison; input shapes and broadcast rules must match."
+  },
+  {
+    "name": "FILL",
+    "family": "Data movement",
+    "source": "fill.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16",
+      "int32",
+      "int64"
+    ],
+    "path": "Mixed",
+    "notes": "Constant dimensions and scalar fill value. Float APIs require CORE >= 7.33.0 and matching enabled feature."
+  },
+  {
+    "name": "FULLY_CONNECTED",
+    "family": "Compute",
+    "source": "fully_connected.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "Quantized activation/weight/bias types must match a supported combination; includes int4 weights with int8 activations. Float paths require matching CORE features."
+  },
+  {
+    "name": "GATHER",
+    "family": "Data movement",
+    "source": "gather.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "CORE >= 7.34.0. Native rank <= 4. Scalar indices use float native paths or int8 Reference; int16 rejects them. Higher-rank FP32/int8 use Reference; FP16/int16 reject."
+  },
+  {
+    "name": "GATHER_ND",
+    "family": "Data movement",
+    "source": "gather_nd.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "CORE >= 7.34.0. Native ranks <= 4 and positive index tuple width. Higher ranks and zero-width tuples use FP32/int8 Reference; FP16/int16 reject."
+  },
+  {
+    "name": "GREATER",
+    "family": "Comparison",
+    "source": "comparisons.cc",
+    "types": [
+      "float32",
+      "int8",
+      "int16",
+      "int32",
+      "int64"
+    ],
+    "path": "Mixed",
+    "notes": "Boolean output. Check broadcast and operand types; no FP16 comparison branch."
+  },
+  {
+    "name": "GREATER_EQUAL",
+    "family": "Comparison",
+    "source": "comparisons.cc",
+    "types": [
+      "float32",
+      "int8",
+      "int16",
+      "int32",
+      "int64"
+    ],
+    "path": "Mixed",
+    "notes": "Boolean output. Check broadcast and operand types; no FP16 comparison branch."
+  },
+  {
+    "name": "HARD_SWISH",
+    "family": "Activation",
+    "source": "hard_swish.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "FP16 requires the CORE float feature; without it preparation fails. FP32 can use Reference."
+  },
+  {
+    "name": "LEAKY_RELU",
+    "family": "Activation",
+    "source": "leaky_relu.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32"
+    ],
+    "path": "Mixed",
+    "notes": "Float32 uses the reference path. No FP16 execution branch in this adapter."
+  },
+  {
+    "name": "LESS",
+    "family": "Comparison",
+    "source": "comparisons.cc",
+    "types": [
+      "float32",
+      "int8",
+      "int16",
+      "int32",
+      "int64"
+    ],
+    "path": "Mixed",
+    "notes": "Boolean output. Check broadcast and operand types; no FP16 comparison branch."
+  },
+  {
+    "name": "LESS_EQUAL",
+    "family": "Comparison",
+    "source": "comparisons.cc",
+    "types": [
+      "float32",
+      "int8",
+      "int16",
+      "int32",
+      "int64"
+    ],
+    "path": "Mixed",
+    "notes": "Boolean output. Check broadcast and operand types; no FP16 comparison branch."
+  },
+  {
+    "name": "LOG",
+    "family": "Arithmetic",
+    "source": "elementwise.cc",
+    "types": [
+      "float32"
+    ],
+    "path": "Reference",
+    "notes": "Reference implementation in the HELIA adapter source; Float32 input/output."
+  },
+  {
+    "name": "LOGICAL_NOT",
+    "family": "Comparison",
+    "source": "elementwise.cc",
+    "types": [
+      "bool"
+    ],
+    "path": "Reference",
+    "notes": "Reference boolean operation."
+  },
+  {
+    "name": "LOGISTIC",
+    "family": "Activation",
+    "source": "logistic.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "int8 uses a lookup table; int16 and enabled floats have HELIA paths. NaN is not supported by the optimized float activation path."
+  },
+  {
+    "name": "MAXIMUM",
+    "family": "Arithmetic",
+    "source": "maximum_minimum.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16",
+      "int32",
+      "int64"
+    ],
+    "path": "Mixed",
+    "notes": "Optimized paths support rank <= 4. Higher-rank FP32/int8/int16 use Reference; FP16 is rejected. int32/int64 use Reference."
+  },
+  {
+    "name": "MAX_POOL_2D",
+    "family": "Compute",
+    "source": "pooling.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "Four-dimensional tensors; check filter/stride/padding and output dimensions. Kernel failure is returned to the application."
+  },
+  {
+    "name": "MEAN",
+    "family": "Reduction",
+    "source": "reduce.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "Float optimized paths support rank <= 4 and axis sets; higher-rank FP32 uses Reference, FP16 is rejected. See reduce_common.cc."
+  },
+  {
+    "name": "MINIMUM",
+    "family": "Arithmetic",
+    "source": "maximum_minimum.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16",
+      "int32",
+      "int64"
+    ],
+    "path": "Mixed",
+    "notes": "Optimized paths support rank <= 4. Higher-rank FP32/int8/int16 use Reference; FP16 is rejected. int32/int64 use Reference."
+  },
+  {
+    "name": "MUL",
+    "family": "Arithmetic",
+    "source": "mul.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16",
+      "int32"
+    ],
+    "path": "Mixed",
+    "notes": "Float identical-shape inputs support arbitrary rank. Optimized broadcasting supports rank <= 4; higher-rank FP32 uses Reference and FP16 is rejected. int32 follows the adapter reference path."
+  },
+  {
+    "name": "NOT_EQUAL",
+    "family": "Comparison",
+    "source": "comparisons.cc",
+    "types": [
+      "bool",
+      "float32",
+      "int8",
+      "int16",
+      "int32",
+      "int64"
+    ],
+    "path": "Mixed",
+    "notes": "Boolean output. Supported input types depend on the comparison; input shapes and broadcast rules must match."
+  },
+  {
+    "name": "PACK",
+    "family": "Data movement",
+    "source": "pack.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16",
+      "int32",
+      "int64"
+    ],
+    "path": "Mixed",
+    "notes": "Equal input shapes, including scalars. Float APIs require CORE >= 7.33.0 and matching enabled feature."
+  },
+  {
+    "name": "PAD",
+    "family": "Data movement",
+    "source": "pad.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16",
+      "int32"
+    ],
+    "path": "Mixed",
+    "notes": "FP16 requires four-dimensional tensors and the float feature. Padding values and output shape must match."
+  },
+  {
+    "name": "PADV2",
+    "family": "Data movement",
+    "source": "pad.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16",
+      "int32"
+    ],
+    "path": "Mixed",
+    "notes": "FP16 requires four-dimensional tensors and the float feature. Padding values and output shape must match."
+  },
+  {
+    "name": "QUANTIZE",
+    "family": "Quantization",
+    "source": "quantize_common.cc",
+    "types": [
+      "int8",
+      "int16",
+      "int32",
+      "uint8",
+      "float32"
+    ],
+    "path": "Mixed",
+    "notes": "Supported input/output pairs are specific: this type list does not imply all pairings. Registration is supplied by kernels/quantize.cc."
+  },
+  {
+    "name": "REDUCE_ALL",
+    "family": "Reduction",
+    "source": "reduce.cc",
+    "types": [
+      "bool"
+    ],
+    "path": "Reference",
+    "notes": "Boolean reduction using Reference in reduce_common.cc."
+  },
+  {
+    "name": "REDUCE_MAX",
+    "family": "Reduction",
+    "source": "reduce.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32"
+    ],
+    "path": "Mixed",
+    "notes": "No FP16 execution path. Axis, output shape and quantization checks apply; implementation is in reduce_common.cc."
+  },
+  {
+    "name": "REDUCE_MIN",
+    "family": "Reduction",
+    "source": "reduce.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32"
+    ],
+    "path": "Mixed",
+    "notes": "No FP16 execution path. Axis, output shape and quantization checks apply; implementation is in reduce_common.cc."
+  },
+  {
+    "name": "RELU",
+    "family": "Activation",
+    "source": "activations.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "Check activation bounds, tensor shape and quantization. Optimized float paths require the matching CORE feature."
+  },
+  {
+    "name": "RELU6",
+    "family": "Activation",
+    "source": "activations.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "Check activation bounds, tensor shape and quantization. Optimized float paths require the matching CORE feature."
+  },
+  {
+    "name": "RESHAPE",
+    "family": "Data movement",
+    "source": "reshape.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16",
+      "int32",
+      "int64",
+      "uint8",
+      "bool"
+    ],
+    "path": "Storage",
+    "notes": "Preserves storage and element count. FP16 storage works without float arithmetic enabled. Types listed here are representative fixed-width storage types."
+  },
+  {
+    "name": "RSQRT",
+    "family": "Arithmetic",
+    "source": "elementwise.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "FP32 and integer paths use Reference. FP16 requires CORE >= 7.33.0 and ARM_NN_ENABLE_F16; input/output shapes and types must match."
+  },
+  {
+    "name": "SIN",
+    "family": "Arithmetic",
+    "source": "elementwise.cc",
+    "types": [
+      "float32"
+    ],
+    "path": "Reference",
+    "notes": "Reference implementation in the HELIA adapter source; Float32 input/output."
+  },
+  {
+    "name": "SOFTMAX",
+    "family": "Activation",
+    "source": "softmax.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "Optimized float path requires beta = 1. Other beta values use FP32 Reference or fail FP16 preparation. int8-to-int16 output has a dedicated registration."
+  },
+  {
+    "name": "SPLIT",
+    "family": "Data movement",
+    "source": "split.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16",
+      "int32"
+    ],
+    "path": "Mixed",
+    "notes": "Constant axis and equal output extents. Float APIs require CORE >= 7.33.0 and corresponding enabled feature."
+  },
+  {
+    "name": "SPLIT_V",
+    "family": "Data movement",
+    "source": "split_v.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16",
+      "int32"
+    ],
+    "path": "Mixed",
+    "notes": "Constant axis and split sizes; one inferred -1 size and zero-length pieces are allowed. Shapes/types/counts are checked during preparation. Float APIs require CORE >= 7.33.0."
+  },
+  {
+    "name": "SQRT",
+    "family": "Arithmetic",
+    "source": "elementwise.cc",
+    "types": [
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "FP32 uses Reference. FP16 requires CORE >= 7.33.0 and ARM_NN_ENABLE_F16; input/output shapes and types must match."
+  },
+  {
+    "name": "SQUARE",
+    "family": "Arithmetic",
+    "source": "elementwise.cc",
+    "types": [
+      "float32"
+    ],
+    "path": "Reference",
+    "notes": "Reference implementation in the HELIA adapter source; Float32 input/output."
+  },
+  {
+    "name": "SQUEEZE",
+    "family": "Data movement",
+    "source": "squeeze.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16",
+      "int32",
+      "int64",
+      "uint8",
+      "bool"
+    ],
+    "path": "Storage",
+    "notes": "Bitwise storage copy; removes unit dimensions, checks matching byte counts and rejects strings. Input rank <= 8."
+  },
+  {
+    "name": "STRIDED_SLICE",
+    "family": "Data movement",
+    "source": "strided_slice.cc",
+    "types": [
+      "int8",
+      "int16",
+      "int32",
+      "float32",
+      "bool"
+    ],
+    "path": "Mixed",
+    "notes": "Check slicing masks, strides and shape constraints in the adapter; no FP16 execution branch."
+  },
+  {
+    "name": "SUB",
+    "family": "Arithmetic",
+    "source": "sub.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16",
+      "int32"
+    ],
+    "path": "Mixed",
+    "notes": "Float identical-shape inputs support arbitrary rank. Optimized broadcasting supports rank <= 4; higher-rank FP32 uses Reference and FP16 is rejected. int32 follows the adapter reference path."
+  },
+  {
+    "name": "SUM",
+    "family": "Reduction",
+    "source": "reduce.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "SUM is LiteRT REDUCE_SUM. Float optimized paths support rank <= 4 and axis sets; higher-rank FP32 uses Reference, FP16 is rejected. See reduce_common.cc."
+  },
+  {
+    "name": "SVDF",
+    "family": "Recurrent",
+    "source": "svdf.cc",
+    "types": [
+      "int8",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "Data input is int8, FP32 or enabled FP16. int16 is a time-weight/state type, not a supported data input type. Variable state persists across invocations; weight types, rank and activation configuration are constrained."
+  },
+  {
+    "name": "TANH",
+    "family": "Activation",
+    "source": "tanh.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "NaN is not supported by the optimized float activation path. Float support is build-gated."
+  },
+  {
+    "name": "TRANSPOSE",
+    "family": "Data movement",
+    "source": "transpose.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "Optimized rank <= 4. Higher ranks use Reference; FP16 has a bitwise storage fallback even with its float feature disabled."
+  },
+  {
+    "name": "TRANSPOSE_CONV",
+    "family": "Compute",
+    "source": "transpose_conv.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "Check output shape, padding and quantized weight/bias combinations. Float features are build-gated."
+  },
+  {
+    "name": "UNIDIRECTIONAL_SEQUENCE_LSTM",
+    "family": "Recurrent",
+    "source": "unidirectional_sequence_lstm.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "Standard four-gate LSTM only. Preparation rejects peephole, projection, layer normalization and missing gates (CIFG), including FP32. Quantized inputs use int8 weights and int16 cell state. Preserve variable state across invocations."
+  },
+  {
+    "name": "UNPACK",
+    "family": "Data movement",
+    "source": "unpack.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16",
+      "int32"
+    ],
+    "path": "Mixed",
+    "notes": "One output per selected axis element. Float APIs require CORE >= 7.33.0 and matching enabled feature."
+  },
+  {
+    "name": "ZEROS_LIKE",
+    "family": "Data movement",
+    "source": "zeros_like.cc",
+    "types": [
+      "int8",
+      "int16",
+      "int32",
+      "int64",
+      "float32"
+    ],
+    "path": "Storage",
+    "notes": "Fills output storage with zero; no FP16 execution branch."
+  }
+]

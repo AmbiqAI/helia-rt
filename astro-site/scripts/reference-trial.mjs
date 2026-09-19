@@ -28,6 +28,7 @@ const config = [
   'GENERATE_HTML = NO',
   'GENERATE_LATEX = NO',
   'EXTRACT_ALL = YES',
+  `INPUT_FILTER = ${quoted(`python3 ${path.join(siteRoot, 'scripts/reference/comment-filter.py')}`)}`,
   'EXTRACT_PRIVATE = NO',
   'EXTRACT_STATIC = NO',
   'ENABLE_PREPROCESSING = YES',
@@ -43,7 +44,8 @@ const extraction = spawnSync('doxygen', [doxyfile], { encoding: 'utf8' });
 fs.writeFileSync(path.join(cache, 'doxygen.log'), extraction.stderr ?? '');
 if (extraction.status !== 0) throw new Error(extraction.stderr || 'Doxygen failed');
 
-const packageRoot = path.join(siteRoot, 'node_modules/@ambiqai/helia-ui');
+const candidateIndex = process.argv.indexOf('--candidate-package');
+const packageRoot = candidateIndex >= 0 ? path.resolve(process.argv[candidateIndex + 1]) : path.join(siteRoot, 'node_modules/@ambiqai/helia-ui');
 const { extractModel, readDoxygenXml } = await import(
   path.join(packageRoot, 'scripts/lib/doxyref-extract.mjs')
 );

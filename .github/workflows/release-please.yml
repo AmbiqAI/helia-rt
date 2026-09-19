@@ -83,3 +83,15 @@ jobs:
       tag: ${{ needs.release.outputs.tag_name }}
       upload_to_release: true
     secrets: inherit
+
+  docs-release:
+    needs: release
+    if: ${{ needs.release.outputs.release_created == 'true' }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/docs.yml
+    with:
+      source_ref: ${{ needs.release.outputs.tag_name }}
+      release_publish: true

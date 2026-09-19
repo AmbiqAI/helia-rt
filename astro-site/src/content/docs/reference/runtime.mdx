@@ -1,0 +1,20 @@
+---
+title: Runtime API
+description: Headers for model loading, interpreter execution, resolvers, allocation and profiling.
+---
+
+import ApiIndex from '../../../components/ApiIndex.astro';
+
+This application-facing header index is validated against the source at build time. Each link opens the declaration at the exact documentation source commit, including overloads, template parameters and comments. It is a header index, not a complete generated method reference.
+
+<ApiIndex />
+
+## Version
+
+Include `tensorflow/lite/micro/helia_rt_version.h` and read `HELIA_RT_VERSION` for the runtime source release string. This macro does not report the linked heliaCORE version or the compiler configuration.
+
+## Invocation contract
+
+The interpreter has constructors accepting either an arena or an existing allocator. Both borrow resources from the caller. `AllocateTensors()` and `Invoke()` return `TfLiteStatus`; check the returned status before proceeding.
+
+Tensor accessors expose memory associated with the interpreter. Typed accessors require the requested C++ type to match the tensor type and can return null. See the header for each accessor's index requirements.

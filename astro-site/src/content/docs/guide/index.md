@@ -1,28 +1,31 @@
 ---
 title: User guide
-description: Understand and configure heliaRT's runtime integration.
+description: Configure the runtime, understand model compatibility and validate an application.
 ---
 
-Start with [Runtime concepts](/helia-rt/guide/runtime/) to understand what the interpreter owns, what your application supplies and how operators reach the selected backend.
+Use this guide after selecting an [integration path](/helia-rt/getting-started/choose-your-path/). Work from the model's requirements toward the firmware configuration, then verify the resulting application.
 
-## Choose your next task
+## Understand the runtime
 
-- [Model compatibility](/helia-rt/guide/model-compatibility/): check operator types, shapes, floating-point features and error stages.
-- [Build configuration](/helia-rt/guide/build-configuration/): select a backend, source or archive integration, kernel profile and diagnostic flavor.
-- [Migrate from LiteRT](/helia-rt/getting-started/migrate-from-litert/): move an existing application with a known model baseline.
+- [Runtime concepts](/helia-rt/guide/runtime/): model, resolver, interpreter, arena and state lifetimes.
+- [Model compatibility](/helia-rt/guide/model-compatibility/): tensor types, shapes, feature gates and failure stages.
+- [Operator coverage](/helia-rt/guide/operators/): inspect the implementation paths relevant to your model.
 
-## Configuration decisions
+## Configure the build
 
-Choose source or prebuilt integration first. Then match the target architecture, toolchain, backend, kernel profile and floating-point options to your model and firmware.
+- [Build configuration](/helia-rt/guide/build-configuration/): source versus prebuilt, backend and build flavor.
+- [Kernel profiles](/helia-rt/guide/kernel-profiles/): SPEED/SIZE defaults and convolution/fully connected overrides.
+- [Floating point](/helia-rt/guide/floating-point/): FP16 storage, FP16/FP32 computation and dependency features.
+- [Build option reference](/helia-rt/guide/build-options/): RT settings for CMake, NSX, Zephyr and Make.
+- [Targets and integration scope](/helia-rt/guide/targets/): release architecture matrix, framework responsibilities and target validation.
+- [Toolchains and artifacts](/helia-rt/guide/toolchains/): compiler and ABI matching, release builder and verification boundaries.
 
-Source configuration does not change an already built static library. For an archive, use the configuration recorded in its release bundle.
+## Validate and diagnose
 
-## Diagnose in execution order
+- [Memory and profiling](/helia-rt/guide/memory-and-profiling/): arena auditing, placement and operator timing.
+- [Benchmark an application](/helia-rt/guide/benchmarks/): harnesses, reproducibility and historical-result boundaries.
+- [Troubleshooting](/helia-rt/guide/troubleshooting/): diagnose configuration, linking, preparation and invocation in order.
 
-1. Confirm the model's operator and tensor-type requirements.
-2. Check every operator registration result.
-3. Check tensor allocation before writing inputs.
-4. Check invocation and inspect the model's output contract.
-5. Measure with the intended model, target and build configuration.
+## Maintain and support
 
-For initial integration, follow [First inference](/helia-rt/getting-started/first-inference/). For declarations and header locations, use the [API reference](/helia-rt/reference/).
+[Source architecture](/helia-rt/guide/maintenance/architecture/), [Testing and CI](/helia-rt/guide/maintenance/testing/), [Upstream maintenance](/helia-rt/guide/maintenance/upstream-sync/) and [Releases](/helia-rt/guide/maintenance/releases/) cover contributor workflows. Consult the [support policy](/helia-rt/guide/maintenance/support/) and [attribution and licensing](/helia-rt/guide/maintenance/attribution/) for product boundaries and notices.

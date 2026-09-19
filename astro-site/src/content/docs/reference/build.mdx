@@ -1,0 +1,12 @@
+---
+title: Documentation version
+description: Identify the runtime header version and exact source commit used to build this documentation.
+---
+
+import BuildInfo from '../../../components/BuildInfo.astro';
+
+<BuildInfo />
+
+The runtime version comes from `helia_rt_version.h`. The commit identifies the source checkout used for the documentation build, which can contain changes after that runtime release. An exact release tag is shown only when the checkout matches it.
+
+Use a library's accompanying headers, release notes and build configuration when integrating a released archive. The documentation source commit does not change the contents of an older archive.

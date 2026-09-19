@@ -66,7 +66,7 @@ The [release workflow](https://github.com/AmbiqAI/helia-rt/blob/main/.github/wor
 
 For CMake source builds, configure `ARM_NN_ENABLE_F32` and `ARM_NN_ENABLE_F16` **before** the `ns-cmsis-nn` dependency is added. heliaRT reads the float capabilities exported by that dependency. Enabling a macro only on the application cannot add missing kernel implementations to the linked library.
 
-FP16 weight storage and FP16 computation are different requirements. A model that widens FP16 weights to FP32 through `DEQUANTIZE` does not require optimized FP16 arithmetic. Models with FP16 compute operators need the corresponding adapter, kernel feature and target support. See the [floating-point integration contract](https://github.com/AmbiqAI/helia-rt/blob/main/docs/guides/floating-point.md) for each build system's defaults and unsupported cases.
+FP16 weight storage and FP16 computation are different requirements. A model that widens FP16 weights to FP32 through `DEQUANTIZE` does not require optimized FP16 arithmetic. Models with FP16 compute operators need the corresponding adapter, kernel feature and target support. See the [floating-point integration contract](/helia-rt/guide/floating-point/) for each build system's defaults and unsupported cases.
 
 ## Verify the application
 
