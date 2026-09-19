@@ -5,6 +5,12 @@ description: Select a heliaRT integration for your application and build system.
 
 Choose the path that matches the project you already have. Keep the runtime source or release bundle version consistent with the integration instructions you follow.
 
+## One source of truth
+
+CMake, Zephyr, neuralSPOT-X source mode and the CMSIS-Pack generator consume the same [source manifest and backend-selection rules](https://github.com/AmbiqAI/helia-rt/blob/main/cmake/README.md). This single source of truth (SSoT) keeps runtime file lists and kernel selection consistent across those integrations.
+
+Make-built release archives use a separate build path. Match an archive's toolchain, architecture and feature settings to your application; shared source selection does not make build configurations interchangeable.
+
 ## Zephyr
 
 Use the repository's west module and Kconfig integration when your application builds with Zephyr. The module supports selecting a backend and using source or prebuilt libraries.

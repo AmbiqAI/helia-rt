@@ -31,17 +31,14 @@
   li { position: relative; padding: clamp(1.3rem, 3vw, 2.2rem); min-width: 0; }
   li + li::before { content: '→' / ''; display: grid; place-items: center; position: absolute; left: -1rem; top: 5.3rem; width: 2rem; height: 2rem; border-radius: 50%; background: var(--sl-color-bg); color: var(--flow-accent); border: 1px solid var(--sl-color-gray-5); z-index: 1; font-size: 1.2rem; }
   .stage-label { display: block; text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.7rem; font-weight: 700; color: var(--sl-color-gray-2); }
-  .stage-symbol { display: block; margin: 1.2rem 0; font-size: clamp(1.6rem, 3vw, 2.4rem); line-height: 1.1; font-weight: 750; letter-spacing: -0.05em; color: var(--flow-accent); }
+  .stage-symbol { display: block; margin: 1.2rem 0; font-size: clamp(1.6rem, 3vw, 2.4rem); line-height: 1.1; font-weight: 750; letter-spacing: -0.05em; color: var(--sl-color-white); }
   h3 { font-size: 1.05rem; margin: 0 0 0.6rem; line-height: 1.35; }
   p { font-size: 0.9rem; color: var(--sl-color-gray-2); }
   a { display: inline-block; margin-top: 1.3rem; font-size: 0.85rem; font-weight: 650; color: var(--flow-accent); text-underline-offset: 0.2em; }
-  .runtime-stage { background: #102c30; color: #f2faf9; }
-  .runtime-stage .stage-label, .runtime-stage p { color: #b8d4d2; }
-  .runtime-stage .stage-symbol { color: #71d5cd; }
-  .runtime-stage h3 { color: #f2faf9; }
-  .runtime-contract { border-top: 1px solid #ffffff25; margin-top: 1.2rem; padding-top: 1rem; font-size: 0.75rem; }
-  .runtime-contract code { color: #71d5cd; }
-  .runtime-contract span { display: block; margin-top: 0.4rem; color: #b8d4d2; line-height: 1.5; }
+  .runtime-stage { background: var(--sl-color-gray-6); }
+  .runtime-contract { border-top: 1px solid var(--sl-color-gray-5); margin-top: 1.2rem; padding-top: 1rem; font-size: 0.75rem; }
+  .runtime-contract code { color: var(--sl-color-text); }
+  .runtime-contract span { display: block; margin-top: 0.4rem; color: var(--sl-color-gray-2); line-height: 1.5; }
   .backend-note { display: flex; align-items: baseline; gap: 1.5rem; padding: 1.2rem 2rem; background: var(--sl-color-gray-6); border-top: 1px solid var(--sl-color-gray-5); font-size: 0.8rem; line-height: 1.6; }
   .backend-note strong { flex-shrink: 0; }
   .backend-note span { color: var(--sl-color-gray-2); }

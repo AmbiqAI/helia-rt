@@ -15,11 +15,11 @@
     "check": "astro check",
     "reference:trial": "node scripts/reference-trial.mjs",
     "check:links": "python3 scripts/check-site-links.py",
-    "prepare:docs": "node scripts/build-info.mjs && node scripts/check-operators.mjs && node scripts/check-api-index.mjs && node scripts/build-reference.mjs",
+    "prepare:docs": "node scripts/build-info.mjs && node scripts/check-operators.mjs && node scripts/check-api-index.mjs && node scripts/build-reference.mjs && node scripts/build-operator-export.mjs",
     "predev": "npm run prepare:docs",
     "prebuild": "npm run prepare:docs",
     "check:operators": "node scripts/check-operators.mjs",
-    "check:output": "node scripts/check-output.mjs",
+    "check:output": "node scripts/check-output.mjs && helia-ui-check-discoverability --root .",
     "reference:build": "node scripts/build-reference.mjs",
     "check:reference": "node scripts/check-reference-output.mjs"
   },

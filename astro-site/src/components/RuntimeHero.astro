@@ -26,7 +26,6 @@ interpreter.Invoke();`;
 <div class="rt-opening">
   <section class="rt-hero" aria-labelledby="rt-headline">
     <div class="rt-copy">
-      <img class="rt-wordmark" src={`${import.meta.env.BASE_URL}/helia-rt-banner-dark.png`} alt="heliaRT" width="1200" height="340" />
       <p class="rt-kicker"><span aria-hidden="true"></span> HELIA AI runtime for Ambiq silicon</p>
       <h1 id="rt-headline">Proven LiteRT workflows.<br />Turbocharged on Ambiq silicon.</h1>
       <p class="rt-summary">heliaRT is Ambiq's optimized LiteRT runtime: the same <code>.tflite</code> models and MicroInterpreter API, backed by heliaCORE kernels tuned for Ambiq silicon.</p>
@@ -80,7 +79,6 @@ interpreter.Invoke();`;
     padding: clamp(3rem, 6vw, 5rem) clamp(1.5rem, 4vw, 3rem) 3rem;
   }
   .rt-copy, .rt-panel { min-width: 0; }
-  .rt-wordmark { display: block; width: 260px; max-width: 100%; height: auto; margin-bottom: 2rem; }
   .rt-copy .rt-kicker { display: flex; align-items: center; gap: 0.65rem; margin: 0 0 1.4rem; font-size: 0.8rem; line-height: 1.5; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--rt-muted); }
   .rt-kicker > span { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--rt-accent); }
   .rt-copy h1 { margin: 0 0 1.6rem; color: var(--rt-ink); font-family: inherit; font-size: clamp(2.4rem, 4.75vw, 4.3rem); line-height: 1.04; font-weight: 760; letter-spacing: -0.055em; text-wrap: balance; }
@@ -112,7 +110,6 @@ interpreter.Invoke();`;
   }
   @media (max-width: 30rem) {
     .rt-hero { padding-inline: 1.25rem; }
-    .rt-wordmark { width: 220px; }
     .rt-panel { padding: 0.8rem; }
     .rt-metrics > * { padding: 0.85rem; }
     .rt-actions a { padding-inline: 1.2rem; }

@@ -57,3 +57,5 @@ heliaRT-test-*/
 # Documentation metadata is derived from the source checkout.
 astro-site/src/data/build-info.json
 astro-site/public/build-info.json
+
+astro-site/public/operators.md
