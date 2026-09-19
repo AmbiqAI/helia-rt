@@ -16,6 +16,11 @@ on:
         required: false
         type: string
         default: ""
+      armclang-m4-qualification:
+        description: "Run only the Cortex-M4+FP Arm Compiler qualification."
+        required: false
+        type: boolean
+        default: false
     secrets:
       ARM_UBL_LICENSE_IDENTIFIER:
         required: false
@@ -30,6 +35,11 @@ on:
         description: "ns-cmsis-nn commit/tag/branch to build against. Empty = repository pin."
         required: false
         default: ""
+      armclang-m4-qualification:
+        description: "Run only the Cortex-M4+FP Arm Compiler qualification."
+        required: false
+        type: boolean
+        default: false
 
 # This workflow builds a caller-supplied commit with make, so it must never
 # hold more than read access. Declaring the cap here is what stops it inheriting
@@ -82,15 +92,79 @@ jobs:
       # image-independent and fast.
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.trigger-sha }}
+          ref: ${{ inputs.trigger-sha || inputs.ref || github.sha }}
 
       # helia-rt #239: a KernelRunner built from a temporary registration
       # reads a dead stack slot and faults under ATfE on cortex-m55.
       - name: Check for KernelRunner temporaries
         run: ./tensorflow/lite/micro/tools/ci_build/check_helia_kernel_runner_temporaries.sh
 
+  armclang_m4_qualification:
+    needs: ci-image
+    if: ${{ inputs.armclang-m4-qualification }}
+    runs-on: ubuntu-latest-md
+    container:
+      image: ${{ needs.ci-image.outputs.image }}
+    timeout-minutes: 30
+    env:
+      ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
+      FVP_TIMEOUT_SECONDS: "120"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.trigger-sha || inputs.ref || github.sha }}
+
+      - name: Mark workspace as safe for Git
+        run: git config --global --add safe.directory "*"
+
+      - name: Cache third-party downloads
+        uses: actions/cache@v6
+        with:
+          path: tensorflow/lite/micro/tools/make/downloads
+          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc','tensorflow/lite/micro/tools/make/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/helia.inc') }}
+
+      - name: Run focused Arm Compiler qualification
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${ARM_UBL_LICENSE_IDENTIFIER}" ]]; then
+            echo "::error ::ARM_UBL_LICENSE_IDENTIFIER is required."
+            exit 1
+          fi
+          common_args=(
+            -f tensorflow/lite/micro/tools/make/Makefile
+            OPTIMIZED_KERNEL_DIR=helia
+            TARGET=cortex_m_corstone_300
+            TARGET_ARCH=cortex-m4+fp
+            TOOLCHAIN=armclang
+          )
+          make "${common_args[@]}" third_party_downloads
+          echo "source head: $(git rev-parse HEAD)"
+          expected_core=$(sed -n \
+            's/^NS_CMSIS_NN_COMMIT ?= //p' \
+            tensorflow/lite/micro/tools/make/ext_libs/helia.inc)
+          actual_core=$(git -C tensorflow/lite/micro/tools/make/downloads/ns_cmsis_nn \
+            rev-parse HEAD)
+          echo "CORE head: ${actual_core}"
+          [[ "${actual_core}" == "${expected_core}" ]]
+          compiler_version=$(tensorflow/lite/micro/tools/make/downloads/arm_compiler/bin/armclang \
+            --version)
+          head -3 <<<"${compiler_version}"
+          for profile in SPEED SIZE; do
+            profile_dir="gen-armclang-m4-${profile,,}"
+            profile_log="${RUNNER_TEMP}/fc-context-${profile,,}.log"
+            make -j"$(nproc)" "${common_args[@]}" \
+              BASE_GENDIR="${profile_dir}" \
+              GLOBAL_KERNEL_OPTIMIZE="${profile}" \
+              test_kernel_fully_connected_context_test | tee "${profile_log}"
+            grep -F \
+              'kernel_fully_connected_context_test: 2 test cases executed' \
+              "${profile_log}"
+          done
+
   helia_test:
     needs: ci-image
+    if: ${{ !inputs.armclang-m4-qualification }}
     runs-on: ubuntu-latest-md
     container:
       image: ${{ needs.ci-image.outputs.image }}
@@ -149,30 +223,32 @@ jobs:
         # ARG_MIN/MAX adds one binary and six cases. see AmbiqAI/ns-cmsis-nn#503
         # CONV/DEPTHWISE status/context adds one binary and 23 cases.
         # see AmbiqAI/helia-rt#238
+        # FULLY_CONNECTED context adds one binary and two cases.
+        # see AmbiqAI/helia-rt#238
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 146
-            min-cases: 1220
+            min-binaries: 147
+            min-cases: 1222
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 146
-            min-cases: 1220
+            min-binaries: 147
+            min-cases: 1222
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and one case fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 145
-            min-cases: 1219
+            min-binaries: 146
+            min-cases: 1221
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 146
-            min-cases: 1268
+            min-binaries: 147
+            min-cases: 1270
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 145
-            min-cases: 1267
+            min-binaries: 146
+            min-cases: 1269
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
@@ -193,7 +269,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.trigger-sha }}
+          ref: ${{ inputs.trigger-sha || inputs.ref || github.sha }}
 
       - name: Mark workspace as safe for Git
         run: git config --global --add safe.directory "*"

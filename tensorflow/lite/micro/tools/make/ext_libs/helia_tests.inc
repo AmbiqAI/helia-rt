@@ -106,6 +106,19 @@ $(kernel_convolution_status_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_depthwise_conv_wrapper_s4_get_buffer_size
 endif
 
+# Fully connected fast-1x1 activation-context contract.
+# see AmbiqAI/helia-rt#238
+$(eval $(call microlite_test,kernel_fully_connected_context_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/fully_connected_context_test.cc))
+
+ifeq ($(TOOLCHAIN),gcc)
+$(kernel_fully_connected_context_test_BINARY): CXXFLAGS += \
+  -DHELIA_FC_LINK_WRAP=1
+$(kernel_fully_connected_context_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_convolve_1x1_s8_fast_get_buffer_size \
+  -Wl,--wrap=arm_convolve_1x1_s8_fast
+endif
+
 # see AmbiqAI/helia-rt#285
 $(eval $(call microlite_test,kernel_sqrt_rsqrt_fp16_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/sqrt_rsqrt_fp16_test.cc))
