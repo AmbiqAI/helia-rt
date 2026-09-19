@@ -17,6 +17,7 @@ export default defineConfig({
       title: 'heliaRT',
       description: "Ambiq's optimized LiteRT for Microcontrollers runtime.",
       favicon: '/helia-rt-favicon.svg',
+      customCss: ['./src/styles/header.css'],
       plugins: [heliaStarlight({
         accent: 'helia-rt',
         sidebar: 'docs',

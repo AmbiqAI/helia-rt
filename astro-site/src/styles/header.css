@@ -1,0 +1,18 @@
+.helia-site-header__hub {
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: var(--helia-radius-md);
+  gap: 0.375rem;
+  min-height: 2.5rem;
+  padding: 0.375rem 0.75rem;
+}
+
+.helia-site-header__hub:hover,
+.helia-site-header__hub:focus-visible {
+  background: var(--sl-color-gray-6);
+  border-color: var(--sl-color-gray-3);
+}
+
+.helia-site-header__hub .helia-hub-icon {
+  height: 0.875em;
+  width: 0.875em;
+}
