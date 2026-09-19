@@ -99,7 +99,6 @@ export default defineConfig({
             { label: 'User guide', href: `${base}/guide/` },
             { label: 'API reference', href: `${base}/reference/` },
             { label: 'GitHub', href: 'https://github.com/AmbiqAI/helia-rt' },
-            { label: 'Upstream LiteRT for Microcontrollers', href: 'https://github.com/tensorflow/tflite-micro' },
           ],
           tagline: 'Ambiq Micro, Inc. Built on LiteRT for Microcontrollers.',
           logo: 'ambiq',
