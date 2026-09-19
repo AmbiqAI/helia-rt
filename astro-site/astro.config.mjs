@@ -28,6 +28,7 @@ export default defineConfig({
               { label: 'Overview', slug: 'getting-started' },
               { label: 'Choose your path', slug: 'getting-started/choose-your-path' },
               { label: 'First inference', slug: 'getting-started/first-inference' },
+              { label: 'Migrate from LiteRT', slug: 'getting-started/migrate-from-litert' },
             ],
           },
           {
@@ -35,6 +36,8 @@ export default defineConfig({
             sidebar: [
               { label: 'Overview', slug: 'guide' },
               { label: 'Runtime concepts', slug: 'guide/runtime' },
+              { label: 'Model compatibility', slug: 'guide/model-compatibility' },
+              { label: 'Build configuration', slug: 'guide/build-configuration' },
             ],
           },
           {

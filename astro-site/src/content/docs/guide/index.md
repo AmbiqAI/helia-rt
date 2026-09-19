@@ -5,6 +5,12 @@ description: Understand and configure heliaRT's runtime integration.
 
 Start with [Runtime concepts](/helia-rt/guide/runtime/) to understand what the interpreter owns, what your application supplies and how operators reach the selected backend.
 
+## Choose your next task
+
+- [Model compatibility](/helia-rt/guide/model-compatibility/): check operator types, shapes, floating-point features and error stages.
+- [Build configuration](/helia-rt/guide/build-configuration/): select a backend, source or archive integration, kernel profile and diagnostic flavor.
+- [Migrate from LiteRT](/helia-rt/getting-started/migrate-from-litert/): move an existing application with a known model baseline.
+
 ## Configuration decisions
 
 Choose source or prebuilt integration first. Then match the target architecture, toolchain, backend, kernel profile and floating-point options to your model and firmware.

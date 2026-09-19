@@ -1,22 +1,56 @@
-<ol class="runtime-flow" aria-label="Model execution path">
-  <li><strong>Your model</strong><span>A .tflite FlatBuffer and application-owned tensors.</span></li>
-  <li><strong>heliaRT</strong><span>The interpreter schedules the operators registered by your application.</span></li>
-  <li><strong>heliaCORE</strong><span>Optimized kernels execute the operations supported by the selected HELIA adapters.</span></li>
-</ol>
+<div class="runtime-architecture">
+  <ol class="runtime-flow" aria-label="Model execution path">
+    <li class="model-stage">
+      <span class="stage-label">01 · Model</span>
+      <span class="stage-symbol">.tflite</span>
+      <h3>Your trained model</h3>
+      <p>A FlatBuffer graph with tensors, constants and operator requirements.</p>
+      <a href={`${import.meta.env.BASE_URL}/guide/model-compatibility/`}>Check model compatibility <span aria-hidden="true">↗</span></a>
+    </li>
+    <li class="runtime-stage">
+      <span class="stage-label">02 · Runtime</span>
+      <span class="stage-symbol">heliaRT</span>
+      <h3>The familiar interpreter</h3>
+      <p>Register operators, allocate tensors, supply inputs and invoke the graph.</p>
+      <div class="runtime-contract"><code>MicroInterpreter</code><span>Application-owned model, resolver and arena</span></div>
+    </li>
+    <li class="backend-stage">
+      <span class="stage-label">03 · Backend</span>
+      <span class="stage-symbol">heliaCORE</span>
+      <h3>Ambiq-tuned kernels</h3>
+      <p>HELIA adapters dispatch supported operations to heliaCORE.</p>
+      <a href={`${import.meta.env.BASE_URL}/guide/build-configuration/`}>Select your backend <span aria-hidden="true">↗</span></a>
+    </li>
+  </ol>
+  <div class="backend-note"><strong>Selected at build time</strong><span>HELIA, CMSIS-NN and Reference are backend choices. Fallback behavior depends on the individual adapter and tensor configuration.</span></div>
+</div>
 
 <style>
-  .runtime-flow {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--helia-space-6);
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    counter-reset: stage;
+  .runtime-architecture { --flow-accent: #177e79; border: 1px solid var(--sl-color-gray-5); border-radius: 1.5rem; background: var(--sl-color-bg); overflow: hidden; }
+  .runtime-flow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); list-style: none; padding: 0; margin: 0; }
+  li { position: relative; padding: clamp(1.3rem, 3vw, 2.2rem); min-width: 0; }
+  li + li::before { content: '→' / ''; display: grid; place-items: center; position: absolute; left: -1rem; top: 5.3rem; width: 2rem; height: 2rem; border-radius: 50%; background: var(--sl-color-bg); color: var(--flow-accent); border: 1px solid var(--sl-color-gray-5); z-index: 1; font-size: 1.2rem; }
+  .stage-label { display: block; text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.7rem; font-weight: 700; color: var(--sl-color-gray-2); }
+  .stage-symbol { display: block; margin: 1.2rem 0; font-size: clamp(1.6rem, 3vw, 2.4rem); line-height: 1.1; font-weight: 750; letter-spacing: -0.05em; color: var(--flow-accent); }
+  h3 { font-size: 1.05rem; margin: 0 0 0.6rem; line-height: 1.35; }
+  p { font-size: 0.9rem; color: var(--sl-color-gray-2); }
+  a { display: inline-block; margin-top: 1.3rem; font-size: 0.85rem; font-weight: 650; color: var(--flow-accent); text-underline-offset: 0.2em; }
+  .runtime-stage { background: #102c30; color: #f2faf9; }
+  .runtime-stage .stage-label, .runtime-stage p { color: #b8d4d2; }
+  .runtime-stage .stage-symbol { color: #71d5cd; }
+  .runtime-stage h3 { color: #f2faf9; }
+  .runtime-contract { border-top: 1px solid #ffffff25; margin-top: 1.2rem; padding-top: 1rem; font-size: 0.75rem; }
+  .runtime-contract code { color: #71d5cd; }
+  .runtime-contract span { display: block; margin-top: 0.4rem; color: #b8d4d2; line-height: 1.5; }
+  .backend-note { display: flex; align-items: baseline; gap: 1.5rem; padding: 1.2rem 2rem; background: var(--sl-color-gray-6); border-top: 1px solid var(--sl-color-gray-5); font-size: 0.8rem; line-height: 1.6; }
+  .backend-note strong { flex-shrink: 0; }
+  .backend-note span { color: var(--sl-color-gray-2); }
+  :global([data-theme='dark']) .runtime-architecture { --flow-accent: #71d5cd; }
+  @media (max-width: 52rem) {
+    .runtime-flow { grid-template-columns: 1fr; }
+    li { padding: 1.5rem; }
+    li + li::before { content: '↓' / ''; top: -1rem; left: calc(50% - 1rem); }
+    .stage-symbol { margin: 0.8rem 0; }
+    .backend-note { display: grid; gap: 0.3rem; padding: 1.5rem; }
   }
-  li { border-top: 1px solid var(--sl-color-hairline); padding-top: var(--helia-space-5); }
-  li::before { counter-increment: stage; content: '0' counter(stage); color: var(--sl-color-text-accent); }
-  strong { display: block; margin-block: var(--helia-space-3); font-size: var(--helia-text-card-title); }
-  span { color: var(--sl-color-gray-2); line-height: 1.65; }
-  @media (max-width: 48rem) { .runtime-flow { grid-template-columns: 1fr; } }
 </style>
