@@ -15,7 +15,7 @@ export default defineConfig({
       favicon: '/helia-rt-favicon.svg',
       plugins: [heliaStarlight({
         accent: 'helia-rt',
-        sidebar: 'always',
+        sidebar: 'docs',
         header: {
           title: 'heliaRT',
           hub: { label: 'HELIA', href: 'https://ambiqai.github.io/helia-developer-hub/' },

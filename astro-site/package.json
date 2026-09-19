@@ -4,14 +4,17 @@
   "private": true,
   "type": "module",
   "version": "0.0.0",
-  "engines": { "node": ">=24", "npm": ">=11" },
+  "engines": {
+    "node": ">=24",
+    "npm": ">=11"
+  },
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
     "check": "astro check",
     "reference:trial": "node scripts/reference-trial.mjs",
-    "test": "node --test scripts/*.test.mjs"
+    "check:links": "python3 scripts/check-site-links.py"
   },
   "dependencies": {
     "@ambiqai/helia-ui": "github:AmbiqAI/helia-ui#v0.1.0-alpha.13",

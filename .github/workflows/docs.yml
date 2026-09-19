@@ -26,6 +26,30 @@ defaults:
     shell: bash
 
 jobs:
+  astro-validate:
+    name: Validate Astro migration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: astro-site
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: astro-site/package-lock.json
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+      - run: npm ci
+      - run: npm run build
+      - run: npm run check
+      - run: npm run check:links
+
   # Pull-request validation. Deliberately does not touch the Pages API or
   # upload an artifact, so it needs no pages permissions and works for
   # fork pull requests.

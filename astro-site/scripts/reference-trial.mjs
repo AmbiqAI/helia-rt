@@ -53,3 +53,36 @@ fs.writeFileSync(path.join(cache, 'model.json'), JSON.stringify(model, null, 2) 
 fs.writeFileSync(path.join(cache, 'warnings.json'), JSON.stringify(warnings, null, 2) + '\n');
 console.log(`Trial XML and model: ${path.relative(siteRoot, cache)}`);
 console.log(`Extractor warnings: ${warnings.length}`);
+
+const symbols = [];
+function collect(value) {
+  if (Array.isArray(value)) value.forEach(collect);
+  else if (value && typeof value === 'object') {
+    if (typeof value.id === 'string' && typeof value.signature === 'string') symbols.push(value);
+    Object.values(value).forEach(collect);
+  }
+}
+collect(model);
+const interpreter = symbols.find((symbol) => symbol.id === 'tflite::MicroInterpreter');
+const constructors = interpreter?.members.filter((symbol) => symbol.name === 'MicroInterpreter') ?? [];
+const resolver = symbols.find((symbol) => symbol.id === 'tflite::MicroMutableOpResolver');
+const typedInput = symbols.find((symbol) => symbol.id === 'tflite::MicroInterpreter::typed_input_tensor');
+const checks = [
+  { name: 'Both interpreter constructors extracted', pass: constructors.length === 2 },
+  { name: 'No overload identity warnings', pass: !warnings.some((warning) => warning.includes('duplicate id')) },
+  { name: 'Resolver template declaration retained', pass: /template\s*</.test(resolver?.signature ?? '') },
+  { name: 'Typed accessor template declaration retained', pass: /template\s*</.test(typedInput?.signature ?? '') },
+  { name: 'Constructor ownership contract retained', pass: constructors.some((symbol) => /ownership remains with the caller/.test(symbol.description ?? '')) },
+];
+const report = {
+  doxygen: doxygen.stdout.trim(),
+  packageVersion: JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8')).version,
+  headers,
+  checks,
+  warnings,
+  complete: checks.every((check) => check.pass),
+};
+fs.writeFileSync(path.join(cache, 'report.json'), JSON.stringify(report, null, 2) + '\n');
+for (const check of checks) console.log(`${check.pass ? 'PASS' : 'GAP'} ${check.name}`);
+console.log(report.complete ? 'Representative checks passed; full coverage still requires a public API manifest.' : 'The generated reference is not ready to publish.');
+if (process.argv.includes('--require-complete') && !report.complete) process.exitCode = 1;
