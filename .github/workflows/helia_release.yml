@@ -1,17 +1,16 @@
 name: heliaRT Release
 
-# Floating-point gating on this workflow, stated plainly so nobody reads more
-# assurance into a green run than it carries (issue #227):
+# Floating-point gating on this workflow (issues #227 and #234):
 #
-#   * NOW: every leg links an FP symbol probe against the artifact it is about
-#     to publish (the "FP symbol link-probe" step below). That proves the
-#     floating-point entry points helia calls RESOLVE in the shipped library,
-#     for all three toolchains. It does NOT prove they compute correctly.
-#   * NEXT: executed FP16/FP32 kernel tests on FVP for the gcc legs arrive
-#     with the FP test PR tracked by issue #227 item 1. The test matrix is
-#     deliberately NOT duplicated here -- the probe is the release-side guard
-#     this workflow adds, chosen because it needs no FVP and so keeps release
-#     wall-clock effectively unchanged.
+#   * All 18 build legs link the FP symbol probe against their archive. This
+#     proves symbol resolution, not numerical behavior.
+#   * The semantic gate executes the exact M55/GCC/release_with_logs archive
+#     (the shipped default-SPEED build) on Corstone-300 before packaging. A
+#     separately built SIZE archive qualifies that source profile but is not
+#     shipped. The other 17 archives retain link-probe coverage only.
+#   * release-please creates the GitHub Release before calling this workflow.
+#     A failed semantic gate blocks bundle creation and asset attachment; it
+#     does not remove the already-created Release object.
 #
 # PRE-TAG GATE for the first release that runs this workflow (1.19.0): the
 # armclang legs of the "FP symbol link-probe" step have never executed in CI --
@@ -166,9 +165,68 @@ jobs:
           name: helia-rt-combo-${{ matrix.arch }}-${{ matrix.toolchain }}-${{ matrix.build }}
           path: out/${{ matrix.arch }}/${{ matrix.toolchain }}/${{ matrix.build }}/**
 
+  release-fp-execution:
+    name: Release FP execution (${{ matrix.profile }})
+    needs: [ci-image, build]
+    runs-on: ubuntu-latest-md
+    container:
+      image: ${{ needs.ci-image.outputs.image }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [ "SPEED", "SIZE" ]
+    env:
+      FVP_TIMEOUT_SECONDS: "120"
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Mark workspace safe
+        run: git config --global --add safe.directory '*'
+
+      - name: Cache third-party downloads
+        uses: actions/cache@v6
+        with:
+          path: tensorflow/lite/micro/tools/make/downloads
+          key: ${{ runner.os }}-third-party-downloads-${{ inputs.ref || github.sha }}-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc','tensorflow/lite/micro/tools/make/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/helia.inc') }}
+
+      - name: Download exact shipped SPEED archive
+        if: ${{ matrix.profile == 'SPEED' }}
+        uses: actions/download-artifact@v8
+        with:
+          name: helia-rt-combo-cortex-m55-gcc-release_with_logs
+          path: downloaded-speed
+
+      - name: Execute release floating-point tests
+        run: |
+          set -euo pipefail
+          profile='${{ matrix.profile }}'
+          args=(
+            --profile "${profile}"
+            --out-dir "${RUNNER_TEMP}/helia-release-fp-${profile,,}"
+          )
+          if [[ "${profile}" == "SPEED" ]]; then
+            mapfile -t archives < <(find downloaded-speed -type f \
+              -name 'libhelia-rt-cm55-gcc-release-with-logs.a' -print)
+            if [[ "${#archives[@]}" -ne 1 ]]; then
+              echo "::error ::Expected one shipped SPEED archive; found ${#archives[@]}."
+              exit 1
+            fi
+            args+=(--archive "${archives[0]}")
+          fi
+          tensorflow/lite/micro/tools/ci_build/test_helia_release_fp.sh \
+            "${args[@]}"
+
   package:
     name: Package heliaRT bundle
-    needs: build
+    needs: [build, release-fp-execution]
     runs-on: ubuntu-latest
     defaults:
       run:
