@@ -332,8 +332,7 @@ TfLiteStatus EvalQuantizedInt8(TfLiteContext* context, TfLiteNode* node,
   }
 
   if (output_dim_count > 2 && data.accum_depth % 4 == 0) {
-    cmsis_nn_context activation_ctx;
-    activation_ctx.size = 0;
+    cmsis_nn_context activation_ctx = {nullptr, 0};
     if (data.activation_buffer_idx > -1) {
       activation_ctx.buf = context->GetScratchBuffer(context, data.activation_buffer_idx);
     }
