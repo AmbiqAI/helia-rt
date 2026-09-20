@@ -48,13 +48,15 @@ require_map_members() {  # <map> <absolute-archive> <member>...
   shift 2
 
   [[ -f "${map_file}" ]] || die "link map not found: ${map_file}"
-  local member match
+  local member match receipt
   for member in "$@"; do
     match="${archive}(${member})"
-    if ! grep -Fq "${match}" "${map_file}"; then
+    receipt="$(awk -v expected="${match}" \
+      'index($0, expected) == 1 { print; exit }' "${map_file}")"
+    if [[ -z "${receipt}" ]]; then
       die "${map_file} does not attribute ${member} to ${archive}"
     fi
-    grep -Fm1 "${match}" "${map_file}"
+    printf '%s\n' "${receipt}"
   done
 }
 
