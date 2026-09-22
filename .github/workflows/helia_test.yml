@@ -225,30 +225,32 @@ jobs:
         # see AmbiqAI/helia-rt#238
         # FULLY_CONNECTED context adds one binary and two cases.
         # see AmbiqAI/helia-rt#238
+        # FULLY_CONNECTED kernel-sum / LEAKY_RELU status adds one binary and six
+        # cases on every leg. see AmbiqAI/helia-rt#238
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 147
-            min-cases: 1222
+            min-binaries: 148
+            min-cases: 1228
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 147
-            min-cases: 1222
+            min-binaries: 148
+            min-cases: 1228
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and one case fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 146
-            min-cases: 1221
+            min-binaries: 147
+            min-cases: 1227
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 147
-            min-cases: 1270
+            min-binaries: 148
+            min-cases: 1276
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 146
-            min-cases: 1269
+            min-binaries: 147
+            min-cases: 1275
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
