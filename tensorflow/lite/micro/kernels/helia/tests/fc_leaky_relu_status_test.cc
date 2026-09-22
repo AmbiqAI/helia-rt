@@ -24,10 +24,11 @@ limitations under the License.
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
 // FULLY_CONNECTED kernel-sum and LEAKY_RELU status contracts: a CORE failure
-// must surface as kTfLiteError and leave the output untouched. The pinned
-// heliaCORE never fails these entry points on its own, so a GNU link wrap
-// injects the failure; without the wrap the failure cases assert the valid
-// path only. see AmbiqAI/helia-rt#238
+// must surface as kTfLiteError and leave the output untouched. A GNU link
+// wrap injects the failure; without the wrap the failure cases assert the
+// valid path only. The FC golden checks the kernel-sum contents only where
+// the kernel consumes them (MVE targets); elsewhere it proves the call and
+// status contract. see AmbiqAI/helia-rt#238
 
 #ifndef HELIA_FC_LEAKY_LINK_WRAP
 #define HELIA_FC_LEAKY_LINK_WRAP 0
@@ -62,9 +63,9 @@ int32_t __wrap_arm_fully_connected_s8_get_buffer_size(
   const int32_t actual =
       __real_arm_fully_connected_s8_get_buffer_size(filter_dims);
   // Report the MVE kernel-sum size on every target so the arm_vector_sum_s8
-  // route executes on non-MVE legs too; CORE's scalar kernels ignore it.
-  return actual > 0 ? actual
-                    : filter_dims->c * static_cast<int32_t>(sizeof(int32_t));
+  // route executes on non-MVE legs too.
+  return actual != 0 ? actual
+                     : filter_dims->c * static_cast<int32_t>(sizeof(int32_t));
 }
 
 arm_cmsis_nn_status __real_arm_vector_sum_s8(int32_t*, int32_t, int32_t,
@@ -131,7 +132,10 @@ struct FcResult {
 
 // Two-dimensional shapes keep the adapter on the arm_fully_connected_wrapper_s8
 // route (not the fast 1x1 convolution one), which is where both kernel-sum
-// call sites live.
+// call sites live. The non-zero input zero point makes the MVE result depend
+// on the precomputed kernel sums.
+constexpr int kFcInputZeroPoint = 1;
+
 FcResult RunFullyConnected() {
   int input_dims_data[] = {2, 1, 4};
   int filter_dims_data[] = {2, 3, 4};
@@ -153,7 +157,8 @@ FcResult RunFullyConnected() {
 
   TfLiteTensor tensors[] = {
       tflite::testing::CreateQuantizedTensor(
-          input, tflite::testing::IntArrayFromInts(input_dims_data), 1.0f),
+          input, tflite::testing::IntArrayFromInts(input_dims_data), 1.0f,
+          kFcInputZeroPoint),
       filter_tensor,
       bias_tensor,
       tflite::testing::CreateQuantizedTensor(
@@ -178,7 +183,8 @@ FcResult RunFullyConnected() {
 void ExpectFullyConnectedGolden(const FcResult& result) {
   EXPECT_EQ(kTfLiteOk, result.prepare);
   EXPECT_EQ(kTfLiteOk, result.invoke);
-  const int8_t expected[] = {-1, 10, 4};
+  // input - zero point = {0, -3, 2, 3}.
+  const int8_t expected[] = {-4, 8, 4};
   for (int i = 0; i < 3; ++i) {
     EXPECT_EQ(expected[i], result.output[i]);
   }

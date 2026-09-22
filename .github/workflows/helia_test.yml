@@ -226,7 +226,8 @@ jobs:
         # FULLY_CONNECTED context adds one binary and two cases.
         # see AmbiqAI/helia-rt#238
         # FULLY_CONNECTED kernel-sum / LEAKY_RELU status adds one binary and six
-        # cases on every leg. see AmbiqAI/helia-rt#238
+        # cases on every leg; on ATfE rows the failure cases run without the
+        # GNU link wrap and assert the valid path. see AmbiqAI/helia-rt#238
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"

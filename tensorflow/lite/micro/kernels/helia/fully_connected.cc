@@ -193,7 +193,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
           data->kernel_sums, filter_dims.n, data->output_depth, filter_data,
           input_offset, filter_offset, tflite::GetTensorData<int32_t>(bias));
       if (vector_sum_status != ARM_CMSIS_NN_SUCCESS) {
-        MicroPrintf("FULLY_CONNECTED: arm_vector_sum_s8 failed (%d).",
+        MicroPrintf("FULLY_CONNECTED: arm_vector_sum_s8 failed at Prepare (%d).",
                     static_cast<int>(vector_sum_status));
         return kTfLiteError;
       }
@@ -336,7 +336,7 @@ TfLiteStatus EvalQuantizedInt8(TfLiteContext* context, TfLiteNode* node,
         tflite::micro::GetTensorData<int8_t>(filter), fc_params.input_offset,
         fc_params.filter_offset, bias_data);
     if (vector_sum_status != ARM_CMSIS_NN_SUCCESS) {
-      MicroPrintf("FULLY_CONNECTED: arm_vector_sum_s8 failed (%d).",
+      MicroPrintf("FULLY_CONNECTED: arm_vector_sum_s8 failed at Invoke (%d).",
                   static_cast<int>(vector_sum_status));
       return kTfLiteError;
     }
