@@ -170,9 +170,9 @@ FcResult RunFullyConnected() {
   params.activation = kTfLiteActNone;
   params.weights_format = kTfLiteFullyConnectedWeightsFormatDefault;
 
+  const TFLMRegistration registration = tflite::Register_FULLY_CONNECTED();
   tflite::micro::KernelRunner runner(
-      tflite::Register_FULLY_CONNECTED(), tensors, 4,
-      tflite::testing::IntArrayFromInts(inputs_data),
+      registration, tensors, 4, tflite::testing::IntArrayFromInts(inputs_data),
       tflite::testing::IntArrayFromInts(outputs_data), &params);
   const TfLiteStatus prepare = runner.InitAndPrepare();
   const TfLiteStatus invoke =
@@ -214,9 +214,9 @@ LeakyResult<T> RunLeakyRelu(const T (&input)[5], T sentinel) {
   TfLiteLeakyReluParams params = {};
   params.alpha = 0.5f;
 
+  const TFLMRegistration registration = tflite::Register_LEAKY_RELU();
   tflite::micro::KernelRunner runner(
-      tflite::Register_LEAKY_RELU(), tensors, 2,
-      tflite::testing::IntArrayFromInts(inputs_data),
+      registration, tensors, 2, tflite::testing::IntArrayFromInts(inputs_data),
       tflite::testing::IntArrayFromInts(outputs_data), &params);
   const TfLiteStatus prepare = runner.InitAndPrepare();
   const TfLiteStatus invoke =
