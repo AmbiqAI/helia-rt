@@ -119,6 +119,21 @@ $(kernel_fully_connected_context_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_convolve_1x1_s8_fast
 endif
 
+# FULLY_CONNECTED kernel-sum and LEAKY_RELU status contracts.
+# see AmbiqAI/helia-rt#238
+$(eval $(call microlite_test,kernel_fc_leaky_relu_status_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/fc_leaky_relu_status_test.cc))
+
+ifeq ($(TOOLCHAIN),gcc)
+$(kernel_fc_leaky_relu_status_test_BINARY): CXXFLAGS += \
+  -DHELIA_FC_LEAKY_LINK_WRAP=1
+$(kernel_fc_leaky_relu_status_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_fully_connected_s8_get_buffer_size \
+  -Wl,--wrap=arm_vector_sum_s8 \
+  -Wl,--wrap=arm_leaky_relu_s8 \
+  -Wl,--wrap=arm_leaky_relu_s16
+endif
+
 # see AmbiqAI/helia-rt#285
 $(eval $(call microlite_test,kernel_sqrt_rsqrt_fp16_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/sqrt_rsqrt_fp16_test.cc))

@@ -187,10 +187,17 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
 
       data->kernel_sums = static_cast<int32_t*>(
           context->AllocatePersistentBuffer(context, buf_size));
+      TF_LITE_ENSURE(context, data->kernel_sums != nullptr);
 
-      arm_vector_sum_s8(data->kernel_sums, filter_dims.n, data->output_depth,
-                        filter_data, input_offset, filter_offset,
-                        tflite::GetTensorData<int32_t>(bias));
+      const arm_cmsis_nn_status vector_sum_status = arm_vector_sum_s8(
+          data->kernel_sums, filter_dims.n, data->output_depth, filter_data,
+          input_offset, filter_offset, tflite::GetTensorData<int32_t>(bias));
+      if (vector_sum_status != ARM_CMSIS_NN_SUCCESS) {
+        MicroPrintf(
+            "FULLY_CONNECTED: arm_vector_sum_s8 failed at Prepare (%d).",
+            static_cast<int>(vector_sum_status));
+        return kTfLiteError;
+      }
 
       // Do not request a scratch buffer since using persistent memory
       buf_size = 0;
@@ -325,10 +332,15 @@ TfLiteStatus EvalQuantizedInt8(TfLiteContext* context, TfLiteNode* node,
     weight_sum_ctx.size = arm_fully_connected_s8_get_buffer_size(&filter_dims);
   } else if (weight_sum_ctx.buf != nullptr) {
     // If behaving like batch matmul we calculate kernel sums in eval.
-    arm_vector_sum_s8(
+    const arm_cmsis_nn_status vector_sum_status = arm_vector_sum_s8(
         static_cast<int32_t*>(weight_sum_ctx.buf), filter_dims.n, data.output_depth,
         tflite::micro::GetTensorData<int8_t>(filter), fc_params.input_offset,
         fc_params.filter_offset, bias_data);
+    if (vector_sum_status != ARM_CMSIS_NN_SUCCESS) {
+      MicroPrintf("FULLY_CONNECTED: arm_vector_sum_s8 failed at Invoke (%d).",
+                  static_cast<int>(vector_sum_status));
+      return kTfLiteError;
+    }
   }
 
   if (output_dim_count > 2 && data.accum_depth % 4 == 0) {

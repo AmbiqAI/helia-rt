@@ -29,7 +29,7 @@ limitations under the License.
 
 namespace tflite {
 
-static inline void leaky_relu_s8(
+static inline arm_cmsis_nn_status leaky_relu_s8(
   const LeakyReluOpData& data,
   const RuntimeShape& input_shape,
   const int8_t* input_data,
@@ -37,7 +37,7 @@ static inline void leaky_relu_s8(
   int8_t* output_data
 ) {
 
-  arm_leaky_relu_s8(
+  return arm_leaky_relu_s8(
     input_data,
     data.input_zero_point,
     data.output_zero_point,
@@ -51,7 +51,7 @@ static inline void leaky_relu_s8(
 
 }
 
-static inline void leaky_relu_s16(
+static inline arm_cmsis_nn_status leaky_relu_s16(
     const LeakyReluOpData& data,
     const RuntimeShape& input_shape,
     const int16_t* input_data,
@@ -59,7 +59,7 @@ static inline void leaky_relu_s16(
     int16_t* output_data
   ) {
 
-  arm_leaky_relu_s16(
+  return arm_leaky_relu_s16(
     input_data,
     data.input_zero_point,
     data.output_zero_point,
@@ -100,23 +100,33 @@ TfLiteStatus LeakyReluEval(TfLiteContext* context, TfLiteNode* node) {
       return kTfLiteOk;
     } break;
     case kTfLiteInt8: {
-      leaky_relu_s8(
+      const arm_cmsis_nn_status status = leaky_relu_s8(
         data,
         tflite::micro::GetTensorShape(input),
         tflite::micro::GetTensorData<int8_t>(input),
         tflite::micro::GetTensorShape(output),
         tflite::micro::GetTensorData<int8_t>(output)
       );
+      if (status != ARM_CMSIS_NN_SUCCESS) {
+        MicroPrintf("LEAKY_RELU: arm_leaky_relu_s8 failed (%d).",
+                    static_cast<int>(status));
+        return kTfLiteError;
+      }
       return kTfLiteOk;
     } break;
     case kTfLiteInt16: {
-      leaky_relu_s16(
+      const arm_cmsis_nn_status status = leaky_relu_s16(
         data,
         tflite::micro::GetTensorShape(input),
         tflite::micro::GetTensorData<int16_t>(input),
         tflite::micro::GetTensorShape(output),
         tflite::micro::GetTensorData<int16_t>(output)
       );
+      if (status != ARM_CMSIS_NN_SUCCESS) {
+        MicroPrintf("LEAKY_RELU: arm_leaky_relu_s16 failed (%d).",
+                    static_cast<int>(status));
+        return kTfLiteError;
+      }
       return kTfLiteOk;
     } break;
     default:
