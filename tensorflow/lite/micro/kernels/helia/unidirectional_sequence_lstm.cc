@@ -125,16 +125,35 @@ LSTMBuffers<int16_t> CMSIS_NN_CreateLSTMBuffers(TfLiteContext* context,
   return buffers;
 }
 
-void CMSIS_NN_VectorSum(int32_t* kernel_sum, const int32_t size1,
-                        const int32_t size2, const int8_t* weights,
-                        const int32_t offset, const int32_t* biases) {
-  arm_vector_sum_s8(kernel_sum, size1, size2, weights, offset, 0, biases);
+TfLiteStatus CMSIS_NN_VectorSum(int32_t* kernel_sum, const int32_t size1,
+                                const int32_t size2, const int8_t* weights,
+                                const int32_t offset, const int32_t* biases,
+                                const char* weights_name) {
+  const arm_cmsis_nn_status status =
+      arm_vector_sum_s8(kernel_sum, size1, size2, weights, offset, 0, biases);
+  if (status != ARM_CMSIS_NN_SUCCESS) {
+    MicroPrintf(
+        "UNIDIRECTIONAL_SEQUENCE_LSTM: arm_vector_sum_s8 failed for %s (%d).",
+        weights_name, static_cast<int>(status));
+    return kTfLiteError;
+  }
+  return kTfLiteOk;
 }
 
-void CMSIS_NN_VectorSum(int64_t* kernel_sum, const int32_t size1,
-                        const int32_t size2, const int8_t* weights,
-                        const int32_t offset, const int64_t* biases) {
-  arm_vector_sum_s8_s64(kernel_sum, size1, size2, weights, offset, biases);
+TfLiteStatus CMSIS_NN_VectorSum(int64_t* kernel_sum, const int32_t size1,
+                                const int32_t size2, const int8_t* weights,
+                                const int32_t offset, const int64_t* biases,
+                                const char* weights_name) {
+  const arm_cmsis_nn_status status =
+      arm_vector_sum_s8_s64(kernel_sum, size1, size2, weights, offset, biases);
+  if (status != ARM_CMSIS_NN_SUCCESS) {
+    MicroPrintf(
+        "UNIDIRECTIONAL_SEQUENCE_LSTM: arm_vector_sum_s8_s64 failed for %s "
+        "(%d).",
+        weights_name, static_cast<int>(status));
+    return kTfLiteError;
+  }
+  return kTfLiteOk;
 }
 
 template <typename BiasType>
@@ -195,73 +214,81 @@ TfLiteStatus CMSIS_NN_PortOpData(TfLiteContext* context, OpDataLSTM* params_ref,
   BiasType* input_data_kernel_sum{
       static_cast<BiasType*>(context->AllocatePersistentBuffer(
           context, size_hidden * sizeof(BiasType)))};
+  TF_LITE_ENSURE(context, input_data_kernel_sum != nullptr);
   BiasType* forget_data_kernel_sum{
       static_cast<BiasType*>(context->AllocatePersistentBuffer(
           context, size_hidden * sizeof(BiasType)))};
+  TF_LITE_ENSURE(context, forget_data_kernel_sum != nullptr);
   BiasType* cell_data_kernel_sum{
       static_cast<BiasType*>(context->AllocatePersistentBuffer(
           context, size_hidden * sizeof(BiasType)))};
+  TF_LITE_ENSURE(context, cell_data_kernel_sum != nullptr);
   BiasType* output_data_kernel_sum{
       static_cast<BiasType*>(context->AllocatePersistentBuffer(
           context, size_hidden * sizeof(BiasType)))};
+  TF_LITE_ENSURE(context, output_data_kernel_sum != nullptr);
 
   BiasType* input_hidden_kernel_sum{
       static_cast<BiasType*>(context->AllocatePersistentBuffer(
           context, size_hidden * sizeof(BiasType)))};
+  TF_LITE_ENSURE(context, input_hidden_kernel_sum != nullptr);
   BiasType* forget_hidden_kernel_sum{
       static_cast<BiasType*>(context->AllocatePersistentBuffer(
           context, size_hidden * sizeof(BiasType)))};
+  TF_LITE_ENSURE(context, forget_hidden_kernel_sum != nullptr);
   BiasType* cell_hidden_kernel_sum = {
       static_cast<BiasType*>(context->AllocatePersistentBuffer(
           context, size_hidden * sizeof(BiasType)))};
+  TF_LITE_ENSURE(context, cell_hidden_kernel_sum != nullptr);
   BiasType* output_hidden_kernel_sum = {
       static_cast<BiasType*>(context->AllocatePersistentBuffer(
           context, size_hidden * sizeof(BiasType)))};
+  TF_LITE_ENSURE(context, output_hidden_kernel_sum != nullptr);
 
   // Compute effective biases
-  CMSIS_NN_VectorSum(
+  TF_LITE_ENSURE_OK(context, CMSIS_NN_VectorSum(
       input_data_kernel_sum, size_data, size_hidden, input_to_input_weights,
       params_ref->input_gate_parameters.input_fc_params.input_offset,
-      input_gate_bias);
+      input_gate_bias, "input_to_input_weights"));
 
-  CMSIS_NN_VectorSum(
+  TF_LITE_ENSURE_OK(context, CMSIS_NN_VectorSum(
       forget_data_kernel_sum, size_data, size_hidden, input_to_forget_weights,
       params_ref->forget_gate_parameters.input_fc_params.input_offset,
-      forget_gate_bias);
+      forget_gate_bias, "input_to_forget_weights"));
 
-  CMSIS_NN_VectorSum(
+  TF_LITE_ENSURE_OK(context, CMSIS_NN_VectorSum(
       cell_data_kernel_sum, size_data, size_hidden, input_to_cell_weights,
       params_ref->cell_gate_parameters.input_fc_params.input_offset,
-      cell_gate_bias);
+      cell_gate_bias, "input_to_cell_weights"));
 
-  CMSIS_NN_VectorSum(
+  TF_LITE_ENSURE_OK(context, CMSIS_NN_VectorSum(
       output_data_kernel_sum, size_data, size_hidden, input_to_output_weights,
       params_ref->output_gate_parameters.input_fc_params.input_offset,
-      output_gate_bias);
+      output_gate_bias, "input_to_output_weights"));
 
-  CMSIS_NN_VectorSum(
+  TF_LITE_ENSURE_OK(context, CMSIS_NN_VectorSum(
       input_hidden_kernel_sum, size_hidden, size_hidden,
       recurrent_to_input_weights,
       -params_ref->inter_gate_parameters.output_mul_params.output_offset,
-      nullptr);
+      nullptr, "recurrent_to_input_weights"));
 
-  CMSIS_NN_VectorSum(
+  TF_LITE_ENSURE_OK(context, CMSIS_NN_VectorSum(
       forget_hidden_kernel_sum, size_hidden, size_hidden,
       recurrent_to_forget_weights,
       -params_ref->inter_gate_parameters.output_mul_params.output_offset,
-      nullptr);
+      nullptr, "recurrent_to_forget_weights"));
 
-  CMSIS_NN_VectorSum(
+  TF_LITE_ENSURE_OK(context, CMSIS_NN_VectorSum(
       cell_hidden_kernel_sum, size_hidden, size_hidden,
       recurrent_to_cell_weights,
       -params_ref->inter_gate_parameters.output_mul_params.output_offset,
-      nullptr);
+      nullptr, "recurrent_to_cell_weights"));
 
-  CMSIS_NN_VectorSum(
+  TF_LITE_ENSURE_OK(context, CMSIS_NN_VectorSum(
       output_hidden_kernel_sum, size_hidden, size_hidden,
       recurrent_to_output_weights,
       -params_ref->inter_gate_parameters.output_mul_params.output_offset,
-      nullptr);
+      nullptr, "recurrent_to_output_weights"));
 
   // Create input gate parameters
   cmsis_nn_lstm_gate gate_input{
@@ -658,14 +685,16 @@ TfLiteStatus UnidirectionalSequenceLstmPrepare(TfLiteContext* context,
   if (activation_type == kTfLiteInt8 && cell_state_type == kTfLiteInt16) {
     auto kernel_content = CreateLSTMKernelContent(context, node);
     number_of_buffers = kCmsisNnQuantizedScratchBuffers;
-    CMSIS_NN_PortOpData<int32_t>(context, op_data_lstm, kernel_content,
-                                 &op_data->params_cmsis_nn);
+    TF_LITE_ENSURE_OK(context, CMSIS_NN_PortOpData<int32_t>(
+                                   context, op_data_lstm, kernel_content,
+                                   &op_data->params_cmsis_nn));
   } else if (activation_type == kTfLiteInt16 &&
              cell_state_type == kTfLiteInt16) {
     auto kernel_content = CreateLSTMKernelContent(context, node);
     number_of_buffers = kCmsisNnQuantizedScratchBuffers;
-    CMSIS_NN_PortOpData<int64_t>(context, op_data_lstm, kernel_content,
-                                 &op_data->params_cmsis_nn);
+    TF_LITE_ENSURE_OK(context, CMSIS_NN_PortOpData<int64_t>(
+                                   context, op_data_lstm, kernel_content,
+                                   &op_data->params_cmsis_nn));
   } else {
     number_of_buffers = 4;
   }

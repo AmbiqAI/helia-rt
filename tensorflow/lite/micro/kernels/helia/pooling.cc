@@ -35,6 +35,7 @@ struct OpData {
 
   // Index to buffer for optimizations if applicable.
   int buffer_idx;
+  int32_t buffer_size;
 };
 
 void PopulateCommonParams(
@@ -74,6 +75,7 @@ void PopulateCommonParams(
   ctx->size = 0;
   if (data.buffer_idx > -1) {
     ctx->buf = context->GetScratchBuffer(context, data.buffer_idx);
+    ctx->size = data.buffer_size;
   }
 }
 
@@ -295,6 +297,7 @@ TfLiteStatus MaxPrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_STATUS(HeliaPoolingPrepare(context, node));
   // Set buffer index to a reset value
   static_cast<OpData*>(node->user_data)->buffer_idx = -1;
+  static_cast<OpData*>(node->user_data)->buffer_size = 0;
   return kTfLiteOk;
 }
 
@@ -323,7 +326,10 @@ TfLiteStatus AveragePrepare(TfLiteContext* context, TfLiteNode* node) {
             ? arm_avgpool_s16_get_buffer_size(output_width, depth)
             : arm_avgpool_s8_get_buffer_size(output_width, depth);
 
+    TF_LITE_ENSURE_MSG(context, buffer_size >= 0,
+                       "AVERAGE_POOL_2D: invalid scratch buffer size.");
     auto* data = static_cast<OpData*>(node->user_data);
+    data->buffer_size = buffer_size;
     if (buffer_size > 0) {
       TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
           context, buffer_size, &data->buffer_idx));

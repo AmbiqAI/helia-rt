@@ -21,6 +21,16 @@ Drop-in: same `MicroInterpreter`/`Model`/`OpResolver` API as upstream.
 - **Fork discipline.** Upstream-derived files keep upstream layout and style;
   no drive-by reformatting, it breaks merges. Ambiq-specific work lives in the
   heliaCORE kernel paths; copy the idiom of a neighboring kernel.
+- **heliaCORE calls: check every status, declare every buffer size.** Capture
+  each `arm_cmsis_nn_status` a CORE call returns and map a failure to
+  `kTfLiteError` (`TF_LITE_ENSURE_EQ`, or a `MicroPrintf` naming the op and
+  entry point); `TFLITE_DCHECK_EQ` is not a check in a release build. Whether
+  a CORE entry point returns a status or `void` does not follow its name, so
+  read the pinned header. A `cmsis_nn_context` backed by a scratch or
+  persistent buffer carries the byte count Prepare requested, stored in
+  `OpData` and obtained from the sizer the header names for that entry point;
+  several entry points read `size == 0` as undeclared and skip their bounds
+  check. `{nullptr, 0}` is for routes that request no buffer.
 - Toolchains: GCC, Arm Compiler 6, ATfE, but the PR test matrix
   (`helia_test.yml`) covers gcc and ATfE only; armclang is exercised by
   `helia_release.yml` and by `cortex_m_arm_compiler.yml`, which is manual.

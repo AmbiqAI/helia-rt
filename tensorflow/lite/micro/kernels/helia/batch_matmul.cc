@@ -39,6 +39,7 @@ struct OpData {
   cmsis_nn_dims output_shape;
 
   int buffer_idx;
+  int32_t buffer_size;
 };
 
 template <typename T>
@@ -301,6 +302,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
       output_rank, reinterpret_cast<int32_t*>(output->dims->data));
 
   data->buffer_idx = -1;
+  data->buffer_size = 0;
   int buf_size = 0;
 #if ARM_NN_ENABLE_F32
   if (lhs_input->type == kTfLiteFloat32 &&
@@ -376,7 +378,16 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
       data->reference_op_data.quantization->output_activation_max =
           std::numeric_limits<int8_t>::max();
 
-      buf_size = arm_fully_connected_s8_get_buffer_size(&data->output_shape);
+      // Kernel sums are indexed by rhs row, so size them from the rhs as
+      // EvalInt8 passes it: transposed to [..., N, K] unless adj_y.
+      const cmsis_nn_dims rhs_dims =
+          adj_y
+              ? FillVariableShape(rhs_input->dims->size, rhs_input->dims->data)
+              : FillVariableShapeSwapInnerDims(rhs_input->dims->size,
+                                               rhs_input->dims->data);
+      buf_size = arm_batch_matmul_s8_get_buffer_size(&rhs_dims);
+      TF_LITE_ENSURE_MSG(context, buf_size >= 0,
+                         "BATCH_MATMUL: invalid kernel-sum buffer size.");
     } else {
       data->reference_op_data.quantization->output_activation_min =
           std::numeric_limits<int16_t>::min();
@@ -392,6 +403,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   if (buf_size > 0) {
     TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
         context, buf_size, &data->buffer_idx));
+    data->buffer_size = buf_size;
   }
 
   micro_context->DeallocateTempTfLiteTensor(output);
@@ -440,9 +452,7 @@ TfLiteStatus EvalInt8(TfLiteContext* context, TfLiteNode* node) {
 
   if (data.buffer_idx > -1) {
     ctx.buf = context->GetScratchBuffer(context, data.buffer_idx);
-    // Note: ctx.size is currently not used in cmsis_nn.
-    // The buffer should be allocated in the prepare function through
-    // the corresponding arm_convolve_wrapper_[type]_get_buffer_size
+    ctx.size = data.buffer_size;
   }
 
   cmsis_nn_fc_params fc_params;

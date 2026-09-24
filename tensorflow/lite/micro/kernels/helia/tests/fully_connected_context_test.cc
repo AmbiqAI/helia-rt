@@ -48,6 +48,8 @@ TfLiteStatus PrepareAfterFourScratchReservations(TfLiteContext* context,
 }
 
 #if HELIA_FC_LINK_WRAP
+constexpr int32_t kPerTensorActivationSize = 16;
+
 struct LinkState {
   Scenario scenario;
   int size_calls;
@@ -69,7 +71,7 @@ int32_t __wrap_arm_convolve_1x1_s8_fast_get_buffer_size(
     const cmsis_nn_dims* input_dims) {
   ++g_link_state.size_calls;
   if (g_link_state.scenario == Scenario::kPerTensor) {
-    return 16;
+    return kPerTensorActivationSize;
   }
   return __real_arm_convolve_1x1_s8_fast_get_buffer_size(input_dims);
 }
@@ -89,14 +91,23 @@ arm_cmsis_nn_status __wrap_arm_convolve_1x1_s8_fast(
     const cmsis_nn_dims* bias_dims, const int32_t* bias,
     const cmsis_nn_dims* output_dims, int8_t* output) {
   ++g_link_state.compute_calls;
-  bool context_ok = context != nullptr && context->size == 0;
+  bool context_ok = context != nullptr;
   if (g_link_state.scenario == Scenario::kPerChannel) {
-    context_ok =
-        context_ok && context->buf == nullptr && g_link_state.size_calls == 0;
+    context_ok = context_ok && context->buf == nullptr && context->size == 0 &&
+                 g_link_state.size_calls == 0;
   } else {
-    context_ok =
-        context_ok && context->buf != nullptr && g_link_state.size_calls == 1;
+    // The context declares the size requested at Prepare.
+    context_ok = context_ok && context->buf != nullptr &&
+                 context->size == kPerTensorActivationSize &&
+                 g_link_state.size_calls == 1;
   }
+  // The weight-sum context declares the documented size wherever CORE uses
+  // the sums (MVE); elsewhere that size is 0 and no buffer is requested.
+  const int32_t weight_sum_size =
+      arm_convolve_s8_get_weights_sum_size(output_dims);
+  context_ok = context_ok && output_channel_context != nullptr &&
+               output_channel_context->size == weight_sum_size &&
+               (weight_sum_size == 0 || output_channel_context->buf != nullptr);
   g_link_state.context_ok = g_link_state.context_ok && context_ok;
   if (!context_ok) {
     return ARM_CMSIS_NN_ARG_ERROR;
