@@ -43,6 +43,10 @@ struct OpData {
   int activation_buffer_idx;
   int weight_buffer_idx;
 
+  // Byte counts requested at Prepare for the contexts at Invoke.
+  int32_t activation_buffer_size;
+  int32_t weight_buffer_size;
+
   int32_t* kernel_sums;
   int32_t batches;
   int32_t accum_depth;
@@ -118,6 +122,9 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   data->activation_buffer_idx = -1;
   data->weight_buffer_idx = -1;
   data->buffer_conv_1x1_idx = -1;
+  data->activation_buffer_size = 0;
+  data->weight_buffer_size = 0;
+  data->kernel_sums = nullptr;
 
   // Float16 is unquantized like Float32; present it as Float32 so the
   // upstream helper takes its no-op float path. Keeps
@@ -168,15 +175,16 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
         input_dims.c = data->accum_depth;
 
         int32_t conv_activation_buf_size = arm_convolve_1x1_s8_fast_get_buffer_size(&input_dims);
+        TF_LITE_ENSURE_MSG(context, conv_activation_buf_size >= 0,
+                           "FULLY_CONNECTED: invalid activation buffer size.");
         if (conv_activation_buf_size > 0) {
           TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
               context, conv_activation_buf_size, &data->activation_buffer_idx));
+          data->activation_buffer_size = conv_activation_buf_size;
         }
       }
     }
     buf_size = arm_fully_connected_s8_get_buffer_size(&filter_dims);
-
-    data->kernel_sums = nullptr;
 
 #if defined(FC_KERNEL_OPTIMIZED_FOR_SPEED)
     const int8_t* filter_data = GetTensorData<const int8_t>(filter);
@@ -198,14 +206,15 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
             static_cast<int>(vector_sum_status));
         return kTfLiteError;
       }
-
-      // Do not request a scratch buffer since using persistent memory
-      buf_size = 0;
     }
 #endif
   }
 
-  if (buf_size > 0) {
+  TF_LITE_ENSURE_MSG(context, buf_size >= 0,
+                     "FULLY_CONNECTED: invalid weight buffer size.");
+  data->weight_buffer_size = buf_size;
+  // Kernel sums precomputed into persistent memory need no scratch buffer.
+  if (buf_size > 0 && data->kernel_sums == nullptr) {
     TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
         context, buf_size, &data->weight_buffer_idx));
   }
@@ -254,6 +263,7 @@ void PopulateCommonParams(TfLiteContext* context,
   ctx->size = 0;
   if (data.weight_buffer_idx > -1) {
     ctx->buf = context->GetScratchBuffer(context, data.weight_buffer_idx);
+    ctx->size = data.weight_buffer_size;
   }
 }
 
@@ -329,7 +339,7 @@ TfLiteStatus EvalQuantizedInt8(TfLiteContext* context, TfLiteNode* node,
   //always perform the kernel sum now
   if (data.kernel_sums != nullptr) {
     weight_sum_ctx.buf = data.kernel_sums;
-    weight_sum_ctx.size = arm_fully_connected_s8_get_buffer_size(&filter_dims);
+    weight_sum_ctx.size = data.weight_buffer_size;
   } else if (weight_sum_ctx.buf != nullptr) {
     // If behaving like batch matmul we calculate kernel sums in eval.
     const arm_cmsis_nn_status vector_sum_status = arm_vector_sum_s8(
@@ -347,6 +357,7 @@ TfLiteStatus EvalQuantizedInt8(TfLiteContext* context, TfLiteNode* node,
     cmsis_nn_context activation_ctx = {nullptr, 0};
     if (data.activation_buffer_idx > -1) {
       activation_ctx.buf = context->GetScratchBuffer(context, data.activation_buffer_idx);
+      activation_ctx.size = data.activation_buffer_size;
     }
 
     cmsis_nn_conv_params conv_params;

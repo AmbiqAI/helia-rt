@@ -228,30 +228,33 @@ jobs:
         # FULLY_CONNECTED kernel-sum / LEAKY_RELU status adds one binary and six
         # cases on every leg; on ATfE rows the failure cases run without the
         # GNU link wrap and assert the valid path. see AmbiqAI/helia-rt#238
+        # LSTM status / scratch-context sizes adds one binary and eleven cases
+        # on every leg; ATfE rows assert the valid outputs only.
+        # see AmbiqAI/helia-rt#238
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 148
-            min-cases: 1228
+            min-binaries: 149
+            min-cases: 1239
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 148
-            min-cases: 1228
+            min-binaries: 149
+            min-cases: 1239
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and one case fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 147
-            min-cases: 1227
+            min-binaries: 148
+            min-cases: 1238
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 148
-            min-cases: 1276
+            min-binaries: 149
+            min-cases: 1287
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 147
-            min-cases: 1275
+            min-binaries: 148
+            min-cases: 1286
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}

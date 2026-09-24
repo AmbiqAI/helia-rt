@@ -134,6 +134,32 @@ $(kernel_fc_leaky_relu_status_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_leaky_relu_s16
 endif
 
+# UNIDIRECTIONAL_SEQUENCE_LSTM kernel-sum status and the FULLY_CONNECTED,
+# BATCH_MATMUL and AVERAGE_POOL_2D scratch-context size contracts.
+# see AmbiqAI/helia-rt#238
+$(eval $(call microlite_test,kernel_status_context_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/status_context_test.cc \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/testdata/lstm_test_data.cc,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/testdata/lstm_test_data.h))
+
+ifeq ($(TOOLCHAIN),gcc)
+$(kernel_status_context_test_BINARY): CXXFLAGS += \
+  -DHELIA_STATUS_CONTEXT_LINK_WRAP=1
+$(kernel_status_context_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_vector_sum_s8 \
+  -Wl,--wrap=arm_vector_sum_s8_s64 \
+  -Wl,--wrap=arm_fully_connected_s8_get_buffer_size \
+  -Wl,--wrap=arm_fully_connected_per_channel_s16_get_buffer_size \
+  -Wl,--wrap=arm_fully_connected_wrapper_s8 \
+  -Wl,--wrap=arm_fully_connected_wrapper_s16 \
+  -Wl,--wrap=arm_batch_matmul_s8_get_buffer_size \
+  -Wl,--wrap=arm_batch_matmul_s8 \
+  -Wl,--wrap=arm_avgpool_s8_get_buffer_size \
+  -Wl,--wrap=arm_avgpool_s16_get_buffer_size \
+  -Wl,--wrap=arm_avgpool_s8 \
+  -Wl,--wrap=arm_avgpool_s16
+endif
+
 # see AmbiqAI/helia-rt#285
 $(eval $(call microlite_test,kernel_sqrt_rsqrt_fp16_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/sqrt_rsqrt_fp16_test.cc))
