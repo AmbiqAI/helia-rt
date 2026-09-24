@@ -27,13 +27,13 @@ limitations under the License.
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
 // UNIDIRECTIONAL_SEQUENCE_LSTM kernel-sum status and the scratch-context size
-// contract of FULLY_CONNECTED, BATCH_MATMUL and AVERAGE_POOL_2D: a CORE
-// failure must surface as kTfLiteError at Prepare, and every context backed
-// by a scratch or persistent buffer must carry the byte count requested for
-// it, since CORE treats size 0 as undeclared and skips its bounds check. GNU
-// link wraps inject the failures, report a positive size on legs whose CORE
-// needs no buffer, and record each context; without them the cases assert the
-// valid outputs only. see AmbiqAI/helia-rt#238
+// contract of FULLY_CONNECTED, BATCH_MATMUL and AVERAGE_POOL_2D: a CORE failure
+// must surface as kTfLiteError at Prepare, and every context backed by a
+// scratch or persistent buffer must carry the byte count requested for it,
+// since several CORE entry points read size 0 as undeclared and skip their
+// bounds check. GNU link wraps inject the failures, report a positive size on
+// legs whose CORE needs no buffer, and record each context; without them the
+// cases assert the valid outputs only. see AmbiqAI/helia-rt#238
 
 #ifndef HELIA_STATUS_CONTEXT_LINK_WRAP
 #define HELIA_STATUS_CONTEXT_LINK_WRAP 0

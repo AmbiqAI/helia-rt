@@ -101,6 +101,13 @@ arm_cmsis_nn_status __wrap_arm_convolve_1x1_s8_fast(
                  context->size == kPerTensorActivationSize &&
                  g_link_state.size_calls == 1;
   }
+  // The weight-sum context declares the documented size wherever CORE uses
+  // the sums (MVE); elsewhere that size is 0 and no buffer is requested.
+  const int32_t weight_sum_size =
+      arm_convolve_s8_get_weights_sum_size(output_dims);
+  context_ok = context_ok && output_channel_context != nullptr &&
+               output_channel_context->size == weight_sum_size &&
+               (weight_sum_size == 0 || output_channel_context->buf != nullptr);
   g_link_state.context_ok = g_link_state.context_ok && context_ok;
   if (!context_ok) {
     return ARM_CMSIS_NN_ARG_ERROR;

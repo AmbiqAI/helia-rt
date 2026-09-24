@@ -184,7 +184,14 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
         }
       }
     }
-    buf_size = arm_fully_connected_s8_get_buffer_size(&filter_dims);
+    if (is_conv_1x1_possible) {
+      // The fast 1x1 route reads the kernel sums as convolution weight sums.
+      const cmsis_nn_dims output_dims = {data->batches, 1, 1,
+                                         data->output_depth};
+      buf_size = arm_convolve_s8_get_weights_sum_size(&output_dims);
+    } else {
+      buf_size = arm_fully_connected_s8_get_buffer_size(&filter_dims);
+    }
 
 #if defined(FC_KERNEL_OPTIMIZED_FOR_SPEED)
     const int8_t* filter_data = GetTensorData<const int8_t>(filter);
