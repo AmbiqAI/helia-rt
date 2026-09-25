@@ -17,17 +17,18 @@ limitations under the License.
 //
 // Why this test exists: heliaCORE's float LSTM step once ran an MVE body over
 // the hidden dimension and finished the remainder with a scalar tail, and the
-// two halves computed lanes of the *same* gate tensor differently (a different
-// tanh in float16, a different cell-state FMA placement in float32).
+// two halves computed lanes of the *same* cell-state and output tensors
+// differently (a different tanh in float16, a different cell-state FMA
+// placement in float32).
 // see AmbiqAI/helia-rt#227, AmbiqAI/ns-cmsis-nn#315,
 // AmbiqAI/ns-cmsis-nn#324
 //
 // The existing shared coverage cannot see this. The float16 case in
 // kernels/unidirectional_sequence_lstm_test.cc uses state_dimension == 2,
-// which is smaller than one MVE half-precision vector, so *every* lane goes
-// down the scalar tail and the two implementations are never mixed within one
-// tensor. Reproducing ns#315 requires state_dimension > 8 and
-// state_dimension % 8 != 0; this test uses 10.
+// which is smaller than one MVE half-precision vector, so a body/tail split
+// could never mix two implementations within one tensor there. Reproducing
+// ns#315 requires state_dimension > 8 and state_dimension % 8 != 0; this test
+// uses 10.
 //
 // The primary assertion is a *lane-uniformity invariant* rather than a
 // tolerance comparison. Every gate row (input, recurrent and bias) is
@@ -36,10 +37,9 @@ limitations under the License.
 // therefore emit 10 numerically equal values per (batch, time step), and no
 // tolerance has to be chosen.
 //
-// Both precisions assert it exactly: every lane of a gate must take one
-// implementation (a tail-predicated MVE loop on MVE builds, the scalar loop
-// otherwise), so any lane divergence is a per-lane defect such as a returned
-// body/tail split. see AmbiqAI/ns-cmsis-nn#324, AmbiqAI/helia-rt#265
+// Both precisions assert it exactly: every lane must take one implementation,
+// so any lane divergence is a per-lane defect such as a returned body/tail
+// split. see AmbiqAI/ns-cmsis-nn#324, AmbiqAI/helia-rt#265
 //
 // A second, deliberately loose golden comparison against a double-precision
 // reference LSTM guards against the degenerate case where every lane is
@@ -444,14 +444,14 @@ TEST(HeliaFloatLstmTailLaneTest, Float16TailLanesMatchVectorLanes) {
 
 // Float16TailLanesMatchVectorLanes is the float16 lane detector, and
 // cortex-m55 is the only configuration that compiles the MVE float16 path it
-// guards. If
-// ARM_NN_ENABLE_F16 ever stops being defined on such a build the detector
-// would disappear while the leg still reported success, so fail loudly.
-// see AmbiqAI/helia-rt#231, AmbiqAI/helia-rt#256
+// guards. If ARM_NN_ENABLE_F16 ever stops being defined on such a build the
+// detector would disappear while the leg still reported success, so fail
+// loudly. see AmbiqAI/helia-rt#231, AmbiqAI/helia-rt#256
 //
 // Known gap: ATfE builds cortex-m55 with +nomve, so __ARM_FEATURE_MVE is unset
-// there and this cannot fire. Acceptable: without MVE there is no MVE float16
-// path, so there is no coverage to lose. see AmbiqAI/helia-rt#225
+// there and this cannot fire; there is no MVE float16 path to guard, but the
+// scalar float16 case would drop silently if ARM_NN_ENABLE_F16 disappeared.
+// see AmbiqAI/helia-rt#225
 TEST(HeliaFloatLstmTailLaneTest, Float16CoverageMustNotSilentlyDisappear) {
   FAIL(
       "ARM_NN_ENABLE_F16 is not defined on a build with MVE floating point. "
