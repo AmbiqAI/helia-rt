@@ -21,7 +21,10 @@
 # uses a tag, release artifacts can be built by an image nothing tested.
 # see AmbiqAI/helia-rt#219 and .github/workflows/README.md
 #
-# Rules, applied to every .yml/.yaml workflow outside YAML comments:
+# Rules, applied to every .yml/.yaml workflow outside comments. Comments are
+# found line by line (a line starting with #, or a # after whitespace), which
+# matches YAML except inside block scalars and quoted strings: there a " #"
+# before the image on the same line hides the reference. Rules:
 #   * each pin point below references the image exactly once, as
 #     ghcr.io/ambiqai/helia-rt-ci@sha256:<64 lowercase hex digits>;
 #   * all pin points carry the same digest;
@@ -74,7 +77,7 @@ is_pin_point() {
 references() {
   local path
   for path in "${WORKFLOWS}"/*.yml "${WORKFLOWS}"/*.yaml; do
-    [[ -e "${path}" ]] || continue
+    [[ -f "${path}" ]] || continue
     awk -v file="$(basename "${path}")" -v image="${IMAGE}" '
       {
         line = $0
@@ -90,15 +93,21 @@ references() {
           line = substr(line, i + length(image))
           lower = substr(lower, i + length(image))
         }
-      }' "${path}"
+      }' "${path}" || return 1
   done
 }
+
+if ! refs="$(references)"; then
+  echo "error: could not read the workflows under ${WORKFLOWS}" >&2
+  exit 2
+fi
 
 status=0
 declare -A pin_count=()
 digests=()
 
 while IFS=$'\t' read -r file suffix; do
+  [[ -n "${file}" ]] || continue
   if is_pin_point "${file}"; then
     pin_count["${file}"]=$(( ${pin_count["${file}"]:-0} + 1 ))
     if [[ "${suffix}" =~ ${DIGEST_RE} ]]; then
@@ -115,7 +124,7 @@ while IFS=$'\t' read -r file suffix; do
          "but is not a listed pin point" >&2
     status=1
   fi
-done < <(references)
+done <<< "${refs}"
 
 for file in "${PIN_POINTS[@]}"; do
   if [[ ! -f "${WORKFLOWS}/${file}" ]]; then

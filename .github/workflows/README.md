@@ -87,8 +87,10 @@ image exactly once as `helia-rt-ci@sha256:<64 lowercase hex>`, when the pin
 points disagree, or when any other workflow references the image by digest,
 tag or bare name (the bare repository name in
 [helia_build_docker_image.yml](helia_build_docker_image.yml) is the one
-exception). It checks the PR head, not the merge result, so two PRs that each
-pass can still combine unevenly; the next PR then fails. Run it locally before
+exception). Comments are recognised line by line, so a ` #` inside a shell or
+quoted string before the image can hide a reference there. It checks the PR
+head, not the merge result, so two PRs that each pass can still combine
+unevenly; a later PR based on that `main` then fails. Run it locally before
 opening a bump PR:
 
 ```sh
