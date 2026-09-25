@@ -24,9 +24,9 @@ MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
 #                                 outside it (ns#314 / ns#303 classes).
 #   float_elementwise_edge_test - ADD/MUL NaN propagation (ns#333 class).
 #   float_lstm_tail_lane_test   - UNIDIRECTIONAL_SEQUENCE_LSTM with
-#                                 state_dimension == 10, asserting that the
-#                                 vector lanes and the scalar tail lanes of one
-#                                 gate agree (ns#315 class).
+#                                 state_dimension == 10, asserting that all
+#                                 lanes of one gate agree exactly (ns#315
+#                                 class).
 #
 # More than one of these is expected to fail on the current ns-cmsis-nn pin.
 # `make test` walks MICROLITE_TEST_TARGETS in list order, so a failing binary
