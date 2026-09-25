@@ -31,15 +31,32 @@ limitations under the License.
 // must surface as kTfLiteError at Prepare, and every context backed by a
 // scratch or persistent buffer must carry the byte count requested for it,
 // since several CORE entry points read size 0 as undeclared and skip their
-// bounds check. GNU link wraps inject the failures, report a positive size on
-// legs whose CORE needs no buffer, and record each context; without them the
-// cases assert the valid outputs only. see AmbiqAI/helia-rt#238
+// bounds check. The int8/int16 ADD, SUB, MUL, MAXIMUM and MINIMUM statuses
+// must surface as kTfLiteError at Invoke. GNU link wraps inject the failures,
+// report a positive size on legs whose CORE needs no buffer, and record each
+// context and call; without them the cases assert the valid outputs and the
+// failures CORE reports on its own. see AmbiqAI/helia-rt#238
 
 #ifndef HELIA_STATUS_CONTEXT_LINK_WRAP
 #define HELIA_STATUS_CONTEXT_LINK_WRAP 0
 #endif
 
 namespace {
+
+// Elementwise heliaCORE entry points, indexing LinkState's per-entry arrays.
+enum ElementwiseEntry {
+  kAddS8,
+  kAddS16,
+  kSubS8,
+  kSubS16,
+  kMulS8,
+  kMulS16,
+  kMaximumS8,
+  kMaximumS16,
+  kMinimumS8,
+  kMinimumS16,
+  kElementwiseEntries,
+};
 
 #if HELIA_STATUS_CONTEXT_LINK_WRAP
 constexpr int kLstmVectorSumCalls = 8;
@@ -63,6 +80,8 @@ struct LinkState {
   ContextRecord fc_s16;
   ContextRecord bmm;
   ContextRecord pool;
+  int elementwise_calls[kElementwiseEntries];
+  bool elementwise_fail[kElementwiseEntries];
 };
 
 LinkState g_link;
@@ -237,6 +256,79 @@ arm_cmsis_nn_status __wrap_arm_avgpool_s16(
   return __real_arm_avgpool_s16(ctx, pool_params, input_dims, input,
                                 filter_dims, output_dims, output);
 }
+
+// Counts the call and reports whether the test asked for it to fail.
+bool ElementwiseFails(int entry) {
+  ++g_link.elementwise_calls[entry];
+  return g_link.elementwise_fail[entry];
+}
+
+#define HELIA_WRAP_ARITHMETIC(name, entry, T)                                  \
+  arm_cmsis_nn_status __real_##name(                                           \
+      const T*, const cmsis_nn_dims*, const T*, const cmsis_nn_dims*, int32_t, \
+      int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, T*,                \
+      const cmsis_nn_dims*, int32_t, int32_t, int32_t, int32_t, int32_t);      \
+  arm_cmsis_nn_status __wrap_##name(                                           \
+      const T* input1, const cmsis_nn_dims* input1_dims, const T* input2,      \
+      const cmsis_nn_dims* input2_dims, int32_t input1_offset,                 \
+      int32_t input1_mult, int32_t input1_shift, int32_t input2_offset,        \
+      int32_t input2_mult, int32_t input2_shift, int32_t left_shift,           \
+      T* output, const cmsis_nn_dims* output_dims, int32_t out_offset,         \
+      int32_t out_mult, int32_t out_shift, int32_t act_min, int32_t act_max) { \
+    if (ElementwiseFails(entry)) return ARM_CMSIS_NN_ARG_ERROR;                \
+    return __real_##name(input1, input1_dims, input2, input2_dims,             \
+                         input1_offset, input1_mult, input1_shift,             \
+                         input2_offset, input2_mult, input2_shift, left_shift, \
+                         output, output_dims, out_offset, out_mult, out_shift, \
+                         act_min, act_max);                                    \
+  }
+
+#define HELIA_WRAP_MUL(name, entry, T)                                         \
+  arm_cmsis_nn_status __real_##name(const T*, const cmsis_nn_dims*, const T*,  \
+                                    const cmsis_nn_dims*, int32_t, int32_t,    \
+                                    T*, const cmsis_nn_dims*, int32_t,         \
+                                    int32_t, int32_t, int32_t, int32_t);       \
+  arm_cmsis_nn_status __wrap_##name(                                           \
+      const T* input1, const cmsis_nn_dims* input1_dims, const T* input2,      \
+      const cmsis_nn_dims* input2_dims, int32_t input1_offset,                 \
+      int32_t input2_offset, T* output, const cmsis_nn_dims* output_dims,      \
+      int32_t out_offset, int32_t out_mult, int32_t out_shift,                 \
+      int32_t act_min, int32_t act_max) {                                      \
+    if (ElementwiseFails(entry)) return ARM_CMSIS_NN_ARG_ERROR;                \
+    return __real_##name(input1, input1_dims, input2, input2_dims,             \
+                         input1_offset, input2_offset, output, output_dims,    \
+                         out_offset, out_mult, out_shift, act_min, act_max);   \
+  }
+
+#define HELIA_WRAP_EXTREMUM(name, entry, T)                                    \
+  arm_cmsis_nn_status __real_##name(const cmsis_nn_context*, const T*,         \
+                                    const cmsis_nn_dims*, const T*,            \
+                                    const cmsis_nn_dims*, T*,                  \
+                                    const cmsis_nn_dims*);                     \
+  arm_cmsis_nn_status __wrap_##name(                                           \
+      const cmsis_nn_context* ctx, const T* input1,                            \
+      const cmsis_nn_dims* input1_dims, const T* input2,                       \
+      const cmsis_nn_dims* input2_dims, T* output,                             \
+      const cmsis_nn_dims* output_dims) {                                      \
+    if (ElementwiseFails(entry)) return ARM_CMSIS_NN_ARG_ERROR;                \
+    return __real_##name(ctx, input1, input1_dims, input2, input2_dims,        \
+                         output, output_dims);                                 \
+  }
+
+HELIA_WRAP_ARITHMETIC(arm_add_s8, kAddS8, int8_t)
+HELIA_WRAP_ARITHMETIC(arm_add_s16, kAddS16, int16_t)
+HELIA_WRAP_ARITHMETIC(arm_sub_s8, kSubS8, int8_t)
+HELIA_WRAP_ARITHMETIC(arm_sub_s16, kSubS16, int16_t)
+HELIA_WRAP_MUL(arm_mul_s8, kMulS8, int8_t)
+HELIA_WRAP_MUL(arm_mul_s16, kMulS16, int16_t)
+HELIA_WRAP_EXTREMUM(arm_maximum_s8, kMaximumS8, int8_t)
+HELIA_WRAP_EXTREMUM(arm_maximum_s16, kMaximumS16, int16_t)
+HELIA_WRAP_EXTREMUM(arm_minimum_s8, kMinimumS8, int8_t)
+HELIA_WRAP_EXTREMUM(arm_minimum_s16, kMinimumS16, int16_t)
+
+#undef HELIA_WRAP_ARITHMETIC
+#undef HELIA_WRAP_MUL
+#undef HELIA_WRAP_EXTREMUM
 
 }  // extern "C"
 
@@ -497,7 +589,122 @@ void ExpectAveragePool(const TFLMRegistration& registration) {
 #endif
 }
 
+// ADD, SUB, MUL, MAXIMUM and MINIMUM, int8 and int16, over two [1, 4]
+// operands with unit scales and zero offsets.
+template <typename T>
+Status RunElementwise(const TFLMRegistration& registration, const T* input1,
+                      const T* input2, T* output, int* output_dims_data,
+                      void* params) {
+  int input_dims_data[] = {2, 1, 4};
+  TfLiteTensor tensors[] = {
+      tflite::testing::CreateQuantizedTensor(
+          input1, tflite::testing::IntArrayFromInts(input_dims_data), 1.0f, 0),
+      tflite::testing::CreateQuantizedTensor(
+          input2, tflite::testing::IntArrayFromInts(input_dims_data), 1.0f, 0),
+      tflite::testing::CreateQuantizedTensor(
+          output, tflite::testing::IntArrayFromInts(output_dims_data), 1.0f,
+          0),
+  };
+  int inputs[] = {2, 0, 1};
+  int outputs[] = {1, 2};
+  return Run(registration, tensors, 3, inputs, outputs, params);
+}
+
+constexpr int8_t kElementwiseInput1[] = {1, -2, 3, 4};
+constexpr int8_t kElementwiseInput2[] = {2, 5, -1, -3};
+constexpr int8_t kAddExpected[] = {3, 3, 2, 1};
+constexpr int8_t kSubExpected[] = {-1, -7, 4, 7};
+constexpr int8_t kMulExpected[] = {2, -10, -3, -12};
+constexpr int8_t kMaximumExpected[] = {2, 5, 3, 4};
+constexpr int8_t kMinimumExpected[] = {1, -2, -1, -3};
+
+// Runs one registration on valid operands and checks the output and that the
+// CORE entry point ran once; with the link wrap it then fails that entry point
+// and expects Invoke to report it. An output shape the operands do not
+// broadcast to is rejected by CORE itself, so Invoke must fail without the
+// wrap too. An empty output has nothing to compute and must not reach CORE,
+// which rejects zero-size dims.
+template <typename T>
+void ExpectElementwise(const TFLMRegistration& registration, void* params,
+                       ElementwiseEntry entry, const int8_t* expected8) {
+  T input1[4];
+  T input2[4];
+  T expected[4];
+  for (int i = 0; i < 4; ++i) {
+    input1[i] = kElementwiseInput1[i];
+    input2[i] = kElementwiseInput2[i];
+    expected[i] = expected8[i];
+  }
+  int output_dims_data[] = {2, 1, 4};
+#if HELIA_STATUS_CONTEXT_LINK_WRAP
+  ResetLinkState();
+#else
+  (void)entry;
+#endif
+  T output[4] = {};
+  ExpectOutput(RunElementwise(registration, input1, input2, output,
+                              output_dims_data, params),
+               expected, output, 4);
+#if HELIA_STATUS_CONTEXT_LINK_WRAP
+  EXPECT_EQ(1, g_link.elementwise_calls[entry]);
+
+  ResetLinkState();
+  g_link.elementwise_fail[entry] = true;
+  T failed_output[4] = {};
+  const Status failed = RunElementwise(registration, input1, input2,
+                                       failed_output, output_dims_data, params);
+  EXPECT_EQ(kTfLiteOk, failed.prepare);
+  EXPECT_EQ(kTfLiteError, failed.invoke);
+  EXPECT_EQ(1, g_link.elementwise_calls[entry]);
+
+  ResetLinkState();
+#endif
+  int short_output_dims[] = {2, 1, 3};
+  T short_output[4] = {};
+  const Status mismatched = RunElementwise(
+      registration, input1, input2, short_output, short_output_dims, params);
+  EXPECT_EQ(kTfLiteOk, mismatched.prepare);
+  EXPECT_EQ(kTfLiteError, mismatched.invoke);
+
+  // One operand empty, the other broadcast from one element, so the guard
+  // must read the output rather than either input.
+  int empty_dims[] = {2, 1, 0};
+  int one_dims[] = {2, 1, 1};
+  for (int empty_operand = 0; empty_operand < 2; ++empty_operand) {
+    TfLiteTensor tensors[] = {
+        tflite::testing::CreateQuantizedTensor(
+            input1,
+            tflite::testing::IntArrayFromInts(empty_operand == 0 ? empty_dims
+                                                                 : one_dims),
+            1.0f, 0),
+        tflite::testing::CreateQuantizedTensor(
+            input2,
+            tflite::testing::IntArrayFromInts(empty_operand == 1 ? empty_dims
+                                                                 : one_dims),
+            1.0f, 0),
+        tflite::testing::CreateQuantizedTensor(
+            output, tflite::testing::IntArrayFromInts(empty_dims), 1.0f, 0),
+    };
+    int inputs[] = {2, 0, 1};
+    int outputs[] = {1, 2};
+    const Status empty = Run(registration, tensors, 3, inputs, outputs, params);
+    EXPECT_EQ(kTfLiteOk, empty.prepare);
+    EXPECT_EQ(kTfLiteOk, empty.invoke);
+  }
+#if HELIA_STATUS_CONTEXT_LINK_WRAP
+  // The mismatched run reached CORE; the empty runs did not.
+  EXPECT_EQ(1, g_link.elementwise_calls[entry]);
+#endif
+}
+
 }  // namespace
+
+namespace tflite {
+// helia typed registrations without an upstream header declaration.
+TFLMRegistration Register_SUB_INT8();
+TFLMRegistration Register_SUB_INT16();
+TFLMRegistration Register_MUL_INT16();
+}  // namespace tflite
 
 TEST(HeliaStatusContextTest, LstmInt8Golden) {
 #if HELIA_STATUS_CONTEXT_LINK_WRAP
@@ -595,6 +802,78 @@ TEST(HeliaStatusContextTest, AveragePoolInt8Context) {
 
 TEST(HeliaStatusContextTest, AveragePoolInt16Context) {
   ExpectAveragePool<int16_t>(tflite::Register_AVERAGE_POOL_2D_INT16());
+}
+
+TEST(HeliaStatusContextTest, AddInt8Status) {
+  TfLiteAddParams params = {kTfLiteActNone, false};
+  ExpectElementwise<int8_t>(tflite::Register_ADD(), &params, kAddS8,
+                            kAddExpected);
+  ExpectElementwise<int8_t>(tflite::Register_ADD_INT8(), &params, kAddS8,
+                            kAddExpected);
+}
+
+TEST(HeliaStatusContextTest, AddInt16Status) {
+  TfLiteAddParams params = {kTfLiteActNone, false};
+  ExpectElementwise<int16_t>(tflite::Register_ADD(), &params, kAddS16,
+                             kAddExpected);
+  ExpectElementwise<int16_t>(tflite::Register_ADD_INT16(), &params, kAddS16,
+                             kAddExpected);
+}
+
+TEST(HeliaStatusContextTest, SubInt8Status) {
+  TfLiteSubParams params = {kTfLiteActNone, false};
+  ExpectElementwise<int8_t>(tflite::Register_SUB(), &params, kSubS8,
+                            kSubExpected);
+  ExpectElementwise<int8_t>(tflite::Register_SUB_INT8(), &params, kSubS8,
+                            kSubExpected);
+}
+
+TEST(HeliaStatusContextTest, SubInt16Status) {
+  TfLiteSubParams params = {kTfLiteActNone, false};
+  ExpectElementwise<int16_t>(tflite::Register_SUB(), &params, kSubS16,
+                             kSubExpected);
+  ExpectElementwise<int16_t>(tflite::Register_SUB_INT16(), &params, kSubS16,
+                             kSubExpected);
+}
+
+TEST(HeliaStatusContextTest, MulInt8Status) {
+  TfLiteMulParams params = {kTfLiteActNone};
+  ExpectElementwise<int8_t>(tflite::Register_MUL(), &params, kMulS8,
+                            kMulExpected);
+  ExpectElementwise<int8_t>(tflite::Register_MUL_INT8(), &params, kMulS8,
+                            kMulExpected);
+}
+
+TEST(HeliaStatusContextTest, MulInt16Status) {
+  TfLiteMulParams params = {kTfLiteActNone};
+  ExpectElementwise<int16_t>(tflite::Register_MUL(), &params, kMulS16,
+                             kMulExpected);
+  ExpectElementwise<int16_t>(tflite::Register_MUL_INT16(), &params, kMulS16,
+                             kMulExpected);
+}
+
+TEST(HeliaStatusContextTest, MaximumInt8Status) {
+  ExpectElementwise<int8_t>(tflite::Register_MAXIMUM(), nullptr, kMaximumS8,
+                            kMaximumExpected);
+  ExpectElementwise<int8_t>(tflite::Register_MAXIMUM_INT8(), nullptr,
+                            kMaximumS8, kMaximumExpected);
+}
+
+TEST(HeliaStatusContextTest, MaximumInt16Status) {
+  ExpectElementwise<int16_t>(tflite::Register_MAXIMUM(), nullptr, kMaximumS16,
+                             kMaximumExpected);
+}
+
+TEST(HeliaStatusContextTest, MinimumInt8Status) {
+  ExpectElementwise<int8_t>(tflite::Register_MINIMUM(), nullptr, kMinimumS8,
+                            kMinimumExpected);
+  ExpectElementwise<int8_t>(tflite::Register_MINIMUM_INT8(), nullptr,
+                            kMinimumS8, kMinimumExpected);
+}
+
+TEST(HeliaStatusContextTest, MinimumInt16Status) {
+  ExpectElementwise<int16_t>(tflite::Register_MINIMUM(), nullptr, kMinimumS16,
+                             kMinimumExpected);
 }
 
 TF_LITE_MICRO_TESTS_MAIN

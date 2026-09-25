@@ -231,30 +231,33 @@ jobs:
         # LSTM status / scratch-context sizes adds one binary and eleven cases
         # on every leg; ATfE rows assert the valid outputs only.
         # see AmbiqAI/helia-rt#238
+        # ADD/SUB/MUL/MAXIMUM/MINIMUM int8/int16 status adds ten cases to that
+        # binary on every leg; ATfE rows skip the injected failures.
+        # see AmbiqAI/helia-rt#238
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 149
-            min-cases: 1239
+            min-cases: 1249
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 149
-            min-cases: 1239
+            min-cases: 1249
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and one case fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 148
-            min-cases: 1238
+            min-cases: 1248
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 149
-            min-cases: 1287
+            min-cases: 1297
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 148
-            min-cases: 1286
+            min-cases: 1296
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
