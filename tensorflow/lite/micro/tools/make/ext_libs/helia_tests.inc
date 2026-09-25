@@ -134,8 +134,9 @@ $(kernel_fc_leaky_relu_status_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_leaky_relu_s16
 endif
 
-# UNIDIRECTIONAL_SEQUENCE_LSTM kernel-sum status and the FULLY_CONNECTED,
-# BATCH_MATMUL and AVERAGE_POOL_2D scratch-context size contracts.
+# UNIDIRECTIONAL_SEQUENCE_LSTM kernel-sum status, the FULLY_CONNECTED,
+# BATCH_MATMUL and AVERAGE_POOL_2D scratch-context size contracts, and the
+# int8/int16 ADD, SUB, MUL, MAXIMUM and MINIMUM statuses.
 # see AmbiqAI/helia-rt#238
 $(eval $(call microlite_test,kernel_status_context_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/status_context_test.cc \
