@@ -36,7 +36,8 @@ limitations under the License.
 // and data-movement entry points must surface as kTfLiteError at Invoke. GNU
 // link wraps inject the failures, report a positive size on legs whose CORE
 // needs no buffer, and record each context and call; without them the cases
-// assert the valid outputs and the failures CORE reports on its own.
+// assert the valid runs, the golden outputs where a case has them, and the
+// failures CORE reports on its own.
 // see AmbiqAI/helia-rt#238
 
 #ifndef HELIA_STATUS_CONTEXT_LINK_WRAP
@@ -297,35 +298,36 @@ bool CoreFails(int entry) {
                          act_min, act_max);                                    \
   }
 
-#define HELIA_WRAP_MUL(name, entry, T)                                        \
-  arm_cmsis_nn_status __real_##name(const T*, const cmsis_nn_dims*, const T*, \
-                                    const cmsis_nn_dims*, int32_t, int32_t,   \
-                                    T*, const cmsis_nn_dims*, int32_t,        \
-                                    int32_t, int32_t, int32_t, int32_t);      \
-  arm_cmsis_nn_status __wrap_##name(                                          \
-      const T* input1, const cmsis_nn_dims* input1_dims, const T* input2,     \
-      const cmsis_nn_dims* input2_dims, int32_t input1_offset,                \
-      int32_t input2_offset, T* output, const cmsis_nn_dims* output_dims,     \
-      int32_t out_offset, int32_t out_mult, int32_t out_shift,                \
-      int32_t act_min, int32_t act_max) {                                     \
-    if (CoreFails(entry)) return ARM_CMSIS_NN_ARG_ERROR;                      \
-    return __real_##name(input1, input1_dims, input2, input2_dims,            \
-                         input1_offset, input2_offset, output, output_dims,   \
-                         out_offset, out_mult, out_shift, act_min, act_max);  \
+#define HELIA_WRAP_MUL(name, entry, T)                                         \
+  arm_cmsis_nn_status __real_##name(const T*, const cmsis_nn_dims*, const T*,  \
+                                    const cmsis_nn_dims*, int32_t, int32_t,    \
+                                    T*, const cmsis_nn_dims*, int32_t,         \
+                                    int32_t, int32_t, int32_t, int32_t);       \
+  arm_cmsis_nn_status __wrap_##name(                                           \
+      const T* input1, const cmsis_nn_dims* input1_dims, const T* input2,      \
+      const cmsis_nn_dims* input2_dims, int32_t input1_offset,                 \
+      int32_t input2_offset, T* output, const cmsis_nn_dims* output_dims,      \
+      int32_t out_offset, int32_t out_mult, int32_t out_shift,                 \
+      int32_t act_min, int32_t act_max) {                                      \
+    if (CoreFails(entry)) return ARM_CMSIS_NN_ARG_ERROR;                       \
+    return __real_##name(input1, input1_dims, input2, input2_dims,             \
+                         input1_offset, input2_offset, output, output_dims,    \
+                         out_offset, out_mult, out_shift, act_min, act_max);   \
   }
 
-#define HELIA_WRAP_EXTREMUM(name, entry, T)                              \
-  arm_cmsis_nn_status __real_##name(                                     \
-      const cmsis_nn_context*, const T*, const cmsis_nn_dims*, const T*, \
-      const cmsis_nn_dims*, T*, const cmsis_nn_dims*);                   \
-  arm_cmsis_nn_status __wrap_##name(                                     \
-      const cmsis_nn_context* ctx, const T* input1,                      \
-      const cmsis_nn_dims* input1_dims, const T* input2,                 \
-      const cmsis_nn_dims* input2_dims, T* output,                       \
-      const cmsis_nn_dims* output_dims) {                                \
-    if (CoreFails(entry)) return ARM_CMSIS_NN_ARG_ERROR;                 \
-    return __real_##name(ctx, input1, input1_dims, input2, input2_dims,  \
-                         output, output_dims);                           \
+#define HELIA_WRAP_EXTREMUM(name, entry, T)                                    \
+  arm_cmsis_nn_status __real_##name(const cmsis_nn_context*, const T*,         \
+                                    const cmsis_nn_dims*, const T*,            \
+                                    const cmsis_nn_dims*, T*,                  \
+                                    const cmsis_nn_dims*);                     \
+  arm_cmsis_nn_status __wrap_##name(                                           \
+      const cmsis_nn_context* ctx, const T* input1,                            \
+      const cmsis_nn_dims* input1_dims, const T* input2,                       \
+      const cmsis_nn_dims* input2_dims, T* output,                             \
+      const cmsis_nn_dims* output_dims) {                                      \
+    if (CoreFails(entry)) return ARM_CMSIS_NN_ARG_ERROR;                       \
+    return __real_##name(ctx, input1, input1_dims, input2, input2_dims,        \
+                         output, output_dims);                                 \
   }
 
 HELIA_WRAP_ARITHMETIC(arm_add_s8, kAddS8, int8_t)
@@ -1140,14 +1142,15 @@ TEST(HeliaStatusContextTest, HardSwishInt16Status) {
       kHardSwishS16);
 
   // An empty output has nothing to write and must not reach CORE, which
-  // rejects null buffers.
+  // rejects the null buffers TFLM leaves for zero-byte tensors.
   int empty_dims[] = {2, 1, 0};
 #if HELIA_STATUS_CONTEXT_LINK_WRAP
   ResetLinkState();
 #endif
-  const Status empty =
-      RunUnary(tflite::Register_HARD_SWISH(), input, 1.0f / 1024, 0, output,
-               1.0f / 1024, 0, empty_dims, nullptr);
+  const Status empty = RunUnary(
+      tflite::Register_HARD_SWISH(), static_cast<const int16_t*>(nullptr),
+      1.0f / 1024, 0, static_cast<int16_t*>(nullptr), 1.0f / 1024, 0,
+      empty_dims, nullptr);
   EXPECT_EQ(kTfLiteOk, empty.prepare);
   EXPECT_EQ(kTfLiteOk, empty.invoke);
 #if HELIA_STATUS_CONTEXT_LINK_WRAP
