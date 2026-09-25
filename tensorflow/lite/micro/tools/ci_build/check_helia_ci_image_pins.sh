@@ -30,7 +30,10 @@
 #   * all pin points carry the same digest;
 #   * no other reference to the image exists, by digest, tag or bare name,
 #     except the bare repository name in the image publisher. A new pin point
-#     is added to PIN_POINTS and to the README table on purpose.
+#     is added to PIN_POINTS and to the README table on purpose;
+#   * a reference is the whole token around the name: a host or path before
+#     ghcr.io, or a name or path continuing after helia-rt-ci, is a look-alike
+#     and fails wherever it appears.
 #
 # Usage: check_helia_ci_image_pins.sh [root]
 #   root defaults to the repository root inferred from this script's location.
@@ -71,9 +74,13 @@ is_pin_point() {
   return 1
 }
 
-# One "file<TAB>suffix" line per image reference outside a YAML comment, where
-# suffix is whatever follows the repository name (empty for the bare name).
-# The image name is matched case-insensitively; the digest check is exact.
+# One "file<US>kind<US>suffix<US>text" line (US = \037, which unlike a tab
+# keeps empty fields) per image reference outside a comment. kind is
+# "lookalike" when the token around the name extends past it (a host or path
+# before ghcr.io, or a name or path after helia-rt-ci), else "ref"; suffix is
+# the rest of the token after the name (empty for the bare name) and text the
+# whole token. The name is matched case-insensitively; the digest check is
+# exact.
 references() {
   local path
   for path in "${WORKFLOWS}"/*.yml "${WORKFLOWS}"/*.yaml; do
@@ -86,10 +93,17 @@ references() {
         sub(/[[:space:]]#.*$/, "", line)
         lower = tolower(line)
         while ((i = index(lower, image)) > 0) {
+          start = i
+          while (start > 1 && substr(lower, start - 1, 1) ~ /[a-z0-9._\/-]/)
+            start--
           rest = substr(line, i + length(image))
-          match(rest, /^[@:][A-Za-z0-9._:-]*/)
-          suffix = RSTART == 1 ? substr(rest, 1, RLENGTH) : ""
-          print file "\t" suffix
+          suffix = ""
+          if (match(rest, /^[A-Za-z0-9._:@\/+-]+/))
+            suffix = substr(rest, 1, RLENGTH)
+          kind = (start < i || (suffix != "" && suffix !~ /^[@:]/)) ? \
+                 "lookalike" : "ref"
+          text = substr(line, start, i + length(image) - start) suffix
+          print file "\037" kind "\037" suffix "\037" text
           line = substr(line, i + length(image))
           lower = substr(lower, i + length(image))
         }
@@ -106,8 +120,14 @@ status=0
 declare -A pin_count=()
 digests=()
 
-while IFS=$'\t' read -r file suffix; do
+while IFS=$'\037' read -r file kind suffix text; do
   [[ -n "${file}" ]] || continue
+  if [[ "${kind}" == "lookalike" ]]; then
+    echo "error: ${file} references a look-alike of the CI image as" \
+         "'${text}'" >&2
+    status=1
+    continue
+  fi
   if is_pin_point "${file}"; then
     pin_count["${file}"]=$(( ${pin_count["${file}"]:-0} + 1 ))
     if [[ "${suffix}" =~ ${DIGEST_RE} ]]; then
