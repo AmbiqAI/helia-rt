@@ -37,14 +37,21 @@ AR_TOOL  := llvm-ar
 # through with -Wl,...
 
 # ATfE rejects -mfpu=auto; let -mcpu drive FPU/MVE feature selection.
-# Disable MVE auto-vectorization on cortex-m55: clang 22's MVE vectorizer
-# miscompiles `(int)int8_value * float_scale` loops by emitting
-# `vcvt.f32.s32 qN, qN, #12` (i.e., dividing by 2^12) when the correct
-# shift count is -log2(scale). It also matches the picolibc multilib
-# selection (armv8.1m.main_hard_fpdp_nomve_unaligned).
 ATFE_MCPU := $(MCPU_OPTION)
+
+# Library objects keep the release target's CPU, optimization and vectorizer
+# flags (MVE and the auto-vectorizer on); objects outside the library archive
+# (tests, examples, test runtime) get ATFE_TEST_OBJECT_FLAGS. The archive
+# object lists are assigned after this file is read, so the choice is made
+# per object when its recipe expands; `override` keeps it when
+# CORE_OPTIMIZATION_LEVEL is set on the command line.
+# TODO(AmbiqAI/helia-rt#225): drop ATFE_TEST_OBJECT_FLAGS once ATfE fixes llvm-project#226591 and #226592.
 ifneq ($(filter cortex-m55%,$(TARGET_ARCH)),)
-  ATFE_MCPU := $(MCPU_OPTION)+nomve
+  ATFE_TEST_OBJECT_FLAGS := -fno-vectorize -fno-slp-vectorize
+  ATFE_CORE_OPTIMIZATION_LEVEL := $(CORE_OPTIMIZATION_LEVEL)
+  override CORE_OPTIMIZATION_LEVEL = $(ATFE_CORE_OPTIMIZATION_LEVEL) \
+    $(if $(filter %.S,$<)$(filter $@,$(MICROLITE_LIB_OBJS) \
+      $(MICROLITE_THIRD_PARTY_OBJS)),,$(ATFE_TEST_OBJECT_FLAGS))
 endif
 # helia-rt: -fshort-wchar intentionally omitted to match the ABI of
 # `cortex_m_generic` (the target used to produce released prebuilts).

@@ -79,8 +79,7 @@ limitations under the License.
 
 // Does this build select the MVE (vector) activation helpers? heliaCORE gates
 // them on ARM_MATH_MVEF / ARM_MATH_MVE_FLOAT16, which track the compiler's
-// __ARM_FEATURE_MVE; bit 1 is MVE floating point. The ATfE legs build
-// cortex-m55 with +nomve and do not set it. see AmbiqAI/helia-rt#225
+// __ARM_FEATURE_MVE; bit 1 is MVE floating point.
 #if defined(__ARM_FEATURE_MVE) && ((__ARM_FEATURE_MVE) & 2)
 #define HELIA_TEST_MVE_FLOAT 1
 #else
@@ -468,10 +467,6 @@ TEST(HeliaFloatActivationEdgeTest, LogisticFloat16LargeInputsSaturate) {
 // would still print ALL TESTS PASSED, so turn the compile-out into a loud
 // failure on a build that has MVE floating point.
 // see AmbiqAI/helia-rt#231, AmbiqAI/helia-rt#256
-//
-// Known gap: the ATfE legs build cortex-m55 with +nomve, so __ARM_FEATURE_MVE
-// is unset there and this guard cannot fire. Acceptable: without MVE there is
-// no body/tail split to protect. see AmbiqAI/helia-rt#225
 TEST(HeliaFloatActivationEdgeTest, Float16CoverageMustNotSilentlyDisappear) {
   FAIL(
       "ARM_NN_ENABLE_F16 is not defined on a build with MVE floating point. "
