@@ -87,6 +87,11 @@ jobs:
 
   issue-on-error:
     needs: [cortex_m_generic, cortex_m_corstone_300]
+    # ci/issue_on_error.py checks out the repository and runs `gh issue` and
+    # `gh label` against it, hence `contents: read` and `issues: write`.
+    permissions:
+      contents: read
+      issues: write
     if: ${{ always() && contains(needs.*.result, 'failure') }}
     uses: ./.github/workflows/issue_on_error.yml
     with:
