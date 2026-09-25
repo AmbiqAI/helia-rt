@@ -181,7 +181,11 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
           tflite::micro::GetTensorData<float>(output));
     } break;
     case kTfLiteInt16: {
-      arm_hard_swish_precise_s16(
+      // heliaCORE rejects null buffers; an empty output has nothing to write.
+      if (tflite::micro::GetTensorShape(output).FlatSize() == 0) {
+        break;
+      }
+      const arm_cmsis_nn_status status = arm_hard_swish_precise_s16(
           tflite::micro::GetTensorData<int16_t>(input),
           data->input_zero_point,
           data->output_zero_point,
@@ -193,10 +197,14 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
           tflite::micro::GetTensorData<int16_t>(output),
           tflite::micro::GetTensorShape(output).FlatSize()
       );
-
+      if (status != ARM_CMSIS_NN_SUCCESS) {
+        MicroPrintf("HARD_SWISH: arm_hard_swish_precise_s16 failed (%d).",
+                    static_cast<int>(status));
+        return kTfLiteError;
+      }
     } break;
     case kTfLiteInt8: {
-      arm_hard_swish_compat_s8(
+      const arm_cmsis_nn_status status = arm_hard_swish_compat_s8(
           tflite::micro::GetTensorData<int8_t>(input),
           data->input_zero_point,
           data->output_zero_point,
@@ -207,6 +215,11 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
           tflite::micro::GetTensorData<int8_t>(output),
           tflite::micro::GetTensorShape(output).FlatSize()
       );
+      if (status != ARM_CMSIS_NN_SUCCESS) {
+        MicroPrintf("HARD_SWISH: arm_hard_swish_compat_s8 failed (%d).",
+                    static_cast<int>(status));
+        return kTfLiteError;
+      }
     } break;
     default: {
       MicroPrintf("Unsupported type %s", TfLiteTypeGetName(input->type));
