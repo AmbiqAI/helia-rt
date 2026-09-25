@@ -83,9 +83,10 @@ floating `:latest` tag on `main`.
 `tensorflow/lite/micro/tools/ci_build/check_helia_ci_image_pins.sh` enforces
 this on every PR, from the `ci-image` job of [helia_test.yml](helia_test.yml).
 Outside YAML comments it fails when a listed pin point does not reference the
-image exactly once as `helia-rt-ci@sha256:<64 lowercase hex>`, when the pin
-points disagree, or when any other workflow references the image by digest,
-tag or bare name (the bare repository name in
+image exactly once as `ghcr.io/ambiqai/helia-rt-ci@sha256:<64 lowercase hex>`
+(host and name in lowercase), when the pin points disagree, or when any other
+workflow references the image by digest, tag or bare name (the bare
+repository name in
 [helia_build_docker_image.yml](helia_build_docker_image.yml) is the one
 exception). Comments are recognised line by line, so a ` #` inside a shell or
 quoted string before the image can hide a reference there. It checks the PR

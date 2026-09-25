@@ -33,8 +33,10 @@
 #     is added to PIN_POINTS and to the README table on purpose;
 #   * a reference is the whole token around ambiqai/helia-rt-ci: any host
 #     other than ghcr.io/ or docker://ghcr.io/ (another host, a port, a
-#     path), or a name, path or $-expansion continuing after helia-rt-ci, is
-#     a look-alike and fails wherever it appears.
+#     path), a host or name not spelled in lowercase, or a name, path, # or
+#     $-expansion continuing after helia-rt-ci, is a look-alike and fails
+#     wherever it appears. A # directly after the name or digest is part of
+#     the token, so a digest followed by one is not a valid pin.
 #
 # Usage: check_helia_ci_image_pins.sh [root]
 #   root defaults to the repository root inferred from this script's location.
@@ -82,8 +84,9 @@ is_pin_point() {
 # kind is "lookalike" when the host before the name is not ghcr.io/ or
 # docker://ghcr.io/, or the token continues the name, else "ref"; suffix is
 # the rest of the token after the name (empty for the bare name) and text the
-# whole token. The name is matched case-insensitively; the digest check is
-# exact.
+# whole token. The name is found case-insensitively, but only the lowercase
+# spelling of the host and name is a "ref": Docker rejects an upper-case
+# repository path, and the host is held to the one spelling pins use.
 references() {
   local path
   for path in "${WORKFLOWS}"/*.yml "${WORKFLOWS}"/*.yaml; do
@@ -99,13 +102,15 @@ references() {
           start = i
           while (start > 1 && substr(lower, start - 1, 1) ~ /[a-z0-9._:\/-]/)
             start--
-          host = substr(lower, start, i - start)
+          host = substr(line, start, i - start)
           rest = substr(line, i + length(name))
           suffix = ""
-          if (match(rest, /^[A-Za-z0-9._:@\/+$-]+/))
+          if (match(rest, /^[A-Za-z0-9._:@\/+$#-]+/))
             suffix = substr(rest, 1, RLENGTH)
           kind = "ref"
           if (host != "ghcr.io/" && host != "docker://ghcr.io/")
+            kind = "lookalike"
+          if (substr(line, i, length(name)) != name)
             kind = "lookalike"
           if (suffix != "" && suffix !~ /^[@:]/)
             kind = "lookalike"
