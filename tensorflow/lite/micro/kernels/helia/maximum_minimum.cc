@@ -30,6 +30,17 @@ namespace tflite {
 
 namespace {
 
+// Maps a heliaCORE status to kTfLiteError, naming the op and entry point.
+// Callers skip heliaCORE for an empty output: it rejects zero-size dims.
+TfLiteStatus CoreStatus(const char* op, const char* entry,
+                        arm_cmsis_nn_status status) {
+  if (status != ARM_CMSIS_NN_SUCCESS) {
+    MicroPrintf("%s: %s failed (%d).", op, entry, static_cast<int>(status));
+    return kTfLiteError;
+  }
+  return kTfLiteOk;
+}
+
 cmsis_nn_dims FillVariableShape(int32_t rank, int32_t* tensor_dims) {
   if (rank == 4) {
     return {tensor_dims[0], tensor_dims[1], tensor_dims[2], tensor_dims[3]};
@@ -111,20 +122,29 @@ TfLiteStatus EvalMaximum(TfLiteContext* context, TfLiteNode* node) {
       break;
     case kTfLiteInt8:
       if (arm_rank_supported) {
-        arm_maximum_s8(
-            &ctx, tflite::micro::GetTensorData<int8_t>(input1), &input_1_dims,
-            tflite::micro::GetTensorData<int8_t>(input2), &input_2_dims,
-            tflite::micro::GetTensorData<int8_t>(output), &output_dims);
+        if (output_shape.FlatSize() > 0) {
+          const arm_cmsis_nn_status status = arm_maximum_s8(
+              &ctx, tflite::micro::GetTensorData<int8_t>(input1), &input_1_dims,
+              tflite::micro::GetTensorData<int8_t>(input2), &input_2_dims,
+              tflite::micro::GetTensorData<int8_t>(output), &output_dims);
+          TF_LITE_ENSURE_OK(context,
+                            CoreStatus("MAXIMUM", "arm_maximum_s8", status));
+        }
       } else {
         TFLiteOperation<int8_t, MaximumOp>(context, node, op_context);
       }
       break;
     case kTfLiteInt16:
       if (arm_rank_supported) {
-        arm_maximum_s16(
-            &ctx, tflite::micro::GetTensorData<int16_t>(input1), &input_1_dims,
-            tflite::micro::GetTensorData<int16_t>(input2), &input_2_dims,
-            tflite::micro::GetTensorData<int16_t>(output), &output_dims);
+        if (output_shape.FlatSize() > 0) {
+          const arm_cmsis_nn_status status = arm_maximum_s16(
+              &ctx, tflite::micro::GetTensorData<int16_t>(input1),
+              &input_1_dims, tflite::micro::GetTensorData<int16_t>(input2),
+              &input_2_dims, tflite::micro::GetTensorData<int16_t>(output),
+              &output_dims);
+          TF_LITE_ENSURE_OK(context,
+                            CoreStatus("MAXIMUM", "arm_maximum_s16", status));
+        }
       } else {
         TFLiteOperation<int16_t, MaximumOp>(context, node, op_context);
       }
@@ -175,10 +195,14 @@ TfLiteStatus EvalMaximumInt8(TfLiteContext* context, TfLiteNode* node) {
         ctx.buf = nullptr;
         ctx.size = 0;
 
-        arm_maximum_s8(
-            &ctx, tflite::micro::GetTensorData<int8_t>(input1), &input_1_dims,
-            tflite::micro::GetTensorData<int8_t>(input2), &input_2_dims,
-            tflite::micro::GetTensorData<int8_t>(output), &output_dims);
+        if (output_shape.FlatSize() > 0) {
+          const arm_cmsis_nn_status status = arm_maximum_s8(
+              &ctx, tflite::micro::GetTensorData<int8_t>(input1), &input_1_dims,
+              tflite::micro::GetTensorData<int8_t>(input2), &input_2_dims,
+              tflite::micro::GetTensorData<int8_t>(output), &output_dims);
+          TF_LITE_ENSURE_OK(context,
+                            CoreStatus("MAXIMUM", "arm_maximum_s8", status));
+        }
       } else {
         TFLiteOperation<int8_t, MaximumOp>(context, node, op_context);
       }
@@ -256,10 +280,14 @@ TfLiteStatus EvalMinimum(TfLiteContext* context, TfLiteNode* node) {
       break;
     case kTfLiteInt8:
       if (arm_rank_supported) {
-        arm_minimum_s8(
-            &ctx, tflite::micro::GetTensorData<int8_t>(input1), &input_1_dims,
-            tflite::micro::GetTensorData<int8_t>(input2), &input_2_dims,
-            tflite::micro::GetTensorData<int8_t>(output), &output_dims);
+        if (output_shape.FlatSize() > 0) {
+          const arm_cmsis_nn_status status = arm_minimum_s8(
+              &ctx, tflite::micro::GetTensorData<int8_t>(input1), &input_1_dims,
+              tflite::micro::GetTensorData<int8_t>(input2), &input_2_dims,
+              tflite::micro::GetTensorData<int8_t>(output), &output_dims);
+          TF_LITE_ENSURE_OK(context,
+                            CoreStatus("MINIMUM", "arm_minimum_s8", status));
+        }
       } else {
         TFLiteOperation<int8_t, MinimumOp>(context, node, op_context);
       }
@@ -267,10 +295,15 @@ TfLiteStatus EvalMinimum(TfLiteContext* context, TfLiteNode* node) {
 
     case kTfLiteInt16:
       if (arm_rank_supported) {
-        arm_minimum_s16(
-            &ctx, tflite::micro::GetTensorData<int16_t>(input1), &input_1_dims,
-            tflite::micro::GetTensorData<int16_t>(input2), &input_2_dims,
-            tflite::micro::GetTensorData<int16_t>(output), &output_dims);
+        if (output_shape.FlatSize() > 0) {
+          const arm_cmsis_nn_status status = arm_minimum_s16(
+              &ctx, tflite::micro::GetTensorData<int16_t>(input1),
+              &input_1_dims, tflite::micro::GetTensorData<int16_t>(input2),
+              &input_2_dims, tflite::micro::GetTensorData<int16_t>(output),
+              &output_dims);
+          TF_LITE_ENSURE_OK(context,
+                            CoreStatus("MINIMUM", "arm_minimum_s16", status));
+        }
       } else {
         TFLiteOperation<int16_t, MinimumOp>(context, node, op_context);
       }
@@ -321,10 +354,14 @@ TfLiteStatus EvalMinimumInt8(TfLiteContext* context, TfLiteNode* node) {
         ctx.buf = nullptr;
         ctx.size = 0;
 
-        arm_minimum_s8(
-            &ctx, tflite::micro::GetTensorData<int8_t>(input1), &input_1_dims,
-            tflite::micro::GetTensorData<int8_t>(input2), &input_2_dims,
-            tflite::micro::GetTensorData<int8_t>(output), &output_dims);
+        if (output_shape.FlatSize() > 0) {
+          const arm_cmsis_nn_status status = arm_minimum_s8(
+              &ctx, tflite::micro::GetTensorData<int8_t>(input1), &input_1_dims,
+              tflite::micro::GetTensorData<int8_t>(input2), &input_2_dims,
+              tflite::micro::GetTensorData<int8_t>(output), &output_dims);
+          TF_LITE_ENSURE_OK(context,
+                            CoreStatus("MINIMUM", "arm_minimum_s8", status));
+        }
       } else {
         TFLiteOperation<int8_t, MinimumOp>(context, node, op_context);
       }

@@ -157,7 +157,17 @@ $(kernel_status_context_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_avgpool_s8_get_buffer_size \
   -Wl,--wrap=arm_avgpool_s16_get_buffer_size \
   -Wl,--wrap=arm_avgpool_s8 \
-  -Wl,--wrap=arm_avgpool_s16
+  -Wl,--wrap=arm_avgpool_s16 \
+  -Wl,--wrap=arm_add_s8 \
+  -Wl,--wrap=arm_add_s16 \
+  -Wl,--wrap=arm_sub_s8 \
+  -Wl,--wrap=arm_sub_s16 \
+  -Wl,--wrap=arm_mul_s8 \
+  -Wl,--wrap=arm_mul_s16 \
+  -Wl,--wrap=arm_maximum_s8 \
+  -Wl,--wrap=arm_maximum_s16 \
+  -Wl,--wrap=arm_minimum_s8 \
+  -Wl,--wrap=arm_minimum_s16
 endif
 
 # see AmbiqAI/helia-rt#285
