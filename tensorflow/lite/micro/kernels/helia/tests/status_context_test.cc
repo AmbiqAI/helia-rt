@@ -21,6 +21,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/kernels/fully_connected.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
 #include "tensorflow/lite/micro/kernels/micro_ops.h"
+#include "tensorflow/lite/micro/kernels/softmax.h"
 #include "tensorflow/lite/micro/kernels/testdata/lstm_test_data.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 #include "tensorflow/lite/micro/test_helpers.h"
@@ -31,11 +32,12 @@ limitations under the License.
 // must surface as kTfLiteError at Prepare, and every context backed by a
 // scratch or persistent buffer must carry the byte count requested for it,
 // since several CORE entry points read size 0 as undeclared and skip their
-// bounds check. The int8/int16 ADD, SUB, MUL, MAXIMUM and MINIMUM statuses
-// must surface as kTfLiteError at Invoke. GNU link wraps inject the failures,
-// report a positive size on legs whose CORE needs no buffer, and record each
-// context and call; without them the cases assert the valid outputs and the
-// failures CORE reports on its own. see AmbiqAI/helia-rt#238
+// bounds check. The statuses of the int8/int16 elementwise, activation, softmax
+// and data-movement entry points must surface as kTfLiteError at Invoke. GNU
+// link wraps inject the failures, report a positive size on legs whose CORE
+// needs no buffer, and record each context and call; without them the cases
+// assert the valid outputs and the failures CORE reports on its own.
+// see AmbiqAI/helia-rt#238
 
 #ifndef HELIA_STATUS_CONTEXT_LINK_WRAP
 #define HELIA_STATUS_CONTEXT_LINK_WRAP 0
@@ -43,8 +45,9 @@ limitations under the License.
 
 namespace {
 
-// Elementwise heliaCORE entry points, indexing LinkState's per-entry arrays.
-enum ElementwiseEntry {
+// Status-returning heliaCORE entry points, indexing LinkState's per-entry
+// arrays.
+enum CoreEntry {
   kAddS8,
   kAddS16,
   kSubS8,
@@ -55,7 +58,18 @@ enum ElementwiseEntry {
   kMaximumS16,
   kMinimumS8,
   kMinimumS16,
-  kElementwiseEntries,
+  kConcatenationS8,
+  kConcatenationS16,
+  kDequantizeS8,
+  kDequantizeS16,
+  kHardSwishS8,
+  kHardSwishS16,
+  kLogisticS16,
+  kTanhS16,
+  kPadS8,
+  kPadS16,
+  kSoftmaxS16,
+  kCoreEntries,
 };
 
 #if HELIA_STATUS_CONTEXT_LINK_WRAP
@@ -80,8 +94,8 @@ struct LinkState {
   ContextRecord fc_s16;
   ContextRecord bmm;
   ContextRecord pool;
-  int elementwise_calls[kElementwiseEntries];
-  bool elementwise_fail[kElementwiseEntries];
+  int core_calls[kCoreEntries];
+  bool core_fail[kCoreEntries];
 };
 
 LinkState g_link;
@@ -258,9 +272,9 @@ arm_cmsis_nn_status __wrap_arm_avgpool_s16(
 }
 
 // Counts the call and reports whether the test asked for it to fail.
-bool ElementwiseFails(int entry) {
-  ++g_link.elementwise_calls[entry];
-  return g_link.elementwise_fail[entry];
+bool CoreFails(int entry) {
+  ++g_link.core_calls[entry];
+  return g_link.core_fail[entry];
 }
 
 #define HELIA_WRAP_ARITHMETIC(name, entry, T)                                  \
@@ -275,7 +289,7 @@ bool ElementwiseFails(int entry) {
       int32_t input2_mult, int32_t input2_shift, int32_t left_shift,           \
       T* output, const cmsis_nn_dims* output_dims, int32_t out_offset,         \
       int32_t out_mult, int32_t out_shift, int32_t act_min, int32_t act_max) { \
-    if (ElementwiseFails(entry)) return ARM_CMSIS_NN_ARG_ERROR;                \
+    if (CoreFails(entry)) return ARM_CMSIS_NN_ARG_ERROR;                       \
     return __real_##name(input1, input1_dims, input2, input2_dims,             \
                          input1_offset, input1_mult, input1_shift,             \
                          input2_offset, input2_mult, input2_shift, left_shift, \
@@ -283,36 +297,35 @@ bool ElementwiseFails(int entry) {
                          act_min, act_max);                                    \
   }
 
-#define HELIA_WRAP_MUL(name, entry, T)                                         \
-  arm_cmsis_nn_status __real_##name(const T*, const cmsis_nn_dims*, const T*,  \
-                                    const cmsis_nn_dims*, int32_t, int32_t,    \
-                                    T*, const cmsis_nn_dims*, int32_t,         \
-                                    int32_t, int32_t, int32_t, int32_t);       \
-  arm_cmsis_nn_status __wrap_##name(                                           \
-      const T* input1, const cmsis_nn_dims* input1_dims, const T* input2,      \
-      const cmsis_nn_dims* input2_dims, int32_t input1_offset,                 \
-      int32_t input2_offset, T* output, const cmsis_nn_dims* output_dims,      \
-      int32_t out_offset, int32_t out_mult, int32_t out_shift,                 \
-      int32_t act_min, int32_t act_max) {                                      \
-    if (ElementwiseFails(entry)) return ARM_CMSIS_NN_ARG_ERROR;                \
-    return __real_##name(input1, input1_dims, input2, input2_dims,             \
-                         input1_offset, input2_offset, output, output_dims,    \
-                         out_offset, out_mult, out_shift, act_min, act_max);   \
+#define HELIA_WRAP_MUL(name, entry, T)                                        \
+  arm_cmsis_nn_status __real_##name(const T*, const cmsis_nn_dims*, const T*, \
+                                    const cmsis_nn_dims*, int32_t, int32_t,   \
+                                    T*, const cmsis_nn_dims*, int32_t,        \
+                                    int32_t, int32_t, int32_t, int32_t);      \
+  arm_cmsis_nn_status __wrap_##name(                                          \
+      const T* input1, const cmsis_nn_dims* input1_dims, const T* input2,     \
+      const cmsis_nn_dims* input2_dims, int32_t input1_offset,                \
+      int32_t input2_offset, T* output, const cmsis_nn_dims* output_dims,     \
+      int32_t out_offset, int32_t out_mult, int32_t out_shift,                \
+      int32_t act_min, int32_t act_max) {                                     \
+    if (CoreFails(entry)) return ARM_CMSIS_NN_ARG_ERROR;                      \
+    return __real_##name(input1, input1_dims, input2, input2_dims,            \
+                         input1_offset, input2_offset, output, output_dims,   \
+                         out_offset, out_mult, out_shift, act_min, act_max);  \
   }
 
-#define HELIA_WRAP_EXTREMUM(name, entry, T)                                    \
-  arm_cmsis_nn_status __real_##name(const cmsis_nn_context*, const T*,         \
-                                    const cmsis_nn_dims*, const T*,            \
-                                    const cmsis_nn_dims*, T*,                  \
-                                    const cmsis_nn_dims*);                     \
-  arm_cmsis_nn_status __wrap_##name(                                           \
-      const cmsis_nn_context* ctx, const T* input1,                            \
-      const cmsis_nn_dims* input1_dims, const T* input2,                       \
-      const cmsis_nn_dims* input2_dims, T* output,                             \
-      const cmsis_nn_dims* output_dims) {                                      \
-    if (ElementwiseFails(entry)) return ARM_CMSIS_NN_ARG_ERROR;                \
-    return __real_##name(ctx, input1, input1_dims, input2, input2_dims,        \
-                         output, output_dims);                                 \
+#define HELIA_WRAP_EXTREMUM(name, entry, T)                              \
+  arm_cmsis_nn_status __real_##name(                                     \
+      const cmsis_nn_context*, const T*, const cmsis_nn_dims*, const T*, \
+      const cmsis_nn_dims*, T*, const cmsis_nn_dims*);                   \
+  arm_cmsis_nn_status __wrap_##name(                                     \
+      const cmsis_nn_context* ctx, const T* input1,                      \
+      const cmsis_nn_dims* input1_dims, const T* input2,                 \
+      const cmsis_nn_dims* input2_dims, T* output,                       \
+      const cmsis_nn_dims* output_dims) {                                \
+    if (CoreFails(entry)) return ARM_CMSIS_NN_ARG_ERROR;                 \
+    return __real_##name(ctx, input1, input1_dims, input2, input2_dims,  \
+                         output, output_dims);                           \
   }
 
 HELIA_WRAP_ARITHMETIC(arm_add_s8, kAddS8, int8_t)
@@ -329,6 +342,69 @@ HELIA_WRAP_EXTREMUM(arm_minimum_s16, kMinimumS16, int16_t)
 #undef HELIA_WRAP_ARITHMETIC
 #undef HELIA_WRAP_MUL
 #undef HELIA_WRAP_EXTREMUM
+
+#define HELIA_WRAP_STATUS(name, entry, params, args)     \
+  arm_cmsis_nn_status __real_##name params;              \
+  arm_cmsis_nn_status __wrap_##name params {             \
+    if (CoreFails(entry)) return ARM_CMSIS_NN_ARG_ERROR; \
+    return __real_##name args;                           \
+  }
+
+HELIA_WRAP_STATUS(arm_concatenation_s8, kConcatenationS8,
+                  (const int8_t* const* in, int32_t count, const int32_t* dims,
+                   int32_t axis, int8_t* out, int32_t rank,
+                   const int32_t* shape),
+                  (in, count, dims, axis, out, rank, shape))
+HELIA_WRAP_STATUS(arm_concatenation_s16, kConcatenationS16,
+                  (const int16_t* const* in, int32_t count, const int32_t* dims,
+                   int32_t axis, int16_t* out, int32_t rank,
+                   const int32_t* shape),
+                  (in, count, dims, axis, out, rank, shape))
+HELIA_WRAP_STATUS(arm_dequantize_s8_f32, kDequantizeS8,
+                  (const int8_t* in, float* out, int32_t size, int32_t zp,
+                   float scale),
+                  (in, out, size, zp, scale))
+HELIA_WRAP_STATUS(arm_dequantize_s16_f32, kDequantizeS16,
+                  (const int16_t* in, float* out, int32_t size, int32_t zp,
+                   float scale),
+                  (in, out, size, zp, scale))
+HELIA_WRAP_STATUS(arm_hard_swish_compat_s8, kHardSwishS8,
+                  (const int8_t* in, int32_t in_offset, int32_t out_offset,
+                   int32_t out_mult, int32_t out_exp, int32_t relu_mult,
+                   int32_t relu_exp, int8_t* out, int32_t size),
+                  (in, in_offset, out_offset, out_mult, out_exp, relu_mult,
+                   relu_exp, out, size))
+HELIA_WRAP_STATUS(arm_hard_swish_precise_s16, kHardSwishS16,
+                  (const int16_t* in, int32_t in_offset, int32_t out_offset,
+                   int32_t out_mult, int32_t out_shift, int32_t relu3,
+                   int32_t relu6, int32_t prescale, int16_t* out, int32_t size),
+                  (in, in_offset, out_offset, out_mult, out_shift, relu3, relu6,
+                   prescale, out, size))
+HELIA_WRAP_STATUS(arm_logistic_s16, kLogisticS16,
+                  (const int16_t* in, int16_t* out, int32_t size, int32_t mult,
+                   int32_t shift),
+                  (in, out, size, mult, shift))
+HELIA_WRAP_STATUS(arm_tanh_s16, kTanhS16,
+                  (const int16_t* in, int16_t* out, int32_t size, int32_t mult,
+                   int32_t shift),
+                  (in, out, size, mult, shift))
+HELIA_WRAP_STATUS(arm_pad_s8, kPadS8,
+                  (const int8_t* in, int8_t* out, int8_t pad_value,
+                   const cmsis_nn_dims* size, const cmsis_nn_dims* pre,
+                   const cmsis_nn_dims* post),
+                  (in, out, pad_value, size, pre, post))
+HELIA_WRAP_STATUS(arm_pad_s16, kPadS16,
+                  (const int16_t* in, int16_t* out, int16_t pad_value,
+                   const cmsis_nn_dims* size, const cmsis_nn_dims* pre,
+                   const cmsis_nn_dims* post),
+                  (in, out, pad_value, size, pre, post))
+HELIA_WRAP_STATUS(arm_softmax_s16, kSoftmaxS16,
+                  (const int16_t* in, int32_t rows, int32_t row_size,
+                   int32_t mult, int32_t shift,
+                   const cmsis_nn_softmax_lut_s16* luts, int16_t* out),
+                  (in, rows, row_size, mult, shift, luts, out))
+
+#undef HELIA_WRAP_STATUS
 
 }  // extern "C"
 
@@ -626,7 +702,7 @@ constexpr int8_t kMinimumExpected[] = {1, -2, -1, -3};
 // which rejects zero-size dims.
 template <typename T>
 void ExpectElementwise(const TFLMRegistration& registration, void* params,
-                       ElementwiseEntry entry, const int8_t* expected8) {
+                       CoreEntry entry, const int8_t* expected8) {
   T input1[4];
   T input2[4];
   T expected[4];
@@ -646,16 +722,16 @@ void ExpectElementwise(const TFLMRegistration& registration, void* params,
                               output_dims_data, params),
                expected, output, 4);
 #if HELIA_STATUS_CONTEXT_LINK_WRAP
-  EXPECT_EQ(1, g_link.elementwise_calls[entry]);
+  EXPECT_EQ(1, g_link.core_calls[entry]);
 
   ResetLinkState();
-  g_link.elementwise_fail[entry] = true;
+  g_link.core_fail[entry] = true;
   T failed_output[4] = {};
   const Status failed = RunElementwise(registration, input1, input2,
                                        failed_output, output_dims_data, params);
   EXPECT_EQ(kTfLiteOk, failed.prepare);
   EXPECT_EQ(kTfLiteError, failed.invoke);
-  EXPECT_EQ(1, g_link.elementwise_calls[entry]);
+  EXPECT_EQ(1, g_link.core_calls[entry]);
 
   ResetLinkState();
 #endif
@@ -693,8 +769,156 @@ void ExpectElementwise(const TFLMRegistration& registration, void* params,
   }
 #if HELIA_STATUS_CONTEXT_LINK_WRAP
   // The mismatched run reached CORE; the empty runs did not.
-  EXPECT_EQ(1, g_link.elementwise_calls[entry]);
+  EXPECT_EQ(1, g_link.core_calls[entry]);
 #endif
+}
+
+// Single-input and data-movement ops. Each runner builds fresh tensors over
+// the caller's buffers, so one lambda serves the valid and the injected run.
+
+// A valid run must reach the CORE entry point once; with the link wrap, a
+// failure injected there must surface as kTfLiteError at Invoke.
+template <typename RunFn>
+void ExpectCoreStatus(RunFn run, CoreEntry entry) {
+#if HELIA_STATUS_CONTEXT_LINK_WRAP
+  ResetLinkState();
+#endif
+  const Status ok = run();
+  EXPECT_EQ(kTfLiteOk, ok.prepare);
+  EXPECT_EQ(kTfLiteOk, ok.invoke);
+#if HELIA_STATUS_CONTEXT_LINK_WRAP
+  EXPECT_EQ(1, g_link.core_calls[entry]);
+  ResetLinkState();
+  g_link.core_fail[entry] = true;
+  const Status failed = run();
+  EXPECT_EQ(kTfLiteOk, failed.prepare);
+  EXPECT_EQ(kTfLiteError, failed.invoke);
+  EXPECT_EQ(1, g_link.core_calls[entry]);
+  ResetLinkState();
+#else
+  (void)entry;
+#endif
+}
+
+// A unary op over a [1, 4] tensor with the given quantization.
+template <typename TIn, typename TOut>
+Status RunUnary(const TFLMRegistration& registration, const TIn* input,
+                float input_scale, int input_zero_point, TOut* output,
+                float output_scale, int output_zero_point, int* dims,
+                void* params) {
+  TfLiteTensor tensors[] = {
+      tflite::testing::CreateQuantizedTensor(
+          input, tflite::testing::IntArrayFromInts(dims), input_scale,
+          input_zero_point),
+      tflite::testing::CreateQuantizedTensor(
+          output, tflite::testing::IntArrayFromInts(dims), output_scale,
+          output_zero_point),
+  };
+  int inputs[] = {1, 0};
+  int outputs[] = {1, 1};
+  return Run(registration, tensors, 2, inputs, outputs, params);
+}
+
+template <typename T>
+Status RunConcatenation(const T* input1, const T* input2, T (&output)[4]) {
+  int input_dims[] = {2, 1, 2};
+  int output_dims[] = {2, 1, 4};
+  TfLiteTensor tensors[] = {
+      tflite::testing::CreateQuantizedTensor(
+          input1, tflite::testing::IntArrayFromInts(input_dims), 1.0f, 0),
+      tflite::testing::CreateQuantizedTensor(
+          input2, tflite::testing::IntArrayFromInts(input_dims), 1.0f, 0),
+      tflite::testing::CreateQuantizedTensor(
+          output, tflite::testing::IntArrayFromInts(output_dims), 1.0f, 0),
+  };
+  int inputs[] = {2, 0, 1};
+  int outputs[] = {1, 2};
+  TfLiteConcatenationParams params = {/*axis=*/1, kTfLiteActNone};
+  return Run(tflite::Register_CONCATENATION(), tensors, 3, inputs, outputs,
+             &params);
+}
+
+template <typename T>
+void ExpectConcatenation(CoreEntry entry) {
+  const T input1[] = {1, -2};
+  const T input2[] = {3, 4};
+  const T expected[] = {1, -2, 3, 4};
+  T output[4] = {};
+  ExpectOutput(RunConcatenation(input1, input2, output), expected, output, 4);
+  ExpectCoreStatus([&] { return RunConcatenation(input1, input2, output); },
+                   entry);
+}
+
+template <typename T>
+void ExpectDequantize(int zero_point, CoreEntry entry) {
+  const T input[] = {1, -2, 3, 4};
+  float expected[4];
+  for (int i = 0; i < 4; ++i) expected[i] = (input[i] - zero_point) * 0.5f;
+  int dims[] = {2, 1, 4};
+  float output[4] = {};
+  auto run = [&] {
+    TfLiteTensor tensors[] = {
+        tflite::testing::CreateQuantizedTensor(
+            input, tflite::testing::IntArrayFromInts(dims), 0.5f, zero_point),
+        tflite::testing::CreateTensor(output,
+                                      tflite::testing::IntArrayFromInts(dims)),
+    };
+    int inputs[] = {1, 0};
+    int outputs[] = {1, 1};
+    return Run(tflite::Register_DEQUANTIZE(), tensors, 2, inputs, outputs,
+               nullptr);
+  };
+  ExpectOutput(run(), expected, output, 4);
+  ExpectCoreStatus(run, entry);
+}
+
+// PAD with paddings {0,0},{0,0},{1,1},{0,0} over [1, 1, 2, 1]; PADV2 adds a
+// constant pad value.
+template <typename T>
+Status RunPad(const TFLMRegistration& registration, const T* pad_value,
+              T (&output)[4]) {
+  const T input[] = {1, 2};
+  int input_dims[] = {4, 1, 1, 2, 1};
+  int paddings_dims[] = {2, 4, 2};
+  const int32_t paddings[] = {0, 0, 0, 0, 1, 1, 0, 0};
+  int value_dims[] = {1, 1};
+  int output_dims[] = {4, 1, 1, 4, 1};
+  TfLiteTensor tensors[] = {
+      tflite::testing::CreateQuantizedTensor(
+          input, tflite::testing::IntArrayFromInts(input_dims), 1.0f, 0),
+      tflite::testing::CreateTensor(
+          paddings, tflite::testing::IntArrayFromInts(paddings_dims)),
+      tflite::testing::CreateQuantizedTensor(
+          output, tflite::testing::IntArrayFromInts(output_dims), 1.0f, 0),
+      tflite::testing::CreateQuantizedTensor(
+          pad_value, tflite::testing::IntArrayFromInts(value_dims), 1.0f, 0),
+  };
+  tensors[1].allocation_type = kTfLiteMmapRo;
+  int pad_inputs[] = {2, 0, 1};
+  int padv2_inputs[] = {3, 0, 1, 3};
+  int outputs[] = {1, 2};
+  return Run(registration, tensors, 4,
+             pad_value == nullptr ? pad_inputs : padv2_inputs, outputs,
+             nullptr);
+}
+
+template <typename T>
+void ExpectPad(CoreEntry entry) {
+  const T expected_pad[] = {0, 1, 2, 0};
+  T output[4] = {};
+  ExpectOutput(RunPad<T>(tflite::Register_PAD(), nullptr, output), expected_pad,
+               output, 4);
+  ExpectCoreStatus(
+      [&] { return RunPad<T>(tflite::Register_PAD(), nullptr, output); },
+      entry);
+
+  const T value[] = {5};
+  const T expected_padv2[] = {5, 1, 2, 5};
+  ExpectOutput(RunPad<T>(tflite::Register_PADV2(), value, output),
+               expected_padv2, output, 4);
+  ExpectCoreStatus(
+      [&] { return RunPad<T>(tflite::Register_PADV2(), value, output); },
+      entry);
 }
 
 }  // namespace
@@ -874,6 +1098,105 @@ TEST(HeliaStatusContextTest, MinimumInt8Status) {
 TEST(HeliaStatusContextTest, MinimumInt16Status) {
   ExpectElementwise<int16_t>(tflite::Register_MINIMUM(), nullptr, kMinimumS16,
                              kMinimumExpected);
+}
+
+TEST(HeliaStatusContextTest, ConcatenationInt8Status) {
+  ExpectConcatenation<int8_t>(kConcatenationS8);
+}
+
+TEST(HeliaStatusContextTest, ConcatenationInt16Status) {
+  ExpectConcatenation<int16_t>(kConcatenationS16);
+}
+
+TEST(HeliaStatusContextTest, DequantizeInt8Status) {
+  ExpectDequantize<int8_t>(/*zero_point=*/1, kDequantizeS8);
+}
+
+TEST(HeliaStatusContextTest, DequantizeInt16Status) {
+  ExpectDequantize<int16_t>(/*zero_point=*/0, kDequantizeS16);
+}
+
+TEST(HeliaStatusContextTest, HardSwishInt8Status) {
+  const int8_t input[] = {-30, -10, 10, 30};
+  int8_t output[4] = {};
+  int dims[] = {2, 1, 4};
+  ExpectCoreStatus(
+      [&] {
+        return RunUnary(tflite::Register_HARD_SWISH(), input, 0.1f, 0, output,
+                        0.1f, 0, dims, nullptr);
+      },
+      kHardSwishS8);
+}
+
+TEST(HeliaStatusContextTest, HardSwishInt16Status) {
+  const int16_t input[] = {-3072, -1024, 1024, 3072};
+  int16_t output[4] = {};
+  int dims[] = {2, 1, 4};
+  ExpectCoreStatus(
+      [&] {
+        return RunUnary(tflite::Register_HARD_SWISH(), input, 1.0f / 1024, 0,
+                        output, 1.0f / 1024, 0, dims, nullptr);
+      },
+      kHardSwishS16);
+
+  // An empty output has nothing to write and must not reach CORE, which
+  // rejects null buffers.
+  int empty_dims[] = {2, 1, 0};
+#if HELIA_STATUS_CONTEXT_LINK_WRAP
+  ResetLinkState();
+#endif
+  const Status empty =
+      RunUnary(tflite::Register_HARD_SWISH(), input, 1.0f / 1024, 0, output,
+               1.0f / 1024, 0, empty_dims, nullptr);
+  EXPECT_EQ(kTfLiteOk, empty.prepare);
+  EXPECT_EQ(kTfLiteOk, empty.invoke);
+#if HELIA_STATUS_CONTEXT_LINK_WRAP
+  EXPECT_EQ(0, g_link.core_calls[kHardSwishS16]);
+#endif
+}
+
+TEST(HeliaStatusContextTest, LogisticInt16Status) {
+  const int16_t input[] = {-4096, -1024, 1024, 4096};
+  int16_t output[4] = {};
+  int dims[] = {2, 1, 4};
+  ExpectCoreStatus(
+      [&] {
+        return RunUnary(tflite::Register_LOGISTIC(), input, 1.0f / 4096, 0,
+                        output, 1.0f / 32768, 0, dims, nullptr);
+      },
+      kLogisticS16);
+}
+
+TEST(HeliaStatusContextTest, TanhInt16Status) {
+  const int16_t input[] = {-4096, -1024, 1024, 4096};
+  int16_t output[4] = {};
+  int dims[] = {2, 1, 4};
+  ExpectCoreStatus(
+      [&] {
+        return RunUnary(tflite::Register_TANH(), input, 1.0f / 4096, 0, output,
+                        1.0f / 32768, 0, dims, nullptr);
+      },
+      kTanhS16);
+}
+
+TEST(HeliaStatusContextTest, PadInt8Status) { ExpectPad<int8_t>(kPadS8); }
+
+TEST(HeliaStatusContextTest, PadInt16Status) { ExpectPad<int16_t>(kPadS16); }
+
+TEST(HeliaStatusContextTest, SoftmaxInt16Status) {
+  const int16_t input[] = {-4096, -1024, 1024, 4096};
+  int16_t output[4] = {};
+  int dims[] = {2, 1, 4};
+  TfLiteSoftmaxParams params = {/*beta=*/1.0f};
+  for (const TFLMRegistration& registration :
+       {tflite::Register_SOFTMAX(), tflite::Register_SOFTMAX_INT16()}) {
+    ExpectCoreStatus(
+        [&] {
+          return RunUnary(registration, input, 1.0f / 4096, 0, output,
+                          1.0f / 32768, 0, dims, &params);
+        },
+        kSoftmaxS16);
+  }
 }
 
 TF_LITE_MICRO_TESTS_MAIN

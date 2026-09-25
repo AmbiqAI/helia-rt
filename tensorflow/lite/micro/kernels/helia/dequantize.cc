@@ -50,24 +50,36 @@ TfLiteStatus DequantizeEval(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(output->type == kTfLiteFloat32);
 
   switch (input->type) {
-    case kTfLiteInt8:
-      arm_dequantize_s8_f32(
+    case kTfLiteInt8: {
+      const arm_cmsis_nn_status status = arm_dequantize_s8_f32(
         tflite::micro::GetTensorData<int8_t>(input),
         tflite::micro::GetTensorData<float>(output),
         ElementCount(*input->dims),
         data->quantization_params.zero_point,
         data->quantization_params.scale
       );
+      if (status != ARM_CMSIS_NN_SUCCESS) {
+        MicroPrintf("DEQUANTIZE: arm_dequantize_s8_f32 failed (%d).",
+                    static_cast<int>(status));
+        return kTfLiteError;
+      }
       break;
-    case kTfLiteInt16:
-      arm_dequantize_s16_f32(
+    }
+    case kTfLiteInt16: {
+      const arm_cmsis_nn_status status = arm_dequantize_s16_f32(
         tflite::micro::GetTensorData<int16_t>(input),
         tflite::micro::GetTensorData<float>(output),
         ElementCount(*input->dims),
         data->quantization_params.zero_point,
         data->quantization_params.scale
       );
+      if (status != ARM_CMSIS_NN_SUCCESS) {
+        MicroPrintf("DEQUANTIZE: arm_dequantize_s16_f32 failed (%d).",
+                    static_cast<int>(status));
+        return kTfLiteError;
+      }
       break;
+    }
     case kTfLiteUInt8:
       reference_ops::Dequantize(data->quantization_params,
                                 tflite::micro::GetTensorShape(input),

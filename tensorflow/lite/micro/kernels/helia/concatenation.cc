@@ -86,7 +86,7 @@ inline void GetAllInputTensorData(const TfLiteContext* context,
 
 
 template <typename data_type>
-void EvalUnquantized(TfLiteContext* context, TfLiteNode* node) {
+TfLiteStatus EvalUnquantized(TfLiteContext* context, TfLiteNode* node) {
   // Collect the shapes and data pointer of input tensors
   RuntimeShape inputs_shape[kMaxInputNum];
   int32_t input_concat_dims[kMaxInputNum];
@@ -170,7 +170,7 @@ void EvalUnquantized(TfLiteContext* context, TfLiteNode* node) {
 #endif
         offset += in_dims_r[helia_axis];
       }
-      return;
+      return kTfLiteOk;
     }
   }
 
@@ -184,7 +184,7 @@ void EvalUnquantized(TfLiteContext* context, TfLiteNode* node) {
   }
 
   if constexpr (std::is_same_v<data_type, int8_t>) {
-    arm_concatenation_s8(
+    const arm_cmsis_nn_status status = arm_concatenation_s8(
       inputs_data,
       data->params.inputs_count,
       input_concat_dims,
@@ -193,8 +193,13 @@ void EvalUnquantized(TfLiteContext* context, TfLiteNode* node) {
       output_shape.DimensionsCount(),
       concat_shape
     );
+    if (status != ARM_CMSIS_NN_SUCCESS) {
+      MicroPrintf("CONCATENATION: arm_concatenation_s8 failed (%d).",
+                  static_cast<int>(status));
+      return kTfLiteError;
+    }
   } else if constexpr (std::is_same_v<data_type, int16_t>) {
-    arm_concatenation_s16(
+    const arm_cmsis_nn_status status = arm_concatenation_s16(
       inputs_data,
       data->params.inputs_count,
       input_concat_dims,
@@ -203,6 +208,11 @@ void EvalUnquantized(TfLiteContext* context, TfLiteNode* node) {
       output_shape.DimensionsCount(),
       concat_shape
     );
+    if (status != ARM_CMSIS_NN_SUCCESS) {
+      MicroPrintf("CONCATENATION: arm_concatenation_s16 failed (%d).",
+                  static_cast<int>(status));
+      return kTfLiteError;
+    }
   } else {
     reference_ops::Concatenation(
       data->params, inputs_shape_ptr, inputs_data,
@@ -210,6 +220,7 @@ void EvalUnquantized(TfLiteContext* context, TfLiteNode* node) {
       output_data
     );
   }
+  return kTfLiteOk;
 }
 
 void* ConcatenationInit(TfLiteContext* context, const char* buffer,
@@ -336,28 +347,28 @@ TfLiteStatus ConcatenationEval(TfLiteContext* context, TfLiteNode* node) {
 
   switch (output_type) {  // Already know in/outtypes are same.
     case kTfLiteFloat32:
-      EvalUnquantized<float>(context, node);
+      TF_LITE_ENSURE_OK(context, EvalUnquantized<float>(context, node));
       break;
  #if ARM_NN_ENABLE_F16
     case kTfLiteFloat16:
-      EvalUnquantized<float16_t>(context, node);
+      TF_LITE_ENSURE_OK(context, EvalUnquantized<float16_t>(context, node));
       break;
  #endif
     case kTfLiteInt32:
-      EvalUnquantized<int32_t>(context, node);
+      TF_LITE_ENSURE_OK(context, EvalUnquantized<int32_t>(context, node));
       break;
     case kTfLiteInt8:
       // concatenation_int8(context, node);
-      EvalUnquantized<int8_t>(context, node);
+      TF_LITE_ENSURE_OK(context, EvalUnquantized<int8_t>(context, node));
       break;
     case kTfLiteInt64:
-      EvalUnquantized<int64_t>(context, node);
+      TF_LITE_ENSURE_OK(context, EvalUnquantized<int64_t>(context, node));
       break;
     case kTfLiteInt16:
-      EvalUnquantized<int16_t>(context, node);
+      TF_LITE_ENSURE_OK(context, EvalUnquantized<int16_t>(context, node));
       break;
     case kTfLiteBool:
-      EvalUnquantized<bool>(context, node);
+      TF_LITE_ENSURE_OK(context, EvalUnquantized<bool>(context, node));
       break;
 
     default:

@@ -242,13 +242,18 @@ TfLiteStatus TanhEval(TfLiteContext* context, TfLiteNode* node) {
       return kTfLiteOk;
     } break;
     case kTfLiteInt16: {
-      arm_tanh_s16(
+      const arm_cmsis_nn_status status = arm_tanh_s16(
           tflite::micro::GetTensorData<int16_t>(input),
           tflite::micro::GetTensorData<int16_t>(output),
           tflite::micro::GetTensorShape(input).FlatSize(),
           data.input_multiplier,
           data.input_left_shift
       );
+      if (status != ARM_CMSIS_NN_SUCCESS) {
+        MicroPrintf("TANH: arm_tanh_s16 failed (%d).",
+                    static_cast<int>(status));
+        return kTfLiteError;
+      }
       return kTfLiteOk;
     } break;
     case kTfLiteInt8: {

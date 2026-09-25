@@ -136,7 +136,7 @@ endif
 
 # UNIDIRECTIONAL_SEQUENCE_LSTM kernel-sum status, the FULLY_CONNECTED,
 # BATCH_MATMUL and AVERAGE_POOL_2D scratch-context size contracts, and the
-# int8/int16 ADD, SUB, MUL, MAXIMUM and MINIMUM statuses.
+# int8/int16 statuses of the remaining heliaCORE entry points.
 # see AmbiqAI/helia-rt#238
 $(eval $(call microlite_test,kernel_status_context_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/status_context_test.cc \
@@ -168,7 +168,18 @@ $(kernel_status_context_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_maximum_s8 \
   -Wl,--wrap=arm_maximum_s16 \
   -Wl,--wrap=arm_minimum_s8 \
-  -Wl,--wrap=arm_minimum_s16
+  -Wl,--wrap=arm_minimum_s16 \
+  -Wl,--wrap=arm_concatenation_s8 \
+  -Wl,--wrap=arm_concatenation_s16 \
+  -Wl,--wrap=arm_dequantize_s8_f32 \
+  -Wl,--wrap=arm_dequantize_s16_f32 \
+  -Wl,--wrap=arm_hard_swish_compat_s8 \
+  -Wl,--wrap=arm_hard_swish_precise_s16 \
+  -Wl,--wrap=arm_logistic_s16 \
+  -Wl,--wrap=arm_tanh_s16 \
+  -Wl,--wrap=arm_pad_s8 \
+  -Wl,--wrap=arm_pad_s16 \
+  -Wl,--wrap=arm_softmax_s16
 endif
 
 # see AmbiqAI/helia-rt#285

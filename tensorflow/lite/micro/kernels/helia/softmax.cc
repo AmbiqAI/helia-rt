@@ -181,13 +181,16 @@ TfLiteStatus SoftmaxEval(TfLiteContext* context, TfLiteNode* node) {
           .exp_lut = op_data.softmax_params.exp_lut,
           .one_by_one_lut = op_data.softmax_params.one_over_one_plus_x_lut};
 
-      TFLITE_DCHECK_EQ(
-          arm_softmax_s16(
-              tflite::micro::GetTensorData<int16_t>(input), op_data.num_rows,
-              op_data.row_size, op_data.softmax_params.input_multiplier,
-              op_data.softmax_params.input_left_shift, &softmax_params,
-              tflite::micro::GetTensorData<int16_t>(output)),
-          ARM_CMSIS_NN_SUCCESS);
+      const arm_cmsis_nn_status status = arm_softmax_s16(
+          tflite::micro::GetTensorData<int16_t>(input), op_data.num_rows,
+          op_data.row_size, op_data.softmax_params.input_multiplier,
+          op_data.softmax_params.input_left_shift, &softmax_params,
+          tflite::micro::GetTensorData<int16_t>(output));
+      if (status != ARM_CMSIS_NN_SUCCESS) {
+        MicroPrintf("SOFTMAX: arm_softmax_s16 failed (%d).",
+                    static_cast<int>(status));
+        return kTfLiteError;
+      }
       return kTfLiteOk;
     }
     default:
@@ -243,13 +246,16 @@ TfLiteStatus SoftmaxEvalInt16(TfLiteContext* context, TfLiteNode* node) {
       .exp_lut = op_data.softmax_params.exp_lut,
       .one_by_one_lut = op_data.softmax_params.one_over_one_plus_x_lut};
 
-  TFLITE_DCHECK_EQ(
-      arm_softmax_s16(tflite::micro::GetTensorData<int16_t>(input),
-                      op_data.num_rows, op_data.row_size,
-                      op_data.softmax_params.input_multiplier,
-                      op_data.softmax_params.input_left_shift, &softmax_params,
-                      tflite::micro::GetTensorData<int16_t>(output)),
-      ARM_CMSIS_NN_SUCCESS);
+  const arm_cmsis_nn_status status = arm_softmax_s16(
+      tflite::micro::GetTensorData<int16_t>(input), op_data.num_rows,
+      op_data.row_size, op_data.softmax_params.input_multiplier,
+      op_data.softmax_params.input_left_shift, &softmax_params,
+      tflite::micro::GetTensorData<int16_t>(output));
+  if (status != ARM_CMSIS_NN_SUCCESS) {
+    MicroPrintf("SOFTMAX: arm_softmax_s16 failed (%d).",
+                static_cast<int>(status));
+    return kTfLiteError;
+  }
 
   return kTfLiteOk;
 }

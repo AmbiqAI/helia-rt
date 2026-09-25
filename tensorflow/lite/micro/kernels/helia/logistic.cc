@@ -102,11 +102,16 @@ TfLiteStatus LogisticEval(TfLiteContext* context, TfLiteNode* node) {
   else if (input->type == kTfLiteInt16) {
     switch (output->type) {
       case kTfLiteInt16: {
-        arm_logistic_s16(
+        const arm_cmsis_nn_status status = arm_logistic_s16(
           const_cast<int16_t*>(tflite::micro::GetTensorData<int16_t>(input)),
           const_cast<int16_t*>(tflite::micro::GetTensorData<int16_t>(output)),
             NumElements(input->dims),
             data->input_multiplier, data->input_left_shift);
+        if (status != ARM_CMSIS_NN_SUCCESS) {
+          MicroPrintf("LOGISTIC: arm_logistic_s16 failed (%d).",
+                      static_cast<int>(status));
+          return kTfLiteError;
+        }
         return kTfLiteOk;
       }
       default:
