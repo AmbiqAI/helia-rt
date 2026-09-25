@@ -666,22 +666,33 @@ void ExpectElementwise(const TFLMRegistration& registration, void* params,
   EXPECT_EQ(kTfLiteOk, mismatched.prepare);
   EXPECT_EQ(kTfLiteError, mismatched.invoke);
 
+  // One operand empty, the other broadcast from one element, so the guard
+  // must read the output rather than either input.
   int empty_dims[] = {2, 1, 0};
-  TfLiteTensor tensors[] = {
-      tflite::testing::CreateQuantizedTensor(
-          input1, tflite::testing::IntArrayFromInts(empty_dims), 1.0f, 0),
-      tflite::testing::CreateQuantizedTensor(
-          input2, tflite::testing::IntArrayFromInts(empty_dims), 1.0f, 0),
-      tflite::testing::CreateQuantizedTensor(
-          output, tflite::testing::IntArrayFromInts(empty_dims), 1.0f, 0),
-  };
-  int inputs[] = {2, 0, 1};
-  int outputs[] = {1, 2};
-  const Status empty = Run(registration, tensors, 3, inputs, outputs, params);
-  EXPECT_EQ(kTfLiteOk, empty.prepare);
-  EXPECT_EQ(kTfLiteOk, empty.invoke);
+  int one_dims[] = {2, 1, 1};
+  for (int empty_operand = 0; empty_operand < 2; ++empty_operand) {
+    TfLiteTensor tensors[] = {
+        tflite::testing::CreateQuantizedTensor(
+            input1,
+            tflite::testing::IntArrayFromInts(empty_operand == 0 ? empty_dims
+                                                                 : one_dims),
+            1.0f, 0),
+        tflite::testing::CreateQuantizedTensor(
+            input2,
+            tflite::testing::IntArrayFromInts(empty_operand == 1 ? empty_dims
+                                                                 : one_dims),
+            1.0f, 0),
+        tflite::testing::CreateQuantizedTensor(
+            output, tflite::testing::IntArrayFromInts(empty_dims), 1.0f, 0),
+    };
+    int inputs[] = {2, 0, 1};
+    int outputs[] = {1, 2};
+    const Status empty = Run(registration, tensors, 3, inputs, outputs, params);
+    EXPECT_EQ(kTfLiteOk, empty.prepare);
+    EXPECT_EQ(kTfLiteOk, empty.invoke);
+  }
 #if HELIA_STATUS_CONTEXT_LINK_WRAP
-  // The mismatched run reached CORE; the empty run did not.
+  // The mismatched run reached CORE; the empty runs did not.
   EXPECT_EQ(1, g_link.elementwise_calls[entry]);
 #endif
 }
