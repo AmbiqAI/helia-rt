@@ -80,14 +80,19 @@ floating `:latest` tag on `main`.
 | 4 | [helia_test.yml](helia_test.yml) | `ci-image` setup job |
 | 5 | [check_tflite_files.yml](check_tflite_files.yml) | workflow-level `env.CI_IMAGE` |
 
-`tensorflow/lite/micro/tools/ci_build/check_ci_image_pins.sh` enforces this
-on every PR, from the `ci-image` job of [helia_test.yml](helia_test.yml). It
-fails when a listed pin point does not carry exactly one
-`helia-rt-ci@sha256:<64 hex>`, when the pin points disagree, or when a workflow
-outside the list pins the image. Run it locally before opening a bump PR:
+`tensorflow/lite/micro/tools/ci_build/check_helia_ci_image_pins.sh` enforces
+this on every PR, from the `ci-image` job of [helia_test.yml](helia_test.yml).
+Outside YAML comments it fails when a listed pin point does not reference the
+image exactly once as `helia-rt-ci@sha256:<64 lowercase hex>`, when the pin
+points disagree, or when any other workflow references the image by digest,
+tag or bare name (the bare repository name in
+[helia_build_docker_image.yml](helia_build_docker_image.yml) is the one
+exception). It checks the PR head, not the merge result, so two PRs that each
+pass can still combine unevenly; the next PR then fails. Run it locally before
+opening a bump PR:
 
 ```sh
-./tensorflow/lite/micro/tools/ci_build/check_ci_image_pins.sh
+./tensorflow/lite/micro/tools/ci_build/check_helia_ci_image_pins.sh
 ```
 
 Adding a pin point means adding it to `PIN_POINTS` in that script and to the
@@ -152,8 +157,8 @@ grep -rl --include='*.yml' "${OLD}" .github/workflows/ \
 rm -f .github/workflows/*.yml.bak
 ```
 
-Then re-run the two-property check above, and update each trailing tag
-comment's date by hand.
+Then run `check_helia_ci_image_pins.sh` (above), and update each trailing
+tag comment's date by hand.
 
 ## Local dev
 
