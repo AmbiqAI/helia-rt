@@ -447,11 +447,6 @@ TEST(HeliaFloatLstmTailLaneTest, Float16TailLanesMatchVectorLanes) {
 // guards. If ARM_NN_ENABLE_F16 ever stops being defined on such a build the
 // detector would disappear while the leg still reported success, so fail
 // loudly. see AmbiqAI/helia-rt#231, AmbiqAI/helia-rt#256
-//
-// Known gap: ATfE builds cortex-m55 with +nomve, so __ARM_FEATURE_MVE is unset
-// there and this cannot fire; there is no MVE float16 path to guard, but the
-// scalar float16 case would drop silently if ARM_NN_ENABLE_F16 disappeared.
-// see AmbiqAI/helia-rt#225
 TEST(HeliaFloatLstmTailLaneTest, Float16CoverageMustNotSilentlyDisappear) {
   FAIL(
       "ARM_NN_ENABLE_F16 is not defined on a build with MVE floating point. "
