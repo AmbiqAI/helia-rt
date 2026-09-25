@@ -21,8 +21,8 @@ jobs:
 
   issue-on-error:
     needs: [call-ci]
-    # ci/issue_on_error.py checks out the repository and runs `gh issue` and
-    # `gh label` against it, hence `contents: read` and `issues: write`.
+    # issue_on_error.yml checks out the repository (`contents: read`) and
+    # ci/issue_on_error.py runs `gh issue` and `gh label` (`issues: write`).
     permissions:
       contents: read
       issues: write
