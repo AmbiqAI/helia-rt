@@ -31,6 +31,7 @@ export default defineConfig({
             label: 'Getting started', href: `${base}/getting-started/`,
             sidebar: [
               { label: 'Overview', slug: 'getting-started' },
+              { label: 'Run your first model', slug: 'getting-started/first-model' },
               { label: 'Choose your path', slug: 'getting-started/choose-your-path' },
               { label: 'Zephyr', slug: 'getting-started/zephyr' },
               { label: 'neuralSPOT-X', slug: 'getting-started/neuralspot-x' },

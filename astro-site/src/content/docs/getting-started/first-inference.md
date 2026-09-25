@@ -5,6 +5,8 @@ description: Model loading, operator registration, tensor allocation and inferen
 
 Once heliaRT is linked into your firmware, inference follows the LiteRT for Microcontrollers sequence. The example below illustrates a model containing one fully connected operator. Replace the resolver registrations and tensor handling with those required by your model.
 
+For a complete runnable application with a supplied model and expected outputs, start with [Run your first model](/helia-rt/getting-started/first-model/). This page explains how to adapt that sequence to your firmware.
+
 ## Embed a model
 
 The repository includes an array generator. From the heliaRT checkout, with Python, NumPy and Pillow installed in your environment, convert a trusted `model.tflite` file:
