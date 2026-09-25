@@ -27,10 +27,10 @@ A digest is immutable, so the image becomes a reviewable part of the diff.
 Two rules follow from this and both matter:
 
 - **All five pin points must carry the same digest.** They are separate
-  literals in separate files with nothing enforcing agreement. If a bump
-  updates some and not others, the test matrix and the release build run on
-  *different* images — release artifacts built by an image nothing tested
-  — and nothing fails or warns. Bump them together, in one PR.
+  literals in separate files. If a bump updates some and not others, the test
+  matrix and the release build run on *different* images — release artifacts
+  built by an image nothing tested. The pin check below fails such a PR; bump
+  them together, in one PR.
 - **Pin the image index digest, not a per-architecture manifest digest.**
   The recipe below returns the index digest, which preserves multi-arch
   resolution exactly as the tag did.
@@ -80,23 +80,26 @@ floating `:latest` tag on `main`.
 | 4 | [helia_test.yml](helia_test.yml) | `ci-image` setup job |
 | 5 | [check_tflite_files.yml](check_tflite_files.yml) | workflow-level `env.CI_IMAGE` |
 
-To confirm they agree, check **two** properties. Uniqueness alone is not
-enough: if four pin points reverted to `:latest` and one kept a digest, the
-surviving digest is still unique, and a uniqueness-only check would bless
-exactly the release-on-an-untested-image state this is meant to prevent.
+`tensorflow/lite/micro/tools/ci_build/check_helia_ci_image_pins.sh` enforces
+this on every PR, from the `ci-image` job of [helia_test.yml](helia_test.yml).
+Outside YAML comments it fails when a listed pin point does not reference the
+image exactly once as `ghcr.io/ambiqai/helia-rt-ci@sha256:<64 lowercase hex>`
+(host and name in lowercase), when the pin points disagree, or when any other
+workflow references the image by digest, tag or bare name (the bare
+repository name in
+[helia_build_docker_image.yml](helia_build_docker_image.yml) is the one
+exception). Comments are recognised line by line, so a ` #` inside a shell or
+quoted string before the image can hide a reference there. It checks the PR
+head, not the merge result, so two PRs that each pass can still combine
+unevenly; a later PR based on that `main` then fails. Run it locally before
+opening a bump PR:
 
 ```sh
-digests=$(grep -rho 'helia-rt-ci@sha256:[0-9a-f]*' .github/workflows/*.yml)
-test "$(printf '%s\n' "${digests}" | sort -u | grep -c .)" -eq 1 \
-  || { echo "pin points do not share a single digest"; exit 1; }
-test "$(printf '%s\n' "${digests}" | grep -c .)" -eq 5 \
-  || { echo "expected 5 pinned points, found $(printf '%s\n' "${digests}" | grep -c .)"; exit 1; }
-echo "OK: 5 pin points, 1 digest"
+./tensorflow/lite/micro/tools/ci_build/check_helia_ci_image_pins.sh
 ```
 
-`grep -c .` rather than `wc -l` on both counts: it counts non-empty lines, so
-"no digests at all" reads as 0 and not as 1. Any failure means a bump was
-applied unevenly — fix it before merging anything else.
+Adding a pin point means adding it to `PIN_POINTS` in that script and to the
+table above.
 
 ## Resolving a digest
 
@@ -157,8 +160,8 @@ grep -rl --include='*.yml' "${OLD}" .github/workflows/ \
 rm -f .github/workflows/*.yml.bak
 ```
 
-Then re-run the two-property check above, and update each trailing tag
-comment's date by hand.
+Then run `check_helia_ci_image_pins.sh` (above), and update each trailing
+tag comment's date by hand.
 
 ## Local dev
 

@@ -99,6 +99,11 @@ jobs:
       - name: Check for KernelRunner temporaries
         run: ./tensorflow/lite/micro/tools/ci_build/check_helia_kernel_runner_temporaries.sh
 
+      # helia-rt #219: workflows use the CI image only through one shared
+      # digest, so an uneven bump or a tag reference fails the PR.
+      - name: Check CI image pins agree
+        run: ./tensorflow/lite/micro/tools/ci_build/check_helia_ci_image_pins.sh
+
   armclang_m4_qualification:
     needs: ci-image
     if: ${{ inputs.armclang-m4-qualification }}

@@ -1,0 +1,186 @@
+#!/usr/bin/env bash
+# Copyright 2026 The TensorFlow Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+#
+# Checks that the workflows use the CI image only through one shared digest.
+#
+# The test matrix and the release build pull the image from separate literals
+# in separate workflows. If a bump updates some and not others, or a workflow
+# uses a tag, release artifacts can be built by an image nothing tested.
+# see AmbiqAI/helia-rt#219 and .github/workflows/README.md
+#
+# Rules, applied to every .yml/.yaml workflow outside comments. Comments are
+# found line by line (a line starting with #, or a # after whitespace), which
+# matches YAML except inside block scalars and quoted strings: there a " #"
+# before the image on the same line hides the reference. Rules:
+#   * each pin point below references the image exactly once, as
+#     ghcr.io/ambiqai/helia-rt-ci@sha256:<64 lowercase hex digits>;
+#   * all pin points carry the same digest;
+#   * no other reference to the image exists, by digest, tag or bare name,
+#     except the bare repository name in the image publisher. A new pin point
+#     is added to PIN_POINTS and to the README table on purpose;
+#   * a reference is the whole token around ambiqai/helia-rt-ci: any host
+#     other than ghcr.io/ or docker://ghcr.io/ (another host, a port, a
+#     path), a host or name not spelled in lowercase, or a name, path, # or
+#     $-expansion continuing after helia-rt-ci, is a look-alike and fails
+#     wherever it appears. A # directly after the name or digest is part of
+#     the token, so a digest followed by one is not a valid pin.
+#
+# Usage: check_helia_ci_image_pins.sh [root]
+#   root defaults to the repository root inferred from this script's location.
+#
+# Exit codes: 0 consistent, 1 inconsistent references, 2 usage error or an
+# unreadable workflow.
+
+set -e
+set -u
+set -o pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="${1:-$(cd "${SCRIPT_DIR}/../../../../.." && pwd)}"
+WORKFLOWS="${ROOT}/.github/workflows"
+
+if [[ ! -d "${WORKFLOWS}" ]]; then
+  echo "usage: $(basename "$0") [repo-root]" >&2
+  echo "error: '${ROOT}' has no .github/workflows directory" >&2
+  exit 2
+fi
+
+PIN_POINTS=(
+  ci.yml
+  helia_build.yml
+  helia_release.yml
+  helia_test.yml
+  check_tflite_files.yml
+)
+PUBLISHER=helia_build_docker_image.yml
+
+IMAGE='ghcr.io/ambiqai/helia-rt-ci'
+NAME='ambiqai/helia-rt-ci'
+DIGEST_RE='^@sha256:[0-9a-f]{64}$'
+
+is_pin_point() {
+  local pin
+  for pin in "${PIN_POINTS[@]}"; do
+    [[ "$1" == "${pin}" ]] && return 0
+  done
+  return 1
+}
+
+# One "file<US>kind<US>suffix<US>text" line (US = \037, which unlike a tab
+# keeps empty fields) per reference to ambiqai/helia-rt-ci outside a comment.
+# kind is "lookalike" when the host before the name is not ghcr.io/ or
+# docker://ghcr.io/, or the token continues the name, else "ref"; suffix is
+# the rest of the token after the name (empty for the bare name) and text the
+# whole token. The name is found case-insensitively, but only the lowercase
+# spelling of the host and name is a "ref": Docker rejects an upper-case
+# repository path, and the host is held to the one spelling pins use.
+references() {
+  local path
+  for path in "${WORKFLOWS}"/*.yml "${WORKFLOWS}"/*.yaml; do
+    [[ -f "${path}" ]] || continue
+    awk -v file="$(basename "${path}")" -v name="${NAME}" '
+      {
+        line = $0
+        sub(/\r$/, "", line)
+        if (line ~ /^[[:space:]]*#/) next
+        sub(/[[:space:]]#.*$/, "", line)
+        lower = tolower(line)
+        while ((i = index(lower, name)) > 0) {
+          start = i
+          while (start > 1 && substr(lower, start - 1, 1) ~ /[a-z0-9._:\/-]/)
+            start--
+          host = substr(line, start, i - start)
+          rest = substr(line, i + length(name))
+          suffix = ""
+          if (match(rest, /^[A-Za-z0-9._:@\/+$#-]+/))
+            suffix = substr(rest, 1, RLENGTH)
+          kind = "ref"
+          if (host != "ghcr.io/" && host != "docker://ghcr.io/")
+            kind = "lookalike"
+          if (substr(line, i, length(name)) != name)
+            kind = "lookalike"
+          if (suffix != "" && suffix !~ /^[@:]/)
+            kind = "lookalike"
+          text = substr(line, start, i + length(name) - start) suffix
+          print file "\037" kind "\037" suffix "\037" text
+          line = substr(line, i + length(name))
+          lower = substr(lower, i + length(name))
+        }
+      }' "${path}" || return 1
+  done
+}
+
+if ! refs="$(references)"; then
+  echo "error: could not read the workflows under ${WORKFLOWS}" >&2
+  exit 2
+fi
+
+status=0
+declare -A pin_count=()
+digests=()
+
+while IFS=$'\037' read -r file kind suffix text; do
+  [[ -n "${file}" ]] || continue
+  if [[ "${kind}" == "lookalike" ]]; then
+    echo "error: ${file} references a look-alike of the CI image as" \
+         "'${text}'" >&2
+    status=1
+    continue
+  fi
+  if is_pin_point "${file}"; then
+    pin_count["${file}"]=$(( ${pin_count["${file}"]:-0} + 1 ))
+    if [[ "${suffix}" =~ ${DIGEST_RE} ]]; then
+      digests+=("${file}: ${suffix#@sha256:}")
+    else
+      echo "error: ${file} references the CI image as '${IMAGE}${suffix}';" \
+           "expected @sha256:<64 lowercase hex>" >&2
+      status=1
+    fi
+  elif [[ "${file}" == "${PUBLISHER}" && -z "${suffix}" ]]; then
+    continue
+  else
+    echo "error: ${file} references the CI image as '${IMAGE}${suffix}'" \
+         "but is not a listed pin point" >&2
+    status=1
+  fi
+done <<< "${refs}"
+
+for file in "${PIN_POINTS[@]}"; do
+  if [[ ! -f "${WORKFLOWS}/${file}" ]]; then
+    echo "error: pin point ${file} is missing" >&2
+    status=1
+  elif [[ "${pin_count["${file}"]:-0}" -ne 1 ]]; then
+    echo "error: ${file} references the CI image" \
+         "${pin_count["${file}"]:-0} times; expected 1" >&2
+    status=1
+  fi
+done
+
+if [[ "${#digests[@]}" -gt 0 ]]; then
+  distinct="$(printf '%s\n' "${digests[@]}" | sed 's/^[^ ]* //' \
+              | sort -u | grep -c .)"
+  if [[ "${distinct}" -ne 1 ]]; then
+    echo "error: pin points carry ${distinct} different digests:" >&2
+    printf '  %s\n' "${digests[@]}" >&2
+    status=1
+  fi
+fi
+
+if [[ "${status}" -eq 0 ]]; then
+  echo "check_helia_ci_image_pins: ${#PIN_POINTS[@]} pin points share digest" \
+       "${digests[0]#* }"
+fi
+exit "${status}"
