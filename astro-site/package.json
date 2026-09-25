@@ -18,6 +18,7 @@
     "prepare:docs": "node scripts/build-info.mjs && node scripts/check-operators.mjs && node scripts/check-api-index.mjs && node scripts/build-reference.mjs && node scripts/build-operator-export.mjs",
     "predev": "npm run prepare:docs",
     "prebuild": "npm run prepare:docs",
+    "precheck": "node scripts/build-info.mjs",
     "check:operators": "node scripts/check-operators.mjs",
     "check:output": "node scripts/check-output.mjs && helia-ui-check-discoverability --root .",
     "reference:build": "node scripts/build-reference.mjs",

@@ -25,6 +25,8 @@ npm run preview
 
 Site-wide search uses the Pagefind index created by the production build. Test it in preview, and reload an open tab after rebuilding. Operator filters also work in development.
 
+`npm run check` also works before a build: its precheck generates the source metadata required by the Astro configuration. It does not generate or validate the complete API reference; run the build and the remaining checks above for that coverage.
+
 ## Reference scope and checks
 
 `src/data/api-manifest.json` selects application-facing declarations for execution, model loading, registration, allocation, planning, profiling and platform initialization. Internal kernel helpers, test utilities and FlatBuffer builders are excluded. Add a manifest entry when expanding that scope.

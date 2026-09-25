@@ -5,6 +5,10 @@ description: Choose an integration and run your first inference with heliaRT.
 
 heliaRT is Ambiq's optimized fork of LiteRT for Microcontrollers. It keeps the model, interpreter and operator-resolver programming model while integrating HELIA kernel adapters.
 
+## Run a known model first
+
+[Run your first model](/helia-rt/getting-started/first-model/) embeds a supplied sine model, builds a complete host application with CMake, and checks its outputs. Start here for a working reference-backend baseline before integrating your own model or board.
+
 ## Start with your integration
 
 [Choose your path](/helia-rt/getting-started/choose-your-path/) to connect heliaRT to Zephyr, neuralSPOT-X, a CMSIS-Pack project or your own firmware build.
