@@ -338,17 +338,9 @@ TEST(HeliaFloatActivationEdgeTest, TanhFloat16NanBehavior) {
                                  kTfLiteFloat16, input, output,
                                  tflite::testing::kNonFiniteCount);
 
-#if HELIA_TEST_MVE_FLOAT
-  // CHARACTERIZATION: arm_nn_vtanh_lut_direct_mve_f16 has the same
-  // vminnmq/vnegq_m structure as the float32 MVE helper, over a narrower
-  // table window, so the expected magnitude is the float16 window's bound.
-  tflite::testing::ExpectTanhNanCharacterized(
-      static_cast<float>(output[0]), "f16/MVE");
-#else
-  // CONTRACT: arm_nn_tanh_scalar_ref_f16 is a pure rational evaluation, so a
-  // NaN flows through the arithmetic untouched.
+  // CONTRACT: heliaCORE preserves NaN in float16 tanh on both the MVE and the
+  // scalar route (from v7.36.0). see AmbiqAI/ns-cmsis-nn#537
   EXPECT_TRUE(std::isnan(static_cast<float>(output[0])));
-#endif
 
   EXPECT_NEAR(1.0f, static_cast<float>(output[1]),
               tflite::testing::kFloat16ActivationTolerance);
