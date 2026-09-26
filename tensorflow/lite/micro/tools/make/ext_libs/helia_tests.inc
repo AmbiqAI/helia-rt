@@ -8,6 +8,7 @@
 # not provide). Keeping these tests under kernels/helia/tests/ avoids
 # patching the upstream test files for purely additive coverage.
 MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/depthwise_dilated_test.cc \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/hard_swish_int16_test.cc \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/pooling_status_test.cc \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/quantize_zero_point_test.cc \
@@ -95,7 +96,7 @@ $(kernel_convolution_status_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_convolve_wrapper_s16 \
   -Wl,--wrap=arm_depthwise_conv_wrapper_s8 \
   -Wl,--wrap=arm_depthwise_conv_wrapper_s4 \
-  -Wl,--wrap=arm_depthwise_conv_s16 \
+  -Wl,--wrap=arm_depthwise_conv_wrapper_s16 \
   -Wl,--wrap=arm_convolve_weight_sum \
   -Wl,--wrap=arm_depthwise_convolve_weight_sum \
   -Wl,--wrap=arm_convolve_s8_get_weights_sum_size \
@@ -103,7 +104,8 @@ $(kernel_convolution_status_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_convolve_wrapper_s4_get_buffer_size \
   -Wl,--wrap=arm_convolve_wrapper_s16_get_buffer_size \
   -Wl,--wrap=arm_depthwise_conv_wrapper_s8_get_buffer_size \
-  -Wl,--wrap=arm_depthwise_conv_wrapper_s4_get_buffer_size
+  -Wl,--wrap=arm_depthwise_conv_wrapper_s4_get_buffer_size \
+  -Wl,--wrap=arm_depthwise_conv_wrapper_s16_get_buffer_size
 endif
 
 # Fully connected fast-1x1 activation-context contract.

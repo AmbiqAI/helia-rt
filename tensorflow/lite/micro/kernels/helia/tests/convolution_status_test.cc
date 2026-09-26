@@ -42,6 +42,7 @@ enum class QueryRoute {
   kConvS16,
   kDepthwiseS8,
   kDepthwiseS4,
+  kDepthwiseS16,
   kCount,
 };
 
@@ -168,6 +169,17 @@ int32_t __wrap_arm_depthwise_conv_wrapper_s4_get_buffer_size(
     const cmsis_nn_dims* filter_dims, const cmsis_nn_dims* output_dims) {
   return RecordQuery(QueryRoute::kDepthwiseS4,
                      __real_arm_depthwise_conv_wrapper_s4_get_buffer_size(
+                         params, input_dims, filter_dims, output_dims));
+}
+
+int32_t __real_arm_depthwise_conv_wrapper_s16_get_buffer_size(
+    const cmsis_nn_dw_conv_params*, const cmsis_nn_dims*, const cmsis_nn_dims*,
+    const cmsis_nn_dims*);
+int32_t __wrap_arm_depthwise_conv_wrapper_s16_get_buffer_size(
+    const cmsis_nn_dw_conv_params* params, const cmsis_nn_dims* input_dims,
+    const cmsis_nn_dims* filter_dims, const cmsis_nn_dims* output_dims) {
+  return RecordQuery(QueryRoute::kDepthwiseS16,
+                     __real_arm_depthwise_conv_wrapper_s16_get_buffer_size(
                          params, input_dims, filter_dims, output_dims));
 }
 
@@ -338,12 +350,12 @@ arm_cmsis_nn_status __wrap_arm_depthwise_conv_wrapper_s4(
       bias_dims, bias, output_dims, output);
 }
 
-arm_cmsis_nn_status __real_arm_depthwise_conv_s16(
+arm_cmsis_nn_status __real_arm_depthwise_conv_wrapper_s16(
     const cmsis_nn_context*, const cmsis_nn_dw_conv_params*,
     const cmsis_nn_per_channel_quant_params*, const cmsis_nn_dims*,
     const int16_t*, const cmsis_nn_dims*, const int8_t*, const cmsis_nn_dims*,
     const int64_t*, const cmsis_nn_dims*, int16_t*);
-arm_cmsis_nn_status __wrap_arm_depthwise_conv_s16(
+arm_cmsis_nn_status __wrap_arm_depthwise_conv_wrapper_s16(
     const cmsis_nn_context* context, const cmsis_nn_dw_conv_params* params,
     const cmsis_nn_per_channel_quant_params* quant_params,
     const cmsis_nn_dims* input_dims, const int16_t* input,
@@ -353,9 +365,9 @@ arm_cmsis_nn_status __wrap_arm_depthwise_conv_s16(
   if (RecordCompute(ComputeRoute::kDepthwiseS16, context)) {
     return ARM_CMSIS_NN_ARG_ERROR;
   }
-  return __real_arm_depthwise_conv_s16(context, params, quant_params,
-                                       input_dims, input, filter_dims, filter,
-                                       bias_dims, bias, output_dims, output);
+  return __real_arm_depthwise_conv_wrapper_s16(
+      context, params, quant_params, input_dims, input, filter_dims, filter,
+      bias_dims, bias, output_dims, output);
 }
 
 }  // extern "C"
@@ -524,6 +536,7 @@ QueryRoute QueryFor(ComputeRoute route) {
     case ComputeRoute::kDepthwiseS4:
       return QueryRoute::kDepthwiseS4;
     case ComputeRoute::kDepthwiseS16:
+      return QueryRoute::kDepthwiseS16;
     case ComputeRoute::kCount:
       return QueryRoute::kCount;
   }
@@ -774,6 +787,11 @@ TEST(HeliaConvolutionStatusTest, DepthwiseS8RejectsNegativeActivationSize) {
 TEST(HeliaConvolutionStatusTest, DepthwiseS4RejectsNegativeActivationSize) {
   ExpectActivationQueryError(ComputeRoute::kDepthwiseS4,
                              tflite::Register_DEPTHWISE_CONV_2D());
+}
+
+TEST(HeliaConvolutionStatusTest, DepthwiseS16RejectsNegativeActivationSize) {
+  ExpectActivationQueryError(ComputeRoute::kDepthwiseS16,
+                             tflite::Register_DEPTHWISE_CONV_2D_INT16());
 }
 
 TEST(HeliaConvolutionStatusTest, ConvS8RejectsNegativeWeightSize) {

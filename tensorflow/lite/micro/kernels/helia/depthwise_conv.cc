@@ -266,6 +266,35 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
 #endif
     }
 
+  } else if (input->type == kTfLiteInt16) {
+    const int output_depth = SizeOfDimension(output, 3);
+    const cmsis_nn_dims input_dims = {SizeOfDimension(input, 0), input_height,
+                                      input_width, SizeOfDimension(input, 3)};
+    const cmsis_nn_dims filter_dims = {
+        SizeOfDimension(filter, 0), filter_height, filter_width, output_depth};
+    const cmsis_nn_dims output_dims = {
+        SizeOfDimension(output, 0), output_height, output_width, output_depth};
+    cmsis_nn_dw_conv_params dw_conv_params = {};
+    dw_conv_params.ch_mult = params.depth_multiplier;
+    dw_conv_params.stride.h = params.stride_height;
+    dw_conv_params.stride.w = params.stride_width;
+    dw_conv_params.padding.h = data->reference_op_data.padding.height;
+    dw_conv_params.padding.w = data->reference_op_data.padding.width;
+    dw_conv_params.dilation.h = params.dilation_height_factor;
+    dw_conv_params.dilation.w = params.dilation_width_factor;
+    const int32_t buf_size = arm_depthwise_conv_wrapper_s16_get_buffer_size(
+        &dw_conv_params, &input_dims, &filter_dims, &output_dims);
+    if (buf_size < 0) {
+      MicroPrintf(
+          "DEPTHWISE_CONV_2D: 16x8 activation buffer size query failed (%d).",
+          static_cast<int>(buf_size));
+      return kTfLiteError;
+    }
+    data->activation_buffer_size = buf_size;
+    if (buf_size > 0) {
+      TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
+          context, buf_size, &data->activation_buffer_idx));
+    }
   }
 
 #if ARM_NN_ENABLE_F32
@@ -509,17 +538,21 @@ TfLiteStatus EvalQuantizedPerChannel16x8(
                        &filter_dims, &bias_dims, &output_dims, params, data,
                        input, filter, bias, output);
 
-  cmsis_nn_context ctx = {nullptr, 0};
+  cmsis_nn_context ctx = {nullptr, data.activation_buffer_size};
+  if (data.activation_buffer_idx > -1) {
+    ctx.buf = context->GetScratchBuffer(context, data.activation_buffer_idx);
+  }
 
-  const arm_cmsis_nn_status status = arm_depthwise_conv_s16(
+  const arm_cmsis_nn_status status = arm_depthwise_conv_wrapper_s16(
       &ctx, &dw_conv_params, &quant_params, &input_dims,
       tflite::micro::GetTensorData<int16_t>(input), &filter_dims,
       tflite::micro::GetTensorData<int8_t>(filter), &bias_dims,
       tflite::micro::GetOptionalTensorData<int64_t>(bias), &output_dims,
       tflite::micro::GetTensorData<int16_t>(output));
   if (status != ARM_CMSIS_NN_SUCCESS) {
-    MicroPrintf("DEPTHWISE_CONV_2D: arm_depthwise_conv_s16 failed (%d).",
-                static_cast<int>(status));
+    MicroPrintf(
+        "DEPTHWISE_CONV_2D: arm_depthwise_conv_wrapper_s16 failed (%d).",
+        static_cast<int>(status));
     return kTfLiteError;
   }
   return kTfLiteOk;
