@@ -242,30 +242,32 @@ jobs:
         # CONCATENATION/DEQUANTIZE/HARD_SWISH/LOGISTIC/TANH/PAD/SOFTMAX status
         # adds eleven cases to that binary on every leg; ATfE rows skip the
         # injected failures. see AmbiqAI/helia-rt#238
+        # Dilated depthwise adds one binary and six cases, and 16x8 depthwise
+        # status adds one case to the conv status binary. see AmbiqAI/helia-rt#314
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 149
-            min-cases: 1260
+            min-binaries: 150
+            min-cases: 1267
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 149
-            min-cases: 1260
+            min-binaries: 150
+            min-cases: 1267
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and one case fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 148
-            min-cases: 1259
+            min-binaries: 149
+            min-cases: 1266
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 149
-            min-cases: 1308
+            min-binaries: 150
+            min-cases: 1315
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 148
-            min-cases: 1307
+            min-binaries: 149
+            min-cases: 1314
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
