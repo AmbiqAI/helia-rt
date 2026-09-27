@@ -8,7 +8,6 @@
 # not provide). Keeping these tests under kernels/helia/tests/ avoids
 # patching the upstream test files for purely additive coverage.
 MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
-  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/depthwise_dilated_test.cc \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/hard_swish_int16_test.cc \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/pooling_status_test.cc \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/quantize_zero_point_test.cc \
@@ -80,6 +79,22 @@ $(kernel_gather_pair_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_gather_f16 \
   -Wl,--wrap=arm_gather_nd_f16
 endif
+endif
+
+# Dilated and 16x8 DEPTHWISE_CONV_2D against the reference kernel. GNU links
+# wrap the heliaCORE depthwise leaves so each case also proves its route.
+# see AmbiqAI/helia-rt#318
+$(eval $(call microlite_test,kernel_depthwise_dilated_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/depthwise_dilated_test.cc))
+
+ifeq ($(TOOLCHAIN),gcc)
+$(kernel_depthwise_dilated_test_BINARY): CXXFLAGS += \
+  -DHELIA_DW_ROUTE_LINK_WRAP=1
+$(kernel_depthwise_dilated_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_depthwise_conv_s8_opt \
+  -Wl,--wrap=arm_depthwise_conv_s8 \
+  -Wl,--wrap=arm_depthwise_conv_fast_s16 \
+  -Wl,--wrap=arm_depthwise_conv_s16
 endif
 
 # Quantized CONV_2D and DEPTHWISE_CONV_2D status/context contracts.
