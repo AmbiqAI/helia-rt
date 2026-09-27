@@ -17,10 +17,14 @@ limitations under the License.
 // bit with the reference integer implementation. Dilated 1D layers take the
 // optimized heliaCORE kernels (s8_opt, fast_s16); the non-dilated 16x8 cases
 // pin that routing 16x8 through the wrapper leaves those results unchanged.
-// see AmbiqAI/helia-rt#314
+// Both routes are bit-exact, so GCC links also wrap the heliaCORE leaves and
+// each case asserts which one its invoke reached.
+// see AmbiqAI/helia-rt#314 and AmbiqAI/helia-rt#318
 
 #include <cstdint>
+#include <cstring>
 
+#include "Include/arm_nnfunctions.h"
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/kernels/internal/quantization_util.h"
@@ -31,6 +35,95 @@ limitations under the License.
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
+namespace {
+
+enum class Leaf { kS8Opt, kS8, kFastS16, kS16, kCount };
+
+int g_leaf_calls[static_cast<int>(Leaf::kCount)] = {};
+
+void CountCall(Leaf leaf) { ++g_leaf_calls[static_cast<int>(leaf)]; }
+
+}  // namespace
+
+#if HELIA_DW_ROUTE_LINK_WRAP
+extern "C" {
+
+arm_cmsis_nn_status __real_arm_depthwise_conv_s8_opt(
+    const cmsis_nn_context*, const cmsis_nn_context*,
+    const cmsis_nn_dw_conv_params*, const cmsis_nn_per_channel_quant_params*,
+    const cmsis_nn_dims*, const int8_t*, const cmsis_nn_dims*, const int8_t*,
+    const cmsis_nn_dims*, const int32_t*, const cmsis_nn_dims*, int8_t*);
+arm_cmsis_nn_status __wrap_arm_depthwise_conv_s8_opt(
+    const cmsis_nn_context* context, const cmsis_nn_context* weight_sum_context,
+    const cmsis_nn_dw_conv_params* params,
+    const cmsis_nn_per_channel_quant_params* quant_params,
+    const cmsis_nn_dims* input_dims, const int8_t* input,
+    const cmsis_nn_dims* filter_dims, const int8_t* filter,
+    const cmsis_nn_dims* bias_dims, const int32_t* bias,
+    const cmsis_nn_dims* output_dims, int8_t* output) {
+  CountCall(Leaf::kS8Opt);
+  return __real_arm_depthwise_conv_s8_opt(
+      context, weight_sum_context, params, quant_params, input_dims, input,
+      filter_dims, filter, bias_dims, bias, output_dims, output);
+}
+
+arm_cmsis_nn_status __real_arm_depthwise_conv_s8(
+    const cmsis_nn_context*, const cmsis_nn_dw_conv_params*,
+    const cmsis_nn_per_channel_quant_params*, const cmsis_nn_dims*,
+    const int8_t*, const cmsis_nn_dims*, const int8_t*, const cmsis_nn_dims*,
+    const int32_t*, const cmsis_nn_dims*, int8_t*);
+arm_cmsis_nn_status __wrap_arm_depthwise_conv_s8(
+    const cmsis_nn_context* context, const cmsis_nn_dw_conv_params* params,
+    const cmsis_nn_per_channel_quant_params* quant_params,
+    const cmsis_nn_dims* input_dims, const int8_t* input,
+    const cmsis_nn_dims* filter_dims, const int8_t* filter,
+    const cmsis_nn_dims* bias_dims, const int32_t* bias,
+    const cmsis_nn_dims* output_dims, int8_t* output) {
+  CountCall(Leaf::kS8);
+  return __real_arm_depthwise_conv_s8(context, params, quant_params, input_dims,
+                                      input, filter_dims, filter, bias_dims,
+                                      bias, output_dims, output);
+}
+
+arm_cmsis_nn_status __real_arm_depthwise_conv_fast_s16(
+    const cmsis_nn_context*, const cmsis_nn_dw_conv_params*,
+    const cmsis_nn_per_channel_quant_params*, const cmsis_nn_dims*,
+    const int16_t*, const cmsis_nn_dims*, const int8_t*, const cmsis_nn_dims*,
+    const int64_t*, const cmsis_nn_dims*, int16_t*);
+arm_cmsis_nn_status __wrap_arm_depthwise_conv_fast_s16(
+    const cmsis_nn_context* context, const cmsis_nn_dw_conv_params* params,
+    const cmsis_nn_per_channel_quant_params* quant_params,
+    const cmsis_nn_dims* input_dims, const int16_t* input,
+    const cmsis_nn_dims* filter_dims, const int8_t* filter,
+    const cmsis_nn_dims* bias_dims, const int64_t* bias,
+    const cmsis_nn_dims* output_dims, int16_t* output) {
+  CountCall(Leaf::kFastS16);
+  return __real_arm_depthwise_conv_fast_s16(
+      context, params, quant_params, input_dims, input, filter_dims, filter,
+      bias_dims, bias, output_dims, output);
+}
+
+arm_cmsis_nn_status __real_arm_depthwise_conv_s16(
+    const cmsis_nn_context*, const cmsis_nn_dw_conv_params*,
+    const cmsis_nn_per_channel_quant_params*, const cmsis_nn_dims*,
+    const int16_t*, const cmsis_nn_dims*, const int8_t*, const cmsis_nn_dims*,
+    const int64_t*, const cmsis_nn_dims*, int16_t*);
+arm_cmsis_nn_status __wrap_arm_depthwise_conv_s16(
+    const cmsis_nn_context* context, const cmsis_nn_dw_conv_params* params,
+    const cmsis_nn_per_channel_quant_params* quant_params,
+    const cmsis_nn_dims* input_dims, const int16_t* input,
+    const cmsis_nn_dims* filter_dims, const int8_t* filter,
+    const cmsis_nn_dims* bias_dims, const int64_t* bias,
+    const cmsis_nn_dims* output_dims, int16_t* output) {
+  CountCall(Leaf::kS16);
+  return __real_arm_depthwise_conv_s16(context, params, quant_params,
+                                       input_dims, input, filter_dims, filter,
+                                       bias_dims, bias, output_dims, output);
+}
+
+}  // extern "C"
+#endif  // HELIA_DW_ROUTE_LINK_WRAP
+
 namespace tflite {
 namespace testing {
 namespace {
@@ -39,6 +132,28 @@ struct Shape {
   int in_h, in_w, channels, k_h, k_w, dil_w, ch_mult;
   TfLitePadding padding;
 };
+
+enum class Route { kOptimized, kGeneric };
+
+int LeafCalls(Leaf leaf) { return g_leaf_calls[static_cast<int>(leaf)]; }
+
+// Without DSP the optimized leaves delegate to the generic one, so the
+// optimized route asserts only its own leaf.
+void ExpectRoute(bool is16, Route route) {
+#if HELIA_DW_ROUTE_LINK_WRAP
+  const int optimized = LeafCalls(is16 ? Leaf::kFastS16 : Leaf::kS8Opt);
+  const int generic = LeafCalls(is16 ? Leaf::kS16 : Leaf::kS8);
+  if (route == Route::kOptimized) {
+    EXPECT_EQ(1, optimized);
+  } else {
+    EXPECT_EQ(0, optimized);
+    EXPECT_EQ(1, generic);
+  }
+#else
+  (void)is16;
+  (void)route;
+#endif
+}
 
 constexpr int kMaxInput = 240 * 35;
 constexpr int kMaxFilter = 9 * 64;
@@ -57,7 +172,7 @@ int OutSize(TfLitePadding padding, int in, int k, int dil) {
 }
 
 template <typename TIn, typename TBias>
-void ExpectMatchesReference(const Shape& s) {
+void ExpectMatchesReference(const Shape& s, Route route) {
   static TIn input[kMaxInput];
   static int8_t filter[kMaxFilter];
   static TBias bias[kMaxChannels];
@@ -151,7 +266,9 @@ void ExpectMatchesReference(const Shape& s) {
   micro::KernelRunner runner(registration, tensors, 4, IntArrayFromInts(inputs),
                              IntArrayFromInts(outputs), &params);
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  memset(g_leaf_calls, 0, sizeof(g_leaf_calls));
   EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  ExpectRoute(kIs16, route);
 
   DepthwiseParams op_params = {};
   op_params.padding_type = s.padding == kTfLitePaddingSame
@@ -192,40 +309,41 @@ void ExpectMatchesReference(const Shape& s) {
 }  // namespace tflite
 
 using tflite::testing::ExpectMatchesReference;
+using tflite::testing::Route;
 using tflite::testing::Shape;
 
 TEST(HeliaDepthwiseDilatedTest, Int8Dilated1DValid) {
   ExpectMatchesReference<int8_t, int32_t>(
-      Shape{1, 240, 32, 1, 7, 8, 1, kTfLitePaddingValid});
+      Shape{1, 240, 32, 1, 7, 8, 1, kTfLitePaddingValid}, Route::kOptimized);
 }
 
 // SAME padding, and a channel count that is not a multiple of four, so the
 // optimized kernel's channel tail runs.
 TEST(HeliaDepthwiseDilatedTest, Int8Dilated1DSameOddChannels) {
   ExpectMatchesReference<int8_t, int32_t>(
-      Shape{1, 96, 35, 1, 5, 4, 1, kTfLitePaddingSame});
+      Shape{1, 96, 35, 1, 5, 4, 1, kTfLitePaddingSame}, Route::kOptimized);
 }
 
 TEST(HeliaDepthwiseDilatedTest, Int16x8Dilated1DValid) {
   ExpectMatchesReference<int16_t, int64_t>(
-      Shape{1, 240, 32, 1, 7, 8, 1, kTfLitePaddingValid});
+      Shape{1, 240, 32, 1, 7, 8, 1, kTfLitePaddingValid}, Route::kOptimized);
 }
 
 TEST(HeliaDepthwiseDilatedTest, Int16x8Dilated1DSameOddChannels) {
   ExpectMatchesReference<int16_t, int64_t>(
-      Shape{1, 96, 35, 1, 5, 4, 1, kTfLitePaddingSame});
+      Shape{1, 96, 35, 1, 5, 4, 1, kTfLitePaddingSame}, Route::kOptimized);
 }
 
 // Non-dilated 16x8 layers that the wrapper now routes to fast_s16.
 TEST(HeliaDepthwiseDilatedTest, Int16x8Undilated2D) {
   ExpectMatchesReference<int16_t, int64_t>(
-      Shape{9, 11, 19, 3, 3, 1, 1, kTfLitePaddingSame});
+      Shape{9, 11, 19, 3, 3, 1, 1, kTfLitePaddingSame}, Route::kOptimized);
 }
 
 // ch_mult > 1 stays on arm_depthwise_conv_s16.
 TEST(HeliaDepthwiseDilatedTest, Int16x8ChannelMultiplier) {
   ExpectMatchesReference<int16_t, int64_t>(
-      Shape{5, 7, 8, 3, 3, 1, 2, kTfLitePaddingValid});
+      Shape{5, 7, 8, 3, 3, 1, 2, kTfLitePaddingValid}, Route::kGeneric);
 }
 
 TF_LITE_MICRO_TESTS_MAIN
