@@ -17,6 +17,7 @@ limitations under the License.
 
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
+#include "tensorflow/lite/kernels/internal/types.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
@@ -37,20 +38,31 @@ int basic_output_dims[] = {4, 4, 2, 2, 1};
 const float basic_golden[kBasicInputOutputSize] = {1, 3, 9,  11, 2, 4, 10, 12,
                                                    5, 7, 13, 15, 6, 8, 14, 16};
 
+void* InitWithNonzeroPadding(TfLiteContext* context, const char* buffer,
+                             size_t length) {
+  void* data = Register_SPACE_TO_BATCH_ND().init(context, buffer, length);
+  // Persistent storage is not guaranteed to be zero-filled before Prepare.
+  static_cast<SpaceToBatchParams*>(data)->output_offset = 0x55555555;
+  return data;
+}
+
 template <typename T>
 TfLiteStatus ValidateSpaceToBatchNdGoldens(TfLiteTensor* tensors,
                                            int tensors_size, const T* golden,
-                                           T* output, int output_size) {
+                                           T* output, int output_size,
+                                           bool invoke = true) {
   int inputs_array_data[] = {3, 0, 1, 2};
   TfLiteIntArray* inputs_array = IntArrayFromInts(inputs_array_data);
   int outputs_array_data[] = {1, 3};
   TfLiteIntArray* outputs_array = IntArrayFromInts(outputs_array_data);
 
-  const TFLMRegistration registration = Register_SPACE_TO_BATCH_ND();
+  TFLMRegistration registration = Register_SPACE_TO_BATCH_ND();
+  registration.init = InitWithNonzeroPadding;
   micro::KernelRunner runner(registration, tensors, tensors_size, inputs_array,
                              outputs_array, nullptr);
 
   TF_LITE_ENSURE_STATUS(runner.InitAndPrepare());
+  if (!invoke) return kTfLiteOk;
   TF_LITE_ENSURE_STATUS(runner.Invoke());
 
   for (int i = 0; i < output_size; ++i) {
@@ -94,7 +106,7 @@ TfLiteStatus TestSpaceToBatchNdQuantized(
     const int32_t* block_shape_data, int* crops_dims_data,
     const int32_t* crops_data, int* output_dims_data, const float* golden,
     T* golden_quantized, float output_scale, int output_zero_point,
-    T* output_data) {
+    T* output_data, bool invoke = true) {
   TfLiteIntArray* input_dims = IntArrayFromInts(input_dims_data);
   TfLiteIntArray* block_shape_dims = IntArrayFromInts(block_shape_dims_data);
   TfLiteIntArray* crops_dims = IntArrayFromInts(crops_dims_data);
@@ -116,7 +128,8 @@ TfLiteStatus TestSpaceToBatchNdQuantized(
                    output_scale, output_zero_point);
 
   return ValidateSpaceToBatchNdGoldens(tensors, tensors_size, golden_quantized,
-                                       output_data, ElementCount(*output_dims));
+                                       output_data, ElementCount(*output_dims),
+                                       invoke);
 }
 
 }  // namespace
@@ -147,6 +160,81 @@ TEST(SpaceToBatchNdTest, SpaceToBatchBasicInt8) {
           tflite::testing::basic_block_shape, tflite::testing::basic_crops_dims,
           tflite::testing::basic_crops, tflite::testing::basic_output_dims,
           tflite::testing::basic_golden, golden_quantized, 1.0f, 0, output));
+}
+
+TEST(SpaceToBatchNdTest, PaddedInt8) {
+  int input_dims[] = {4, 1, 1, 1, 2};
+  const float input[] = {1, 2};
+  int block_dims[] = {1, 2};
+  const int32_t block[] = {2, 2};
+  int padding_dims[] = {2, 2, 2};
+  const int32_t padding[] = {1, 0, 0, 1};
+  int output_dims[] = {4, 4, 1, 1, 2};
+  const float golden[] = {0, 0, 0, 0, 1, 2, 0, 0};
+  for (int zero_point : {-128, -17, 0, 42, 127}) {
+    int8_t input_quantized[2];
+    int8_t golden_quantized[8];
+    int8_t output[8];
+    EXPECT_EQ(kTfLiteOk,
+              tflite::testing::TestSpaceToBatchNdQuantized(
+                  input_dims, input, input_quantized, 0.5f, zero_point,
+                  block_dims, block, padding_dims, padding, output_dims, golden,
+                  golden_quantized, 0.5f, zero_point, output));
+  }
+}
+
+TEST(SpaceToBatchNdTest, PaddedFloat) {
+  int input_dims[] = {4, 1, 1, 1, 2};
+  const float input[] = {-1.5f, 2.5f};
+  int block_dims[] = {1, 2};
+  const int32_t block[] = {2, 2};
+  int padding_dims[] = {2, 2, 2};
+  const int32_t padding[] = {1, 0, 0, 1};
+  int output_dims[] = {4, 4, 1, 1, 2};
+  const float golden[] = {0, 0, 0, 0, -1.5f, 2.5f, 0, 0};
+  float output[8];
+  EXPECT_EQ(kTfLiteOk, tflite::testing::TestSpaceToBatchNdFloat(
+                           input_dims, input, block_dims, block, padding_dims,
+                           padding, output_dims, golden, output));
+}
+
+TEST(SpaceToBatchNdTest, PaddedInt8ThreeDimensions) {
+  int input_dims[] = {3, 1, 1, 2};
+  const float input[] = {1, 2};
+  int block_dims[] = {1, 1};
+  const int32_t block[] = {2};
+  int padding_dims[] = {2, 1, 2};
+  const int32_t padding[] = {1, 0};
+  int output_dims[] = {3, 2, 1, 2};
+  const float golden[] = {0, 0, 1, 2};
+  int8_t input_quantized[2];
+  int8_t golden_quantized[4];
+  int8_t output[4];
+  EXPECT_EQ(kTfLiteOk,
+            tflite::testing::TestSpaceToBatchNdQuantized(
+                input_dims, input, input_quantized, 0.5f, -128, block_dims,
+                block, padding_dims, padding, output_dims, golden,
+                golden_quantized, 0.5f, -128, output));
+}
+
+TEST(SpaceToBatchNdTest, RejectMismatchedInt8Quantization) {
+  int8_t output[tflite::testing::kBasicInputOutputSize];
+  int8_t input_quantized[tflite::testing::kBasicInputOutputSize];
+  int8_t golden_quantized[tflite::testing::kBasicInputOutputSize];
+  const float output_scales[] = {2.0f, 1.0f};
+  const int output_zero_points[] = {0, 1};
+  for (int i = 0; i < 2; ++i) {
+    EXPECT_EQ(
+        kTfLiteError,
+        tflite::testing::TestSpaceToBatchNdQuantized(
+            tflite::testing::basic_input_dims, tflite::testing::basic_input,
+            input_quantized, 1.0f, 0, tflite::testing::basic_block_shape_dims,
+            tflite::testing::basic_block_shape,
+            tflite::testing::basic_crops_dims, tflite::testing::basic_crops,
+            tflite::testing::basic_output_dims, tflite::testing::basic_golden,
+            golden_quantized, output_scales[i], output_zero_points[i], output,
+            false));
+  }
 }
 
 TF_LITE_MICRO_TESTS_MAIN
