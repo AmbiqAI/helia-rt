@@ -1,0 +1,22 @@
+---
+import Card from '@ambiqai/helia-ui/astro/Card';
+import CardHeader from '@ambiqai/helia-ui/astro/CardHeader';
+import CardContent from '@ambiqai/helia-ui/astro/CardContent';
+interface Props { detailed?: boolean; }
+const { detailed = false } = Astro.props;
+import paths from '../data/integration-paths.json';
+---
+<div class="integration-paths not-content">
+  {paths.map(path => <Card id={path.id} interactive tone="outlined">
+    <CardHeader titleAs={detailed ? 'h2' : 'h3'} href={`/helia-rt/getting-started/${path.route}/`}>{path.title}</CardHeader>
+    <CardContent><p>{path.summary}</p>{detailed && <p class="path-detail">{path.detail}</p>}<span class="path-action" aria-hidden="true">View setup guide ↗</span></CardContent>
+  </Card>)}
+</div>
+<style>
+.integration-paths { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-block: 24px; }
+.integration-paths :global(.helia-card) { scroll-margin-top: 10rem; }
+.integration-paths p { margin: 0; }
+.integration-paths .path-detail { margin-top: 12px; color: var(--helia-ink-secondary); font-size: 14px; }
+.path-action { display: block; margin-top: 20px; font-size: 13px; color: var(--helia-ink-secondary); }
+@media (max-width: 600px) { .integration-paths { grid-template-columns: 1fr; } }
+</style>

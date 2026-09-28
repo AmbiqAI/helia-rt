@@ -9,7 +9,7 @@ Start with a working Zephyr workspace, a board application that already builds, 
 
 Add these projects to the `manifest.projects` list in your workspace's west manifest. This example pairs runtime v1.21.0 with the heliaCORE version required by its adapters:
 
-```yaml
+```yaml title="west.yml · projects"
 - name: helia-rt
   url: https://github.com/AmbiqAI/helia-rt
   revision: helia-rt-v1.21.0
@@ -32,7 +32,7 @@ West discovers their module metadata automatically. For local checkouts outside 
 
 A minimal application `CMakeLists.txt` is:
 
-```cmake
+```cmake title="CMakeLists.txt"
 cmake_minimum_required(VERSION 3.20.0)
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(helia_rt_app)
@@ -41,7 +41,7 @@ target_sources(app PRIVATE src/main.cpp src/model_data.cpp)
 
 Add to `prj.conf`:
 
-```ini
+```ini title="prj.conf"
 CONFIG_STD_CPP17=y
 CONFIG_HELIA_RT=y
 CONFIG_NS_CMSIS_NN=y
@@ -58,7 +58,7 @@ For source builds, choose `CONFIG_HELIA_RT_KERNEL_OPTIMIZE_SPEED=y` (the default
 
 For the Reference backend, replace the HELIA settings with:
 
-```ini
+```ini title="prj.conf"
 CONFIG_HELIA_RT=y
 CONFIG_NS_CMSIS_NN=n
 CONFIG_HELIA_RT_BACKEND_REFERENCE=y
@@ -66,7 +66,7 @@ CONFIG_HELIA_RT_BACKEND_REFERENCE=y
 
 For upstream Arm CMSIS-NN, make its module available in the workspace and use:
 
-```ini
+```ini title="prj.conf"
 CONFIG_HELIA_RT=y
 CONFIG_NS_CMSIS_NN=n
 CONFIG_CMSIS_NN=y
@@ -79,7 +79,7 @@ Enable the upstream CMSIS-NN kernel groups required by your model using that mod
 
 Extract a matching [release bundle](https://github.com/AmbiqAI/helia-rt/releases) into your workspace. Remove the source modules from this application's module discovery. Add the bundle before Zephyr is loaded:
 
-```cmake
+```cmake title="CMakeLists.txt"
 list(APPEND ZEPHYR_EXTRA_MODULES
   "${CMAKE_CURRENT_SOURCE_DIR}/../../modules/helia-rt-bundle")
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
@@ -87,7 +87,7 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 
 Adjust the relative path to your extracted bundle. Configure:
 
-```ini
+```ini title="prj.conf"
 CONFIG_STD_CPP17=y
 CONFIG_HELIA_RT=y
 CONFIG_FPU=y

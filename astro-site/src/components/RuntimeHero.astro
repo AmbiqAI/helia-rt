@@ -1,17 +1,25 @@
 ---
 import versionHeader from '../../../tensorflow/lite/micro/helia_rt_version.h?raw';
-import releaseWorkflow from '../../../.github/workflows/helia_release.yml?raw';
-import { parse } from 'yaml';
-import '@fontsource-variable/inter';
-import CodeBlock from '@ambiqai/helia-ui/astro/CodeBlock';
+import Hero from '@ambiqai/helia-ui/astro/Hero';
+import Button from '@ambiqai/helia-ui/astro/Button';
+import { Code } from 'astro:components';
 import Card from '@ambiqai/helia-ui/astro/Card';
 
 const version = versionHeader.match(/#define HELIA_RT_VERSION "([^"]+)"/)?.[1];
 if (!version) throw new Error('HELIA_RT_VERSION is missing from the runtime header.');
-const release = parse(releaseWorkflow);
-const matrix = release.jobs.build.strategy.matrix;
-const buildCount = matrix.arch.length * matrix.build.length * matrix.toolchain.length;
 const releaseSource = 'https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/helia_release.yml';
+const codeTheme = {
+  name: 'rt-hero',
+  type: 'dark' as const,
+  colors: { 'editor.background': '#131b20', 'editor.foreground': '#e4e9ec' },
+  tokenColors: [
+    { scope: ['entity.name.type', 'entity.name.namespace', 'entity.name.scope-resolution', 'storage.type', 'support.type'], settings: { foreground: '#80cec7' } },
+    { scope: ['entity.name.function', 'support.function'], settings: { foreground: '#acd3e2' } },
+    { scope: ['keyword', 'storage.modifier'], settings: { foreground: '#a9bbbF' } },
+    { scope: ['constant.numeric'], settings: { foreground: '#80cec7' } },
+    { scope: ['variable', 'punctuation', 'keyword.operator'], settings: { foreground: '#e4e9ec' } },
+  ],
+};
 const code = `tflite::MicroMutableOpResolver<3> resolver;
 resolver.AddConv2D();
 resolver.AddFullyConnected();
@@ -24,28 +32,25 @@ interpreter.Invoke();`;
 ---
 
 <div class="rt-opening">
-  <section class="rt-hero" aria-labelledby="rt-headline">
-    <div class="rt-copy">
-      <p class="rt-kicker"><span aria-hidden="true"></span> HELIA AI runtime for Ambiq silicon</p>
-      <h1 id="rt-headline">Proven LiteRT workflows.<br />Turbocharged on Ambiq silicon.</h1>
-      <p class="rt-summary">heliaRT is Ambiq's optimized LiteRT runtime: the same <code>.tflite</code> models and MicroInterpreter API, backed by heliaCORE kernels tuned for Ambiq silicon.</p>
-      <div class="rt-actions">
-        <a class="rt-primary" href={`${import.meta.env.BASE_URL}/getting-started/`}>Get started</a>
-        <a class="rt-secondary" href="#why-heliart">Why heliaRT</a>
-      </div>
-    </div>
-    <Card tone="ink" class="rt-panel">
-      <div class="rt-panel-title"><span>HELIA backend</span><a href="https://github.com/AmbiqAI/helia-rt/releases" aria-label={`heliaRT ${version} releases`}>{version}</a></div>
+  <Hero variant="contrast" palette="product" size="compact" eyebrow="heliaRT">
+    <Fragment>Proven LiteRT workflows.<br />Turbocharged on Ambiq silicon.</Fragment>
+    <Fragment slot="summary">heliaRT is Ambiq's optimized LiteRT runtime: the same <code>.tflite</code> models and MicroInterpreter API, backed by heliaCORE kernels tuned for Ambiq silicon.</Fragment>
+    <Button slot="actions" href={`${import.meta.env.BASE_URL}/getting-started/`}>Get started</Button>
+    <Button slot="actions" variant="secondary" href="#why-heliart">Why heliaRT</Button>
+    <div slot="actions" class="hero-release-row"><a href="https://github.com/AmbiqAI/helia-rt/releases" aria-label={`heliaRT ${version} releases`}>{version}</a></div>
+    <Card slot="media" tone="ink" class="rt-panel">
       <div class="rt-metrics">
-        <div><strong>.tflite</strong><span>Same model format</span></div>
-        <div><strong>HELIA</strong><span>Optimized backend</span></div>
-        <a href={releaseSource}><strong>{buildCount}</strong><span>Release build combos</span></a>
-        <a href={releaseSource}><strong>{matrix.toolchain.length}</strong><span>Build toolchains</span></a>
+        <a href="/helia-rt/guide/runtime/"><strong>LiteRT API</strong><span>MicroInterpreter + OpResolver</span></a>
+        <a href="/helia-rt/guide/build-configuration/"><strong>heliaCORE kernels</strong><span>Selected at build time</span></a>
+        <a href="/helia-rt/guide/memory-and-profiling/"><strong>Tensor arena</strong><span>Application-owned memory</span></a>
+        <a href="/helia-rt/guide/memory-and-profiling/#profile-operators"><strong>Operator profiling</strong><span>Per-operator timing</span></a>
       </div>
-      <CodeBlock code={code} language="cpp" label="LiteRT API, Ambiq-tuned backend" />
-      <p class="rt-code-note">API sketch. <a href={`${import.meta.env.BASE_URL}/getting-started/first-inference/`}>See input handling and status checks →</a></p>
+      <figure class="rt-code">
+        <figcaption><span>Inference</span><span>C++</span></figcaption>
+        <Code code={code} lang="cpp" theme={codeTheme} />
+      </figure>
     </Card>
-  </section>
+  </Hero>
   <nav class="rt-ecosystems" aria-label="Integration paths and toolchains">
     <a href={`${import.meta.env.BASE_URL}/getting-started/choose-your-path/#zephyr`}>Zephyr</a>
     <a href={`${import.meta.env.BASE_URL}/getting-started/choose-your-path/#cmsis-pack`}>Arm CMSIS-Pack</a>
@@ -57,61 +62,45 @@ interpreter.Invoke();`;
 </div>
 
 <style>
-  .rt-opening {
-    --rt-accent: #53bbb5;
-    --rt-ink: #f7f8fa;
-    --rt-muted: #b8c1ce;
-    --rt-line: #29313e;
-    font-family: 'Inter Variable', sans-serif;
-    background: linear-gradient(160deg, #11151c, #090e16);
-    color: var(--rt-ink);
-    margin-inline: calc(50% - 50cqw - var(--sl-content-pad-x));
-    width: calc(100cqw + 2 * var(--sl-content-pad-x));
-    margin-top: -1.5rem;
-  }
-  .rt-hero {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(340px, 0.65fr);
-    gap: clamp(2rem, 4vw, 3.5rem);
-    align-items: center;
-    max-width: 1280px;
-    margin: 0 auto;
-    padding: clamp(3rem, 6vw, 5rem) clamp(1.5rem, 4vw, 3rem) 3rem;
-  }
-  .rt-copy, .rt-panel { min-width: 0; }
-  .rt-copy .rt-kicker { display: flex; align-items: center; gap: 0.65rem; margin: 0 0 1.4rem; font-size: 0.8rem; line-height: 1.5; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--rt-muted); }
-  .rt-kicker > span { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--rt-accent); }
-  .rt-copy h1 { margin: 0 0 1.6rem; color: var(--rt-ink); font-family: inherit; font-size: clamp(2.4rem, 4.75vw, 4.3rem); line-height: 1.04; font-weight: 760; letter-spacing: -0.055em; text-wrap: balance; }
-  .rt-copy .rt-summary { margin: 0 0 2rem; color: var(--rt-muted); font-size: clamp(1.05rem, 1.5vw, 1.23rem); line-height: 1.65; }
-  .rt-summary code { background: #242d39; color: var(--rt-ink); border: 1px solid var(--rt-line); border-radius: 4px; padding: 0.1em 0.3em; font-size: 0.85em; }
-  .rt-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
-  .rt-actions a { display: inline-flex; align-items: center; justify-content: center; border: 2px solid var(--rt-accent); border-radius: 999px; padding: 0.85rem 1.6rem; font-size: 0.95rem; font-weight: 700; text-decoration: none; }
-  .rt-primary { background: var(--rt-accent); color: #062220; }
-  .rt-secondary { color: var(--rt-accent); }
-  .rt-actions a:hover { filter: brightness(1.15); }
-  .rt-opening a:focus-visible { outline: 3px solid var(--rt-accent); outline-offset: 5px; }
-  .rt-panel { border: 1px solid var(--rt-line); border-radius: 24px; padding: 1.2rem; background: #101721; box-shadow: 0 25px 70px #0004; }
-  .rt-panel-title { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
-  .rt-panel-title a { padding: 0.3rem 0.6rem; border-radius: 999px; background: #53bbb51a; color: var(--rt-accent); text-decoration: none; }
-  .rt-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; margin-bottom: 1.1rem; }
-  .rt-metrics > * { padding: 1rem; background: #19212d; border: 1px solid var(--rt-line); border-radius: 16px; text-decoration: none; }
-  .rt-metrics a:hover { border-color: var(--rt-accent); }
-  .rt-metrics strong { display: block; font-size: clamp(1.8rem, 3vw, 2.6rem); font-weight: 760; line-height: 1.1; letter-spacing: -0.05em; color: var(--rt-ink); }
-  .rt-metrics span { display: block; margin-top: 0.45rem; color: var(--rt-muted); font-size: 0.69rem; letter-spacing: 0.075em; text-transform: uppercase; line-height: 1.5; }
-  .rt-panel .rt-code-note { margin: 0.75rem 0 0; font-size: 0.75rem; line-height: 1.6; color: var(--rt-muted); }
-  .rt-code-note a { color: inherit; text-underline-offset: 0.2em; }
-  .rt-ecosystems { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.65rem; padding: 0 1.5rem 2.5rem; }
-  .rt-ecosystems a { border: 1px solid var(--rt-line); background: #131c27; color: var(--rt-muted); border-radius: 999px; padding: 0.4rem 0.85rem; font-size: 0.8rem; font-weight: 600; text-decoration: none; }
-  .rt-ecosystems a:hover { color: var(--rt-ink); border-color: var(--rt-accent); }
-  @media (max-width: 62rem) {
-    .rt-hero { grid-template-columns: 1fr; }
-    .rt-panel { width: 100%; max-width: 620px; }
-    .rt-copy h1 { font-size: clamp(2.4rem, 6.5vw, 4rem); max-width: 780px; }
-  }
-  @media (max-width: 30rem) {
-    .rt-hero { padding-inline: 1.25rem; }
-    .rt-panel { padding: 0.8rem; }
-    .rt-metrics > * { padding: 0.85rem; }
-    .rt-actions a { padding-inline: 1.2rem; }
+  .hero-release-row { flex-basis: 100%; margin-top: 2px; }
+  .hero-release-row a { display: inline-flex; border: 1px solid #41454c; border-radius: 100px; padding: 4px 11px; color: #c4cbd5; font: 12px/1.5 system-ui; text-decoration: none; }
+  .hero-release-row a:hover { border-color: currentColor; color: #f7faff; }
+  .hero-release-row a:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+
+  .rt-opening :global(.helia-hero) { min-height: 550px; padding: 40px; gap: 40px; --helia-hero-headline: 40px; }
+  .rt-opening :global(.helia-hero__summary) { font-size: 16px; }
+  .rt-code { margin: 0; border: 1px solid #344347; border-radius: 12px; overflow: hidden; background: #131b20; }
+  .rt-code figcaption { display: flex; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid #2d3b40; color: #cad6d9; font-size: 12px; }
+  .rt-code figcaption span:last-child { color: #80cec7; font-family: var(--sl-font-mono); }
+  .rt-code :global(pre) { margin: 0; padding: 16px 14px; font-size: 12px; line-height: 1.65; overflow-x: auto; scrollbar-width: thin; scrollbar-color: #344347 transparent; }
+  .rt-code :global(code) { font-family: var(--sl-font-mono); font-size: inherit; }
+  @media(max-width: 991px) { .rt-opening :global(.helia-hero) { min-height: auto; padding: 30px 24px; --helia-hero-headline: 36px; } }
+
+  .rt-opening :global(.helia-hero) { --helia-product-accent: var(--helia-product-helia-rt); }
+  .rt-opening :global(.helia-hero__actions .helia-button--primary) { background: var(--helia-product-accent); color: var(--helia-ink-black); }
+  .rt-opening :global(.helia-hero__actions .helia-button--primary:hover) { background: color-mix(in srgb, var(--helia-product-accent) 88%, white); }
+  .rt-opening :global(.helia-hero__actions .helia-button--secondary) { color: var(--helia-product-accent); border-color: var(--helia-product-accent); }
+
+  .rt-opening { margin-block-end: var(--helia-space-6); }
+  .rt-panel { min-width: 0; padding: 0; box-shadow: none; }
+  .rt-opening :global(.helia-hero__eyebrow) { font-size: 14px; font-weight: 400; letter-spacing: .03em; }
+  .rt-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .rt-metrics > * { padding: 10px 12px; border: 1px solid var(--helia-surface-border); border-radius: var(--helia-radius-md); text-decoration: none; }
+  .rt-metrics a:hover { border-color: var(--helia-product-accent); }
+  .rt-metrics strong { display: block; font-size: 17px; font-weight: var(--helia-weight-semibold); line-height: var(--helia-leading-heading); color: var(--helia-ink-primary); }
+  .rt-metrics span { display: block; margin-top: var(--helia-space-2); color: var(--helia-ink-secondary); font-size: var(--helia-text-caption); line-height: var(--helia-leading-body); }
+  .rt-ecosystems { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--helia-space-3); padding: var(--helia-space-5) var(--helia-space-4) 0; }
+  .rt-ecosystems a { display: inline-flex; align-items: center; border: 1px solid var(--helia-surface-border); background: var(--helia-surface-paper); color: var(--helia-ink-secondary); border-radius: var(--helia-radius-pill); padding: var(--helia-space-2) var(--helia-space-3); font-size: var(--helia-text-caption); font-weight: var(--helia-weight-medium); text-decoration: none; }
+  .rt-ecosystems a:hover,
+  .rt-ecosystems a:focus-visible { color: var(--helia-ink-primary); border-color: var(--helia-product-accent); background: color-mix(in srgb, var(--helia-product-accent) 10%, var(--helia-surface-paper)); }
+  .rt-ecosystems a:focus-visible { outline: 2px solid var(--helia-product-accent); outline-offset: 3px; }
+
+  .rt-opening :global(.helia-hero) { position: relative; }
+  .rt-opening .hero-release-row { position: absolute; top: 16px; right: 20px; margin: 0; }
+  @media (max-width: 991px) {
+    .rt-opening :global(.helia-hero) { row-gap: 18px; padding-top: 64px; }
+    .rt-opening :global(.helia-hero__lede) { display: contents; }
+    .rt-opening :global(.helia-hero__side) { order: 1; margin-top: 10px; }
+    .rt-opening :global(.helia-hero__actions) { order: 2; margin-top: 10px; }
   }
 </style>
