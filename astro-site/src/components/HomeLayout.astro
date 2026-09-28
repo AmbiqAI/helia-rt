@@ -1,4 +1,7 @@
-<div class="heliart-home not-content"><slot /></div>
+---
+import Landing from '@ambiqai/helia-ui/astro/Landing';
+---
+<Landing class="heliart-home not-content"><slot /></Landing>
 
 <style is:global>
   .heliart-home .section-heading { display: grid; gap: var(--helia-space-4); margin-bottom: var(--helia-space-6); max-width: 58rem; }
