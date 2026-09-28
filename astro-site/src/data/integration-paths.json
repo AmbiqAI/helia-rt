@@ -1,0 +1,37 @@
+[
+  {
+    "id": "zephyr",
+    "title": "Zephyr",
+    "route": "zephyr",
+    "summary": "For applications built with west and Kconfig.",
+    "detail": "Select a backend and integrate source or prebuilt libraries with your Zephyr application."
+  },
+  {
+    "id": "neuralspot-x",
+    "title": "neuralSPOT-X",
+    "route": "neuralspot-x",
+    "summary": "For applications built with Ambiq’s development SDK.",
+    "detail": "Add the nsx source module, configure its features and link the runtime into the SDK’s CMake build."
+  },
+  {
+    "id": "cmsis-pack",
+    "title": "CMSIS-Pack",
+    "route": "cmsis-pack",
+    "summary": "For projects managed with CMSIS tooling.",
+    "detail": "Generate, validate and install a local source pack. Pack validation does not establish support for every IDE or board application."
+  },
+  {
+    "id": "source-and-cmake",
+    "title": "Build from source",
+    "route": "source",
+    "summary": "For control over compiler options and kernel selection.",
+    "detail": "Build Make archives or CMake source targets when you need to configure features or debug the runtime."
+  },
+  {
+    "id": "prebuilt-archive",
+    "title": "Prebuilt archive",
+    "route": "cmake",
+    "summary": "For firmware that links a released runtime library.",
+    "detail": "Choose an archive with matching architecture, toolchain and features, then link it with compatible headers and ABI settings."
+  }
+]

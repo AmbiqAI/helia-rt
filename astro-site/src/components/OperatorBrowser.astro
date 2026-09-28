@@ -8,8 +8,8 @@ const sourceBase = `https://github.com/AmbiqAI/helia-rt/blob/${build.commit}/ten
 <rt-operator-browser>
   <form class="operator-filters" hidden data-pagefind-ignore role="search" aria-label="Filter operators">
     <label class="operator-search">Search operators<input name="query" type="search" placeholder="Name, constraint or feature…" autocomplete="off" /></label>
-    <label>Family<select name="family"><option value="">All families</option>{families.map(family => <option>{family}</option>)}</select></label>
-    <label>Input type<select name="type"><option value="">All types</option>{types.map(type => <option>{type}</option>)}</select></label>
+    <label class="operator-select">Family<select name="family"><option value="">All families</option>{families.map(family => <option>{family}</option>)}</select></label>
+    <label class="operator-select">Input type<select name="type"><option value="">All types</option>{types.map(type => <option>{type}</option>)}</select></label>
     <button type="reset">Clear filters</button>
   </form>
   <p class="operator-count" role="status" aria-live="polite" data-pagefind-ignore>{operators.length} operators</p>
@@ -62,13 +62,13 @@ const sourceBase = `https://github.com/AmbiqAI/helia-rt/blob/${build.commit}/ten
 </script>
 <style>
   rt-operator-browser { display: block; }
-  .operator-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 1rem; padding: 1.2rem; border-radius: 1rem; background: var(--sl-color-gray-6); border: 1px solid var(--sl-color-gray-5); }
+  .operator-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 1rem; padding: 1.2rem; border-radius: 1rem; background: var(--helia-surface-card-muted); border: 1px solid var(--sl-color-gray-5); }
   .operator-filters[hidden], .operator-item[hidden], .operator-empty[hidden] { display: none; }
   label { display: grid; gap: 0.4rem; font-size: 0.8rem; font-weight: 650; flex: 1 1 9rem; }
   .operator-search { flex-basis: 100%; }
   input, select, button { font: inherit; color: var(--sl-color-text); background: var(--sl-color-bg); border: 1px solid var(--sl-color-gray-4); border-radius: 0.4rem; padding: 0.65rem; min-width: 0; }
   button { cursor: pointer; }
-  input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--sl-color-text-accent); outline-offset: 2px; }
+  input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--helia-product-accent); outline-offset: 2px; }
   .operator-count { color: var(--sl-color-gray-2); font-size: 0.85rem; }
   .operator-item { padding: 1.4rem 0; border-top: 1px solid var(--sl-color-gray-5); scroll-margin-top: 6rem; }
   .operator-title { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
@@ -79,4 +79,25 @@ const sourceBase = `https://github.com/AmbiqAI/helia-rt/blob/${build.commit}/ten
   .operator-types li { margin: 0; border: 1px solid var(--sl-color-gray-5); border-radius: 0.4rem; padding: 0.1rem 0.5rem; font: 0.75rem var(--sl-font-mono); background: var(--sl-color-gray-6); }
   .operator-item p { margin: 0.6rem 0; font-size: 0.9rem; }
   .operator-source { font-size: 0.8rem; }
+  .operator-select { position: relative; }
+  .operator-select::after { content: ''; position: absolute; right: 1rem; bottom: 1rem; width: 0.45rem; height: 0.45rem; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); pointer-events: none; }
+  select { appearance: none; padding-right: 2.5rem; }
+  .operator-list { border: 1px solid var(--sl-color-gray-5); border-radius: 0.8rem; overflow: clip; }
+  .operator-item { padding: 1.25rem; margin: 0; }
+  .operator-item:first-child { border-top: 0; }
+  .operator-item:target { background: var(--sl-color-gray-6); box-shadow: inset 3px 0 var(--helia-product-accent); }
+  .operator-title h3 a:hover, .operator-source:hover { color: var(--helia-product-accent); }
+  .operator-title h3 a:focus-visible, .operator-source:focus-visible { outline: 2px solid var(--helia-product-accent); outline-offset: 4px; }
+  .operator-empty { padding: 1.5rem; border: 1px dashed var(--sl-color-gray-4); border-radius: 0.8rem; }
+  @media (min-width: 50rem) {
+    .operator-item { display: grid; grid-template-columns: minmax(12rem, 1fr) minmax(0, 2fr); column-gap: 1.5rem; }
+    .operator-title { grid-column: 1; flex-direction: column; justify-content: start; gap: 0.25rem; }
+    .operator-types { grid-column: 1; align-self: start; }
+    .operator-item p { grid-column: 2; grid-row: 1 / 3; margin: 0; }
+    .operator-source { grid-column: 2; justify-self: start; margin-top: 0.5rem; }
+  }
+  @media (max-width: 30rem) {
+    .operator-filters { padding: 1rem; gap: 0.75rem; }
+    .operator-filters label { flex-basis: 100%; }
+  }
 </style>

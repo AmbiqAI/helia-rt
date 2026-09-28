@@ -26,7 +26,7 @@
 </div>
 
 <style>
-  .runtime-architecture { --flow-accent: #177e79; border: 1px solid var(--sl-color-gray-5); border-radius: 1.5rem; background: var(--sl-color-bg); overflow: hidden; }
+  .runtime-architecture { --flow-accent: var(--sl-color-text-accent); border: 1px solid var(--sl-color-gray-5); border-radius: 1.5rem; background: var(--sl-color-bg); overflow: hidden; }
   .runtime-flow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); list-style: none; padding: 0; margin: 0; }
   li { position: relative; padding: clamp(1.3rem, 3vw, 2.2rem); min-width: 0; }
   li + li::before { content: '→' / ''; display: grid; place-items: center; position: absolute; left: -1rem; top: 5.3rem; width: 2rem; height: 2rem; border-radius: 50%; background: var(--sl-color-bg); color: var(--flow-accent); border: 1px solid var(--sl-color-gray-5); z-index: 1; font-size: 1.2rem; }
@@ -42,7 +42,6 @@
   .backend-note { display: flex; align-items: baseline; gap: 1.5rem; padding: 1.2rem 2rem; background: var(--sl-color-gray-6); border-top: 1px solid var(--sl-color-gray-5); font-size: 0.8rem; line-height: 1.6; }
   .backend-note strong { flex-shrink: 0; }
   .backend-note span { color: var(--sl-color-gray-2); }
-  :global([data-theme='dark']) .runtime-architecture { --flow-accent: #71d5cd; }
   @media (max-width: 52rem) {
     .runtime-flow { grid-template-columns: 1fr; }
     li { padding: 1.5rem; }

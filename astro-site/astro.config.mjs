@@ -3,7 +3,6 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import redirects from './src/data/redirects.json' with { type: 'json' };
 import apiManifest from './src/data/api-manifest.json' with { type: 'json' };
-import buildInfo from './src/data/build-info.json' with { type: 'json' };
 import { heliaStarlight } from '@ambiqai/helia-ui/starlight';
 
 const base = '/helia-rt';
@@ -17,13 +16,12 @@ export default defineConfig({
       title: 'heliaRT',
       description: "Ambiq's optimized LiteRT for Microcontrollers runtime.",
       favicon: '/helia-rt-favicon.svg',
-      customCss: ['./src/styles/header.css'],
       plugins: [heliaStarlight({
         accent: 'helia-rt',
         sidebar: 'docs',
         header: {
           title: 'heliaRT',
-          hub: { label: 'HELIA', href: 'https://ambiqai.github.io/helia-developer-hub/' },
+          hub: { label: 'HELIA HUB', href: 'https://ambiqai.github.io/helia-developer-hub/' },
         },
         sections: [
           { label: 'Home', href: `${base}/`, sidebar: false },
@@ -95,13 +93,12 @@ export default defineConfig({
         discoverability: { ogImage: true, jsonLd: true, markdown: true, llms: true },
         footer: {
           links: [
-            { label: `Docs: ${buildInfo.runtimeVersion} · ${buildInfo.shortCommit}${buildInfo.modified ? ' (modified)' : ''}`, href: `${base}/reference/build/` },
             { label: 'Getting started', href: `${base}/getting-started/` },
             { label: 'User guide', href: `${base}/guide/` },
             { label: 'API reference', href: `${base}/reference/` },
             { label: 'GitHub', href: 'https://github.com/AmbiqAI/helia-rt' },
           ],
-          tagline: 'Ambiq Micro, Inc. Built on LiteRT for Microcontrollers.',
+          tagline: 'Part of the Ambiq HELIA AI platform',
           logo: 'ambiq',
         },
       })],
