@@ -63,6 +63,16 @@ TfLiteStatus SpaceToBatchNDPrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE(context, NumDimensions(output) <= kInputOutputMaxDimensionNum);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
 
+  // helia: see AmbiqAI/helia-rt#317.
+  auto* params = static_cast<SpaceToBatchParams*>(node->user_data);
+  params->output_offset = 0;
+  if (input->type == kTfLiteInt8) {
+    TF_LITE_ENSURE(context, input->params.scale == output->params.scale);
+    TF_LITE_ENSURE_EQ(context, input->params.zero_point,
+                      output->params.zero_point);
+    params->output_offset = output->params.zero_point;
+  }
+
   micro_context->DeallocateTempTfLiteTensor(input);
   micro_context->DeallocateTempTfLiteTensor(output);
   return kTfLiteOk;

@@ -179,6 +179,10 @@ TfLiteStatus EvalAddQuantizedInt8(TfLiteContext* context, TfLiteNode* node,
         tflite::micro::GetTensorShape(output),
         tflite::micro::GetTensorData<int8_t>(output));
   } else {
+    // heliaCORE rejects zero-size dims; an empty output has nothing to write.
+    if (tflite::micro::GetTensorShape(output).FlatSize() == 0) {
+      return kTfLiteOk;
+    }
     cmsis_nn_dims input1_dims;
     cmsis_nn_dims input2_dims;
     cmsis_nn_dims output_dims;
@@ -192,7 +196,7 @@ TfLiteStatus EvalAddQuantizedInt8(TfLiteContext* context, TfLiteNode* node,
         &output_dims
     );
 
-    arm_add_s8(
+    const arm_cmsis_nn_status status = arm_add_s8(
       tflite::micro::GetTensorData<int8_t>(input1),
       &input1_dims,
       tflite::micro::GetTensorData<int8_t>(input2),
@@ -212,6 +216,10 @@ TfLiteStatus EvalAddQuantizedInt8(TfLiteContext* context, TfLiteNode* node,
       op_params.quantized_activation_min,
       op_params.quantized_activation_max
     );
+    if (status != ARM_CMSIS_NN_SUCCESS) {
+      MicroPrintf("ADD: arm_add_s8 failed (%d).", static_cast<int>(status));
+      return kTfLiteError;
+    }
 
   }
 
@@ -240,6 +248,10 @@ TfLiteStatus EvalAddQuantizedInt16(TfLiteContext* context, TfLiteNode* node,
         tflite::micro::GetTensorShape(output),
         tflite::micro::GetTensorData<int16_t>(output));
   } else {
+    // heliaCORE rejects zero-size dims; an empty output has nothing to write.
+    if (tflite::micro::GetTensorShape(output).FlatSize() == 0) {
+      return kTfLiteOk;
+    }
 
     cmsis_nn_dims input1_dims;
     cmsis_nn_dims input2_dims;
@@ -254,7 +266,7 @@ TfLiteStatus EvalAddQuantizedInt16(TfLiteContext* context, TfLiteNode* node,
         &output_dims
     );
 
-    arm_add_s16(
+    const arm_cmsis_nn_status status = arm_add_s16(
       tflite::micro::GetTensorData<int16_t>(input1),
       &input1_dims,
       tflite::micro::GetTensorData<int16_t>(input2),
@@ -274,6 +286,10 @@ TfLiteStatus EvalAddQuantizedInt16(TfLiteContext* context, TfLiteNode* node,
       op_params.quantized_activation_min,
       op_params.quantized_activation_max
     );
+    if (status != ARM_CMSIS_NN_SUCCESS) {
+      MicroPrintf("ADD: arm_add_s16 failed (%d).", static_cast<int>(status));
+      return kTfLiteError;
+    }
 
   }
 
@@ -410,12 +426,15 @@ TfLiteStatus EvalAddQuantized(TfLiteContext* context, TfLiteNode* node,
                               TfLiteEvalTensor* output) {
   switch (output->type) {
     case kTfLiteInt8: {
-      EvalAddQuantizedInt8(context, node, params, data, input1, input2, output);
+      TF_LITE_ENSURE_OK(
+          context, EvalAddQuantizedInt8(context, node, params, data, input1,
+                                        input2, output));
       break;
     }
     case kTfLiteInt16: {
-      EvalAddQuantizedInt16(context, node, params, data, input1, input2,
-                            output);
+      TF_LITE_ENSURE_OK(
+          context, EvalAddQuantizedInt16(context, node, params, data, input1,
+                                         input2, output));
       break;
     }
     default:

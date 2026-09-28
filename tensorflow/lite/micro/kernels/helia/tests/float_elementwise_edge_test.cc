@@ -191,8 +191,7 @@ TEST(HeliaFloatElementwiseEdgeTest, MulFloat16PropagatesNan) {
 // See the matching guard in float_activation_edge_test.cc: helia.inc defines
 // ARM_NN_ENABLE_F16 for TARGET_ARCH=cortex-m55 only, and a silent compile-out
 // would drop these cases while the leg still reported success
-// (helia-rt#231). Known gap: ATfE builds cortex-m55 with +nomve
-// (helia-rt#225), so this guard cannot fire there.
+// (helia-rt#231).
 TEST(HeliaFloatElementwiseEdgeTest, Float16CoverageMustNotSilentlyDisappear) {
   FAIL(
       "ARM_NN_ENABLE_F16 is not defined on a build with MVE floating point. "

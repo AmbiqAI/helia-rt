@@ -24,9 +24,9 @@ MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
 #                                 outside it (ns#314 / ns#303 classes).
 #   float_elementwise_edge_test - ADD/MUL NaN propagation (ns#333 class).
 #   float_lstm_tail_lane_test   - UNIDIRECTIONAL_SEQUENCE_LSTM with
-#                                 state_dimension == 10, asserting that the
-#                                 vector lanes and the scalar tail lanes of one
-#                                 gate agree (ns#315 class).
+#                                 state_dimension == 10, asserting that all
+#                                 lanes of one gate agree exactly (ns#315
+#                                 class).
 #
 # More than one of these is expected to fail on the current ns-cmsis-nn pin.
 # `make test` walks MICROLITE_TEST_TARGETS in list order, so a failing binary
@@ -81,6 +81,22 @@ $(kernel_gather_pair_test_BINARY): LDFLAGS += \
 endif
 endif
 
+# Dilated and 16x8 DEPTHWISE_CONV_2D against the reference kernel. GNU links
+# wrap the heliaCORE depthwise leaves so each case also proves its route.
+# see AmbiqAI/helia-rt#318
+$(eval $(call microlite_test,kernel_depthwise_dilated_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/depthwise_dilated_test.cc))
+
+ifeq ($(TOOLCHAIN),gcc)
+$(kernel_depthwise_dilated_test_BINARY): CXXFLAGS += \
+  -DHELIA_DW_ROUTE_LINK_WRAP=1
+$(kernel_depthwise_dilated_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_depthwise_conv_s8_opt \
+  -Wl,--wrap=arm_depthwise_conv_s8 \
+  -Wl,--wrap=arm_depthwise_conv_fast_s16 \
+  -Wl,--wrap=arm_depthwise_conv_s16
+endif
+
 # Quantized CONV_2D and DEPTHWISE_CONV_2D status/context contracts.
 # see AmbiqAI/helia-rt#238
 $(eval $(call microlite_test,kernel_convolution_status_test,\
@@ -95,7 +111,7 @@ $(kernel_convolution_status_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_convolve_wrapper_s16 \
   -Wl,--wrap=arm_depthwise_conv_wrapper_s8 \
   -Wl,--wrap=arm_depthwise_conv_wrapper_s4 \
-  -Wl,--wrap=arm_depthwise_conv_s16 \
+  -Wl,--wrap=arm_depthwise_conv_wrapper_s16 \
   -Wl,--wrap=arm_convolve_weight_sum \
   -Wl,--wrap=arm_depthwise_convolve_weight_sum \
   -Wl,--wrap=arm_convolve_s8_get_weights_sum_size \
@@ -103,7 +119,8 @@ $(kernel_convolution_status_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_convolve_wrapper_s4_get_buffer_size \
   -Wl,--wrap=arm_convolve_wrapper_s16_get_buffer_size \
   -Wl,--wrap=arm_depthwise_conv_wrapper_s8_get_buffer_size \
-  -Wl,--wrap=arm_depthwise_conv_wrapper_s4_get_buffer_size
+  -Wl,--wrap=arm_depthwise_conv_wrapper_s4_get_buffer_size \
+  -Wl,--wrap=arm_depthwise_conv_wrapper_s16_get_buffer_size
 endif
 
 # Fully connected fast-1x1 activation-context contract.
@@ -134,8 +151,9 @@ $(kernel_fc_leaky_relu_status_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_leaky_relu_s16
 endif
 
-# UNIDIRECTIONAL_SEQUENCE_LSTM kernel-sum status and the FULLY_CONNECTED,
-# BATCH_MATMUL and AVERAGE_POOL_2D scratch-context size contracts.
+# UNIDIRECTIONAL_SEQUENCE_LSTM kernel-sum status, the FULLY_CONNECTED,
+# BATCH_MATMUL and AVERAGE_POOL_2D scratch-context size contracts, and the
+# int8/int16 statuses of the remaining heliaCORE entry points.
 # see AmbiqAI/helia-rt#238
 $(eval $(call microlite_test,kernel_status_context_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/status_context_test.cc \
@@ -157,7 +175,28 @@ $(kernel_status_context_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_avgpool_s8_get_buffer_size \
   -Wl,--wrap=arm_avgpool_s16_get_buffer_size \
   -Wl,--wrap=arm_avgpool_s8 \
-  -Wl,--wrap=arm_avgpool_s16
+  -Wl,--wrap=arm_avgpool_s16 \
+  -Wl,--wrap=arm_add_s8 \
+  -Wl,--wrap=arm_add_s16 \
+  -Wl,--wrap=arm_sub_s8 \
+  -Wl,--wrap=arm_sub_s16 \
+  -Wl,--wrap=arm_mul_s8 \
+  -Wl,--wrap=arm_mul_s16 \
+  -Wl,--wrap=arm_maximum_s8 \
+  -Wl,--wrap=arm_maximum_s16 \
+  -Wl,--wrap=arm_minimum_s8 \
+  -Wl,--wrap=arm_minimum_s16 \
+  -Wl,--wrap=arm_concatenation_s8 \
+  -Wl,--wrap=arm_concatenation_s16 \
+  -Wl,--wrap=arm_dequantize_s8_f32 \
+  -Wl,--wrap=arm_dequantize_s16_f32 \
+  -Wl,--wrap=arm_hard_swish_compat_s8 \
+  -Wl,--wrap=arm_hard_swish_precise_s16 \
+  -Wl,--wrap=arm_logistic_s16 \
+  -Wl,--wrap=arm_tanh_s16 \
+  -Wl,--wrap=arm_pad_s8 \
+  -Wl,--wrap=arm_pad_s16 \
+  -Wl,--wrap=arm_softmax_s16
 endif
 
 # see AmbiqAI/helia-rt#285

@@ -379,6 +379,7 @@ re-apply the upstream copy.
 | `LICENSE` | Apache 2.0 replaced with the **Ambiq Apollo SDK License**. Required for distribution alongside the Ambiq Apollo SDK; cannot be reverted. | Never — keep helia version. |
 | `README.md` | Full heliaRT rebrand (badges, intro, links, examples). | Never. |
 | `CONTRIBUTING.md` | heliaRT rebrand + Apollo SDK License preamble + redirected issue-tracker link. | Never. |
+| `SECURITY.md` | Upstream redirect to TensorFlow's security policy replaced with the Ambiq reporting channel (`support.aitg@ambiq.com`, GitHub private vulnerability reporting once enabled). | Never. |
 | `CODEOWNERS` | `/.github/` and `/ci/` reassigned from upstream `@veblush` to helia maintainers (`@advaitjain @rockyrhodes @suleshahid`). | Never. |
 | `.gitignore` | Adds `build/`, `out/`, `.DS_Store`, `.aider*`, `neuralspot-*-local-*`, `neuralspot-*-local-*.zip`, `tflm-vanilla.zip`, `site/`. | Upstream adopts equivalents (won't happen for `neuralspot-*` / `tflm-vanilla.zip` — keep). |
 
@@ -404,3 +405,16 @@ are now identical to `tflm/main`. Note that `ci/Dockerfile.micro` is dead
 code in helia: the `helia-rt-ci` image is built from `.devcontainer/Dockerfile`
 by `.github/workflows/helia_build_docker_image.yml`. We keep `Dockerfile.micro`
 in sync with upstream solely to minimize sync conflicts.
+
+## `tensorflow/lite/micro/kernels/space_to_batch_nd.cc` and test
+
+Prepare initializes real-zero padding (INT8 output zero point, FP32 zero) and
+requires matching INT8 input/output quantization. Regression tests cover padded
+3D/4D inputs and nonzero persistent storage. See AmbiqAI/helia-rt#317.
+
+This common correctness fix stays in the shared kernel: a helia-only override
+or build_helia.sh patch would leave reference/CMSIS-NN, direct CMake, Bazel and
+source consumers unfixed. The shared reference header is unchanged.
+ci/sync_from_upstream_tf.sh preserves micro/, but a TFLM sync must reconcile
+these two files. Drop this drift when the selected upstream TFLM pin includes
+equivalent initialization, quantization checks and regression coverage.

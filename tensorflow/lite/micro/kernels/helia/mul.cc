@@ -79,9 +79,11 @@ void ArmPopulateCommonParams(const RuntimeShape& unextended_input1_shape,
 }
 
 
-void EvalQuantized(TfLiteContext* context, TfLiteNode* node,
-                   const OpDataMul* data, const TfLiteEvalTensor* input1,
-                   const TfLiteEvalTensor* input2, TfLiteEvalTensor* output) {
+TfLiteStatus EvalQuantized(TfLiteContext* context, TfLiteNode* node,
+                           const OpDataMul* data,
+                           const TfLiteEvalTensor* input1,
+                           const TfLiteEvalTensor* input2,
+                           TfLiteEvalTensor* output) {
   tflite::ArithmeticParams op_params = {};
 
   op_params.quantized_activation_min = data->output_activation_min;
@@ -118,6 +120,10 @@ void EvalQuantized(TfLiteContext* context, TfLiteNode* node,
     }
 
   } else {
+    // heliaCORE rejects zero-size dims; an empty output has nothing to write.
+    if (tflite::micro::GetTensorShape(output).FlatSize() == 0) {
+      return kTfLiteOk;
+    }
 
     cmsis_nn_dims input1_dims;
     cmsis_nn_dims input2_dims;
@@ -133,7 +139,7 @@ void EvalQuantized(TfLiteContext* context, TfLiteNode* node,
       );
 
     if (input1->type == kTfLiteInt8) {
-      arm_mul_s8(
+      const arm_cmsis_nn_status status = arm_mul_s8(
         tflite::micro::GetTensorData<int8_t>(input1),
         &input1_dims,
         tflite::micro::GetTensorData<int8_t>(input2),
@@ -148,9 +154,13 @@ void EvalQuantized(TfLiteContext* context, TfLiteNode* node,
         op_params.quantized_activation_min,
         op_params.quantized_activation_max
       );
+      if (status != ARM_CMSIS_NN_SUCCESS) {
+        MicroPrintf("MUL: arm_mul_s8 failed (%d).", static_cast<int>(status));
+        return kTfLiteError;
+      }
 
     } else if (input1->type == kTfLiteInt16) {
-      arm_mul_s16(
+      const arm_cmsis_nn_status status = arm_mul_s16(
         tflite::micro::GetTensorData<int16_t>(input1),
         &input1_dims,
         tflite::micro::GetTensorData<int16_t>(input2),
@@ -165,8 +175,13 @@ void EvalQuantized(TfLiteContext* context, TfLiteNode* node,
         op_params.quantized_activation_min,
         op_params.quantized_activation_max
       );
+      if (status != ARM_CMSIS_NN_SUCCESS) {
+        MicroPrintf("MUL: arm_mul_s16 failed (%d).", static_cast<int>(status));
+        return kTfLiteError;
+      }
     }
   }
+  return kTfLiteOk;
 }
 
 }  // namespace
@@ -189,10 +204,9 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
 
   switch (input1->type) {
     case kTfLiteInt8:
-      EvalQuantized(context, node, data, input1, input2, output);
-      break;
     case kTfLiteInt16:
-      EvalQuantized(context, node, data, input1, input2, output);
+      TF_LITE_ENSURE_OK(
+          context, EvalQuantized(context, node, data, input1, input2, output));
       break;
     case kTfLiteInt32:
       EvalMulQuantizedReference(context, node, data, input1, input2, output);
@@ -290,9 +304,7 @@ TfLiteStatus EvalInt8(TfLiteContext* context, TfLiteNode* node) {
       tflite::micro::GetEvalOutput(context, node, kMulOutputTensor);
   TFLITE_DCHECK(input1->type == kTfLiteInt8);
 
-  EvalQuantized(context, node, data, input1, input2, output);
-
-  return kTfLiteOk;
+  return EvalQuantized(context, node, data, input1, input2, output);
 }
 
 TfLiteStatus EvalInt16(TfLiteContext* context, TfLiteNode* node) {
@@ -308,9 +320,7 @@ TfLiteStatus EvalInt16(TfLiteContext* context, TfLiteNode* node) {
       tflite::micro::GetEvalOutput(context, node, kMulOutputTensor);
   TFLITE_DCHECK(input1->type == kTfLiteInt16);
 
-  EvalQuantized(context, node, data, input1, input2, output);
-
-  return kTfLiteOk;
+  return EvalQuantized(context, node, data, input1, input2, output);
 }
 
 // Wraps the shared MulPrepare to classify the shape pair against the heliaCORE

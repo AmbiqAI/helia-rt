@@ -62,7 +62,7 @@ CXXFLAGS += -Wno-error=unknown-attributes
 CCFLAGS  += -Wno-error=unknown-attributes
 
 # ATfE / clang 22 miscompiles `BuildSimpleModelWithSubgraphsAndWhile()` in
-# `test_helpers.cc` at any optimization level >= -O1 on cortex-m55+nomve:
+# `test_helpers.cc` at any optimization level >= -O1 on cortex-m55:
 # the resulting flatbuffer puts `kernel_while_test` into an infinite loop
 # inside `MicroInterpreter::Invoke()`. Compiling this single test-only
 # translation unit at -O0 dodges the bug without affecting runtime perf

@@ -21,7 +21,7 @@ Ambiq provides critical/security fixes for 12 months from the minor release date
 
 A critical defect is a security vulnerability or a wrong-inference/data-corruption defect with no workaround. If a later patch of the supported minor already fixes the issue, upgrade to that patch.
 
-Report security issues to [support.aitg@ambiq.com](mailto:support.aitg@ambiq.com) rather than opening a public issue. Use [GitHub issues](https://github.com/AmbiqAI/helia-rt/issues/new/choose) for ordinary bug reports and integration questions.
+Report security issues to [support.aitg@ambiq.com](mailto:support.aitg@ambiq.com) rather than opening a public issue, as described in the repository's [security policy](https://github.com/AmbiqAI/helia-rt/blob/main/SECURITY.md). Use [GitHub issues](https://github.com/AmbiqAI/helia-rt/issues/new/choose) for ordinary bug reports and integration questions.
 
 ## Deprecation notice
 

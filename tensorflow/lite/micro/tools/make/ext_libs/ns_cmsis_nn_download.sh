@@ -82,7 +82,7 @@ NS_CMSIS_NN_URL="https://github.com/AmbiqAI/ns-cmsis-nn.git"
 # local-scope rules are not part of the threat model either way.
 
 # Set GIT_COMMIT to NS_CMSIS_NN_COMMIT if set, otherwise use default.
-# Default tracks AmbiqAI/ns-cmsis-nn tag v7.35.0. Keep in sync with
+# Default tracks AmbiqAI/ns-cmsis-nn tag v7.36.0. Keep in sync with
 # NS_CMSIS_NN_COMMIT in ext_libs/helia.inc, which is what make actually passes;
 # this fallback only applies when the script is run directly.
 #
@@ -92,7 +92,7 @@ NS_CMSIS_NN_URL="https://github.com/AmbiqAI/ns-cmsis-nn.git"
 # into extra argv words for `git checkout` (option injection, not shell
 # injection -- there is no eval here). The canary also validates the input
 # against ^[A-Za-z0-9._/-]+$ before it gets this far; this is the second layer.
-GIT_COMMIT=${NS_CMSIS_NN_COMMIT:-cad3c8fa0cc2f7b13d6ff750bfc9744af0d621a6}
+GIT_COMMIT=${NS_CMSIS_NN_COMMIT:-8d34472eaf494589515d1463b8a427564ee83947}
 
 # clone_ns_cmsis_nn: attempt git clone and surface a clear error on failure.
 clone_ns_cmsis_nn() {

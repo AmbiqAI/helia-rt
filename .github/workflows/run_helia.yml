@@ -23,6 +23,11 @@ jobs:
 
   issue-on-error:
     needs: [call-helia-build, call-helia-test]
+    # issue_on_error.yml checks out the repository (`contents: read`) and
+    # ci/issue_on_error.py runs `gh issue` and `gh label` (`issues: write`).
+    permissions:
+      contents: read
+      issues: write
     if: ${{ always() && (needs.call-helia-build.result == 'failure' || needs.call-helia-test.result == 'failure') }}
     uses: ./.github/workflows/issue_on_error.yml
     with:

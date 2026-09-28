@@ -251,9 +251,13 @@ TfLiteStatus Eval(TfLiteContext *context, TfLiteNode *node)
       cmsis_nn_dims pre_pad;
       cmsis_nn_dims post_pad;
       PopulateCommonParams(&input_size, &pre_pad, &post_pad, data, tflite::micro::GetTensorShape(input));
-      arm_pad_s8(
+      const arm_cmsis_nn_status status = arm_pad_s8(
           tflite::micro::GetTensorData<int8_t>(input), tflite::micro::GetTensorData<int8_t>(output), pad_value,
           &input_size, &pre_pad, &post_pad);
+      if (status != ARM_CMSIS_NN_SUCCESS) {
+        MicroPrintf("PAD: arm_pad_s8 failed (%d).", static_cast<int>(status));
+        return kTfLiteError;
+      }
     }
     else
     {
@@ -282,11 +286,15 @@ TfLiteStatus Eval(TfLiteContext *context, TfLiteNode *node)
       cmsis_nn_dims pre_pad;
       cmsis_nn_dims post_pad;
       PopulateCommonParams(&input_size, &pre_pad, &post_pad, data, tflite::micro::GetTensorShape(input));
-      arm_pad_s16(
+      const arm_cmsis_nn_status status = arm_pad_s16(
           tflite::micro::GetTensorData<int16_t>(input),
           tflite::micro::GetTensorData<int16_t>(output),
           pad_value, &input_size, &pre_pad, &post_pad
       );
+      if (status != ARM_CMSIS_NN_SUCCESS) {
+        MicroPrintf("PAD: arm_pad_s16 failed (%d).", static_cast<int>(status));
+        return kTfLiteError;
+      }
     }
     else {
       reference_ops::Pad(

@@ -3,9 +3,9 @@ ifneq (,$(filter $(TARGET_ARCH), x86_64))
   # NS-CMSIS-NN optimizations not supported
 endif
 
-# Tracks AmbiqAI/ns-cmsis-nn tag v7.35.0. Consumed by ns_cmsis_nn_download.sh
+# Tracks AmbiqAI/ns-cmsis-nn tag v7.36.0. Consumed by ns_cmsis_nn_download.sh
 # via the environment.
-NS_CMSIS_NN_COMMIT ?= cad3c8fa0cc2f7b13d6ff750bfc9744af0d621a6
+NS_CMSIS_NN_COMMIT ?= 8d34472eaf494589515d1463b8a427564ee83947
 export NS_CMSIS_NN_COMMIT
 
 ifneq (,$(NS_CMSIS_NN_LIBS))

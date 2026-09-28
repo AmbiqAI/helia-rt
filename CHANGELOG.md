@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.21.1](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.21.0...helia-rt-v1.21.1) (2026-09-26)
+
+
+### Bug Fixes
+
+* **build:** drop obsolete ns-cmsis-nn FP16 workaround ([#261](https://github.com/AmbiqAI/helia-rt/issues/261)) ([e584cfd](https://github.com/AmbiqAI/helia-rt/commit/e584cfd8fde9f45cb7e5a2b2654dea91d974bbc4))
+* **helia:** check the remaining heliaCORE statuses ([#306](https://github.com/AmbiqAI/helia-rt/issues/306)) ([7892ba6](https://github.com/AmbiqAI/helia-rt/commit/7892ba63a0385a13aba122ef9d081d98ec3284f8)), closes [#238](https://github.com/AmbiqAI/helia-rt/issues/238)
+* **helia:** propagate elementwise int8/int16 heliaCORE statuses ([#305](https://github.com/AmbiqAI/helia-rt/issues/305)) ([b9a786f](https://github.com/AmbiqAI/helia-rt/commit/b9a786f55e004247b1d6f1c631ca0030abbbbb6f)), closes [#238](https://github.com/AmbiqAI/helia-rt/issues/238)
+* **helia:** propagate FULLY_CONNECTED kernel-sum and LEAKY_RELU failures ([#301](https://github.com/AmbiqAI/helia-rt/issues/301)) ([79d0fa3](https://github.com/AmbiqAI/helia-rt/commit/79d0fa3a7d56b80cba7c797b00acd80c39d9ca11)), closes [#238](https://github.com/AmbiqAI/helia-rt/issues/238)
+* **helia:** propagate LSTM kernel-sum failures and declare scratch sizes ([#302](https://github.com/AmbiqAI/helia-rt/issues/302)) ([a89c70e](https://github.com/AmbiqAI/helia-rt/commit/a89c70e7ea207308d7ff86fbbd755f374c7a73f0)), closes [#238](https://github.com/AmbiqAI/helia-rt/issues/238)
+* **helia:** propagate quantized convolution failures ([#295](https://github.com/AmbiqAI/helia-rt/issues/295)) ([2e12208](https://github.com/AmbiqAI/helia-rt/commit/2e122086b277db95686377979edb95ebefd1a0c8))
+
+
+### Performance
+
+* **helia:** route 16x8 depthwise through the heliaCORE wrapper ([#316](https://github.com/AmbiqAI/helia-rt/issues/316)) ([d342d38](https://github.com/AmbiqAI/helia-rt/commit/d342d380035af7dbe2c7dcaf4164e28424d6b916)), closes [#314](https://github.com/AmbiqAI/helia-rt/issues/314)
+
 ## [1.21.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.20.0...helia-rt-v1.21.0) (2026-09-15)
 
 
