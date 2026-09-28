@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.21.2](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.21.1...helia-rt-v1.21.2) (2026-09-28)
+
+
+### Bug Fixes
+
+* initialize space-to-batch padding to real zero ([2af11b9](https://github.com/AmbiqAI/helia-rt/commit/2af11b97ba0bd20e99f9f630214ec408b72ac6f9)), closes [#317](https://github.com/AmbiqAI/helia-rt/issues/317)
+
 ## [1.21.1](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.21.0...helia-rt-v1.21.1) (2026-09-26)
 
 
