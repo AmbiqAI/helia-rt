@@ -35,6 +35,7 @@ export default defineConfig({
               { label: 'Build from source', slug: 'getting-started/source' },
               { label: 'Prebuilt archive', slug: 'getting-started/cmake' },
               { label: 'CMSIS-Pack', slug: 'getting-started/cmsis-pack' },
+              { label: 'Run your first model', slug: 'getting-started/first-model' },
               { label: 'First inference', slug: 'getting-started/first-inference' },
               { label: 'Migrate from LiteRT', slug: 'getting-started/migrate-from-litert' },
             ],
