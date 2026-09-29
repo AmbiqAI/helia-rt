@@ -10,8 +10,7 @@
 MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/hard_swish_int16_test.cc \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/pooling_status_test.cc \
-  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/quantize_zero_point_test.cc \
-  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/transpose_conv_optional_bias_test.cc
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/quantize_zero_point_test.cc
 
 # Executed floating-point coverage (helia-rt#227). The shared upstream kernel
 # tests already run float32 and float16 goldens for the helia dispatch, but
@@ -95,6 +94,20 @@ $(kernel_depthwise_dilated_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_depthwise_conv_s8 \
   -Wl,--wrap=arm_depthwise_conv_fast_s16 \
   -Wl,--wrap=arm_depthwise_conv_s16
+endif
+
+# TRANSPOSE_CONV optional bias, and the int8 scratch-context contract on GNU
+# links. see AmbiqAI/helia-rt#238
+$(eval $(call microlite_test,kernel_transpose_conv_optional_bias_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/transpose_conv_optional_bias_test.cc))
+
+ifeq ($(TOOLCHAIN),gcc)
+$(kernel_transpose_conv_optional_bias_test_BINARY): CXXFLAGS += \
+  -DHELIA_TRANSPOSE_CONV_LINK_WRAP=1
+$(kernel_transpose_conv_optional_bias_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_transpose_conv_wrapper_s8 \
+  -Wl,--wrap=arm_transpose_conv_s8_get_buffer_size \
+  -Wl,--wrap=arm_transpose_conv_s8_get_reverse_conv_buffer_size
 endif
 
 # Quantized CONV_2D and DEPTHWISE_CONV_2D status/context contracts.
