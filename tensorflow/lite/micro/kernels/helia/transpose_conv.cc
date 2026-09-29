@@ -51,6 +51,10 @@ struct OpData {
   // Scratch buffers are required for quantized implementations.
   int scratch_buffer_index;
   int scratch_buffer_output_index;
+  // Byte counts Prepare requested for the two int8 buffers; the contexts
+  // passed to heliaCORE must carry them.
+  int32_t scratch_buffer_size;
+  int32_t scratch_buffer_output_size;
 
   // TODO(b/192090531): Remove this once all 8x16 transpose conv models use
   // 64-bit biases.
@@ -220,6 +224,8 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   // float paths) cannot leave an index holding uninitialized memory.
   data->scratch_buffer_index = -1;
   data->scratch_buffer_output_index = -1;
+  data->scratch_buffer_size = 0;
+  data->scratch_buffer_output_size = 0;
 
 
   // Get height and width of the output.
@@ -328,6 +334,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     TF_LITE_ENSURE_OK(context,
                       context->RequestScratchBufferInArena(
                           context, buf_size, &(data->scratch_buffer_index)));
+    data->scratch_buffer_size = buf_size;
 
     // Quantized 8-bit kernels use a second scratch buffer for reversing the
     // filter for certain configurations.
@@ -339,6 +346,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     TF_LITE_ENSURE_OK(context, context->RequestScratchBufferInArena(
                                    context, reverse_buf_size,
                                    &(data->scratch_buffer_output_index)));
+    data->scratch_buffer_output_size = reverse_buf_size;
   }
   // Quantized 16x8 kernels use an int64 scratch buffer.
   if (input->type == kTfLiteInt16) {
@@ -468,12 +476,13 @@ TfLiteStatus EvalQuantizedPerChannel(TfLiteContext* context, TfLiteNode* node,
   // never be called with the -1 sentinel. Prepare requests both buffers on the
   // int8 path, so these guards are belt-and-braces; a NULL buf is reported by
   // the kernel's own argument check below rather than read out of bounds here.
-  cmsis_nn_context ctx = {nullptr, 0};
+  cmsis_nn_context ctx = {nullptr, data.scratch_buffer_size};
   if (data.scratch_buffer_index >= 0) {
     ctx.buf = context->GetScratchBuffer(context, data.scratch_buffer_index);
   }
 
-  cmsis_nn_context scratch_output_ctx = {nullptr, 0};
+  cmsis_nn_context scratch_output_ctx = {nullptr,
+                                         data.scratch_buffer_output_size};
   if (data.scratch_buffer_output_index >= 0) {
     scratch_output_ctx.buf =
         context->GetScratchBuffer(context, data.scratch_buffer_output_index);
