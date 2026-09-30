@@ -94,6 +94,9 @@ TfLiteStatus EvalMaximum(TfLiteContext* context, TfLiteNode* node) {
   switch (op_context.output->type) {
     case kTfLiteFloat16:
 #if ARM_NN_ENABLE_F16
+      if (output_shape.FlatSize() == 0) {
+        break;
+      }
       if (arm_rank_supported &&
           arm_maximum_f16(
               &ctx, tflite::micro::GetTensorData<float16_t>(input1), &input_1_dims,
@@ -252,6 +255,9 @@ TfLiteStatus EvalMinimum(TfLiteContext* context, TfLiteNode* node) {
   switch (op_context.output->type) {
     case kTfLiteFloat16:
 #if ARM_NN_ENABLE_F16
+      if (output_shape.FlatSize() == 0) {
+        break;
+      }
       if (arm_rank_supported &&
           arm_minimum_f16(
               &ctx, tflite::micro::GetTensorData<float16_t>(input1), &input_1_dims,
