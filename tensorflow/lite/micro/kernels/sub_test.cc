@@ -436,6 +436,51 @@ TEST(SubTest, QuantizedSubRankAbove4BroadcastInt16) {
       kTfLiteActNone, output);
 }
 
+TEST(SubTest, QuantizedSubRankAbove4SecondInputInt16) {
+  const float scales[] = {0.04, 0.06, 0.1};
+  const int zero_points[] = {0, 0, 0};
+  const int output_dims_count = 6;
+
+  int input1_shape[] = {1, 1};
+  int input2_shape[] = {5, 1, 2, 1, 3, 1};
+  const float input1_values[] = {0.4};
+  const float input2_values[] = {0.6, 1.2, -0.6, 0.3, 2.4, 0.0};
+  const float golden_values[] = {-0.2, -0.8, 1.0, 0.1, -2.0, 0.4};
+
+  int16_t input1_quantized[1];
+  int16_t input2_quantized[output_dims_count];
+  int16_t golden_quantized[output_dims_count];
+  int16_t output[output_dims_count];
+
+  tflite::testing::TestSubQuantized(
+      input1_shape, input1_values, input1_quantized, scales[0], zero_points[0],
+      input2_shape, input2_values, input2_quantized, scales[1], zero_points[1],
+      input2_shape, golden_values, golden_quantized, scales[2], zero_points[2],
+      kTfLiteActNone, output);
+}
+
+TEST(SubTest, QuantizedSubRankAbove4ActivationInt16) {
+  const float scales[] = {0.06, 0.04, 0.1};
+  const int zero_points[] = {0, 0, 0};
+  const int output_dims_count = 6;
+
+  int shape[] = {5, 1, 2, 1, 3, 1};
+  const float input1_values[] = {0.6, 1.2, -0.6, 0.3, 2.4, 0.0};
+  const float input2_values[] = {0.4, 0.2, 0.4, 0.8, -1.6, 1.2};
+  const float golden_values[] = {0.2, 1.0, -1.0, -0.5, 1.0, -1.0};
+
+  int16_t input1_quantized[output_dims_count];
+  int16_t input2_quantized[output_dims_count];
+  int16_t golden_quantized[output_dims_count];
+  int16_t output[output_dims_count];
+
+  tflite::testing::TestSubQuantized(
+      shape, input1_values, input1_quantized, scales[0], zero_points[0], shape,
+      input2_values, input2_quantized, scales[1], zero_points[1], shape,
+      golden_values, golden_quantized, scales[2], zero_points[2],
+      kTfLiteActReluN1To1, output);
+}
+
 TEST(SubTest, QuantizedSubWithScalarBroadcastFloat) {
   float output_float[tflite::testing::broadcast_output_dims_count];
 

@@ -40,14 +40,12 @@ constexpr int kOutputTensor = 0;
 struct OpData {
   bool requires_broadcast;
 
-  // These fields are used in both the general 8-bit -> 8bit quantized path,
-  // and the special 16-bit -> 16bit quantized path
+  // Quantized int8 and int16 parameters.
   int input1_shift;
   int input2_shift;
   int32_t output_activation_min;
   int32_t output_activation_max;
 
-  // These fields are used only in the general 8-bit -> 8bit quantized path
   int32_t input1_multiplier;
   int32_t input2_multiplier;
   int32_t output_multiplier;
