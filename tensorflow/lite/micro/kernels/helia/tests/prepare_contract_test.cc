@@ -42,7 +42,9 @@ TfLiteStatus PrepareUnary(const TFLMRegistration& registration, T* input,
   int outputs[] = {1, 1};
   micro::KernelRunner runner(registration, tensors, 2, IntArrayFromInts(inputs),
                              IntArrayFromInts(outputs), nullptr);
-  return runner.InitAndPrepare();
+  const TfLiteStatus status = runner.InitAndPrepare();
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
+  return status;
 }
 
 // Runs float16 MAXIMUM or MINIMUM on an empty output of the given shape and
