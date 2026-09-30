@@ -35,6 +35,12 @@ limitations under the License.
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
+// State carried across invocations needs ns-cmsis-nn v7.28.0; older pins build
+// the kernel's stateless fallback. Keep the threshold in sync with the fences
+// in kernels/helia/unidirectional_sequence_lstm.cc.
+#include "Include/arm_nn_types.h"  // NS_CMSIS_NN_VERSION
+#define HELIA_LSTM_STATEFUL (NS_CMSIS_NN_VERSION >= 7028000)
+
 namespace tflite {
 namespace testing {
 
@@ -137,6 +143,7 @@ void TestStreamingShapes(float hidden_tolerance, float cell_tolerance) {
   const ActivationType* sequence_output = sequence.GetOutputData();
   const auto& quantization = sequence.QuantizationSettings();
 
+#if HELIA_LSTM_STATEFUL
   // time_steps == 1: one invocation per step, state carried by the kernel.
   float step_input[kTimeSteps][kBatchSize * kInputDimension];
   for (int t = 0; t < kTimeSteps; ++t) {
@@ -194,6 +201,7 @@ void TestStreamingShapes(float hidden_tolerance, float cell_tolerance) {
                    quantization.cell_state.scale,
                    quantization.cell_state.zero_point,
                    eval_data.expected_cell_state, cell_tolerance);
+#endif  // HELIA_LSTM_STATEFUL
 
   // batch == 1: batch 0 of the two-batch sequence.
   auto single = CreateIntegerContents<ActivationType, BiasType, 1, kTimeSteps>(
@@ -210,13 +218,14 @@ void TestStreamingShapes(float hidden_tolerance, float cell_tolerance) {
   for (int i = 0; i < kTimeSteps * kStateDimension; ++i) {
     EXPECT_EQ(sequence_output[i], single.GetOutputData()[i]);
   }
+  ExpectNearGolden(single.GetOutputData(), kTimeSteps * kStateDimension,
+                   quantization.output.scale, quantization.output.zero_point,
+                   eval_data.expected_output, hidden_tolerance);
+#if HELIA_LSTM_STATEFUL
   for (int i = 0; i < kStateDimension; ++i) {
     EXPECT_EQ(sequence.GetHiddenStateData()[i], single.GetHiddenStateData()[i]);
     EXPECT_EQ(sequence.GetCellStateData()[i], single.GetCellStateData()[i]);
   }
-  ExpectNearGolden(single.GetOutputData(), kTimeSteps * kStateDimension,
-                   quantization.output.scale, quantization.output.zero_point,
-                   eval_data.expected_output, hidden_tolerance);
   ExpectNearGolden(single.GetHiddenStateData(), kStateDimension,
                    quantization.hidden_state.scale,
                    quantization.hidden_state.zero_point,
@@ -225,6 +234,7 @@ void TestStreamingShapes(float hidden_tolerance, float cell_tolerance) {
                    quantization.cell_state.scale,
                    quantization.cell_state.zero_point,
                    eval_data.expected_cell_state, cell_tolerance);
+#endif  // HELIA_LSTM_STATEFUL
 }
 
 }  // namespace
