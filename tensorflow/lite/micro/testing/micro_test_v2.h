@@ -34,6 +34,7 @@ limitations under the License.
 // TF_LITE_MICRO_TESTS_MAIN
 // ----------------------------------------------------------------------------
 
+#include <cmath>
 #include <cstdarg>
 #include <cstddef>
 #include <limits>
@@ -52,6 +53,13 @@ inline void InitializeTest() { InitializeTarget(); }
 
 namespace micro_test {
 namespace internal {
+
+// A near check passes on two NaNs and fails on a NaN against anything else.
+template <typename A, typename B>
+inline bool BothNaN(const A& a, const B& b) {
+  return std::isnan(static_cast<double>(a)) &&
+         std::isnan(static_cast<double>(b));
+}
 
 // Information about a registered test case.
 struct TestInfo {
@@ -292,7 +300,8 @@ inline TfLiteStatus RunAllTests() { return internal::TestRunner::Get().Run(); }
     auto va = (a);                                                      \
     auto vb = (b);                                                      \
     auto delta = ((va) > (vb)) ? ((va) - (vb)) : ((vb) - (va));         \
-    if (va != vb && delta > epsilon) {                                  \
+    if (!(va == vb || delta <= epsilon ||                               \
+          micro_test::internal::BothNaN(va, vb))) {                     \
       micro_test::internal::printer::ReportFailureNear(                 \
           #a, #b, #epsilon, delta, epsilon, __FILE__, __LINE__);        \
       micro_test::internal::TestRunner::Get().fail() = true;            \
