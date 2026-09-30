@@ -34,7 +34,6 @@ MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
 #                                 lanes of one gate agree exactly (ns#315
 #                                 class).
 #
-# More than one of these is expected to fail on the current ns-cmsis-nn pin.
 # `make test` walks MICROLITE_TEST_TARGETS in list order, so a failing binary
 # would stop every later one from running at all; tools/ci_build/test_helia.sh
 # therefore runs the suite with `make -k`. Do not rely on list order to decide
@@ -43,6 +42,8 @@ MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_activation_edge_test.cc \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_elementwise_edge_test.cc
 
+# GNU links wrap the heliaCORE float32 LSTM call so the tail-lane test can
+# assert that heliaCORE, not the reference fallback, ran.
 $(eval $(call microlite_test,kernel_float_lstm_tail_lane_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_lstm_tail_lane_test.cc))
 

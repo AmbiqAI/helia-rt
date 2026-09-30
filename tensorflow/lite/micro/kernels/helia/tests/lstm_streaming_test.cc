@@ -125,11 +125,15 @@ void TestStreamingShapes(float hidden_tolerance, float cell_tolerance) {
           eval_data.input_data);
   SetConstTensors(sequence);
   auto sequence_params = sequence.BuiltinData();
-  micro::KernelRunner sequence_runner(
-      registration, sequence.GetTensors(), kNumTensors, sequence.KernelInputs(),
-      sequence.KernelOutputs(), &sequence_params);
-  ASSERT_EQ(kTfLiteOk, sequence_runner.InitAndPrepare());
-  ASSERT_EQ(kTfLiteOk, sequence_runner.Invoke());
+  // Runners share KernelRunner's static arena, so each is finished with
+  // before the next one is built.
+  {
+    micro::KernelRunner runner(registration, sequence.GetTensors(), kNumTensors,
+                               sequence.KernelInputs(),
+                               sequence.KernelOutputs(), &sequence_params);
+    ASSERT_EQ(kTfLiteOk, runner.InitAndPrepare());
+    ASSERT_EQ(kTfLiteOk, runner.Invoke());
+  }
   const ActivationType* sequence_output = sequence.GetOutputData();
   const auto& quantization = sequence.QuantizationSettings();
 
@@ -148,31 +152,34 @@ void TestStreamingShapes(float hidden_tolerance, float cell_tolerance) {
           step_input[0]);
   SetConstTensors(streaming);
   auto streaming_params = streaming.BuiltinData();
-  micro::KernelRunner streaming_runner(
-      registration, streaming.GetTensors(), kNumTensors,
-      streaming.KernelInputs(), streaming.KernelOutputs(), &streaming_params);
-  ASSERT_EQ(kTfLiteOk, streaming_runner.InitAndPrepare());
-  for (int t = 0; t < kTimeSteps; ++t) {
-    // Same quantization settings, so the quantized step input can be copied.
-    auto step =
-        CreateIntegerContents<ActivationType, BiasType, kBatchSize, 1>(
-            step_input[t]);
-    streaming.SetInputData(step.GetInputData());
-    ASSERT_EQ(kTfLiteOk, streaming_runner.Invoke());
+  {
+    micro::KernelRunner runner(registration, streaming.GetTensors(),
+                               kNumTensors, streaming.KernelInputs(),
+                               streaming.KernelOutputs(), &streaming_params);
+    ASSERT_EQ(kTfLiteOk, runner.InitAndPrepare());
+    for (int t = 0; t < kTimeSteps; ++t) {
+      // Same quantization settings, so the quantized step input can be copied.
+      auto step =
+          CreateIntegerContents<ActivationType, BiasType, kBatchSize, 1>(
+              step_input[t]);
+      streaming.SetInputData(step.GetInputData());
+      ASSERT_EQ(kTfLiteOk, runner.Invoke());
 
-    float step_golden[kBatchSize * kStateDimension];
-    for (int b = 0; b < kBatchSize; ++b) {
-      for (int s = 0; s < kStateDimension; ++s) {
-        const int sequence_index = (b * kTimeSteps + t) * kStateDimension + s;
-        EXPECT_EQ(sequence_output[sequence_index],
-                  streaming.GetOutputData()[b * kStateDimension + s]);
-        step_golden[b * kStateDimension + s] =
-            eval_data.expected_output[sequence_index];
+      float step_golden[kBatchSize * kStateDimension];
+      for (int b = 0; b < kBatchSize; ++b) {
+        for (int s = 0; s < kStateDimension; ++s) {
+          const int sequence_index = (b * kTimeSteps + t) * kStateDimension + s;
+          EXPECT_EQ(sequence_output[sequence_index],
+                    streaming.GetOutputData()[b * kStateDimension + s]);
+          step_golden[b * kStateDimension + s] =
+              eval_data.expected_output[sequence_index];
+        }
       }
+      ExpectNearGolden(streaming.GetOutputData(), kBatchSize * kStateDimension,
+                       quantization.output.scale,
+                       quantization.output.zero_point, step_golden,
+                       hidden_tolerance);
     }
-    ExpectNearGolden(streaming.GetOutputData(), kBatchSize * kStateDimension,
-                     quantization.output.scale, quantization.output.zero_point,
-                     step_golden, hidden_tolerance);
   }
   for (int i = 0; i < kBatchSize * kStateDimension; ++i) {
     EXPECT_EQ(sequence.GetHiddenStateData()[i],
@@ -193,11 +200,13 @@ void TestStreamingShapes(float hidden_tolerance, float cell_tolerance) {
       eval_data.input_data);
   SetConstTensors(single);
   auto single_params = single.BuiltinData();
-  micro::KernelRunner single_runner(
-      registration, single.GetTensors(), kNumTensors, single.KernelInputs(),
-      single.KernelOutputs(), &single_params);
-  ASSERT_EQ(kTfLiteOk, single_runner.InitAndPrepare());
-  ASSERT_EQ(kTfLiteOk, single_runner.Invoke());
+  {
+    micro::KernelRunner runner(registration, single.GetTensors(), kNumTensors,
+                               single.KernelInputs(), single.KernelOutputs(),
+                               &single_params);
+    ASSERT_EQ(kTfLiteOk, runner.InitAndPrepare());
+    ASSERT_EQ(kTfLiteOk, runner.Invoke());
+  }
   for (int i = 0; i < kTimeSteps * kStateDimension; ++i) {
     EXPECT_EQ(sequence_output[i], single.GetOutputData()[i]);
   }
@@ -208,6 +217,10 @@ void TestStreamingShapes(float hidden_tolerance, float cell_tolerance) {
   ExpectNearGolden(single.GetOutputData(), kTimeSteps * kStateDimension,
                    quantization.output.scale, quantization.output.zero_point,
                    eval_data.expected_output, hidden_tolerance);
+  ExpectNearGolden(single.GetHiddenStateData(), kStateDimension,
+                   quantization.hidden_state.scale,
+                   quantization.hidden_state.zero_point,
+                   eval_data.expected_hidden_state, hidden_tolerance);
   ExpectNearGolden(single.GetCellStateData(), kStateDimension,
                    quantization.cell_state.scale,
                    quantization.cell_state.zero_point,
