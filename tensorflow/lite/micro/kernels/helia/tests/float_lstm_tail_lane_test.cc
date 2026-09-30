@@ -61,9 +61,33 @@ limitations under the License.
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
-#if ARM_NN_ENABLE_F16
+#if ARM_NN_ENABLE_F16 || HELIA_LSTM_F32_LINK_WRAP
 #include "arm_nnfunctions_flt.h"
 #endif
+
+// A failing heliaCORE float32 call falls back to the reference EvalLstm, so on
+// GNU links the float32 case also asserts that heliaCORE is what ran.
+#if HELIA_LSTM_F32_LINK_WRAP
+namespace {
+int g_lstm_f32_calls = 0;
+arm_cmsis_nn_status g_lstm_f32_status = ARM_CMSIS_NN_SUCCESS;
+}  // namespace
+
+extern "C" {
+arm_cmsis_nn_status __real_arm_lstm_unidirectional_f32(
+    const float32_t* input, float32_t* output,
+    const cmsis_nn_lstm_params_f32* params, cmsis_nn_lstm_context_f32* buffers);
+arm_cmsis_nn_status __wrap_arm_lstm_unidirectional_f32(
+    const float32_t* input, float32_t* output,
+    const cmsis_nn_lstm_params_f32* params,
+    cmsis_nn_lstm_context_f32* buffers) {
+  ++g_lstm_f32_calls;
+  g_lstm_f32_status =
+      __real_arm_lstm_unidirectional_f32(input, output, params, buffers);
+  return g_lstm_f32_status;
+}
+}  // extern "C"
+#endif  // HELIA_LSTM_F32_LINK_WRAP
 
 namespace tflite {
 namespace testing {
@@ -296,6 +320,10 @@ TEST(HeliaFloatLstmTailLaneTest, Float32TailLanesMatchVectorLanes) {
       reinterpret_cast<void*>(&builtin_data));
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
   EXPECT_EQ(kTfLiteOk, runner.Invoke());
+#if HELIA_LSTM_F32_LINK_WRAP
+  EXPECT_EQ(1, g_lstm_f32_calls);
+  EXPECT_EQ(ARM_CMSIS_NN_SUCCESS, g_lstm_f32_status);
+#endif
 
   const float* output = contents.GetOutputData();
 

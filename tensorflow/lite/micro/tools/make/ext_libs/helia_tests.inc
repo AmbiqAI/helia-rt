@@ -41,8 +41,17 @@ MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
 # which defect classes get observed.
 MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_activation_edge_test.cc \
-  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_elementwise_edge_test.cc \
-  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_lstm_tail_lane_test.cc
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_elementwise_edge_test.cc
+
+$(eval $(call microlite_test,kernel_float_lstm_tail_lane_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_lstm_tail_lane_test.cc))
+
+ifeq ($(TOOLCHAIN),gcc)
+$(kernel_float_lstm_tail_lane_test_BINARY): CXXFLAGS += \
+  -DHELIA_LSTM_F32_LINK_WRAP=1
+$(kernel_float_lstm_tail_lane_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_lstm_unidirectional_f32
+endif
 
 # heliaCORE float routing tests; each compares the kernel against the TFLM
 # reference and exercises the fallback. see AmbiqAI/helia-rt#275
@@ -170,6 +179,13 @@ $(kernel_fc_leaky_relu_status_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_leaky_relu_s8 \
   -Wl,--wrap=arm_leaky_relu_s16
 endif
+
+# Stateful quantized LSTM at the streaming shapes (time_steps == 1 invoked per
+# step, batch == 1). see AmbiqAI/helia-rt#211
+$(eval $(call microlite_test,kernel_lstm_streaming_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/lstm_streaming_test.cc \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/testdata/lstm_test_data.cc,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/testdata/lstm_test_data.h))
 
 # UNIDIRECTIONAL_SEQUENCE_LSTM kernel-sum status, the FULLY_CONNECTED,
 # BATCH_MATMUL and AVERAGE_POOL_2D scratch-context size contracts, and the
