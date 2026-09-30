@@ -213,9 +213,10 @@ TfLiteStatus PrepareWithShapes(const TFLMRegistration& registration,
   return runner.Invoke();
 }
 
-void ExpectPrepareThenInvokeError(const TFLMRegistration& registration,
-                                  uint16_t* input, uint16_t* output,
-                                  int* dims) {
+// SQUARE and ABS have no float16 path and reject it at Prepare.
+// see AmbiqAI/helia-rt#342
+void ExpectPrepareError(const TFLMRegistration& registration, uint16_t* input,
+                        uint16_t* output, int* dims) {
   TfLiteTensor tensors[] = {
       CreateTensor(input, IntArrayFromInts(dims), false, kTfLiteFloat16),
       CreateTensor(output, IntArrayFromInts(dims), false, kTfLiteFloat16),
@@ -224,9 +225,8 @@ void ExpectPrepareThenInvokeError(const TFLMRegistration& registration,
   tflite::micro::KernelRunner runner(registration, tensors, 2,
                                      IntArrayFromInts(inputs),
                                      IntArrayFromInts(outputs), nullptr);
-  ASSERT_EQ(runner.InitAndPrepare(), kTfLiteOk);
-  ASSERT_TRUE(runner.ValidateTempBufferDeallocated());
-  EXPECT_EQ(runner.Invoke(), kTfLiteError);
+  EXPECT_EQ(runner.InitAndPrepare(), kTfLiteError);
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
 }
 
 }  // namespace
@@ -357,9 +357,8 @@ TEST(HeliaSqrtRsqrtFp16Test, SiblingAdmissionAndLegacyRoutes) {
   uint16_t input = 0x3c00;
   uint16_t output = 0;
   int dims[] = {1, 1};
-  ExpectPrepareThenInvokeError(tflite::Register_SQUARE(), &input, &output,
-                               dims);
-  ExpectPrepareThenInvokeError(tflite::Register_ABS(), &input, &output, dims);
+  ExpectPrepareError(tflite::Register_SQUARE(), &input, &output, dims);
+  ExpectPrepareError(tflite::Register_ABS(), &input, &output, dims);
 
   float f32_input = 4.0f;
   float f32_output = 0.0f;

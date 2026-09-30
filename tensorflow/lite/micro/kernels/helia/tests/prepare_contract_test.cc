@@ -45,12 +45,14 @@ TfLiteStatus PrepareUnary(const TFLMRegistration& registration, T* input,
   return runner.InitAndPrepare();
 }
 
-// Runs float16 MAXIMUM or MINIMUM on an empty [2, 0] output.
-TfLiteStatus InvokeEmptyFloat16(const TFLMRegistration& registration) {
+// Runs float16 MAXIMUM or MINIMUM on an empty output of the given shape and
+// checks nothing was written.
+TfLiteStatus InvokeEmptyFloat16(const TFLMRegistration& registration,
+                                int* dims_data) {
+  constexpr uint16_t kSentinel = 0x7e00;
   uint16_t input1[1] = {};
   uint16_t input2[1] = {};
-  uint16_t output[1] = {};
-  int dims_data[] = {2, 2, 0};
+  uint16_t output[1] = {kSentinel};
   TfLiteTensor tensors[] = {
       CreateTensor(input1, IntArrayFromInts(dims_data), false, kTfLiteFloat16),
       CreateTensor(input2, IntArrayFromInts(dims_data), false, kTfLiteFloat16),
@@ -61,10 +63,11 @@ TfLiteStatus InvokeEmptyFloat16(const TFLMRegistration& registration) {
   micro::KernelRunner runner(registration, tensors, 3, IntArrayFromInts(inputs),
                              IntArrayFromInts(outputs), nullptr);
   TfLiteStatus status = runner.InitAndPrepare();
-  if (status != kTfLiteOk) {
-    return status;
+  if (status == kTfLiteOk) {
+    status = runner.Invoke();
   }
-  return runner.Invoke();
+  EXPECT_EQ(kSentinel, output[0]);
+  return status;
 }
 
 }  // namespace
@@ -99,6 +102,11 @@ TEST(HeliaPrepareContractTest, AbsRejectsInt32AtPrepare) {
   EXPECT_EQ(kTfLiteError,
             tflite::testing::PrepareUnary(tflite::Register_ABS(), input, output,
                                           kTfLiteInt32));
+  uint16_t half_input[4] = {};
+  uint16_t half_output[4] = {};
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::PrepareUnary(tflite::Register_ABS(), half_input,
+                                          half_output, kTfLiteFloat16));
 }
 
 TEST(HeliaPrepareContractTest, SupportedTypesStillPrepare) {
@@ -117,13 +125,29 @@ TEST(HeliaPrepareContractTest, SupportedTypesStillPrepare) {
 
 TEST(HeliaPrepareContractTest, Float16MaximumMinimumEmptyOutput) {
   using tflite::testing::InvokeEmptyFloat16;
+  int rank2[] = {2, 2, 0};
+  int rank5[] = {5, 1, 1, 1, 2, 0};
 #if ARM_NN_ENABLE_F16
-  EXPECT_EQ(kTfLiteOk, InvokeEmptyFloat16(tflite::Register_MAXIMUM()));
-  EXPECT_EQ(kTfLiteOk, InvokeEmptyFloat16(tflite::Register_MINIMUM()));
+  constexpr TfLiteStatus kExpected = kTfLiteOk;
 #else
-  EXPECT_EQ(kTfLiteError, InvokeEmptyFloat16(tflite::Register_MAXIMUM()));
-  EXPECT_EQ(kTfLiteError, InvokeEmptyFloat16(tflite::Register_MINIMUM()));
+  constexpr TfLiteStatus kExpected = kTfLiteError;
 #endif
+  EXPECT_EQ(kExpected, InvokeEmptyFloat16(tflite::Register_MAXIMUM(), rank2));
+  EXPECT_EQ(kExpected, InvokeEmptyFloat16(tflite::Register_MINIMUM(), rank2));
+  EXPECT_EQ(kExpected, InvokeEmptyFloat16(tflite::Register_MAXIMUM(), rank5));
+  EXPECT_EQ(kExpected, InvokeEmptyFloat16(tflite::Register_MINIMUM(), rank5));
 }
+
+#if !ARM_NN_ENABLE_F16 && defined(__ARM_FEATURE_MVE) && \
+    ((__ARM_FEATURE_MVE) & 2)
+// helia.inc defines ARM_NN_ENABLE_F16 for TARGET_ARCH=cortex-m55 only, and a
+// silent compile-out would flip the float16 case to its rejection branch.
+// see AmbiqAI/helia-rt#231
+TEST(HeliaPrepareContractTest, Float16CoverageMustNotSilentlyDisappear) {
+  FAIL(
+      "ARM_NN_ENABLE_F16 is not defined on a build with MVE floating point. "
+      "The float16 MAXIMUM/MINIMUM coverage silently compiled out.");
+}
+#endif
 
 TF_LITE_MICRO_TESTS_MAIN
