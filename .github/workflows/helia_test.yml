@@ -250,30 +250,32 @@ jobs:
         # binaries and nine cases on every leg. see AmbiqAI/helia-rt#335
         # LSTM streaming shapes add one binary and two cases on every leg.
         # see AmbiqAI/helia-rt#211
+        # Prepare contract checks add one binary and five cases on every leg.
+        # see AmbiqAI/helia-rt#342
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 154
-            min-cases: 1282
+            min-binaries: 155
+            min-cases: 1287
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 154
-            min-cases: 1282
+            min-binaries: 155
+            min-cases: 1287
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and one case fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 153
-            min-cases: 1281
+            min-binaries: 154
+            min-cases: 1286
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 154
-            min-cases: 1330
+            min-binaries: 155
+            min-cases: 1335
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 153
-            min-cases: 1329
+            min-binaries: 154
+            min-cases: 1334
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
