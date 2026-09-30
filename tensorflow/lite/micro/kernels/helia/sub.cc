@@ -226,7 +226,7 @@ TfLiteStatus EvalSubQuantizedInt16(TfLiteContext* context, TfLiteNode* node,
   const int32_t input2_dims_count = input2_shape.DimensionsCount();
 
   if (input1_dims_count > 4 || input2_dims_count > 4) {
-    reference_ops::BroadcastSub16POTSlow(
+    reference_ops::BroadcastQuantSubSlow(
         op_params, tflite::micro::GetTensorShape(input1),
         tflite::micro::GetTensorData<int16_t>(input1),
         tflite::micro::GetTensorShape(input2),
