@@ -18,7 +18,7 @@ Different builds exercise different runtime paths. Use a workflow result as evid
 
 ## Workflow entry points
 
-[tests_entry.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/tests_entry.yml) invokes the HELIA test workflow on pull requests. The `ci:run_full` label also invokes the broader upstream CI workflow. Inspect both the trigger and job conditions when requesting additional coverage.
+[tests_entry.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/tests_entry.yml) invokes the HELIA test workflow on pull requests. The `ci:run_full` label also invokes the broader upstream CI workflow. Draft pull requests skip the jobs in `tests_entry.yml` (unless labelled `ci:run_full`) and `smoke_cmake.yml`; marking the pull request ready for review runs them. Inspect both the trigger and job conditions when requesting additional coverage.
 
 [helia_test.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/helia_test.yml) defines the HELIA GCC and ATfE matrix, including target/profile choices and executed-test floors. [smoke_cmake.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/smoke_cmake.yml) covers manifest and integration checks. Arm Compiler 6 has separate [Cortex-M workflow](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/cortex_m_arm_compiler.yml) and [release workflow](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/helia_release.yml) paths.
 
