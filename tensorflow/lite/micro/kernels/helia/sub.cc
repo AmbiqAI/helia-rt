@@ -73,7 +73,7 @@ TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteSubParams* params,
       tflite::GetTensorShape(output));
 
   if (output->type == kTfLiteInt8 || output->type == kTfLiteInt16) {
-    // 8bit -> 8bit general quantized path, with general rescalings
+    // int8 and int16 quantized path, with general rescalings
     data->input1_offset = -input1->params.zero_point;
     data->input2_offset = -input2->params.zero_point;
     data->output_offset = output->params.zero_point;
