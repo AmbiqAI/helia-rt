@@ -11,10 +11,9 @@ name: heliaRT Release
 #     the debug/release archives retain link-probe coverage only.
 #   * release-please creates the GitHub Release before calling this workflow,
 #     so helia_release_gate.yml runs this workflow without upload on the
-#     release PR when a maintainer adds the release:gate label. That run is
-#     not a required check and does not rerun when the PR head changes; the
-#     release guide makes a pass on the final head a merge precondition. See
-#     AmbiqAI/helia-rt#347.
+#     release PR when a maintainer adds the release:gate label. That run
+#     does not rerun when the PR head changes; the release guide makes a pass
+#     on the final head a merge precondition. See AmbiqAI/helia-rt#347.
 #
 # PRE-TAG GATE for the first release that runs this workflow (1.19.0): the
 # armclang legs of the "FP symbol link-probe" step have never executed in CI --
