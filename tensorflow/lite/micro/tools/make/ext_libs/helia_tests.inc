@@ -20,6 +20,11 @@ MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/near_nan_test.cc \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/near_nan_legacy_test.cc
 
+# float16 reductions whose exact sum needs float16 partials folded into
+# float32. see AmbiqAI/helia-rt#337
+MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/fp16_long_reduction_test.cc
+
 # Executed floating-point coverage (helia-rt#227). The shared upstream kernel
 # tests already run float32 and float16 goldens for the helia dispatch, but
 # nothing there feeds a non-finite value to a float kernel, and the shared
