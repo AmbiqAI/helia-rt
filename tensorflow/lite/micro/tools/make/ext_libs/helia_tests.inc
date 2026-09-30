@@ -13,6 +13,12 @@ MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/quantize_zero_point_test.cc \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/sub_rank_above4_test.cc
 
+# Every float golden relies on the near and float-equal checks failing on a
+# NaN. see AmbiqAI/helia-rt#335
+MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/near_nan_test.cc \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/near_nan_legacy_test.cc
+
 # Executed floating-point coverage (helia-rt#227). The shared upstream kernel
 # tests already run float32 and float16 goldens for the helia dispatch, but
 # nothing there feeds a non-finite value to a float kernel, and the shared

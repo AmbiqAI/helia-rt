@@ -51,6 +51,7 @@ limitations under the License.
 
 #ifndef TENSORFLOW_LITE_MICRO_TESTING_MICRO_TEST_H_
 #define TENSORFLOW_LITE_MICRO_TESTING_MICRO_TEST_H_
+#include <cmath>
 #include <limits>
 #include <type_traits>
 
@@ -59,6 +60,13 @@ limitations under the License.
 #include "tensorflow/lite/micro/system_setup.h"
 
 namespace micro_test {
+// A near check passes on two NaNs and fails on a NaN against anything else.
+template <typename A, typename B>
+inline bool BothNaN(const A& a, const B& b) {
+  return std::isnan(static_cast<double>(a)) &&
+         std::isnan(static_cast<double>(b));
+}
+
 extern int tests_passed;
 extern int tests_failed;
 extern bool is_test_complete;
@@ -128,7 +136,9 @@ inline void InitializeTest() { InitializeTarget(); }
     bool isFloatingY = (std::is_floating_point<decltype(vy)>::value);     \
     if (isFloatingX && isFloatingY) {                                     \
       auto delta = ((vx) > (vy)) ? ((vx) - (vy)) : ((vy) - (vx));         \
-      if (delta > std::numeric_limits<decltype(delta)>::epsilon()) {      \
+      if (!(vx == vy ||                                                   \
+            delta <= std::numeric_limits<decltype(delta)>::epsilon() ||   \
+            micro_test::BothNaN(vx, vy))) {                               \
         MicroPrintf(#x " == " #y " failed at %s:%d (%f vs %f)", __FILE__, \
                     __LINE__, static_cast<double>(vx),                    \
                     static_cast<double>(vy));                             \
@@ -171,26 +181,26 @@ inline void InitializeTest() { InitializeTarget(); }
 #define TF_LITE_MICRO_ARRAY_ELEMENT_EXPECT_NEAR(arr1, idx1, arr2, idx2,       \
                                                 epsilon)                      \
   do {                                                                        \
-    auto delta = ((arr1)[(idx1)] > (arr2)[(idx2)])                            \
-                     ? ((arr1)[(idx1)] - (arr2)[(idx2)])                      \
-                     : ((arr2)[(idx2)] - (arr1)[(idx1)]);                     \
-    if (delta > epsilon) {                                                    \
+    auto va = (arr1)[(idx1)];                                                 \
+    auto vb = (arr2)[(idx2)];                                                 \
+    auto delta = (va > vb) ? (va - vb) : (vb - va);                           \
+    if (!(va == vb || delta <= epsilon || micro_test::BothNaN(va, vb))) {     \
       MicroPrintf(#arr1 "[%d] (%f) near " #arr2 "[%d] (%f) failed at %s:%d",  \
-                  static_cast<int>(idx1), static_cast<float>((arr1)[(idx1)]), \
-                  static_cast<int>(idx2), static_cast<float>((arr2)[(idx2)]), \
+                  static_cast<int>(idx1), static_cast<double>(va),            \
+                  static_cast<int>(idx2), static_cast<double>(vb),            \
                   __FILE__, __LINE__);                                        \
       micro_test::did_test_fail = true;                                       \
     }                                                                         \
   } while (false)
 
-// The check vx != vy is needed to properly handle the case where both
+// The check vx == vy is needed to properly handle the case where both
 // x and y evaluate to infinity. See #46960 for more details.
 #define TF_LITE_MICRO_EXPECT_NEAR(x, y, epsilon)                              \
   do {                                                                        \
     auto vx = (x);                                                            \
     auto vy = (y);                                                            \
     auto delta = ((vx) > (vy)) ? ((vx) - (vy)) : ((vy) - (vx));               \
-    if (vx != vy && delta > epsilon) {                                        \
+    if (!(vx == vy || delta <= epsilon || micro_test::BothNaN(vx, vy))) {     \
       MicroPrintf(#x " (%f) near " #y " (%f) failed at %s:%d",                \
                   static_cast<double>(vx), static_cast<double>(vy), __FILE__, \
                   __LINE__);                                                  \
@@ -275,7 +285,9 @@ inline void InitializeTest() { InitializeTarget(); }
     bool isFloatingY = (std::is_floating_point<decltype(vy)>::value);     \
     if (isFloatingX && isFloatingY) {                                     \
       auto delta = ((vx) > (vy)) ? ((vx) - (vy)) : ((vy) - (vx));         \
-      if (delta > std::numeric_limits<decltype(delta)>::epsilon()) {      \
+      if (!(vx == vy ||                                                   \
+            delta <= std::numeric_limits<decltype(delta)>::epsilon() ||   \
+            micro_test::BothNaN(vx, vy))) {                               \
         MicroPrintf(#x " == " #y " failed at %s:%d (%f vs %f)", __FILE__, \
                     __LINE__, static_cast<double>(vx),                    \
                     static_cast<double>(vy));                             \

@@ -246,30 +246,32 @@ jobs:
         # status adds one case to the conv status binary. see AmbiqAI/helia-rt#314
         # int16 SUB above rank 4 adds one binary and four cases on every leg.
         # see AmbiqAI/helia-rt#334
+        # The NaN self-tests for the near and float-equal checks add two
+        # binaries and nine cases on every leg. see AmbiqAI/helia-rt#335
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 151
-            min-cases: 1271
+            min-binaries: 153
+            min-cases: 1280
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 151
-            min-cases: 1271
+            min-binaries: 153
+            min-cases: 1280
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and one case fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 150
-            min-cases: 1270
+            min-binaries: 152
+            min-cases: 1279
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 151
-            min-cases: 1319
+            min-binaries: 153
+            min-cases: 1328
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 150
-            min-cases: 1318
+            min-binaries: 152
+            min-cases: 1327
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
