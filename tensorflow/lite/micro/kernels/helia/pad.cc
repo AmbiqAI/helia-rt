@@ -50,6 +50,32 @@ void PopulateCommonParams(
   post_pad->c = data->params.right_padding_count >= 4 ? data->params.right_padding[3] : 0;
 }
 
+// Places a rank <= 4 input on the last dims of (N, H, W, C): the leading
+// dims are 1 and unpadded, as reference_ops::Pad extends them.
+void PopulateRightAlignedParams(
+    cmsis_nn_dims *const input_size,
+    cmsis_nn_dims *const pre_pad,
+    cmsis_nn_dims *const post_pad,
+    const OpDataPad *data,
+    const RuntimeShape &input_shape
+  )
+{
+  const int offset = 4 - input_shape.DimensionsCount();
+  int32_t dims[4];
+  int32_t pre[4];
+  int32_t post[4];
+  for (int i = 0; i < 4; ++i)
+  {
+    const int src = i - offset;
+    dims[i] = src < 0 ? 1 : input_shape.Dims(src);
+    pre[i] = src < 0 ? 0 : data->params.left_padding[src];
+    post[i] = src < 0 ? 0 : data->params.right_padding[src];
+  }
+  *input_size = {dims[0], dims[1], dims[2], dims[3]};
+  *pre_pad = {pre[0], pre[1], pre[2], pre[3]};
+  *post_pad = {post[0], post[1], post[2], post[3]};
+}
+
 void *Init(TfLiteContext *context, const char *buffer, size_t length)
 {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
@@ -81,14 +107,14 @@ TfLiteStatus Prepare(TfLiteContext *context, TfLiteNode *node)
   TF_LITE_ENSURE(context, NumDimensions(input) <= reference_ops::PadKernelMaxDimensionCount());
 
   // The float16 pad path is optimized-only (no reference fallback) and
-  // handles exactly 4-D tensors; reject anything else here rather than
-  // failing at Invoke time.
+  // heliaCORE pads NHWC tensors, so reject rank 5 here rather than failing
+  // at Invoke time.
   if (input->type == kTfLiteFloat16)
   {
     TF_LITE_ENSURE_MSG(context, kHeliaFloat16Enabled,
                        "Float16 PAD requires ARM_NN_ENABLE_F16.");
-    TF_LITE_ENSURE_MSG(context, NumDimensions(input) == 4,
-                       "Float16 PAD supports only 4-D tensors.");
+    TF_LITE_ENSURE_MSG(context, NumDimensions(input) <= 4,
+                       "Float16 PAD supports up to 4-D tensors.");
   }
 
   if (constant_values != nullptr)
@@ -183,12 +209,12 @@ TfLiteStatus Eval(TfLiteContext *context, TfLiteNode *node)
         constant_values == nullptr
             ? static_cast<float16_t>(0)
             : *tflite::micro::GetTensorData<float16_t>(constant_values);
-    if (tflite::micro::GetTensorShape(input).DimensionsCount() == 4) {
+    if (tflite::micro::GetTensorShape(input).DimensionsCount() <= 4) {
       cmsis_nn_dims input_size;
       cmsis_nn_dims pre_pad;
       cmsis_nn_dims post_pad;
-      PopulateCommonParams(&input_size, &pre_pad, &post_pad, data,
-                           tflite::micro::GetTensorShape(input));
+      PopulateRightAlignedParams(&input_size, &pre_pad, &post_pad, data,
+                                 tflite::micro::GetTensorShape(input));
       if (arm_pad_f16(tflite::micro::GetTensorData<float16_t>(input),
                       tflite::micro::GetTensorData<float16_t>(output), pad_value,
                       &input_size, &pre_pad, &post_pad) ==
