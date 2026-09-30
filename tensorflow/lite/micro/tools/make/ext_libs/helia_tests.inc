@@ -10,7 +10,8 @@
 MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/hard_swish_int16_test.cc \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/pooling_status_test.cc \
-  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/quantize_zero_point_test.cc
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/quantize_zero_point_test.cc \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/sub_rank_above4_test.cc
 
 # Executed floating-point coverage (helia-rt#227). The shared upstream kernel
 # tests already run float32 and float16 goldens for the helia dispatch, but
