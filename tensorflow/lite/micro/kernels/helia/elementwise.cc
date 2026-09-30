@@ -129,6 +129,8 @@ TfLiteStatus GenericPrepare(TfLiteContext* context, TfLiteNode* node) {
   if (!is_supported_type(input->type)) {
     MicroPrintf("Input data type %s (%d) is not supported.",
                 TfLiteTypeGetName(input->type), input->type);
+    micro_context->DeallocateTempTfLiteTensor(input);
+    micro_context->DeallocateTempTfLiteTensor(output);
     return kTfLiteError;
   }
 
@@ -187,6 +189,8 @@ TfLiteStatus PrepareAbsRsqrt(TfLiteContext* context, TfLiteNode* node) {
   if (!is_supported_type(input->type)) {
     MicroPrintf("Input data type %s (%d) is not supported.",
                 TfLiteTypeGetName(input->type), input->type);
+    micro_context->DeallocateTempTfLiteTensor(input);
+    micro_context->DeallocateTempTfLiteTensor(output);
     return kTfLiteError;
   }
 
