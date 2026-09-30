@@ -21,7 +21,7 @@ The matrix includes `cortex-m4+fp` and `cortex-m55`, GCC/Arm Compiler 6/ATfE, an
 
 1. Review public capability changes, fixes, dependency pins and compatibility requirements in the changelog.
 2. Ensure required checks refer to the release PR's exact head. If GitHub presents an approval gate, resolve it through the normal maintainer flow and wait for the checks.
-3. Add the `release:gate` label to the release PR once its content is final. [helia_release_gate.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/helia_release_gate.yml) then runs the artifact workflow on the PR head without uploading. Merge only after it passes, because merging creates the tag and the GitHub release.
+3. Add the `release:gate` label to the release PR once its content is final. [helia_release_gate.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/helia_release_gate.yml) then runs the artifact workflow on the PR head without uploading. Merge only after it passes on the current head, because merging creates the tag and the GitHub release. The gate does not rerun when the PR changes, so remove and re-add the label after any update.
 4. Check version files and the [support policy](/helia-rt/guide/maintenance/support/), including the current/previous minor window and any withdrawn release.
 5. After the release is created, verify artifact jobs, attached libraries, headers, bundle metadata and documentation delivery independently.
 6. Record target execution evidence and remaining gaps. Do not describe a compiler's link probe as an executed model test.

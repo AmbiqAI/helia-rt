@@ -48,7 +48,8 @@ USAGE
 # Each linker names an archive member differently in its map:
 #   GNU ld  "<archive>(<member>)" at the start of a line (archive-member list)
 #   lld     "<archive>(<member>):(.text..." in the section listing
-#   armlink "<member>(<archive basename>)" in the image memory map
+#   armlink "<archive basename>(<member>)" as the last field of an image
+#           memory map line
 require_map_members() {  # <toolchain> <map> <absolute-archive> <member>...
   local toolchain="$1"
   local map_file="$2"
@@ -70,9 +71,9 @@ require_map_members() {  # <toolchain> <map> <absolute-archive> <member>...
           'index($0, expected) > 0 { print; exit }' "${map_file}")"
         ;;
       armclang)
-        match="${member}($(basename "${archive}"))"
+        match="$(basename "${archive}")(${member})"
         receipt="$(awk -v expected="${match}" \
-          'index($0, expected) > 0 { print; exit }' "${map_file}")"
+          '$NF == expected { print; exit }' "${map_file}")"
         ;;
     esac
     if [[ -z "${receipt}" ]]; then
@@ -241,7 +242,7 @@ main() {
   cd "${root_dir}"
 
   if [[ -z "${out_dir}" ]]; then
-    out_dir="$(mktemp -d "${TMPDIR:-/tmp}/helia-release-fp-${profile,,}.XXXXXX")"
+    out_dir="$(mktemp -d "${TMPDIR:-/tmp}/helia-release-fp-${toolchain}-${profile,,}.XXXXXX")"
   else
     if [[ -e "${out_dir}" ]] && \
        [[ -n "$(find "${out_dir}" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]; then
@@ -300,7 +301,7 @@ main() {
       -f "${makefile}"
       TARGET=cortex_m_generic
       TARGET_ARCH=cortex-m55
-      TOOLCHAIN=gcc
+      "TOOLCHAIN=${toolchain}"
       OPTIMIZED_KERNEL_DIR=helia
       BUILD_TYPE=release_with_logs
       GLOBAL_KERNEL_OPTIMIZE=SIZE
@@ -313,7 +314,7 @@ main() {
     [[ -f "${built_archive}" ]] || die "SIZE archive not found: ${built_archive}"
     archive_dir="${out_dir}/archive"
     mkdir -p "${archive_dir}"
-    archive="${archive_dir}/libhelia-rt-cm55-gcc-release-with-logs-size.a"
+    archive="${archive_dir}/libhelia-rt-cm55-${toolchain}-release-with-logs-size.a"
     cp "${built_archive}" "${archive}"
     archive="$(realpath "${archive}")"
   fi
@@ -329,7 +330,11 @@ main() {
   runtime_sources+=" tensorflow/lite/micro/cortex_m_corstone_300/system_setup.cc"
   runtime_sources+=" tensorflow/lite/micro/cortex_m_corstone_300/fault_handlers.cc"
   runtime_sources+=" tensorflow/lite/micro/tools/make/downloads/ethos_u_core_platform/targets/corstone-300/uart.c"
-  runtime_sources+=" tensorflow/lite/micro/tools/make/downloads/ethos_u_core_platform/targets/corstone-300/retarget.c"
+  # The Corstone target links retarget.c for gcc and armclang only; ATfE
+  # uses picolibc semihosting instead.
+  if [[ "${toolchain}" != "atfe" ]]; then
+    runtime_sources+=" tensorflow/lite/micro/tools/make/downloads/ethos_u_core_platform/targets/corstone-300/retarget.c"
+  fi
   runtime_sources+=" tensorflow/lite/micro/tools/make/downloads/cmsis/Cortex_DFP/Device/ARMCM55/Source/system_ARMCM55.c"
   runtime_sources+=" tensorflow/lite/micro/tools/make/downloads/cmsis/Cortex_DFP/Device/ARMCM55/Source/startup_ARMCM55.c"
 

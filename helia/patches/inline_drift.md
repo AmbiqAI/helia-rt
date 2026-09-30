@@ -210,7 +210,7 @@ Drop condition: upstream adds first-class `atfe` and Windows-host support.
 
 ## `tensorflow/lite/micro/tools/make/targets/cortex_m_corstone_300_makefile.inc`
 
-Reduced to four minimal hooks (the bulk of the atfe logic — ~85 lines —
+Reduced to five minimal hooks (the bulk of the atfe logic — ~85 lines —
 lives in [`targets/cortex_m_corstone_300_atfe.inc`](../../tensorflow/lite/micro/tools/make/targets/cortex_m_corstone_300_atfe.inc),
 which is helia-owned):
 
@@ -228,11 +228,17 @@ which is helia-owned):
    `PATH`, and with none on `PATH` its `TARGET_TOOLCHAIN_ROOT ?=` is a no-op
    because the Makefile already defines the variable (empty), so the helia CI
    image would build with a bare `arm-none-eabi-gcc` that does not exist.
+5. `ifeq` guard around the armlink `$(LIBDIR)/$(MICROLITE_LIB_NAME)(startup_$(ARM_CPU).o)`
+   entry hint (3 lines), skipping it when `startup_$(ARM_CPU).c` is in
+   `MICROLITE_TEST_RUNTIME_SRCS`. `test_helia_release_fp.sh` links a shipped
+   archive with the startup file as a runtime object, so the library the hint
+   names is never built and armlink stops with L6002U.
 
 Drop condition: upstream adds first-class `atfe` toolchain support, picks
 up the helia armclang download convention, and either drops `retarget.c`
 or guards it against picolibc. Hook 4 goes when upstream's gcc branch
-works without a compiler on `PATH`.
+works without a compiler on `PATH`. Hook 5 goes when upstream only emits the
+hint when the startup object is in the library.
 
 ## `tensorflow/lite/micro/tools/benchmarking/show_meta_data.cc.template`
 

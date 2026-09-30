@@ -1,12 +1,12 @@
 name: heliaRT Release Gate
 
 # Runs the full release build and floating-point execution gate on the
-# release-please PR before it is merged. Merging that PR is what makes
-# release-please create the tag and the GitHub Release, so a failure here keeps
-# a release without a passing gate from existing. It runs once per release,
-# when a maintainer adds the release:gate label, not on every update of the
-# release PR (release-please rewrites it after each merge to main).
-# see AmbiqAI/helia-rt#347
+# release-please PR before it is merged, because merging that PR is what makes
+# release-please create the tag and the GitHub Release. It runs when a
+# maintainer adds the release:gate label, not on every update of the release PR
+# (release-please rewrites it after each merge to main). It is not a required
+# check and does not rerun on a new head: remove and re-add the label after the
+# PR changes. see AmbiqAI/helia-rt#347
 
 on:
   pull_request:
