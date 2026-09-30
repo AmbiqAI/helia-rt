@@ -22,12 +22,16 @@ name: Tests Entry Point
 #
 # This path needs neither: the PR matrix is gcc/atfe only, no secrets are
 # passed to the called workflows, and nothing here writes to the repository.
+#
+# Draft pull requests run nothing on opened/synchronize unless labelled
+# `ci:run_full`; `ready_for_review` runs the matrix on the ready head.
 on:
   pull_request:
     types:
       - opened
       - synchronize
       - labeled
+      - ready_for_review
 
 # Least privilege. Checkout is the only thing on this path that needs the
 # token at all, and it only needs to read. This also propagates to the called
@@ -83,9 +87,15 @@ jobs:
     # Skipping is safe for the required status checks: a label event does not
     # change the head SHA, so the contexts already reported for that SHA by the
     # opened/synchronize run stay the latest result for their names.
+    #
+    # Skipping a draft is safe too: this job calls a reusable workflow, so a
+    # skip reports only "helia-test" and the ten required contexts stay pending.
     if: >-
-      github.event.action != 'labeled' ||
-      github.event.label.name == 'ci:run_full'
+      (github.event.action == 'labeled' &&
+      github.event.label.name == 'ci:run_full') ||
+      (github.event.action != 'labeled' &&
+      (!github.event.pull_request.draft ||
+      contains(github.event.pull_request.labels.*.name, 'ci:run_full')))
     uses: ./.github/workflows/helia_test.yml
     with:
       trigger-sha: ${{ github.event.pull_request.head.sha }}
