@@ -60,8 +60,33 @@ TF_LITE_MICRO_TEST(LegacyFloatEqFailsWhenOneSideIsNaN) {
   TF_LITE_MICRO_EXPECT_EQ(0.0f, kNaN);
   const bool eq_second = TakeFailure();
 
+  // TF_LITE_MICRO_ASSERT_EQ leaves the enclosing loop on failure.
+  for (int i = 0; i < 1; ++i) {
+    TF_LITE_MICRO_ASSERT_EQ(kNaN, 0.0f);
+  }
+  const bool assert_eq = TakeFailure();
+
   TF_LITE_MICRO_EXPECT(eq_first);
   TF_LITE_MICRO_EXPECT(eq_second);
+  TF_LITE_MICRO_EXPECT(assert_eq);
+}
+
+TF_LITE_MICRO_TEST(LegacyNearFailsOutsideEpsilon) {
+  TF_LITE_MICRO_EXPECT_NEAR(1.0f, 2.0f, 0.5f);
+  const bool near_finite = TakeFailure();
+  TF_LITE_MICRO_EXPECT_NEAR(kInf, 1.0f, 0.5f);
+  const bool near_inf = TakeFailure();
+
+  const float values[] = {1.0f, 2.0f, kInf};
+  TF_LITE_MICRO_ARRAY_ELEMENT_EXPECT_NEAR(values, 0, values, 1, 0.5f);
+  const bool array_finite = TakeFailure();
+  TF_LITE_MICRO_ARRAY_ELEMENT_EXPECT_NEAR(values, 2, values, 0, 0.5f);
+  const bool array_inf = TakeFailure();
+
+  TF_LITE_MICRO_EXPECT(near_finite);
+  TF_LITE_MICRO_EXPECT(near_inf);
+  TF_LITE_MICRO_EXPECT(array_finite);
+  TF_LITE_MICRO_EXPECT(array_inf);
 }
 
 TF_LITE_MICRO_TEST(LegacyFloatChecksPass) {
@@ -75,6 +100,8 @@ TF_LITE_MICRO_TEST(LegacyFloatChecksPass) {
   TF_LITE_MICRO_EXPECT_EQ(kInf, kInf);
   TF_LITE_MICRO_EXPECT_EQ(1.0f, 1.0f);
   TF_LITE_MICRO_EXPECT_NE(kNaN, 0.0f);
+  TF_LITE_MICRO_ASSERT_EQ(kNaN, kNaN);
+  TF_LITE_MICRO_ASSERT_EQ(kInf, kInf);
 }
 
 TF_LITE_MICRO_TESTS_END

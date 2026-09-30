@@ -186,14 +186,14 @@ inline void InitializeTest() { InitializeTarget(); }
     auto delta = (va > vb) ? (va - vb) : (vb - va);                           \
     if (!(va == vb || delta <= epsilon || micro_test::BothNaN(va, vb))) {     \
       MicroPrintf(#arr1 "[%d] (%f) near " #arr2 "[%d] (%f) failed at %s:%d",  \
-                  static_cast<int>(idx1), static_cast<float>((arr1)[(idx1)]), \
-                  static_cast<int>(idx2), static_cast<float>((arr2)[(idx2)]), \
+                  static_cast<int>(idx1), static_cast<double>(va),            \
+                  static_cast<int>(idx2), static_cast<double>(vb),            \
                   __FILE__, __LINE__);                                        \
       micro_test::did_test_fail = true;                                       \
     }                                                                         \
   } while (false)
 
-// The check vx != vy is needed to properly handle the case where both
+// The check vx == vy is needed to properly handle the case where both
 // x and y evaluate to infinity. See #46960 for more details.
 #define TF_LITE_MICRO_EXPECT_NEAR(x, y, epsilon)                              \
   do {                                                                        \

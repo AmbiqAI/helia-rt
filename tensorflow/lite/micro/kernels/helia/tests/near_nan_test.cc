@@ -36,6 +36,9 @@ bool TakeFailure() {
   return failed;
 }
 
+void AssertNearNaN() { ASSERT_NEAR(kNaN, 1.0f, 0.5f); }
+void AssertFloatEqNaN() { ASSERT_FLOAT_EQ(0.0f, kNaN); }
+
 }  // namespace
 
 TEST(NearNaN, NearFailsWhenOneSideIsNaN) {
@@ -59,6 +62,16 @@ TEST(NearNaN, FloatEqFailsWhenOneSideIsNaN) {
 
   EXPECT_TRUE(nan_first);
   EXPECT_TRUE(nan_second);
+}
+
+TEST(NearNaN, AssertFailsWhenOneSideIsNaN) {
+  AssertNearNaN();
+  const bool near = TakeFailure();
+  AssertFloatEqNaN();
+  const bool float_eq = TakeFailure();
+
+  EXPECT_TRUE(near);
+  EXPECT_TRUE(float_eq);
 }
 
 TEST(NearNaN, NearFailsOutsideEpsilon) {
