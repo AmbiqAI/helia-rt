@@ -114,7 +114,7 @@ inline void SetRsqrtOutputMultiplier(const float input_scale,
 }
 
 typedef bool (*IsSupportedType)(TfLiteType);
-template <IsSupportedType>
+template <IsSupportedType is_supported_type>
 TfLiteStatus GenericPrepare(TfLiteContext* context, TfLiteNode* node) {
   MicroContext* micro_context = GetMicroContext(context);
   TF_LITE_ENSURE_EQ(context, NumInputs(node), 1);
@@ -126,9 +126,11 @@ TfLiteStatus GenericPrepare(TfLiteContext* context, TfLiteNode* node) {
       micro_context->AllocateTempOutputTensor(node, kElementwiseOutputTensor);
   TF_LITE_ENSURE(context, output != nullptr);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
-  if (!IsSupportedType(input->type)) {
+  if (!is_supported_type(input->type)) {
     MicroPrintf("Input data type %s (%d) is not supported.",
                 TfLiteTypeGetName(input->type), input->type);
+    micro_context->DeallocateTempTfLiteTensor(input);
+    micro_context->DeallocateTempTfLiteTensor(output);
     return kTfLiteError;
   }
 
@@ -174,7 +176,7 @@ TfLiteStatus SqrtPrepare(TfLiteContext* context, TfLiteNode* node) {
 }
 
 typedef bool (*IsSupportedType)(TfLiteType);
-template <IsSupportedType, const int op_nameid>
+template <IsSupportedType is_supported_type, const int op_nameid>
 TfLiteStatus PrepareAbsRsqrt(TfLiteContext* context, TfLiteNode* node) {
   MicroContext* micro_context = GetMicroContext(context);
   TF_LITE_ENSURE_EQ(context, NumInputs(node), 1);
@@ -184,9 +186,11 @@ TfLiteStatus PrepareAbsRsqrt(TfLiteContext* context, TfLiteNode* node) {
   TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
   TF_LITE_ENSURE(context, output != nullptr);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
-  if (!IsSupportedType(input->type)) {
+  if (!is_supported_type(input->type)) {
     MicroPrintf("Input data type %s (%d) is not supported.",
                 TfLiteTypeGetName(input->type), input->type);
+    micro_context->DeallocateTempTfLiteTensor(input);
+    micro_context->DeallocateTempTfLiteTensor(output);
     return kTfLiteError;
   }
 

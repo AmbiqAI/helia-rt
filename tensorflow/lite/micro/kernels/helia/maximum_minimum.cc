@@ -86,7 +86,7 @@ TfLiteStatus EvalMaximum(TfLiteContext* context, TfLiteNode* node) {
   // would make the heliaCore kernels silently compute a single element.
   // Restrict the optimized paths to rank <= 4; higher ranks fall back to
   // the reference loop (float32/int8/int16) or fail with a message
-  // (float16).
+  // (float16, unless the output is empty).
   const bool arm_rank_supported = input_1_shape.DimensionsCount() <= 4 &&
                                   input_2_shape.DimensionsCount() <= 4 &&
                                   output_shape.DimensionsCount() <= 4;
@@ -94,6 +94,9 @@ TfLiteStatus EvalMaximum(TfLiteContext* context, TfLiteNode* node) {
   switch (op_context.output->type) {
     case kTfLiteFloat16:
 #if ARM_NN_ENABLE_F16
+      if (output_shape.FlatSize() == 0) {
+        break;
+      }
       if (arm_rank_supported &&
           arm_maximum_f16(
               &ctx, tflite::micro::GetTensorData<float16_t>(input1), &input_1_dims,
@@ -244,7 +247,7 @@ TfLiteStatus EvalMinimum(TfLiteContext* context, TfLiteNode* node) {
   // would make the heliaCore kernels silently compute a single element.
   // Restrict the optimized paths to rank <= 4; higher ranks fall back to
   // the reference loop (float32/int8/int16) or fail with a message
-  // (float16).
+  // (float16, unless the output is empty).
   const bool arm_rank_supported = input_1_shape.DimensionsCount() <= 4 &&
                                   input_2_shape.DimensionsCount() <= 4 &&
                                   output_shape.DimensionsCount() <= 4;
@@ -252,6 +255,9 @@ TfLiteStatus EvalMinimum(TfLiteContext* context, TfLiteNode* node) {
   switch (op_context.output->type) {
     case kTfLiteFloat16:
 #if ARM_NN_ENABLE_F16
+      if (output_shape.FlatSize() == 0) {
+        break;
+      }
       if (arm_rank_supported &&
           arm_minimum_f16(
               &ctx, tflite::micro::GetTensorData<float16_t>(input1), &input_1_dims,
