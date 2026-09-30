@@ -12,7 +12,8 @@ MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/pooling_status_test.cc \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/quantize_zero_point_test.cc \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/sub_rank_above4_test.cc \
-  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/prepare_contract_test.cc
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/prepare_contract_test.cc \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/fp16_pad_rank_test.cc
 
 # Every float golden relies on the near and float-equal checks failing on a
 # NaN. see AmbiqAI/helia-rt#335
