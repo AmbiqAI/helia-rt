@@ -39,13 +39,19 @@ constexpr uint16_t k4 = 0x4400;
 constexpr uint16_t k5 = 0x4500;
 constexpr uint16_t k6 = 0x4600;
 constexpr uint16_t k7 = 0x4700;
+// Fills the output buffer so an unwritten or overrun cell is visible.
+constexpr uint16_t kSentinel = 0x7e01;
+constexpr int kOutputCapacity = 16;
 
 // Runs PAD (or PADV2 when `constant` is set) and compares the output bits.
 // Legs without float16 support must reject float16 at Prepare.
 void RunPad(int* input_dims, uint16_t* input, int* pad_dims,
             const int32_t* pads, uint16_t* constant, int* output_dims,
             const uint16_t* expected, int output_size) {
-  uint16_t output[16] = {};
+  uint16_t output[kOutputCapacity];
+  for (int i = 0; i < kOutputCapacity; ++i) {
+    output[i] = kSentinel;
+  }
   int scalar_dims[] = {0};
   TfLiteTensor tensors[] = {
       CreateTensor(input, IntArrayFromInts(input_dims), false, kTfLiteFloat16),
@@ -71,6 +77,9 @@ void RunPad(int* input_dims, uint16_t* input, int* pad_dims,
   ASSERT_EQ(kTfLiteOk, runner.Invoke());
   for (int i = 0; i < output_size; ++i) {
     EXPECT_EQ(expected[i], output[i]);
+  }
+  for (int i = output_size; i < kOutputCapacity; ++i) {
+    EXPECT_EQ(kSentinel, output[i]);
   }
 #else
   (void)expected;
@@ -118,5 +127,17 @@ TEST(HeliaFp16PadRankTest, Rank3WithConstant) {
   RunPad(input_dims, input, pad_dims, pads, &constant, output_dims, expected,
          12);
 }
+
+#if !ARM_NN_ENABLE_F16 && defined(__ARM_FEATURE_MVE) && \
+    ((__ARM_FEATURE_MVE) & 2)
+// helia.inc defines ARM_NN_ENABLE_F16 for TARGET_ARCH=cortex-m55 only, and a
+// silent compile-out would pass every case above through its Prepare-rejects
+// branch. see AmbiqAI/helia-rt#231
+TEST(HeliaFp16PadRankTest, Float16CoverageMustNotSilentlyDisappear) {
+  FAIL(
+      "ARM_NN_ENABLE_F16 is not defined on a build with MVE floating point. "
+      "The float16 PAD rank coverage silently compiled out.");
+}
+#endif
 
 TF_LITE_MICRO_TESTS_MAIN
