@@ -40,14 +40,12 @@ constexpr int kOutputTensor = 0;
 struct OpData {
   bool requires_broadcast;
 
-  // These fields are used in both the general 8-bit -> 8bit quantized path,
-  // and the special 16-bit -> 16bit quantized path
+  // Quantized int8 and int16 parameters.
   int input1_shift;
   int input2_shift;
   int32_t output_activation_min;
   int32_t output_activation_max;
 
-  // These fields are used only in the general 8-bit -> 8bit quantized path
   int32_t input1_multiplier;
   int32_t input2_multiplier;
   int32_t output_multiplier;
@@ -75,7 +73,7 @@ TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteSubParams* params,
       tflite::GetTensorShape(output));
 
   if (output->type == kTfLiteInt8 || output->type == kTfLiteInt16) {
-    // 8bit -> 8bit general quantized path, with general rescalings
+    // int8 and int16 quantized path, with general rescalings
     data->input1_offset = -input1->params.zero_point;
     data->input2_offset = -input2->params.zero_point;
     data->output_offset = output->params.zero_point;
@@ -226,7 +224,7 @@ TfLiteStatus EvalSubQuantizedInt16(TfLiteContext* context, TfLiteNode* node,
   const int32_t input2_dims_count = input2_shape.DimensionsCount();
 
   if (input1_dims_count > 4 || input2_dims_count > 4) {
-    reference_ops::BroadcastSub16POTSlow(
+    reference_ops::BroadcastQuantSubSlow(
         op_params, tflite::micro::GetTensorShape(input1),
         tflite::micro::GetTensorData<int16_t>(input1),
         tflite::micro::GetTensorShape(input2),

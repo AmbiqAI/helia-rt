@@ -244,30 +244,32 @@ jobs:
         # injected failures. see AmbiqAI/helia-rt#238
         # Dilated depthwise adds one binary and six cases, and 16x8 depthwise
         # status adds one case to the conv status binary. see AmbiqAI/helia-rt#314
+        # int16 SUB above rank 4 adds one binary and four cases on every leg.
+        # see AmbiqAI/helia-rt#334
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 150
-            min-cases: 1267
+            min-binaries: 151
+            min-cases: 1271
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 150
-            min-cases: 1267
+            min-binaries: 151
+            min-cases: 1271
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and one case fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 149
-            min-cases: 1266
+            min-binaries: 150
+            min-cases: 1270
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 150
-            min-cases: 1315
+            min-binaries: 151
+            min-cases: 1319
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 149
-            min-cases: 1314
+            min-binaries: 150
+            min-cases: 1318
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
