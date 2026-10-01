@@ -32,7 +32,7 @@ limitations under the License.
 // clamps a raw infinity to the finite bound. Only the NaN-producing cases are
 // implementation-independent.
 //
-// These are TRUE CONTRACT assertions, unlike the tanh/logistic NaN cases in
+// These are TRUE CONTRACT assertions, unlike the logistic NaN cases in
 // float_activation_edge_test.cc: the elementwise clamp helpers reclassify NaN
 // on the integer bit pattern, which survives -Ofast, so this holds on every
 // toolchain rather than only outside fast-math. see AmbiqAI/ns-cmsis-nn#380

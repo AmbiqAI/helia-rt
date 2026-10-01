@@ -18,17 +18,14 @@ limitations under the License.
 // finite values, so nothing else in the tree observes this.
 // see AmbiqAI/helia-rt#227
 //
-// NaN behaviour splits by path, and the tests below split the same way:
+// NaN behaviour splits by op, and the tests below split the same way:
 //
-//   TANH float32, scalar leg (cortex-m3, cortex-m4+fp)   -> NaN propagates.
-//       CONTRACT. arm_nn_tanh_scalar_ref_f32 carries an explicit NaN guard,
-//       which -ffinite-math-only would delete; helia builds ns-cmsis-nn at -O3
-//       for gcc and ATfE, and armclang appends -ffp-mode=full after -Ofast, so
-//       the guard holds there too. see AmbiqAI/helia-rt#230
-//   TANH float32/float16, MVE leg (cortex-m55)           -> saturation bound.
-//       CHARACTERIZATION. Documented and deliberate upstream: vminnmq is IEEE
-//       minNum, so a qNaN lane is replaced by the table bound.
-//       see AmbiqAI/ns-cmsis-nn#382, AmbiqAI/ns-cmsis-nn#388
+//   TANH float32/float16, every leg                      -> NaN propagates.
+//       CONTRACT. The MVE and soft-float scalar helpers classify NaN on the
+//       bit pattern. The hard-float scalar guard is a float compare, which
+//       -ffinite-math-only would delete; helia builds ns-cmsis-nn at -O3 for
+//       gcc and ATfE, and armclang appends -ffp-mode=full after -Ofast, so the
+//       guard holds there too. see AmbiqAI/helia-rt#230, AmbiqAI/ns-cmsis-nn#635
 //   LOGISTIC float32/float16                             -> saturation bound.
 //       CHARACTERIZATION. There is no MVE sigmoid helper for either precision,
 //       so LOGISTIC is always the scalar path; its exp input clamp flushes NaN
@@ -75,15 +72,6 @@ limitations under the License.
 #define HELIA_TEST_OPTIMIZED_F32 1
 #else
 #define HELIA_TEST_OPTIMIZED_F32 0
-#endif
-
-// Does this build select the MVE (vector) activation helpers? heliaCORE gates
-// them on ARM_MATH_MVEF / ARM_MATH_MVE_FLOAT16, which track the compiler's
-// __ARM_FEATURE_MVE; bit 1 is MVE floating point.
-#if defined(__ARM_FEATURE_MVE) && ((__ARM_FEATURE_MVE) & 2)
-#define HELIA_TEST_MVE_FLOAT 1
-#else
-#define HELIA_TEST_MVE_FLOAT 0
 #endif
 
 namespace tflite {
@@ -134,24 +122,6 @@ constexpr float kSaturationFloor = 0.99f;
 // ULP is all that is warranted; float16 resolves ~4.9e-4 and needs more room.
 constexpr float kSaturationCeilF32 = 1.0000005f;  // ~8 float32 ULP
 constexpr float kLogisticFloorF32 = -2e-7f;       // ~3 float32 ULP below 0
-
-#if HELIA_TEST_OPTIMIZED_F32 && HELIA_TEST_MVE_FLOAT
-// Asserts the "NaN was mapped to the saturation bound" behavior class without
-// pinning a literal, which moves with the upstream table window. Logs the
-// observed value so the CI record carries the concrete number.
-void ExpectTanhNanCharacterized(float observed, const char* label) {
-  MicroPrintf("%s: tanh(NaN) observed = %f", label,
-              static_cast<double>(observed));
-  EXPECT_FALSE(std::isnan(observed));
-  EXPECT_TRUE(std::isfinite(observed));
-  // Documented as NEGATIVE: Armv8.1-M defines VCMP `lt` as the logical inverse
-  // of `ge`, so it is true for unordered operands and the vnegq_m negation
-  // predicate fires on every NaN lane.
-  EXPECT_LT(observed, 0.0f);
-  EXPECT_GE(-observed, kSaturationFloor);
-  EXPECT_LE(-observed, kSaturationCeilF32);
-}
-#endif
 
 void ExpectLogisticNanCharacterized(float observed, const char* label) {
   MicroPrintf("%s: logistic(NaN) observed = %f", label,
@@ -240,20 +210,24 @@ TEST(HeliaFloatActivationEdgeTest, TanhFloat32NanBehavior) {
                                  kTfLiteFloat32, input, output,
                                  tflite::testing::kNonFiniteCount);
 
-#if HELIA_TEST_OPTIMIZED_F32 && HELIA_TEST_MVE_FLOAT
-  // CHARACTERIZATION: the MVE leg maps NaN to the negated saturation bound by
-  // design. Not a defect; see the file header.
-  tflite::testing::ExpectTanhNanCharacterized(output[0], "f32/MVE");
-#else
-  // CONTRACT: the scalar leg propagates NaN, and so does the TFLM reference
-  // kernel used on host builds.
+  // Contract on every path, the TFLM reference kernel on host builds included.
   EXPECT_TRUE(std::isnan(output[0]));
-#endif
-
-  // Contract on every path.
   EXPECT_NEAR(1.0f, output[1], 1e-6f);
   EXPECT_NEAR(-1.0f, output[2], 1e-6f);
   EXPECT_NEAR(std::tanh(0.5f), output[3], 1e-5f);
+}
+
+// tanh(-0) == -0 and tanh(+0) == +0 on every path. see AmbiqAI/ns-cmsis-nn#635
+TEST(HeliaFloatActivationEdgeTest, TanhFloat32KeepsSignedZero) {
+  const float input[2] = {-0.0f, 0.0f};
+  float output[2] = {1.0f, 1.0f};
+  tflite::testing::RunActivation(tflite::testing::Activation::kTanh,
+                                 kTfLiteFloat32, input, output, 2);
+
+  EXPECT_EQ(0.0f, output[0]);
+  EXPECT_TRUE(std::signbit(output[0]));
+  EXPECT_EQ(0.0f, output[1]);
+  EXPECT_FALSE(std::signbit(output[1]));
 }
 
 TEST(HeliaFloatActivationEdgeTest, LogisticFloat32NanBehavior) {
