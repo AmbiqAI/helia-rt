@@ -137,7 +137,6 @@ set(HELIA_RT_RUNTIME_COMMON_SOURCES
     tensorflow/lite/kernels/internal/portable_tensor_utils.cc
     tensorflow/lite/kernels/internal/tensor_ctypes.cc
     tensorflow/lite/kernels/internal/tensor_utils.cc
-    tensorflow/lite/kernels/internal/reference/comparisons.cc
     tensorflow/lite/kernels/internal/reference/portable_tensor_utils.cc
     tensorflow/lite/kernels/kernel_util.cc
 )
@@ -185,6 +184,7 @@ set(HELIA_RT_KERNEL_BASENAMES
     add_n.cc
     arg_min_max.cc
     assign_variable.cc
+    basic_classifier.cc
     batch_matmul.cc
     batch_matmul_common.cc
     batch_to_space_nd.cc

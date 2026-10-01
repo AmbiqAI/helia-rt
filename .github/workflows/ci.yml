@@ -21,7 +21,7 @@ permissions:
 # workflow, so a tag lets the image drift from the repo's Dockerfile with no
 # commit recording the change -- and no run recording which image it used.
 #
-# Five workflows pin this image and they must all carry the SAME digest, or
+# Four workflows pin this image and they must all carry the SAME digest, or
 # the test matrix and the release build silently run on different images. See
 # .github/workflows/README.md for the pin-point list and the re-pin recipe.
 
@@ -154,9 +154,9 @@ jobs:
   #       run: |
   #         tensorflow/lite/micro/tools/ci_build/test_bazel_ubsan.sh
 
-  cortex_m_bluepill_release:
+  cortex_m_bluepill:
     runs-on: ubuntu-latest-md
-    name: Cortex-M Bluepill Release (presubmit)
+    name: Cortex-M Bluepill (presubmit)
     needs: ci-image
     container:
       image: ${{ needs.ci-image.outputs.image }}
@@ -167,37 +167,7 @@ jobs:
       - name: Test
         run: |
           cd ../
-          helia-rt/tensorflow/lite/micro/tools/ci_build/test_bluepill_release.sh helia-rt/
-
-  cortex_m_bluepill_no_release:
-    runs-on: ubuntu-latest-md
-    name: Cortex-M Bluepill No Release (presubmit)
-    needs: ci-image
-    container:
-      image: ${{ needs.ci-image.outputs.image }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.trigger-sha }}
-      - name: Test
-        run: |
-          cd ../
-          helia-rt/tensorflow/lite/micro/tools/ci_build/test_bluepill_no_release.sh helia-rt/
-
-  cortex_m_bluepill_renode:
-    runs-on: ubuntu-latest-md
-    name: Cortex-M Bluepill Renode (presubmit)
-    needs: ci-image
-    container:
-      image: ${{ needs.ci-image.outputs.image }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.trigger-sha }}
-      - name: Test
-        run: |
-          cd ../
-          helia-rt/tensorflow/lite/micro/tools/ci_build/test_bluepill_renode.sh helia-rt/
+          helia-rt/tensorflow/lite/micro/tools/ci_build/test_bluepill.sh helia-rt/
 
   cortex_m_qemu:
     runs-on: ubuntu-latest-md
