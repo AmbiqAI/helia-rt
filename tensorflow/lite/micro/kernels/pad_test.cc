@@ -505,4 +505,36 @@ TEST(PadTest, Test2DInt8ExpectFailureQuantizationRangeExcludesZero) {
       output_zero_point, output_data, kTfLiteError);
 }
 
+// helia: Prepare must reject input and output ranks that differ before it
+// indexes dims or paddings by the other rank. Each buffer holds the slot an
+// unchecked Prepare would read, consistent with the output, so only the rank
+// check can reject the model. see AmbiqAI/helia-rt#350
+TEST(PadTest, ExpectFailureOutputRankAboveInputRank) {
+  int input_dims[] = {2, 1, 2, 3};
+  const float input_values[] = {1, 2, 3, 4, 5, 6};
+  int pad_dims[] = {2, 3, 2};
+  const int32_t pad_values[] = {0, 0, 0, 0, 0, 0};
+  int output_dims[] = {3, 1, 2, 3};
+  const float golden[] = {1, 2, 3, 4, 5, 6};
+  float output_data[6];
+
+  tflite::testing::TestPadFloat(input_dims, input_values, pad_dims, pad_values,
+                                output_dims, golden, output_data,
+                                kTfLiteError);
+}
+
+TEST(PadTest, ExpectFailureInputRankAboveOutputRank) {
+  int input_dims[] = {3, 1, 2, 1};
+  const float input_values[] = {1, 2};
+  int pad_dims[] = {2, 2, 2};
+  const int32_t pad_values[] = {0, 0, 0, 0, 0, 0};
+  int output_dims[] = {2, 1, 2};
+  const float golden[] = {1, 2};
+  float output_data[2];
+
+  tflite::testing::TestPadFloat(input_dims, input_values, pad_dims, pad_values,
+                                output_dims, golden, output_data,
+                                kTfLiteError);
+}
+
 TF_LITE_MICRO_TESTS_MAIN

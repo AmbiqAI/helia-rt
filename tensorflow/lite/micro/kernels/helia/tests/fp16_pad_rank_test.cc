@@ -13,10 +13,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-// Float16 PAD and PADV2 below rank 4. The helia float16 path runs only on
-// heliaCORE, which pads NHWC tensors, so a rank-r input must land on the last
-// r of (N, H, W, C). The expected outputs are exact in float16.
-// see AmbiqAI/helia-rt#348
+// Float16 PAD and PADV2 below rank 4, and empty tensors at any rank. The
+// helia float16 path runs only on heliaCORE, which pads NHWC tensors, so a
+// rank-r input must land on the last r of (N, H, W, C). The expected outputs
+// are exact in float16. see AmbiqAI/helia-rt#348, AmbiqAI/helia-rt#351
 
 #include <cstdint>
 
@@ -126,6 +126,53 @@ TEST(HeliaFp16PadRankTest, Rank3WithConstant) {
                                k4, k5, k6, k7};
   RunPad(input_dims, input, pad_dims, pads, &constant, output_dims, expected,
          12);
+}
+
+// An empty output has nothing to write, as in the reference kernel.
+// see AmbiqAI/helia-rt#351
+TEST(HeliaFp16PadRankTest, Rank4EmptyOutput) {
+  using namespace tflite::testing;
+  int input_dims[] = {4, 1, 0, 2, 1};
+  uint16_t input[] = {k1};
+  int pad_dims[] = {2, 4, 2};
+  const int32_t pads[] = {0, 0, 0, 0, 1, 1, 0, 0};
+  int output_dims[] = {4, 1, 0, 4, 1};
+  RunPad(input_dims, input, pad_dims, pads, nullptr, output_dims, nullptr, 0);
+}
+
+TEST(HeliaFp16PadRankTest, Rank2EmptyOutputWithConstant) {
+  using namespace tflite::testing;
+  int input_dims[] = {2, 0, 3};
+  uint16_t input[] = {k1};
+  int pad_dims[] = {2, 2, 2};
+  const int32_t pads[] = {0, 0, 1, 0};
+  uint16_t constant = k7;
+  int output_dims[] = {2, 0, 4};
+  RunPad(input_dims, input, pad_dims, pads, &constant, output_dims, nullptr, 0);
+}
+
+TEST(HeliaFp16PadRankTest, Rank2EmptyInput) {
+  using namespace tflite::testing;
+  int input_dims[] = {2, 0, 3};
+  uint16_t input[] = {k1};
+  int pad_dims[] = {2, 2, 2};
+  const int32_t pads[] = {1, 1, 0, 0};
+  int output_dims[] = {2, 2, 3};
+  const uint16_t expected[] = {k0, k0, k0, k0, k0, k0};
+  RunPad(input_dims, input, pad_dims, pads, nullptr, output_dims, expected, 6);
+}
+
+// An empty input has no arena buffer; the output is all padding.
+TEST(HeliaFp16PadRankTest, Rank4EmptyNullInputWithConstant) {
+  using namespace tflite::testing;
+  int input_dims[] = {4, 1, 0, 2, 1};
+  int pad_dims[] = {2, 4, 2};
+  const int32_t pads[] = {0, 0, 1, 1, 0, 0, 0, 0};
+  uint16_t constant = k7;
+  int output_dims[] = {4, 1, 2, 2, 1};
+  const uint16_t expected[] = {k7, k7, k7, k7};
+  RunPad(input_dims, nullptr, pad_dims, pads, &constant, output_dims,
+         expected, 4);
 }
 
 #if !ARM_NN_ENABLE_F16 && defined(__ARM_FEATURE_MVE) && \
