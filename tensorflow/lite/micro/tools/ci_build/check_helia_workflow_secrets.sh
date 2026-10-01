@@ -23,10 +23,11 @@
 # see AmbiqAI/helia-rt#366
 #
 # The rule applies to every top-level .yml/.yaml workflow, line by line: a
-# "secrets:" key whose value is inherit, bare or quoted, in a block or flow
-# mapping or alone on the next non-blank, non-comment line, fails. Line
+# secrets key, bare or quoted, fails when its value, in a block or flow mapping
+# or alone on the next non-blank, non-comment line, is inherit (bare, quoted
+# or behind an anchor) or an alias, which this check cannot resolve. Line
 # matching also flags the text inside a block scalar (run: |), and does not
-# see a quoted key or a YAML tag or alias.
+# see a YAML tag or a key written as an explicit ? entry.
 #
 # Usage: check_helia_workflow_secrets.sh [root]
 #   root defaults to the repository root inferred from this script's location.
@@ -55,6 +56,12 @@ status=0
 for file in "${files[@]}"; do
   rc=0
   hits="$(awk '
+    BEGIN {
+      q = "[\"\047]?"
+      key = q "secrets" q
+      # inherit, optionally quoted or anchored, or an alias.
+      value = "((&[^[:space:],}]+[[:space:]]+)?" q "inherit" q "|\\*[^[:space:],}]+)"
+    }
     {
       line = $0
       sub(/\r$/, "", line)
@@ -62,12 +69,12 @@ for file in "${files[@]}"; do
       sub(/[[:space:]]#.*$/, "", line)
       if (line ~ /^[[:space:]]*$/) next
       if (pending) {
-        if (line ~ /^[[:space:]]*["'"'"']?inherit["'"'"']?[[:space:]]*$/) print pending
+        if (line ~ ("^[[:space:]]*" value "[[:space:]]*$")) print pending
         pending = 0
       }
-      if (line ~ /(^|[{,[:space:]])secrets[[:space:]]*:[[:space:]]*["'"'"']?inherit["'"'"']?[[:space:]]*([,}]|$)/)
+      if (line ~ ("(^|[{,[:space:]])" key "[[:space:]]*:[[:space:]]*" value "[[:space:]]*([,}]|$)"))
         print NR
-      else if (line ~ /(^|[[:space:]])secrets[[:space:]]*:[[:space:]]*$/)
+      else if (line ~ ("(^|[[:space:]])" key "[[:space:]]*:[[:space:]]*$"))
         pending = NR
     }' "${file}")" || rc=$?
   if [[ ${rc} -ne 0 ]]; then
