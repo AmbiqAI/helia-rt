@@ -111,7 +111,8 @@ jobs:
       - name: Self-test the heliaCORE status guard
         run: ./tensorflow/lite/micro/tools/ci_build/check_helia_cmsis_nn_status_checks_test.sh
 
-      # helia-rt #366: called workflows get the secrets they declare, by name.
+      # Called workflows get only the secrets they declare, passed by name.
+      # see AmbiqAI/helia-rt#366
       - name: Check workflows pass no inherited secrets
         run: ./tensorflow/lite/micro/tools/ci_build/check_helia_workflow_secrets.sh
 
