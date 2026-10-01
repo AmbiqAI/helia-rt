@@ -102,31 +102,34 @@ namespace testing {
 namespace {
 
 struct Shape {
-  int in_h, in_w, in_c, out_c, stride, dilation;
+  int batch, in_h, in_w, in_c, out_c, stride, dilation;
   TfLitePadding padding;
 };
 
 enum class Route { kC16S1, kGeneric };
 
-// The direct entry exists only on MVE builds; elsewhere every case is generic
-// and only the results are compared.
+// The wrapper runs the direct entry only on MVE builds; elsewhere every layer
+// takes arm_convolve_s8.
 void ExpectRoute(Route route) {
-#if HELIA_CONV_ROUTE_LINK_WRAP && defined(ARM_MATH_MVEI) && \
-    !defined(ARM_MATH_AUTOVECTORIZE)
-  const int c16 = g_leaf_calls[static_cast<int>(Leaf::kC16S1)];
-  const int generic = g_leaf_calls[static_cast<int>(Leaf::kS8)];
-  EXPECT_EQ(route == Route::kC16S1 ? 1 : 0, c16);
-  EXPECT_EQ(route == Route::kC16S1 ? 0 : 1, generic);
+#if HELIA_CONV_ROUTE_LINK_WRAP
+#if defined(ARM_MATH_MVEI) && !defined(ARM_MATH_AUTOVECTORIZE)
+  const bool direct = route == Route::kC16S1;
+#else
+  (void)route;
+  const bool direct = false;
+#endif
+  EXPECT_EQ(direct ? 1 : 0, g_leaf_calls[static_cast<int>(Leaf::kC16S1)]);
+  EXPECT_EQ(direct ? 0 : 1, g_leaf_calls[static_cast<int>(Leaf::kS8)]);
 #else
   (void)route;
 #endif
 }
 
 constexpr int kKernel = 3;
-constexpr int kMaxInput = 12 * 12 * 16;
+constexpr int kMaxInput = 2 * 12 * 12 * 16;
 constexpr int kMaxFilter = 24 * kKernel * kKernel * 16;
 constexpr int kMaxChannels = 24;
-constexpr int kMaxOutput = 12 * 12 * 24;
+constexpr int kMaxOutput = 2 * 12 * 12 * 24;
 
 uint32_t g_seed = 371;
 int NextInt(int lo, int hi) {
@@ -158,9 +161,9 @@ void ExpectMatchesReference(const Shape& s, Route route) {
 
   const int out_h = OutSize(s.padding, s.in_h, s.stride, s.dilation);
   const int out_w = OutSize(s.padding, s.in_w, s.stride, s.dilation);
-  const int input_count = s.in_h * s.in_w * s.in_c;
+  const int input_count = s.batch * s.in_h * s.in_w * s.in_c;
   const int filter_count = s.out_c * kKernel * kKernel * s.in_c;
-  const int output_count = out_h * out_w * s.out_c;
+  const int output_count = s.batch * out_h * out_w * s.out_c;
   EXPECT_LE(input_count, kMaxInput);
   EXPECT_LE(filter_count, kMaxFilter);
   EXPECT_LE(output_count, kMaxOutput);
@@ -205,10 +208,10 @@ void ExpectMatchesReference(const Shape& s, Route route) {
     shifts[c] = shift;
   }
 
-  int input_dims[] = {4, 1, s.in_h, s.in_w, s.in_c};
+  int input_dims[] = {4, s.batch, s.in_h, s.in_w, s.in_c};
   int filter_dims[] = {4, s.out_c, kKernel, kKernel, s.in_c};
   int bias_dims[] = {1, s.out_c};
-  int output_dims[] = {4, 1, out_h, out_w, s.out_c};
+  int output_dims[] = {4, s.batch, out_h, out_w, s.out_c};
   TfLiteAffineQuantization filter_quant = {FloatArrayFromFloats(filter_scales),
                                            IntArrayFromInts(filter_zero_points),
                                            0};
@@ -239,6 +242,7 @@ void ExpectMatchesReference(const Shape& s, Route route) {
   micro::KernelRunner runner(registration, tensors, 4, IntArrayFromInts(inputs),
                              IntArrayFromInts(outputs), &params);
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  memset(output, 0x55, sizeof(output));
   memset(g_leaf_calls, 0, sizeof(g_leaf_calls));
   EXPECT_EQ(kTfLiteOk, runner.Invoke());
   ExpectRoute(route);
@@ -260,10 +264,10 @@ void ExpectMatchesReference(const Shape& s, Route route) {
   op_params.output_offset = output_zero_point;
   op_params.quantized_activation_min = -128;
   op_params.quantized_activation_max = 127;
-  const int32_t in_shape[] = {1, s.in_h, s.in_w, s.in_c};
+  const int32_t in_shape[] = {s.batch, s.in_h, s.in_w, s.in_c};
   const int32_t f_shape[] = {s.out_c, kKernel, kKernel, s.in_c};
   const int32_t b_shape[] = {s.out_c};
-  const int32_t o_shape[] = {1, out_h, out_w, s.out_c};
+  const int32_t o_shape[] = {s.batch, out_h, out_w, s.out_c};
   reference_integer_ops::ConvPerChannel(
       op_params, multipliers, shifts, RuntimeShape(4, in_shape), input,
       RuntimeShape(4, f_shape), filter, RuntimeShape(1, b_shape), bias,
@@ -284,30 +288,36 @@ using tflite::testing::ExpectMatchesReference;
 using tflite::testing::Route;
 using tflite::testing::Shape;
 
+// 9x11 = 99 output pixels, so the entry's pixel tail runs next to the
+// padded border.
 TEST(HeliaConv3x3C16RouteTest, SamePaddingInGate) {
-  ExpectMatchesReference(Shape{9, 11, 16, 24, 1, 1, kTfLitePaddingSame},
+  ExpectMatchesReference(Shape{1, 9, 11, 16, 24, 1, 1, kTfLitePaddingSame},
                          Route::kC16S1);
 }
 
-// An output depth that is not a multiple of four, so the entry's channel tail
-// runs.
-TEST(HeliaConv3x3C16RouteTest, ValidPaddingOddOutputDepthInGate) {
-  ExpectMatchesReference(Shape{8, 10, 16, 13, 1, 1, kTfLitePaddingValid},
+// No border, 6x9 = 54 output pixels (a pixel tail) and an odd output depth.
+TEST(HeliaConv3x3C16RouteTest, ValidPaddingPixelTailInGate) {
+  ExpectMatchesReference(Shape{1, 8, 11, 16, 13, 1, 1, kTfLitePaddingValid},
+                         Route::kC16S1);
+}
+
+TEST(HeliaConv3x3C16RouteTest, BatchTwoInGate) {
+  ExpectMatchesReference(Shape{2, 7, 9, 16, 8, 1, 1, kTfLitePaddingSame},
                          Route::kC16S1);
 }
 
 TEST(HeliaConv3x3C16RouteTest, StrideTwoIsGeneric) {
-  ExpectMatchesReference(Shape{9, 11, 16, 24, 2, 1, kTfLitePaddingSame},
+  ExpectMatchesReference(Shape{1, 9, 11, 16, 24, 2, 1, kTfLitePaddingSame},
                          Route::kGeneric);
 }
 
 TEST(HeliaConv3x3C16RouteTest, DilationTwoIsGeneric) {
-  ExpectMatchesReference(Shape{12, 12, 16, 8, 1, 2, kTfLitePaddingValid},
+  ExpectMatchesReference(Shape{1, 12, 12, 16, 8, 1, 2, kTfLitePaddingValid},
                          Route::kGeneric);
 }
 
 TEST(HeliaConv3x3C16RouteTest, InputDepthEightIsGeneric) {
-  ExpectMatchesReference(Shape{9, 11, 8, 24, 1, 1, kTfLitePaddingSame},
+  ExpectMatchesReference(Shape{1, 9, 11, 8, 24, 1, 1, kTfLitePaddingSame},
                          Route::kGeneric);
 }
 
