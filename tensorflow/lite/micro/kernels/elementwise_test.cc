@@ -377,4 +377,50 @@ TEST(ElementwiseTest, LogicalNot) {
                                        input, shape, golden, output_data);
 }
 
+// helia: each Prepare must reject a dtype its predicate excludes, rather
+// than admit it and fail at Invoke. see AmbiqAI/helia-rt#376
+namespace {
+template <typename T>
+TfLiteStatus PrepareWithType(const TFLMRegistration& registration,
+                             TfLiteType type) {
+  int shape[] = {1, 2};
+  T input[2] = {};
+  T output[2] = {};
+  TfLiteTensor tensors[] = {
+      tflite::testing::CreateTensor(
+          input, tflite::testing::IntArrayFromInts(shape), false, type),
+      tflite::testing::CreateTensor(
+          output, tflite::testing::IntArrayFromInts(shape), false, type),
+  };
+  int inputs[] = {1, 0};
+  int outputs[] = {1, 1};
+  tflite::micro::KernelRunner runner(
+      registration, tensors, 2, tflite::testing::IntArrayFromInts(inputs),
+      tflite::testing::IntArrayFromInts(outputs), /*builtin_data=*/nullptr);
+  const TfLiteStatus status = runner.InitAndPrepare();
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
+  return status;
+}
+}  // namespace
+
+TEST(ElementwiseTest, SinRejectsInt32AtPrepare) {
+  EXPECT_EQ(kTfLiteError, PrepareWithType<int32_t>(tflite::Register_SIN(),
+                                                   kTfLiteInt32));
+}
+
+TEST(ElementwiseTest, AbsRejectsInt32AtPrepare) {
+  EXPECT_EQ(kTfLiteError, PrepareWithType<int32_t>(tflite::Register_ABS(),
+                                                   kTfLiteInt32));
+}
+
+TEST(ElementwiseTest, RsqrtRejectsInt32AtPrepare) {
+  EXPECT_EQ(kTfLiteError, PrepareWithType<int32_t>(tflite::Register_RSQRT(),
+                                                   kTfLiteInt32));
+}
+
+TEST(ElementwiseTest, LogicalNotRejectsFloat32AtPrepare) {
+  EXPECT_EQ(kTfLiteError, PrepareWithType<float>(
+                              tflite::Register_LOGICAL_NOT(), kTfLiteFloat32));
+}
+
 TF_LITE_MICRO_TESTS_MAIN
