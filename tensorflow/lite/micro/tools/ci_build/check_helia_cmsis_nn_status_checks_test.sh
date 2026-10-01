@@ -108,6 +108,10 @@ run_case "discarded after a string with comment markers" 1 4 \
   "${OPEN}"$'\n  const char* s = "a/*b//c";\n  arm_one_line(x);\n}'
 run_case "return type mid-line in the header" 1 3 "${OPEN}"$'\n  arm_mid_line(x);\n}' \
   "${HEADER}"$'\nstatic inline arm_cmsis_nn_status arm_mid_line(int a) { return 0; }'
+run_case "discarded under an unbraced if constexpr" 1 4 \
+  "${OPEN}"$'\n  if constexpr (sizeof(int) == 4)\n    arm_one_line(x);\n}'
+run_case "captured after a braced TFLITE_DCHECK" 0 '' \
+  "${OPEN}"$'\n  if (x) { TFLITE_DCHECK(x > 0); }\n  const arm_cmsis_nn_status s =\n      arm_one_line(x);\n}'
 run_case "argument continuation" 0 '' \
   "${OPEN}"$'\n  TF_LITE_ENSURE_EQ(context,\n      arm_one_line(x), ARM_CMSIS_NN_SUCCESS);\n}'
 run_case "call opening an argument list" 0 '' \

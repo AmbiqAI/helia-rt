@@ -30,8 +30,9 @@
 # when its status is discarded:
 #   * the call starts a statement: it is the first thing on its line,
 #     optionally behind (void), and the previous code line ends with ; { or }
-#     (not a brace initializer), ends a label (case X: or default:), is an
-#     unbraced if, for or while header, or is else or do. Preprocessor lines do
+#     (not an = { initializer), ends a label (case X: or default:), is an
+#     unbraced if, if constexpr, for or while header, or is else or do. A
+#     ternary line ending in : also counts; clang-format never produces one. Preprocessor lines do
 #     not count as the previous line;
 #   * the call is an argument of a TFLITE_DCHECK* macro, which is compiled out
 #     of a release build.
@@ -160,13 +161,13 @@ for file in "${sources[@]}"; do
       if (in_dcheck) {
         name = first_call(text)
         if (name != "") print dline ": " name " in TFLITE_DCHECK"
-        if (text ~ /;$/) in_dcheck = 0
+        if (text ~ /;/) in_dcheck = 0
       } else if (match(text, /^(\(void\)[[:space:]]*)?arm_[A-Za-z0-9_]+[[:space:]]*\(/)) {
         name = substr(text, RSTART, RLENGTH)
         sub(/^\(void\)[[:space:]]*/, "", name); sub(/[[:space:]]*\($/, "", name)
         starts = (prev == "" || prev ~ /[;}]$/ || (prev ~ /\{$/ && prev !~ /=[[:space:]]*\{$/) ||
                   prev ~ /(^|[^A-Za-z0-9_])(else|do)$/ || prev ~ /[^:]:$/ ||
-                  prev ~ /^(\}[[:space:]]*)?(else[[:space:]]+)?(if|for|while)[[:space:]]*\(.*\)$/)
+                  prev ~ /^(\}[[:space:]]*)?(else[[:space:]]+)?(if([[:space:]]+constexpr)?|for|while)[[:space:]]*\(.*\)$/)
         if ((name in known) && starts) print FNR ": " name
       }
       prev = text
