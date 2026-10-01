@@ -515,3 +515,18 @@ rank 5 to one element and returned wrong values; after it, `ExtendedShape(4,
 ...)` aborts. See AmbiqAI/helia-rt#356.
 
 Drop condition: upstream's CMSIS-NN MAXIMUM/MINIMUM handle rank above 4.
+
+## `tensorflow/lite/micro/kernels/arg_min_max.cc`
+
+Floating-point ARG_MAX/ARG_MIN use a NaN-aware comparator with the semantics
+of upstream's `reference_ops::GetComparefunction` (a NaN never wins, as in
+TensorFlow/LiteRT), as a functor rather than a `std::function`; integer types
+keep the plain comparators. Upstream's micro kernel passes `GreaterFn`/`LessFn`
+for every type, which leave a leading NaN in place.
+`kernels/arg_min_max_test.cc` adds the float32 NaN cases. See
+AmbiqAI/helia-rt#359.
+
+This correctness fix stays in the shared kernel: a build_helia.sh patch would
+leave reference/CMSIS-NN, direct CMake, Bazel and source consumers unfixed.
+
+Drop condition: upstream's micro ARG_MAX/ARG_MIN use the NaN-aware comparator.

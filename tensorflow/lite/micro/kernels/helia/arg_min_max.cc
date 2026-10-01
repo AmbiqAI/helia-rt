@@ -16,13 +16,13 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/reference/arg_min_max.h"
 
 #include <climits>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 
 #include "Include/arm_nnfunctions.h"
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
-#include "tensorflow/lite/kernels/internal/reference/comparisons.h"
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
@@ -205,22 +205,35 @@ TfLiteStatus ArgMinMaxPrepare(TfLiteContext* context, TfLiteNode* node) {
   return kTfLiteOk;
 }
 
+// TensorFlow/LiteRT ARG_MAX/ARG_MIN semantics: a NaN candidate never wins and
+// a finite candidate replaces a NaN accumulator. see AmbiqAI/helia-rt#359
+template <typename T>
+inline bool ArgIsNaN(T) {
+  return false;
+}
+inline bool ArgIsNaN(float value) { return std::isnan(value); }
+
+template <typename T, bool kArgMax>
+struct ArgCompare {
+  bool operator()(T candidate, T current) const {
+    if (ArgIsNaN(candidate)) return false;
+    if (ArgIsNaN(current)) return true;
+    return kArgMax ? candidate > current : candidate < current;
+  }
+};
+
 template <typename T1, typename T2, typename T3>
 inline void ArgMinMaxHelper(const RuntimeShape& input1_shape,
                             const T1* input1_data, const T3* input2_data,
                             const RuntimeShape& output_shape, T2* output_data,
                             bool is_arg_max) {
-  // Use Greater/Less from comparisons.h (formerly from kernels/micro_utils.h
-  // which was deprecated). Same as gtl::Greater but used here to reduce
-  // dependencies and binary size for micro environment.
   if (is_arg_max) {
     reference_ops::ArgMinMax(input1_shape, input1_data, input2_data,
-                             output_shape, output_data,
-                             reference_ops::GreaterFn<T1>());
+                             output_shape, output_data, ArgCompare<T1, true>());
   } else {
     reference_ops::ArgMinMax(input1_shape, input1_data, input2_data,
                              output_shape, output_data,
-                             reference_ops::LessFn<T1>());
+                             ArgCompare<T1, false>());
   }
 }
 
@@ -296,6 +309,8 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node, bool is_arg_max) {
   TF_LITE_ENSURE(context,
                  (core_shape.input_count == 0 || input_data != nullptr) &&
                      (core_shape.output_count == 0 || output_data != nullptr));
+  // TODO(AmbiqAI/ns-cmsis-nn#648): the pinned float16 kernels return the
+  // first NaN's index; align with the float32 rule above once the pin moves.
   const arm_cmsis_nn_status status =
       is_arg_max ? arm_argmax_f16(input_data, &core_shape.input_dims,
                                   core_shape.axis, output_data)
