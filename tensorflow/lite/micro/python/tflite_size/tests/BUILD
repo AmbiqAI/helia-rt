@@ -1,5 +1,4 @@
-load("@rules_python//python:defs.bzl", "py_test")
-load("@tflm_pip_deps//:requirements.bzl", "requirement")
+load("//python:py_rules.bzl", "tflm_py_test")
 load("//tensorflow/lite/micro:build_def.bzl", "INCOMPATIBLE_WITH_WINDOWS")
 
 licenses(["notice"])
@@ -13,7 +12,7 @@ filegroup(
     ],
 )
 
-py_test(
+tflm_py_test(
     name = "flatbuffer_size_test",
     srcs = ["flatbuffer_size_test.py"],
     data = [
@@ -27,8 +26,6 @@ py_test(
     ],
     target_compatible_with = INCOMPATIBLE_WITH_WINDOWS,
     deps = [
-        "//:tflite_micro_shim",
-        requirement("tensorflow"),
         "//tensorflow/lite/micro/python/tflite_size/src:flatbuffer_size",
     ],
 )

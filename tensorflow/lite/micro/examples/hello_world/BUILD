@@ -1,7 +1,5 @@
-# Description:
-#   TensorFlow Lite for Microcontrollers "hello world" example.
-load("@rules_python//python:defs.bzl", "py_binary")
 load("@tflm_pip_deps//:requirements.bzl", "requirement")
+load("//python:py_rules.bzl", "tflm_py_binary")
 load(
     "//tensorflow/lite/micro:build_def.bzl",
     "tflm_cc_library",
@@ -43,19 +41,18 @@ tflm_cc_test(
     ],
 )
 
-py_binary(
+tflm_py_binary(
     name = "evaluate",
     srcs = ["evaluate.py"],
     data = ["//tensorflow/lite/micro/examples/hello_world/models:hello_world_float.tflite"],
     deps = [
-        requirement("absl_py"),
         requirement("numpy"),
-        requirement("tensorflow"),
+        requirement("ai-edge-litert"),
         "//python/tflite_micro:runtime",
     ],
 )
 
-py_binary(
+tflm_py_binary(
     name = "evaluate_test",
     srcs = ["evaluate_test.py"],
     data = [
@@ -64,14 +61,5 @@ py_binary(
     ],
     deps = [
         ":evaluate",
-    ],
-)
-
-py_binary(
-    name = "train",
-    srcs = ["train.py"],
-    deps = [
-        requirement("numpy"),
-        requirement("tensorflow"),
     ],
 )

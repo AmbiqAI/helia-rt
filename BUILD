@@ -6,7 +6,7 @@ load("@rules_python//python:defs.bzl", "py_library")
 # navigation and autocompletion based on the source graph and compiler commands.
 alias(
     name = "refresh_compile_commands",
-    actual = "@wolfd_bazel_compile_commands//:generate_compile_commands",
+    actual = "//tensorflow/lite/micro/tools:refresh_compile_commands",
 )
 
 bool_flag(
@@ -21,6 +21,15 @@ config_setting(
     },
 )
 
+licenses(["notice"])
+
+exports_files(["LICENSE"])
+
+# Synthesizes the "tflite_micro" top-level package namespace at import time, so
+# that `from tflite_micro...` imports resolve (see tflite_micro.py). Necessary
+# because Bzlmod fixes the main repo's runfiles root to "_main" rather than the
+# module name. Targets should generally not depend on this directly: use the
+# tflm_py_* wrappers in //python:py_rules.bzl, which add it automatically.
 py_library(
     name = "tflite_micro_shim",
     srcs = ["tflite_micro.py"],

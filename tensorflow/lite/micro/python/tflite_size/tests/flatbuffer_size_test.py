@@ -14,13 +14,13 @@
 # ==============================================================================
 import os
 
-from tensorflow.python.framework import test_util
-from tensorflow.python.platform import test
-from tflite_micro.tensorflow.lite.micro.python.tflite_size.src import flatbuffer_size
+import unittest
+from tflite_micro.tensorflow.lite.micro.python.tflite_size.src import (
+  flatbuffer_size,
+)
 
 
-class FlatbufferSizeTest(test_util.TensorFlowTestCase):
-
+class FlatbufferSizeTest(unittest.TestCase):
   def _compareFile(self, file1, data2):
     with open(file1, 'rb') as f1:
       data1 = f1.read()
@@ -43,4 +43,4 @@ class FlatbufferSizeTest(test_util.TensorFlowTestCase):
 
 
 if __name__ == '__main__':
-  test.main()
+  unittest.main()

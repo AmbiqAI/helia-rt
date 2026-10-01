@@ -16,8 +16,38 @@
 
 import enum
 import os
-from tflite_micro.tensorflow.lite.tools import flatbuffer_utils
 from tflite_micro.python.tflite_micro import _runtime
+from tflite_micro.tensorflow.lite.python import schema_py_generated as schema_fb
+
+
+def convert_bytearray_to_object(model_bytearray):
+  """Converts a tflite model from a bytearray to an object for parsing."""
+  model_object = schema_fb.Model.GetRootAsModel(model_bytearray, 0)
+  return schema_fb.ModelT.InitFromObj(model_object)
+
+
+def get_builtin_code_from_operator_code(opcode):
+  """Return the builtin code of the given operator code."""
+  if hasattr(opcode, 'BuiltinCode') and callable(opcode.BuiltinCode):
+    return max(opcode.BuiltinCode(), opcode.DeprecatedBuiltinCode())
+  return max(opcode.builtinCode, opcode.deprecatedBuiltinCode)
+
+
+def count_resource_variables(model):
+  """Calculates the number of unique resource variables in a model."""
+  if not isinstance(model, schema_fb.ModelT):
+    model = convert_bytearray_to_object(model)
+  unique_shared_names = set()
+  for subgraph in model.subgraphs:
+    if subgraph.operators is None:
+      continue
+    for op in subgraph.operators:
+      builtin_code = get_builtin_code_from_operator_code(
+        model.operatorCodes[op.opcodeIndex]
+      )
+      if builtin_code == schema_fb.BuiltinOperator.VAR_HANDLE:
+        unique_shared_names.add(op.builtinOptions.sharedName)
+  return len(unique_shared_names)
 
 
 class InterpreterConfig(enum.Enum):
@@ -53,56 +83,61 @@ class InterpreterConfig(enum.Enum):
   kPreserveAllTensors = 1
 
 
-#TODO(b/297118768): Once Korko Docker container for ubuntu x86 has imutabledict
+# TODO(b/297118768): Once Korko Docker container for ubuntu x86 has imutabledict
 # added to it, this should be turned into an immutabledict.
 _ENUM_TRANSLATOR = {
-    InterpreterConfig.kAllocationRecording:
-    (_runtime.PythonInterpreterConfig.kAllocationRecording),
-    InterpreterConfig.kPreserveAllTensors:
-    (_runtime.PythonInterpreterConfig.kPreserveAllTensors),
+  InterpreterConfig.kAllocationRecording: (
+    _runtime.PythonInterpreterConfig.kAllocationRecording
+  ),
+  InterpreterConfig.kPreserveAllTensors: (
+    _runtime.PythonInterpreterConfig.kPreserveAllTensors
+  ),
 }
 
 
 class Interpreter(object):
-
   def __init__(
-      self,
-      model_data,
-      custom_op_registerers,
-      arena_size,
-      intrepreter_config=InterpreterConfig.kAllocationRecording,
+    self,
+    model_data,
+    custom_op_registerers,
+    arena_size,
+    intrepreter_config=InterpreterConfig.kAllocationRecording,
+    alt_decompression_memory_size=0,
   ):
     if model_data is None:
       raise ValueError("Model must not be None")
 
     if not isinstance(custom_op_registerers, list) or not all(
-        isinstance(s, str) for s in custom_op_registerers):
+      isinstance(s, str) for s in custom_op_registerers
+    ):
       raise ValueError("Custom ops registerers must be a list of strings")
 
     # This is a heuristic to ensure that the arena is sufficiently sized.
     if arena_size is None:
       arena_size = len(model_data) * 10
     # Some models make use of resource variables ops, get the count here
-    num_resource_variables = flatbuffer_utils.count_resource_variables(
-        model_data)
-    print("Number of resource variables the model uses = ",
-          num_resource_variables)
+    num_resource_variables = count_resource_variables(model_data)
+    print(
+      "Number of resource variables the model uses = ", num_resource_variables
+    )
 
     self._interpreter = _runtime.InterpreterWrapper(
-        model_data,
-        custom_op_registerers,
-        arena_size,
-        num_resource_variables,
-        _ENUM_TRANSLATOR[intrepreter_config],
+      model_data,
+      custom_op_registerers,
+      arena_size,
+      num_resource_variables,
+      _ENUM_TRANSLATOR[intrepreter_config],
+      alt_decompression_memory_size,
     )
 
   @classmethod
   def from_file(
-      self,
-      model_path,
-      custom_op_registerers=[],
-      arena_size=None,
-      intrepreter_config=InterpreterConfig.kAllocationRecording,
+    self,
+    model_path,
+    custom_op_registerers=None,
+    arena_size=None,
+    intrepreter_config=InterpreterConfig.kAllocationRecording,
+    alt_decompression_memory_size=0,
   ):
     """Instantiates a TFLM interpreter from a model .tflite filepath.
 
@@ -112,10 +147,16 @@ class Interpreter(object):
         custom OP registerer
       arena_size: Tensor arena size in bytes. If unused, tensor arena size will
         default to 10 times the model size.
+      alt_decompression_memory_size: Size in bytes of alternate decompression
+        memory. If non-zero, DECODE operators will use this memory instead of
+        the main arena for decompressed tensor outputs.
 
     Returns:
       An Interpreter instance
     """
+    if custom_op_registerers is None:
+      custom_op_registerers = []
+
     if model_path is None or not os.path.isfile(model_path):
       raise ValueError("Invalid model file path")
 
@@ -123,19 +164,21 @@ class Interpreter(object):
       model_data = f.read()
 
     return Interpreter(
-        model_data,
-        custom_op_registerers,
-        arena_size,
-        intrepreter_config,
+      model_data,
+      custom_op_registerers,
+      arena_size,
+      intrepreter_config,
+      alt_decompression_memory_size,
     )
 
   @classmethod
   def from_bytes(
-      self,
-      model_data,
-      custom_op_registerers=[],
-      arena_size=None,
-      intrepreter_config=InterpreterConfig.kAllocationRecording,
+    self,
+    model_data,
+    custom_op_registerers=None,
+    arena_size=None,
+    intrepreter_config=InterpreterConfig.kAllocationRecording,
+    alt_decompression_memory_size=0,
   ):
     """Instantiates a TFLM interpreter from a model in byte array.
 
@@ -145,16 +188,23 @@ class Interpreter(object):
         custom OP registerer
       arena_size: Tensor arena size in bytes. If unused, tensor arena size will
         default to 10 times the model size.
+      alt_decompression_memory_size: Size in bytes of alternate decompression
+        memory. If non-zero, DECODE operators will use this memory instead of
+        the main arena for decompressed tensor outputs.
 
     Returns:
       An Interpreter instance
     """
 
+    if custom_op_registerers is None:
+      custom_op_registerers = []
+
     return Interpreter(
-        model_data,
-        custom_op_registerers,
-        arena_size,
-        intrepreter_config,
+      model_data,
+      custom_op_registerers,
+      arena_size,
+      intrepreter_config,
+      alt_decompression_memory_size,
     )
 
   def print_allocations(self):

@@ -64,9 +64,8 @@ const float golden_2d_beta_half[] = {
 // 3-dimensional test data.
 const int flat_size_3d = 60;
 int shape_3d[] = {3, 3, 4, 5};
-const float input_data_3d[] = {
-    // c = 0
-    // h = 0
+const float input_data_3d[] = {  // c = 0
+                                 // h = 0
     3.00, 6.00, -5.00, 4.00, -9.00,
     // h = 1
     -10.00, -10.00, -8.00, 2.00, 2.00,
@@ -129,10 +128,9 @@ float golden_3d[] = {
 // 4-dimensional test data.
 const int flat_size_4d = 120;
 int shape_4d[] = {4, 2, 3, 4, 5};
-const float input_data_4d[] = {
-    // n = 0
-    // c = 0
-    // h = 0
+const float input_data_4d[] = {  // n = 0
+                                 // c = 0
+                                 // h = 0
     3.00, 6.00, -5.00, 4.00, -9.00,
     // h = 1
     -10.00, -10.00, -8.00, 2.00, 2.00,

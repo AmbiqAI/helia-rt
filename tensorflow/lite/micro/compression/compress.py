@@ -16,23 +16,23 @@
 See USAGE.
 """
 
-import bitarray
-import bitarray.util
-from dataclasses import dataclass, field
+import argparse
 import os
 import sys
 import tempfile
-from typing import ByteString, Iterable, Optional
+import warnings
+from typing import ByteString, Iterable, Type
 
-import absl.app
-import absl.flags
-import flatbuffers
-import numpy as np
-
-from tflite_micro.tensorflow.lite.micro.compression import model_facade
+from tflite_micro.tensorflow.lite.micro.compression import compressor
+from tflite_micro.tensorflow.lite.micro.compression import decode_insert
+from tflite_micro.tensorflow.lite.micro.compression import huffman
+from tflite_micro.tensorflow.lite.micro.compression import lut
+from tflite_micro.tensorflow.lite.micro.compression import model_editor
+from tflite_micro.tensorflow.lite.micro.compression import pruning
 from tflite_micro.tensorflow.lite.micro.compression import spec
-from tflite_micro.tensorflow.lite.micro.compression import metadata_py_generated as schema
-from tflite_micro.tensorflow.lite.micro.tools import tflite_flatbuffer_align_wrapper
+from tflite_micro.tensorflow.lite.micro.tools import (
+  tflite_flatbuffer_align_wrapper,
+)
 
 USAGE = f"""\
 Usage: compress.py --input <in.tflite> --spec <spec.yaml> [--output <out.tflite>]
@@ -49,219 +49,49 @@ key "tensors" with a list of tensors to compress as its value. E.g.:
 {spec.EXAMPLE_YAML_SPEC}
 ---
 
-The only compression method currently implemented is "lut", i.e.,
-Look-Up-Table. This method requires the tensor in the input model to have a
-small number of unique values, fewer than or equal to 2**index_bitwidth. LUT
-compression collects these values into a lookup table, and rewrites the tensor
-as bitwidth-wide integer indices into that lookup table. Presumably, the input
-model has been trained or preprocessed in a way that the tensor values
-are binned into a meaningful, limited set.
+Supported compression methods:
+
+  lut: Look-Up-Table compression. Requires the tensor to have a small number of
+       unique values, fewer than or equal to 2**index_bitwidth. LUT compression
+       collects these values into a lookup table, and rewrites the tensor as
+       bitwidth-wide integer indices into that lookup table.
+
+  huffman: Huffman compression using Xtensa-format decode tables. (Not yet
+           implemented.)
+
+  pruning: Pruning (sparsity) compression for sparse tensors. (Not yet
+           implemented.)
+
+Compressed models use DECODE operators to decompress tensors at runtime.
 """
 
-# A compressed model augments the usual .tflite flatbuffer with a flatbuffer of
-# its own containing compression metadata, stored at the buffer index stored at
-# the following key in the .tflite flatbuffer's metadata map.
-TFLITE_METADATA_KEY = "COMPRESSION_METADATA"
+# Plugin dispatch table: maps CompressionMethod subclasses to compressor instances
+_COMPRESSORS: dict[Type[spec.CompressionMethod], compressor.Compressor] = {
+  spec.LookUpTableCompression: lut.LutCompressor(),
+  spec.HuffmanCompression: huffman.HuffmanCompressor(),
+  spec.PruningCompression: pruning.PruningCompressor(),
+}
 
 
-class CompressionError(Exception):
-  """Raised when compression fails for the reason documented in the message."""
-
-  def __init__(self, message, wrapped_exception=None):
-    super().__init__(f"{message}: {str(wrapped_exception)}")
-    self.original_exception = wrapped_exception
-
-
-class _MetadataBuilder:
-  """Builder for the compression metadata flatbuffer."""
-
-  def __init__(self):
-    self._metadata = schema.MetadataT()
-    self._metadata.subgraphs = []
-
-  def compile(self) -> bytearray:
-    """Packs the metadata into a binary array and returns it.
-    """
-    builder = flatbuffers.Builder(1 * 2**10)
-    root = self._metadata.Pack(builder)
-    builder.Finish(root)
-    return builder.Output()
-
-  def subgraph(self, index: int):
-    """Return subgraph at index, adding subgraphs if necessary.
-    """
-    while len(self._metadata.subgraphs) <= index:
-      self._add_subgraph()
-    return self._metadata.subgraphs[index]
-
-  def add_lut_tensor(self, subgraph_id: int):
-    """Add LUT tensor to the given subgraph and return it.
-    """
-    tensor = schema.LutTensorT()
-    self.subgraph(subgraph_id).lutTensors.append(tensor)
-    return tensor
-
-  def _add_subgraph(self):
-    subgraph = schema.SubgraphT()
-    subgraph.lutTensors = []
-    self._metadata.subgraphs.append(subgraph)
-    return subgraph
-
-
-@dataclass
-class _LutCompressedArray:
-  compression_axis: Optional[int] = None
-  lookup_tables: list[np.ndarray] = field(default_factory=list)
-  indices: np.ndarray = field(default_factory=lambda: np.array([]))
-
-  @property
-  def index_bitwidth(self) -> int:
-    """Returns the number of bits required to encode the indices."""
-    if self.indices is None:
-      raise ValueError
-
-    max_index = int(np.max(self.indices))
-    return max_index.bit_length() or 1
-
-
-def _lut_compress_array(tensor: np.ndarray,
-                        axis: Optional[int]) -> _LutCompressedArray:
-  """Compresses the given tensor using lookup tables.
-
-  Args:
-      tensor (np.ndarray): The tensor to be compressed.
-
-      axis (Optional[int]): The axis along which to compress the tensor. If an
-          axis is given, a lookup table is created for each slice along the
-          axis. If axis is None, a single lookup table is used for the entire
-          tensor.
-
-          Compressing a tensor with a lookup table per slice along a
-          particular axis is analogous to quantizing a tensor with different
-          quantization parameters per slice along a particular axis (dimension).
-
-  Returns:
-      _LutCompressedArray: An object containing the compressed tensor data,
-      including the lookup tables and indices.
-  """
-  compressed = _LutCompressedArray()
-  compressed.compression_axis = axis
-
-  if axis is None:
-    # Compute unique values and indices for the entire tensor
-    values, indices = np.unique(tensor, return_inverse=True)
-    compressed.lookup_tables.append(values)
-    compressed.indices = indices.reshape(tensor.shape)
-  else:
-    # Iterate over slices along the compression axis
-    slice_indices = []
-    for slice in np.moveaxis(tensor, axis, 0):
-      values, indices = np.unique(slice, return_inverse=True)
-      compressed.lookup_tables.append(values)
-      indices = indices.reshape(slice.shape)
-      slice_indices.append(indices)
-
-    # Reconstruct a tensor of indices from the slices
-    stacked = np.stack(slice_indices, axis=0)
-    compressed.indices = np.moveaxis(stacked, 0, axis)
-
-  return compressed
-
-
-def _check_lut_compression(compression) -> spec.LookUpTableCompression:
-  if len(compression) != 1:
-    raise CompressionError("Each tensor must have exactly one compression")
-  if not isinstance(compression[0], spec.LookUpTableCompression):
-    raise CompressionError('Only "lut" compression may be specified')
-
-  return compression[0]
-
-
-def _identify_compression_axis(tensor: model_facade._Tensor) -> Optional[int]:
-  """Determines the axis along which to compress.
-
-  The axis along which to compress is inferred from the tensor's quantization
-  parameters.
-
-  Returns:
-    The axis along which to compress, or None to indicate one value table for
-    the entire tensor.
-
-  Raises:
-    CompressionError: If the axis cannot be determined.
-  """
-  q = tensor.quantization
-  if q is not None \
-      and q.scale is not None \
-      and q.quantizedDimension < len(tensor.shape):
-    quantization_channels = len(q.scale)
-    if quantization_channels == 1:
-      # Use one value table for the entire tensor
-      return None
-
-    if quantization_channels == tensor.shape[q.quantizedDimension]:
-      return q.quantizedDimension
-
-  raise CompressionError(
-      f"Invalid or no quanitzation parameters from which to "
-      f"infer the axis along which tensor should be compressed.")
-
-
-def _check_bitwidth(compressed: int, specified: int, spec: spec.Tensor):
-  """Applies business logic regarding specified bitwidth.
-
-  It is an error if the bitwidth required to compress a tensor exceeds the
-  specified bitwith, and a warning if the tensor can be compressed in less than
-  the specified bitwidth. The latter is allowed, and is not an error, to permit
-  testing with larger bitwidths without re-binning a model.
-  """
-  if compressed > specified:
-    raise CompressionError(
-        f"index_bitwidth too small: {compressed} bits needed to "
-        f"enumerate unique values in tensor specified in {spec}")
-  elif compressed < specified:
-    print(
-        f"warning: index_bitwidth too large: only {compressed} "
-        f"bits needed to enumerate unique values in tensor specified in {spec}",
-        file=sys.stderr)
-
-
-def _pack_indices(indices: np.ndarray, bitwidth: int) -> bytes:
-  """Packs indices into a bytearray using bitwidth-sized fields.
-  """
-  endianness = "big"
-  bits = bitarray.bitarray(endian=endianness)
-  for i in indices.ravel():
-    bits.extend(
-        bitarray.util.int2ba(int(i), length=bitwidth, endian=endianness))
-  return bits.tobytes()
-
-
-def _pack_lookup_tables(tables: list[np.ndarray], table_len: int) -> bytearray:
-  """Packs the value tables of a LutCompressedArray.
-
-  Pack the value tables of a LutCompressedArray into a bytes object in the
-  format writable to a value_table buffer in the .tflite flatbuffer. The
-  tables are concatenated.
-  """
-  buffer = bytearray()
-  for t in tables:
-    padding_needed = table_len - len(t)
-    padded = np.pad(t, (0, padding_needed), mode='constant', constant_values=0)
-    buffer.extend(padded.tobytes())
-
-  return buffer
+def _get_compressor(method: spec.CompressionMethod) -> compressor.Compressor:
+  """Get the compressor plugin for a given compression method."""
+  compressor_instance = _COMPRESSORS.get(type(method))
+  if compressor_instance is None:
+    raise compressor.CompressionError(
+      f"No compressor registered for {type(method).__name__}"
+    )
+  return compressor_instance
 
 
 def _apply_flatbuffer_alignment(model_bytes: bytearray) -> bytearray:
   """Applies proper FlatBuffer alignment to a model.
-  
+
   The Python flatbuffers library doesn't respect `force_align` schema attributes,
   so we use the C++ wrapper which properly handles alignment requirements.
-  
+
   Args:
     model_bytes: The model flatbuffer to align
-    
+
   Returns:
     The properly aligned model flatbuffer
   """
@@ -275,8 +105,9 @@ def _apply_flatbuffer_alignment(model_bytes: bytearray) -> bytearray:
 
   try:
     # Unpack and repack with proper alignment
-    tflite_flatbuffer_align_wrapper.align_tflite_model(temp_in_path,
-                                                       temp_out_path)
+    tflite_flatbuffer_align_wrapper.align_tflite_model(
+      temp_in_path, temp_out_path
+    )
 
     with open(temp_out_path, 'rb') as f:
       aligned_model = bytearray(f.read())
@@ -293,80 +124,108 @@ def _apply_flatbuffer_alignment(model_bytes: bytearray) -> bytearray:
 def compress(model_in: ByteString, specs: Iterable[spec.Tensor]) -> bytearray:
   """Compresses a model .tflite flatbuffer.
 
+  Compresses tensors according to the given specs and inserts DECODE operators
+  to decompress them at runtime.
+
   Args:
     model_in: the original, uncompressed .tflite flatbuffer
     specs: an iterable of compression specs, see module spec.py
 
   Returns:
-    A compressed flatbuffer.
+    A compressed flatbuffer with DECODE operators inserted.
   """
-  model = model_facade.read(model_in)
-  metadata = _MetadataBuilder()
+  specs = list(specs)
+  if not specs:
+    raise compressor.CompressionError(
+      "Compression spec is empty; no tensors to compress"
+    )
 
-  for spec in specs:
+  model = model_editor.read(model_in)
+  compression_results: dict[tuple[int, int], compressor.CompressionResult] = {}
+
+  for tensor_spec in specs:
     try:
-      tensor = model.subgraphs[spec.subgraph].tensors[spec.tensor]
-      lut_compression = _check_lut_compression(spec.compression)
-      spec_bitwidth = lut_compression.index_bitwidth
-      axis = _identify_compression_axis(tensor)
-      compressed = _lut_compress_array(tensor.array, axis)
-      _check_bitwidth(compressed.index_bitwidth, spec_bitwidth, spec)
+      tensor = model.subgraphs[tensor_spec.subgraph].tensors[tensor_spec.tensor]
 
-      # overwrite tensor data with indices
-      tensor.buffer.data = _pack_indices(compressed.indices, spec_bitwidth)
+      # Currently only one compression method per tensor
+      if len(tensor_spec.compression) != 1:
+        raise compressor.CompressionError(
+          "Each tensor must have exactly one compression method"
+        )
 
-      # write value buffer
-      value_buffer = model.add_buffer()
-      value_buffer.data = _pack_lookup_tables(compressed.lookup_tables,
-                                              2**spec_bitwidth)
-      # add compression metadata for tensor
-      lut_tensor = metadata.add_lut_tensor(subgraph_id=tensor.subgraph.index)
-      lut_tensor.tensor = tensor.index
-      lut_tensor.valueBuffer = value_buffer.index
-      lut_tensor.indexBitwidth = spec_bitwidth
+      method = tensor_spec.compression[0]
+      plugin = _get_compressor(method)
+      original_size = len(tensor.buffer.data) if tensor.buffer.data else 0
+      result = plugin.compress(tensor, method)
 
+      compressed_size = len(result.encoded_data) + len(result.ancillary_data)
+      if compressed_size > original_size:
+        warnings.warn(
+          f"Compression of tensor {tensor.name!r} (subgraph "
+          f"{tensor_spec.subgraph}, tensor {tensor_spec.tensor}) resulted "
+          f"in expansion: {original_size} bytes -> {compressed_size} bytes "
+          f"(encoded: {len(result.encoded_data)}, "
+          f"ancillary: {len(result.ancillary_data)})",
+          stacklevel=2,
+        )
+
+      # Store result for DECODE insertion, which installs the encoded
+      # data. Leave the tensor's buffer untouched: a later spec entry may
+      # name a tensor aliasing it, and its compression must read the
+      # original data.
+      compression_results[(tensor_spec.subgraph, tensor_spec.tensor)] = result
+
+    except compressor.CompressionError:
+      raise
     except Exception as e:
-      raise CompressionError(f"error compressing {spec}") from e
+      raise compressor.CompressionError(
+        f"error compressing {tensor_spec}"
+      ) from e
 
-  # add compression metadata to model
-  model.add_metadata(TFLITE_METADATA_KEY, metadata.compile())
+  # Insert DECODE operators into the graph
+  decode_insert.insert_decode_operators(model, compression_results)
 
-  # Compile the model and apply proper alignment
-  unaligned_model = model.compile()
+  # Build the model and apply proper alignment
+  unaligned_model = model.build()
   return _apply_flatbuffer_alignment(unaligned_model)
 
 
 def _fail_w_usage() -> int:
-  absl.app.usage()
+  sys.stderr.write(USAGE)
   return 1
 
 
-FLAGS = absl.flags.FLAGS
-absl.flags.DEFINE_string("input", None, help="uncompressed .tflite flatbuffer")
-absl.flags.DEFINE_string("spec", None, help="specfile (see module spec.py)")
-absl.flags.DEFINE_string("output", None, help="compressed .tflite flatbuffer")
-
-
 def main(argv):
-  if len(argv) > 1:
+  parser = argparse.ArgumentParser(usage=USAGE)
+  parser.add_argument(
+    "--input", default=None, help="uncompressed .tflite flatbuffer"
+  )
+  parser.add_argument(
+    "--spec", default=None, help="specfile (see module spec.py)"
+  )
+  parser.add_argument(
+    "--output", default=None, help="compressed .tflite flatbuffer"
+  )
+  args, extra = parser.parse_known_args(argv[1:])
+  if extra:
     # no positional arguments accepted
     return _fail_w_usage()
 
-  in_path = FLAGS.input
+  in_path = args.input
   if in_path is None:
     return _fail_w_usage()
   else:
     with open(in_path, "rb") as in_file:
       in_model = in_file.read()
 
-  spec_path = FLAGS.spec
+  spec_path = args.spec
   if spec_path is None:
     return _fail_w_usage()
   else:
     with open(spec_path, "r") as spec_file:
       specs = spec.parse_yaml(spec_file.read())
 
-  out_path = FLAGS.output
+  out_path = args.output
   if out_path is None:
     out_path = in_path.split(".tflite")[0] + ".compressed.tflite"
 
@@ -379,5 +238,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-  sys.modules['__main__'].__doc__ = USAGE  # for absl's use
-  absl.app.run(main)
+  sys.exit(main(sys.argv))

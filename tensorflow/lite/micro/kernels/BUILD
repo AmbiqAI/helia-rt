@@ -236,6 +236,7 @@ tflm_kernel_cc_library(
         "add_n.cc",
         "arg_min_max.cc",
         "assign_variable.cc",
+        "basic_classifier.cc",
         "batch_matmul.cc",
         "batch_matmul_common.cc",
         "batch_to_space_nd.cc",
@@ -502,6 +503,21 @@ tflm_cc_test(
 )
 
 tflm_cc_test(
+    name = "basic_classifier_test",
+    srcs = [
+        "basic_classifier_test.cc",
+    ],
+    deps = [
+        ":kernel_runner",
+        ":micro_ops",
+        "//tensorflow/lite/c:c_api_types",
+        "//tensorflow/lite/c:common",
+        "//tensorflow/lite/micro:test_helpers",
+        "//tensorflow/lite/micro/testing:micro_test",
+    ],
+)
+
+tflm_cc_test(
     name = "batch_matmul_test",
     srcs = [
         "batch_matmul_test.cc",
@@ -745,8 +761,8 @@ tflm_cc_test(
         "notap",
     ],
     target_compatible_with = select({
-        "//conditions:default": ["@platforms//:incompatible"],
         "//:with_compression_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [
         ":decompress",

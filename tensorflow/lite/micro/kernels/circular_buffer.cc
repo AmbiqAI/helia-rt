@@ -96,20 +96,34 @@ TfLiteStatus CircularBufferEval(TfLiteContext* context, TfLiteNode* node) {
     return kTfLiteError;
   }
 
-  if (--data->cycles_until_run != 0) {
-    // Signal the interpreter to end current run if the delay before op invoke
-    // has not been reached.
-    return kTfLiteAbort;
+  const bool is_ready = (--data->cycles_until_run <= 0);
+  if (is_ready) {
+    data->cycles_until_run = data->cycles_max;
   }
 
-  data->cycles_until_run = data->cycles_max;
+  if (node->outputs->size == 2) {
+    TfLiteEvalTensor* valid_output = tflite::micro::GetEvalOutput(
+        context, node, kCircularBufferValidOutputTensor);
+    *tflite::micro::GetTensorData<bool>(valid_output) = is_ready;
+    return kTfLiteOk;
+  }
 
-  return kTfLiteOk;
+  return is_ready ? kTfLiteOk : kTfLiteAbort;
+}
+
+// Restores period counter (cycles_until_run) on reset. Buffer memory cleanup
+// is not needed here: because the output tensor is a variable tensor.
+// ResetVariableTensors() automatically zero-points its memory upon reset.
+void CircularBufferReset(TfLiteContext* context, void* buffer) {
+  TFLITE_DCHECK(buffer != nullptr);
+  OpDataCircularBuffer* data = static_cast<OpDataCircularBuffer*>(buffer);
+  data->cycles_until_run = data->cycles_max;
 }
 
 TFLMRegistration* Register_CIRCULAR_BUFFER() {
   static TFLMRegistration r = tflite::micro::RegisterOp(
-      CircularBufferInit, CircularBufferPrepare, CircularBufferEval);
+      CircularBufferInit, CircularBufferPrepare, CircularBufferEval,
+      /*free=*/nullptr, CircularBufferReset);
   return &r;
 }
 

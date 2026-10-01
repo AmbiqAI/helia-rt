@@ -28,12 +28,13 @@ container. Uses bazel, but does not pollute the WORKSPACE's default cache.
    cp311
    cp312
    cp313
+   cp314
 
 <output-directory> defaults to $OUT_DIR_DEFAULT.
 "
 
 case "$1" in
-    cp310|cp311|cp312|cp313)
+    cp310|cp311|cp312|cp313|cp314)
         PY_TAG=$1
         OUTDIR=$(realpath ${2:-$OUT_DIR_DEFAULT})
         mkdir -p $OUTDIR
@@ -45,7 +46,7 @@ case "$1" in
 esac
 
 SRCDIR=$(realpath .)
-if ! test -f $SRCDIR/WORKSPACE; then
+if ! test -f $SRCDIR/MODULE.bazel; then
     echo "error: must run from the top of the source tree" >&2
     exit 1
 fi
@@ -106,11 +107,13 @@ docker run \
     # Build the wheel via bazel, using the Python compatibility tag matching the
     # build environment. Enable compression support for the official package.
     call_bazel build //python/tflite_micro:whl.dist \
+        --compilation_mode=opt \
         --//python/tflite_micro:compatibility_tag=\$PY_COMPATIBILITY \
         --//:with_compression=true
 
-    # Test, in the container environment.
+    # Test in the container environment. Use the same options as the build.
     call_bazel test //python/tflite_micro:whl_test \
+            --compilation_mode=opt \
             --//python/tflite_micro:compatibility_tag=\$PY_COMPATIBILITY \
             --//:with_compression=true
 EOF
