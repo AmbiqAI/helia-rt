@@ -66,7 +66,7 @@ validate_tally() {  # <tally-file>
 
   awk -F '\t' '
     BEGIN {
-      expected["kernel_float_activation_edge_test"] = 12
+      expected["kernel_float_activation_edge_test"] = 13
       expected["kernel_float_elementwise_edge_test"] = 5
       expected["kernel_float_lstm_tail_lane_test"] = 2
     }
@@ -104,8 +104,8 @@ validate_tally() {  # <tally-file>
           bad = 1
         }
       }
-      if (rows != 3 || total != 19) {
-        printf "ERROR: tally has %d rows and %d cases; expected 3 and 19\n", \
+      if (rows != 3 || total != 20) {
+        printf "ERROR: tally has %d rows and %d cases; expected 3 and 20\n", \
                rows, total > "/dev/stderr"
         bad = 1
       }
@@ -113,7 +113,7 @@ validate_tally() {  # <tally-file>
     }
   ' "${tally_file}" || die "release FP test tally failed"
 
-  echo "release FP tally: 3 binaries, 19 test cases"
+  echo "release FP tally: 3 binaries, 20 test cases"
   cat "${tally_file}"
 }
 
@@ -306,7 +306,7 @@ main() {
   local spec binary expected_count members map_copy
   local -a required_members
   local -a test_specs=(
-    "kernel_float_activation_edge_test:12:logistic.o,tanh.o,arm_nn_activation_f32.o,arm_nn_activation_f16.o"
+    "kernel_float_activation_edge_test:13:logistic.o,tanh.o,arm_nn_activation_f32.o,arm_nn_activation_f16.o"
     "kernel_float_elementwise_edge_test:5:add.o,mul.o,arm_elementwise_add_f32.o,arm_elementwise_add_f16.o,arm_elementwise_mul_f32.o,arm_elementwise_mul_f16.o"
     "kernel_float_lstm_tail_lane_test:2:unidirectional_sequence_lstm.o,arm_lstm_unidirectional_f32.o,arm_lstm_unidirectional_f16.o"
   )

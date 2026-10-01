@@ -37,12 +37,6 @@ inline constexpr bool kHeliaFloat16Enabled = false;
 #endif
 
 #if ARM_NN_ENABLE_F16
-// Lowest finite float16 value, as ARM_NN_F16_FINITE_LOWEST.
-// TODO(AmbiqAI/ns-cmsis-nn#637): use the macro once it stops promoting __fp16.
-inline float16_t HeliaFloat16FiniteLowest() {
-  return static_cast<float16_t>(-static_cast<float>(ARM_NN_F16_FINITE_MAX));
-}
-
 // Converts a float activation bound to float16_t, saturating to heliaCore's
 // finite float16 range. CalculateActivationRange() reports "unbounded" as
 // +/-FLT_MAX, and a plain static_cast of those to float16_t yields +/-inf;
@@ -52,8 +46,8 @@ inline float16_t HeliaFloat16ActivationBound(float bound) {
   if (bound >= static_cast<float>(ARM_NN_F16_FINITE_MAX)) {
     return ARM_NN_F16_FINITE_MAX;
   }
-  if (bound <= static_cast<float>(HeliaFloat16FiniteLowest())) {
-    return HeliaFloat16FiniteLowest();
+  if (bound <= static_cast<float>(ARM_NN_F16_FINITE_LOWEST)) {
+    return ARM_NN_F16_FINITE_LOWEST;
   }
   return static_cast<float16_t>(bound);
 }
