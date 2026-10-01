@@ -135,6 +135,7 @@ constexpr float kSaturationFloor = 0.99f;
 constexpr float kSaturationCeilF32 = 1.0000005f;  // ~8 float32 ULP
 constexpr float kLogisticFloorF32 = -2e-7f;       // ~3 float32 ULP below 0
 
+#if HELIA_TEST_OPTIMIZED_F32 && HELIA_TEST_MVE_FLOAT
 // Asserts the "NaN was mapped to the saturation bound" behavior class without
 // pinning a literal, which moves with the upstream table window. Logs the
 // observed value so the CI record carries the concrete number.
@@ -150,6 +151,7 @@ void ExpectTanhNanCharacterized(float observed, const char* label) {
   EXPECT_GE(-observed, kSaturationFloor);
   EXPECT_LE(-observed, kSaturationCeilF32);
 }
+#endif
 
 void ExpectLogisticNanCharacterized(float observed, const char* label) {
   MicroPrintf("%s: logistic(NaN) observed = %f", label,

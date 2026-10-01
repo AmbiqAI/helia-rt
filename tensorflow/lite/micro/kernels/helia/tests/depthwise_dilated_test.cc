@@ -41,7 +41,9 @@ enum class Leaf { kS8Opt, kS8, kFastS16, kS16, kCount };
 
 int g_leaf_calls[static_cast<int>(Leaf::kCount)] = {};
 
+#if HELIA_DW_ROUTE_LINK_WRAP
 void CountCall(Leaf leaf) { ++g_leaf_calls[static_cast<int>(leaf)]; }
+#endif
 
 }  // namespace
 
@@ -135,7 +137,9 @@ struct Shape {
 
 enum class Route { kOptimized, kGeneric };
 
+#if HELIA_DW_ROUTE_LINK_WRAP
 int LeafCalls(Leaf leaf) { return g_leaf_calls[static_cast<int>(leaf)]; }
+#endif
 
 // Without DSP the optimized leaves delegate to the generic one, so the
 // optimized route asserts only its own leaf.
@@ -224,7 +228,9 @@ void ExpectMatchesReference(const Shape& s, Route route) {
     int32_t multiplier = 0;
     int shift = 0;
     QuantizeMultiplier(
-        static_cast<double>(input_scale) * filter_scales[c + 1] / output_scale,
+        static_cast<double>(input_scale) *
+            static_cast<double>(filter_scales[c + 1]) /
+            static_cast<double>(output_scale),
         &multiplier, &shift);
     multipliers[c] = multiplier;
     shifts[c] = shift;

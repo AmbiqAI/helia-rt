@@ -583,7 +583,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
         const cmsis_nn_bmm_params_f16 bmm_params = {
           .adj_x = false,
           .adj_y = false,
-          .activation = {ARM_NN_F16_FINITE_LOWEST, ARM_NN_F16_FINITE_MAX},
+          .activation = {HeliaFloat16FiniteLowest(), ARM_NN_F16_FINITE_MAX},
           .rhs_format = ARM_NN_WEIGHT_FORMAT_STANDARD};
         const cmsis_nn_dims lhs_dims =
           FillVariableShape(lhs_shape.DimensionsCount(), lhs_shape.DimsData());
