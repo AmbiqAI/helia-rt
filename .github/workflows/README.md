@@ -77,17 +77,23 @@ floating `:latest` tag on `main`.
 
 `tensorflow/lite/micro/tools/ci_build/check_helia_ci_image_pins.sh` enforces
 this on every PR, from the `ci-image` job of [helia_test.yml](helia_test.yml).
-Outside YAML comments it fails when a listed pin point does not reference the
-image exactly once as `ghcr.io/ambiqai/helia-rt-ci@sha256:<64 lowercase hex>`
-(host and name in lowercase), when the pin points disagree, or when any other
-workflow references the image by digest, tag or bare name (the bare
-repository name in
-[helia_build_docker_image.yml](helia_build_docker_image.yml) is the one
-exception). Comments are recognised line by line, so a ` #` inside a shell or
-quoted string before the image can hide a reference there. It checks the PR
-head, not the merge result, so two PRs that each pass can still combine
-unevenly; a later PR based on that `main` then fails. Run it locally before
-opening a bump PR:
+Outside YAML comments, every line that contains `helia-rt-ci` (in any case)
+must be one of two. In a listed pin point it is, after trimming, exactly
+
+```
+run: echo "image=ghcr.io/ambiqai/helia-rt-ci@sha256:<64 lowercase hex>" >> "$GITHUB_OUTPUT"
+```
+
+once per pin point, and the pin points must agree. In
+[helia_build_docker_image.yml](helia_build_docker_image.yml) it is exactly
+`IMAGE_NAME: ghcr.io/ambiqai/helia-rt-ci`. Any other line fails, so a tag,
+another host or owner, a name built from an expression, or anything attached
+before the host or after the digest fails too. Comments are recognised line
+by line, so a ` #` inside a shell or quoted string before the image can hide
+a reference there. It checks the PR head, not the merge result, so two PRs
+that each pass can still combine unevenly; a later PR based on that `main`
+then fails. `check_helia_ci_image_pins_test.sh` runs next to it and holds
+these rules against fixture trees. Run it locally before opening a bump PR:
 
 ```sh
 ./tensorflow/lite/micro/tools/ci_build/check_helia_ci_image_pins.sh

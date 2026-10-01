@@ -21,22 +21,21 @@
 # uses a tag, release artifacts can be built by an image nothing tested.
 # see AmbiqAI/helia-rt#219 and .github/workflows/README.md
 #
-# Rules, applied to every .yml/.yaml workflow outside comments. Comments are
-# found line by line (a line starting with #, or a # after whitespace), which
-# matches YAML except inside block scalars and quoted strings: there a " #"
-# before the image on the same line hides the reference. Rules:
-#   * each pin point below references the image exactly once, as
-#     ghcr.io/ambiqai/helia-rt-ci@sha256:<64 lowercase hex digits>;
+# Rules, applied to every .yml/.yaml workflow line by line outside comments
+# (a line starting with #, or a # after whitespace, which matches YAML except
+# inside block scalars and quoted strings). A line refers to the image when it
+# contains helia-rt-ci in any case, so a name built from an expression or
+# spelled with another host, owner, case or tag still counts. Rules:
+#   * each pin point below has exactly one such line, and it is, after
+#     trimming, exactly
+#       run: echo "image=ghcr.io/ambiqai/helia-rt-ci@sha256:<64 lowercase hex>" >> "$GITHUB_OUTPUT"
+#     so nothing can precede the host or follow the digest inside the word;
 #   * all pin points carry the same digest;
-#   * no other reference to the image exists, by digest, tag or bare name,
-#     except the bare repository name in the image publisher. A new pin point
-#     is added to PIN_POINTS and to the README table on purpose;
-#   * a reference is the whole token around ambiqai/helia-rt-ci: any host
-#     other than ghcr.io/ or docker://ghcr.io/ (another host, a port, a
-#     path), a host or name not spelled in lowercase, or a name, path, # or
-#     $-expansion continuing after helia-rt-ci, is a look-alike and fails
-#     wherever it appears. A # directly after the name or digest is part of
-#     the token, so a digest followed by one is not a valid pin.
+#   * the publisher's one such line is exactly
+#       IMAGE_NAME: ghcr.io/ambiqai/helia-rt-ci
+#   * any other line that refers to the image fails, in any workflow. A new
+#     pin point is added to PIN_POINTS and to the README table on purpose.
+# A name assembled without the literal helia-rt-ci is not seen.
 #
 # Usage: check_helia_ci_image_pins.sh [root]
 #   root defaults to the repository root inferred from this script's location.
@@ -66,9 +65,9 @@ PIN_POINTS=(
 )
 PUBLISHER=helia_build_docker_image.yml
 
-IMAGE='ghcr.io/ambiqai/helia-rt-ci'
-NAME='ambiqai/helia-rt-ci'
-DIGEST_RE='^@sha256:[0-9a-f]{64}$'
+# shellcheck disable=SC2016  # $GITHUB_OUTPUT is matched literally.
+PIN_LINE_RE='^run: echo "image=ghcr\.io/ambiqai/helia-rt-ci@sha256:([0-9a-f]{64})" >> "\$GITHUB_OUTPUT"$'
+PUBLISHER_LINE='IMAGE_NAME: ghcr.io/ambiqai/helia-rt-ci'
 
 is_pin_point() {
   local pin
@@ -78,46 +77,23 @@ is_pin_point() {
   return 1
 }
 
-# One "file<US>kind<US>suffix<US>text" line (US = \037, which unlike a tab
-# keeps empty fields) per reference to ambiqai/helia-rt-ci outside a comment.
-# kind is "lookalike" when the host before the name is not ghcr.io/ or
-# docker://ghcr.io/, or the token continues the name, else "ref"; suffix is
-# the rest of the token after the name (empty for the bare name) and text the
-# whole token. The name is found case-insensitively, but only the lowercase
-# spelling of the host and name is a "ref": Docker rejects an upper-case
-# repository path, and the host is held to the one spelling pins use.
+# One "file<US>line-number<US>text" line (US = \037) per workflow line that
+# contains helia-rt-ci in any case, outside comments, with a trailing comment
+# and surrounding whitespace removed.
 references() {
   local path
   for path in "${WORKFLOWS}"/*.yml "${WORKFLOWS}"/*.yaml; do
     [[ -f "${path}" ]] || continue
-    awk -v file="$(basename "${path}")" -v name="${NAME}" '
+    awk -v file="$(basename "${path}")" '
       {
         line = $0
         sub(/\r$/, "", line)
         if (line ~ /^[[:space:]]*#/) next
         sub(/[[:space:]]#.*$/, "", line)
-        lower = tolower(line)
-        while ((i = index(lower, name)) > 0) {
-          start = i
-          while (start > 1 && substr(lower, start - 1, 1) ~ /[a-z0-9._:\/-]/)
-            start--
-          host = substr(line, start, i - start)
-          rest = substr(line, i + length(name))
-          suffix = ""
-          if (match(rest, /^[A-Za-z0-9._:@\/+$#-]+/))
-            suffix = substr(rest, 1, RLENGTH)
-          kind = "ref"
-          if (host != "ghcr.io/" && host != "docker://ghcr.io/")
-            kind = "lookalike"
-          if (substr(line, i, length(name)) != name)
-            kind = "lookalike"
-          if (suffix != "" && suffix !~ /^[@:]/)
-            kind = "lookalike"
-          text = substr(line, start, i + length(name) - start) suffix
-          print file "\037" kind "\037" suffix "\037" text
-          line = substr(line, i + length(name))
-          lower = substr(lower, i + length(name))
-        }
+        if (index(tolower(line), "helia-rt-ci") == 0) next
+        sub(/^[[:space:]]+/, "", line)
+        sub(/[[:space:]]+$/, "", line)
+        print file "\037" FNR "\037" line
       }' "${path}" || return 1
   done
 }
@@ -131,27 +107,24 @@ status=0
 declare -A pin_count=()
 digests=()
 
-while IFS=$'\037' read -r file kind suffix text; do
+while IFS=$'\037' read -r file lineno text; do
   [[ -n "${file}" ]] || continue
-  if [[ "${kind}" == "lookalike" ]]; then
-    echo "error: ${file} references a look-alike of the CI image as" \
-         "'${text}'" >&2
-    status=1
-    continue
-  fi
-  if is_pin_point "${file}"; then
+  if is_pin_point "${file}" && [[ "${text}" =~ ${PIN_LINE_RE} ]]; then
     pin_count["${file}"]=$(( ${pin_count["${file}"]:-0} + 1 ))
-    if [[ "${suffix}" =~ ${DIGEST_RE} ]]; then
-      digests+=("${file}: ${suffix#@sha256:}")
-    else
-      echo "error: ${file} references the CI image as '${IMAGE}${suffix}';" \
-           "expected @sha256:<64 lowercase hex>" >&2
-      status=1
-    fi
-  elif [[ "${file}" == "${PUBLISHER}" && -z "${suffix}" ]]; then
+    digests+=("${file}: ${BASH_REMATCH[1]}")
+  elif [[ "${file}" == "${PUBLISHER}" && "${text}" == "${PUBLISHER_LINE}" ]]; then
     continue
+  elif [[ "${file}" == "${PUBLISHER}" ]]; then
+    echo "error: ${file}:${lineno} refers to the CI image as '${text}';" \
+         "the publisher has only the line ${PUBLISHER_LINE}" >&2
+    status=1
+  elif is_pin_point "${file}"; then
+    echo "error: ${file}:${lineno} refers to the CI image as '${text}';" \
+         "a pin point has only the line" \
+         "run: echo \"image=ghcr.io/ambiqai/helia-rt-ci@sha256:<64 lowercase hex>\" >> \"\$GITHUB_OUTPUT\"" >&2
+    status=1
   else
-    echo "error: ${file} references the CI image as '${IMAGE}${suffix}'" \
+    echo "error: ${file}:${lineno} refers to the CI image as '${text}'" \
          "but is not a listed pin point" >&2
     status=1
   fi
@@ -162,8 +135,8 @@ for file in "${PIN_POINTS[@]}"; do
     echo "error: pin point ${file} is missing" >&2
     status=1
   elif [[ "${pin_count["${file}"]:-0}" -ne 1 ]]; then
-    echo "error: ${file} references the CI image" \
-         "${pin_count["${file}"]:-0} times; expected 1" >&2
+    echo "error: ${file} has ${pin_count["${file}"]:-0} pin lines for the CI" \
+         "image; expected 1" >&2
     status=1
   fi
 done
