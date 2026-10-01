@@ -46,6 +46,7 @@ Examples:
   ./test_helia.sh -a cortex-m4 -t gcc
   ./test_helia.sh --no-tests
   ./test_helia.sh -O SPEED --build-only
+  ./test_helia.sh -a cortex-m55 -t gcc -O SPEED -k cmsis_nn
 USAGE
 }
 
@@ -71,8 +72,8 @@ case "${OPT_CHOICE}" in
   *) echo "Invalid --opt '${OPT_CHOICE}'. Use SPEED|SIZE|BOTH." >&2; exit 2 ;;
 esac
 
-# cmsis_nn builds the upstream-derived kernels/cmsis_nn/ against upstream
-# CMSIS-NN, the backend the CMake build ships. see AmbiqAI/helia-rt#357
+# cmsis_nn builds the upstream-derived kernels/cmsis_nn/ (the sources of the
+# CMake cmsis_nn backend) against upstream CMSIS-NN. see AmbiqAI/helia-rt#357
 case "${OPTIMIZED_KERNEL_DIR}" in
   helia|cmsis_nn) : ;;
   *) echo "Invalid --kernel-dir '${OPTIMIZED_KERNEL_DIR}'. Use helia|cmsis_nn." >&2; exit 2 ;;
@@ -184,7 +185,8 @@ build_args_with_opts() {
   local opt="$1"
   local -a args=( "${common_args[@]}" )
   [[ -n "${opt}" ]] && args+=( GLOBAL_KERNEL_OPTIMIZE="${opt}" )
-  if [[ "${enable_requantize_inline_asm}" == "true" ]]; then
+  # helia.inc turns this into a define; the cmsis_nn build ignores it.
+  if [[ "${enable_requantize_inline_asm}" == "true" && "${OPTIMIZED_KERNEL_DIR}" == "helia" ]]; then
     args+=( CMSIS_NN_USE_REQUANTIZE_INLINE_ASSEMBLY=1 )
   fi
   # ARM_UBL_LICENSE_IDENTIFIER is deliberately NOT added here. These args are
@@ -205,7 +207,7 @@ fi
 # nproc fallback (e.g., mac w/ gnu coreutils not present)
 JOBS="$(command -v nproc >/dev/null 2>&1 && nproc || echo 4)"
 
-echo "==> TARGET_ARCH=${TARGET_ARCH} TOOLCHAIN=${TOOLCHAIN} OPT=${OPT_CHOICE} TESTS=$([[ $RUN_TESTS -eq 1 ]] && echo ON || echo OFF)"
+echo "==> TARGET_ARCH=${TARGET_ARCH} TOOLCHAIN=${TOOLCHAIN} KERNELS=${OPTIMIZED_KERNEL_DIR} OPT=${OPT_CHOICE} TESTS=$([[ $RUN_TESTS -eq 1 ]] && echo ON || echo OFF)"
 
 for OPTIMIZE_KERNELS_FOR in "${variants[@]}"; do
   echo "=== Building with ${OPTIMIZE_KERNELS_FOR} (TARGET_ARCH=${TARGET_ARCH}) ==="
@@ -217,12 +219,12 @@ for OPTIMIZE_KERNELS_FOR in "${variants[@]}"; do
   readable_run make -j"${JOBS}" "${ARGS[@]}" build
 
   # ---- FP symbol link-probe (issue #227) -------------------------------------
-  # Runs on every leg, right after the library exists and before the test
+  # Runs on every helia leg, right after the library exists and before the test
   # binaries. It links a generated program against the archive that references
   # every ns-cmsis-nn float entry point the helia kernels call, so a missing,
   # renamed, or itself-unresolvable FP symbol fails here even on the legs whose
   # executed FP coverage is still thin. Cheap (one compile + one link) and
-  # needs no FVP, which is why it can be unconditional.
+  # needs no FVP, which is why it can run on every helia leg.
   GENDIR="$(make "${ARGS[@]}" list_gendir 2>/dev/null | tail -1)"
   # The probe lists the ns-cmsis-nn floating-point entry points the helia
   # kernels call; a cmsis_nn library has none of them.
@@ -290,7 +292,7 @@ for OPTIMIZE_KERNELS_FOR in "${variants[@]}"; do
     suite_status=${PIPESTATUS[0]}
     set -e
 
-    echo "==> Failing test targets (${TARGET_ARCH}/${TOOLCHAIN}/${OPTIMIZE_KERNELS_FOR}):"
+    echo "==> Failing test targets (${TARGET_ARCH}/${TOOLCHAIN}/${OPTIMIZED_KERNEL_DIR}/${OPTIMIZE_KERNELS_FOR}):"
     grep -E '^make(\[[0-9]+\])?: \*\*\* \[.*\] Error ' "${suite_log}" \
       | sed -E 's/^make(\[[0-9]+\])?: \*\*\* \[[^]]*: ([^]]*)\] Error.*/  \2/' \
       | sort -u \
@@ -336,7 +338,7 @@ for OPTIMIZE_KERNELS_FOR in "${variants[@]}"; do
          "no case count), ${tally_cases} test cases"
 
     if [[ "${tally_binaries}" -eq 0 || "${tally_cases}" -eq 0 ]]; then
-      echo "::error ::${TARGET_ARCH}/${TOOLCHAIN}/${OPTIMIZE_KERNELS_FOR}:" \
+      echo "::error ::${TARGET_ARCH}/${TOOLCHAIN}/${OPTIMIZED_KERNEL_DIR}/${OPTIMIZE_KERNELS_FOR}:" \
            "the suite executed ${tally_cases} test cases across" \
            "${tally_binaries} binaries. A green leg that ran nothing is a" \
            "harness failure, not a pass (issue #231)."
@@ -357,7 +359,7 @@ for OPTIMIZE_KERNELS_FOR in "${variants[@]}"; do
         exit 1
       fi
       if [[ "${observed}" -lt "${floor}" ]]; then
-        echo "::error ::${TARGET_ARCH}/${TOOLCHAIN}/${OPTIMIZE_KERNELS_FOR}:" \
+        echo "::error ::${TARGET_ARCH}/${TOOLCHAIN}/${OPTIMIZED_KERNEL_DIR}/${OPTIMIZE_KERNELS_FOR}:" \
              "only ${observed} ${what}; floor is ${floor} (${name})." \
              "Tests do not leave this suite silently -- if the drop is" \
              "deliberate, lower the floor in the same change (issue #231)."
