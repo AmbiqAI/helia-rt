@@ -114,7 +114,9 @@ jobs:
       # Called workflows get only the secrets they declare, passed by name.
       # see AmbiqAI/helia-rt#366
       - name: Check workflows pass no inherited secrets
-        run: ./tensorflow/lite/micro/tools/ci_build/check_helia_workflow_secrets.sh
+        run: |
+          ./tensorflow/lite/micro/tools/ci_build/check_helia_workflow_secrets.sh
+          ./tensorflow/lite/micro/tools/ci_build/check_helia_workflow_secrets_test.sh
 
   armclang_m4_qualification:
     needs: ci-image
