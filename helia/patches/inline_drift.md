@@ -12,6 +12,9 @@ Format per entry: file path, brief description, rationale for not using an
 extension hook, and (if applicable) an upstream issue/PR link that would let
 us drop the change.
 
+The upstream commit these entries are measured against is recorded in
+[`helia/UPSTREAM`](../UPSTREAM).
+
 ## Shared kernel headers — `|| defined(HELIA)` guard tokens
 
 **Resolved 2026-05.** All 14 kernel-header guards plus
@@ -121,7 +124,7 @@ ARM CMSIS-NN adopts a `ctx->size` contract).
 
 ## `tensorflow/lite/micro/tools/make/Makefile`
 
-Three minimal hooks (~34 lines of inline drift, down from ~80):
+Four hooks, +158/-7 lines against upstream:
 
 1. `GLOBAL_KERNEL_OPTIMIZE ?= SPEED` knob (defaults match upstream's
    static `KERNELS_OPTIMIZED_FOR_SPEED`) so the helia CI scripts
@@ -132,9 +135,9 @@ Three minimal hooks (~34 lines of inline drift, down from ~80):
    which appends `-D...` directly to `CCFLAGS` / `CXXFLAGS` (the
    `ADDITIONAL_DEFINES` capture in `COMMON_FLAGS` runs before
    `helia.inc` is sourced).
-2. One-line `-Wno-error=nan-infinity-disabled` addition inside the
-   existing armclang post-link branch so `-Werror` builds stay green
-   on armclang. The same suppression for ATfE — plus
+2. `-Werror=nan-infinity-disabled` inside the existing armclang
+   post-link branch, so a NaN or infinity test that fast-math would fold
+   away fails the armclang build instead. The same suppression for ATfE — plus
    `-Wno-error=unknown-attributes`, the `llvm-objcopy` override, the
    `$(BINDIR)%.bin` rule replacement, and the `test_helpers.o -O0`
    workaround for the clang-22 `BuildSimpleModelWithSubgraphsAndWhile`
@@ -162,6 +165,12 @@ Three minimal hooks (~34 lines of inline drift, down from ~80):
    `include tests.inc` and `kernels/Makefile.inc`, because make captures
    a prerequisite list when the rule is defined but expands the recipe
    at execution time.
+
+4. Per-toolchain optimization levels: `-Os`/`-O2`/`-O3` (core, kernels,
+   third-party kernels) for gcc and ATfE, and `-Ofast -ffp-mode=full` for
+   armclang. `-ffp-mode=full` must follow `-Ofast`, which otherwise
+   disables NaN and infinity semantics; the comment at the definition
+   records why.
 
 Drop condition: upstream introduces a per-`OPTIMIZED_KERNEL_DIR` Makefile
 include that runs early enough to extend `ADDITIONAL_DEFINES`, **and**
@@ -201,7 +210,7 @@ Drop condition: upstream adds first-class `atfe` and Windows-host support.
 
 ## `tensorflow/lite/micro/tools/make/targets/cortex_m_corstone_300_makefile.inc`
 
-Reduced to three minimal hooks (the bulk of the atfe logic — ~85 lines —
+Reduced to four minimal hooks (the bulk of the atfe logic — ~85 lines —
 lives in [`targets/cortex_m_corstone_300_atfe.inc`](../../tensorflow/lite/micro/tools/make/targets/cortex_m_corstone_300_atfe.inc),
 which is helia-owned):
 
@@ -213,10 +222,17 @@ which is helia-owned):
    `$(ETHOS_U_CORE_PLATFORM)/retarget.c` (4 lines). picolibc's `libsemihost`
    already provides stdio retargeting; adding `retarget.c` causes a link
    conflict under ATfE.
+4. The gcc branch keeps the downloaded Arm GNU toolchain
+   (`TARGET_TOOLCHAIN_ROOT := $(DOWNLOADS_DIR)/gcc_embedded/bin/`), as
+   `cortex_m_generic` does. Upstream prefers an `arm-none-eabi-gcc` on
+   `PATH`, and with none on `PATH` its `TARGET_TOOLCHAIN_ROOT ?=` is a no-op
+   because the Makefile already defines the variable (empty), so the helia CI
+   image would build with a bare `arm-none-eabi-gcc` that does not exist.
 
 Drop condition: upstream adds first-class `atfe` toolchain support, picks
 up the helia armclang download convention, and either drops `retarget.c`
-or guards it against picolibc.
+or guards it against picolibc. Hook 4 goes when upstream's gcc branch
+works without a compiler on `PATH`.
 
 ## `tensorflow/lite/micro/tools/benchmarking/show_meta_data.cc.template`
 
@@ -332,15 +348,8 @@ when the CMSIS startup for this target stops defining the fault vectors as
 
 ## `.github/workflows/check_tflite_files.yml`
 
-Replaces the upstream `tools/ci_build/check_tflite_files.sh` shell entry
-point with an in-line `docker run … ghcr.io/ambiqai/helia-rt-ci:latest`
-invocation so the file-allowlist check runs in the helia CI Docker image.
-
-Cannot be moved: replacing with a sibling helia-named workflow would break
-existing `pr_test.yml` PR-event wiring.
-
-Drop condition: helia maintains its own `check_tflite_files.sh` and the
-script auto-detects helia-rt vs tflite-micro at run time.
+Resolved: identical to upstream. The workflow has no caller in helia-rt and is
+no longer a CI-image pin point.
 
 ## `.github/workflows/issue_on_error.yml`
 
@@ -349,7 +358,7 @@ Two helia-specific changes:
 1. Default `flag_label` changed from `bot:issue` to `ci:bot_issue` to
    match the helia-rt issue-tracker label scheme.
 2. The error-reporting body calls `ci/issue_on_error.py` (a helia Python
-   script) instead of upstream's inline `actions/github-script@v8` block.
+   script) instead of upstream's inline `actions/github-script` block.
 
 Every helia and inherited workflow that calls `uses:
 ./.github/workflows/issue_on_error.yml` would need to be updated to point
@@ -362,11 +371,21 @@ Drop condition: helia switches all callers to a sibling
 
 Disables the upstream-sync schedule (commented-out cron) and changes the
 schedule-guard repo string from `tensorflow/tflite-micro` to
-`AmbiqAI/helia-rt`. Action versions also pinned lower than upstream's
-current. The workflow stays usable via `workflow_dispatch`.
+`AmbiqAI/helia-rt`, and keeps helia's own Python and action steps (no
+Bazel setup). The workflow stays usable via `workflow_dispatch`.
 
 Drop condition: helia replaces this with a sibling `helia_sync.yml`
 (deferred — see Phase 4 plan).
+
+## Action references in upstream-derived workflows
+
+`log_binary_size_pr.yml`, `sync.yml` and `issue_on_error.yml` reference
+actions by version tag; upstream pins them by commit SHA. Upstream's
+read-only default `permissions` blocks are taken. `.github/dependabot.yml`
+adds an `ignore` list for actions used only by upstream-vendored workflows
+that helia disables, so dependabot does not open PRs against upstream YAML.
+
+Drop condition: helia adopts SHA pinning for these workflows.
 
 ## Top-level branding & policy files
 
@@ -382,6 +401,7 @@ re-apply the upstream copy.
 | `SECURITY.md` | Upstream redirect to TensorFlow's security policy replaced with the Ambiq reporting channel (`support.aitg@ambiq.com`, GitHub private vulnerability reporting once enabled). | Never. |
 | `CODEOWNERS` | `/.github/` and `/ci/` reassigned from upstream `@veblush` to helia maintainers (`@advaitjain @rockyrhodes @suleshahid`). | Never. |
 | `.gitignore` | Adds `build/`, `out/`, `.DS_Store`, `.aider*`, `neuralspot-*-local-*`, `neuralspot-*-local-*.zip`, `tflm-vanilla.zip`, `site/`. | Upstream adopts equivalents (won't happen for `neuralspot-*` / `tflm-vanilla.zip` — keep). |
+| `pyproject.toml` | helia's `[project]` (uv tooling metadata) above upstream's `[tool.ruff]` configuration, plus an `__init__.py` F401 ignore. | Never for `[project]`; take upstream's ruff blocks on each sync. |
 
 ## Top-level helia-only files in upstream-owned directories
 
@@ -393,15 +413,19 @@ under "Other approved helia-only locations".
 - `nsx/` — heliaRT NSX module manifest (see repository_layout.md).
 - `zephyr/` (top level) — Zephyr module manifest (see repository_layout.md).
 - `zephyr_static_export.sh` — top-level Zephyr export driver.
-- `pyproject.toml`, `uv.lock`, `astro-site/`, `release-please-config.json`, `.release-please-manifest.json`.
+- `uv.lock`, `astro-site/`, `release-please-config.json`, `.release-please-manifest.json`.
+- `tensorflow/lite/micro/tools/ci_build/test_cortex_m_generic.sh` — upstream
+  deleted it (#3716); kept because the manual `cortex_m.yml` and
+  `cortex_m_arm_compiler.yml` workflows call it.
+- `tensorflow/lite/micro/tools/github/arm_virtual_hardware/` — upstream
+  deleted it; used only by the dispatch-only `cortex_m_virtual_hardware.yml`.
 - `.devcontainer/`, `.github/stale.yml`.
 - `ci/install_qemu.sh`, `ci/check_tflite_files.py`, `ci/issue_on_error.py`.
 
 ## `ci/` upstream-file drift
 
-Resolved — all four `ci/` files (`Dockerfile.micro`, `install_bazelisk.sh`,
-`install_buildifier.sh`, `sync_from_upstream_tf.sh`) and `ci/tflite_files.txt`
-are now identical to `tflm/main`. Note that `ci/Dockerfile.micro` is dead
+Resolved — the upstream `ci/` files and `ci/tflite_files.txt` are identical
+to the recorded upstream commit. Note that `ci/Dockerfile.micro` is dead
 code in helia: the `helia-rt-ci` image is built from `.devcontainer/Dockerfile`
 by `.github/workflows/helia_build_docker_image.yml`. We keep `Dockerfile.micro`
 in sync with upstream solely to minimize sync conflicts.
@@ -418,3 +442,59 @@ source consumers unfixed. The shared reference header is unchanged.
 ci/sync_from_upstream_tf.sh preserves micro/, but a TFLM sync must reconcile
 these two files. Drop this drift when the selected upstream TFLM pin includes
 equivalent initialization, quantization checks and regression coverage.
+
+## `tensorflow/lite/micro/kernels/ethos_u/ethosu.cc`
+
+Compiles the Ethos-U kernel only under `HELIA_RT_ENABLE_ETHOSU`, which
+`ETHOS_U` sets unless `HELIA_RT_DISABLE_ETHOSU` is defined; otherwise
+`Register_ETHOSU()` is a stub returning `nullptr`. The kernel declares the
+driver entry points it calls instead of including `ethosu_driver.h`. The
+source-list builds (CMake, Zephyr, NSX) compile this file without the
+Ethos-U driver. See AmbiqAI/helia-rt#172 and #213.
+
+Drop condition: upstream gates the kernel on driver availability.
+
+## `tensorflow/lite/micro/testing/micro_test.h`, `micro_test_v2.h`
+
+The near and float-equal checks treat NaN as a mismatch unless both values
+are NaN, so a kernel that returns NaN cannot pass a tolerance check. See
+AmbiqAI/helia-rt#338.
+
+Drop condition: upstream's macros become NaN-aware.
+
+## Kernel tests with helia cases
+
+`activations`, `add`, `batch_matmul`, `concatenation`, `conv`,
+`depthwise_conv`, `fully_connected`, `logistic`, `maximum_minimum`, `mul`,
+`pad`, `pooling`, `reshape`, `softmax`, `svdf`, `tanh`, `transpose`,
+`transpose_conv` and `unidirectional_sequence_lstm` `_test.cc` add
+`#if ARM_NN_ENABLE_F16` float16 cases, keep the kernel registration alive
+for the test's lifetime, and (LSTM) add stateful streaming coverage. These
+run against the helia kernels on the M55 legs.
+
+Drop condition: none; re-merge on each sync.
+
+## Download scripts
+
+`bash_helpers.sh` adds `wget_with_retries` and the seed helpers
+(`check_seed`, `write_seed`). `download_and_extract.sh` reuses a download only
+when it is complete and its URL and checksum match the seed; the seed is
+written into the staging directory before the completion marker, so it
+survives the move into place. `ext_libs/cmsis_download.sh` and
+`cmsis_nn_download.sh` use https, the retrying download and the seed check,
+so a pin change re-downloads instead of reusing a stale tree.
+`xtensa_download.sh` uses https and the retrying download;
+`xtensa_ndsp_download.sh`, `arm_gcc_download.sh`,
+`corstone_300_download.sh` and `renode_download.sh` use the retrying
+download. `corstone_300_download.sh` also drops a stray `fi` that makes
+upstream's copy fail to parse when the FVP has to be downloaded.
+
+Drop condition: upstream re-downloads on pin changes and retries transient
+failures; the `fi` fix drops when upstream's script parses.
+
+## `tensorflow/lite/micro/tools/make/targets/bluepill_makefile.inc`
+
+Writes the link map to `$(GENDIR)` instead of `gen/`, so parallel builds with
+different `BASE_GENDIR` values do not share one map.
+
+Drop condition: upstream writes target maps under `GENDIR`.

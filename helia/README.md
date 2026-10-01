@@ -14,6 +14,7 @@ files wherever possible.
 | Path | Purpose |
 | --- | --- |
 | `helia/README.md` | This file |
+| `helia/UPSTREAM` | The upstream `tensorflow/tflite-micro` commit the tree is synced to |
 | `helia/docs/repository_layout.md` | Contributor guide: where helia-specific files are allowed to live, and where they are **not** allowed to live |
 | `helia/patches/` | Source patches that override upstream files. Used **only** when an in-tree extension hook (helia.inc, helia_tests.inc, kernels/helia/, etc.) is not available |
 | `helia/patches/README.md` | Patch authoring conventions and how patches are applied |
