@@ -80,6 +80,12 @@ jobs:
           npm run check:operators
           npm run check:output
           npm run check:reference
+
+      - name: Check mobile and desktop navigation
+        working-directory: astro-site
+        run: |
+          npx playwright install --with-deps chromium
+          npm test
       - name: Upload tested site
         uses: actions/upload-artifact@v7
         with:
