@@ -417,3 +417,38 @@ jobs:
       - name: Show ccache stats
         if: always()
         run: ccache -s || true
+
+  # The upstream-derived kernels/cmsis_nn/ backend, which the CMake build
+  # ships, against upstream CMSIS-NN. The helia legs never compile it.
+  # see AmbiqAI/helia-rt#357
+  cmsis_nn_test:
+    needs: ci-image
+    if: ${{ !inputs.armclang-m4-qualification && inputs.ns-cmsis-nn-ref == '' }}
+    runs-on: ubuntu-latest-md
+    container:
+      image: ${{ needs.ci-image.outputs.image }}
+    timeout-minutes: 45
+    name: test-cortex-m55-gcc-cmsis_nn
+    env:
+      FVP_TIMEOUT_SECONDS: "120"
+      # Exact counts observed on this leg, as for the helia legs above.
+      HELIA_MIN_TEST_BINARIES: "130"
+      HELIA_MIN_EXECUTED_CASES: "1134"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.trigger-sha || inputs.ref || github.sha }}
+
+      - name: Mark workspace as safe for Git
+        run: git config --global --add safe.directory "*"
+
+      - name: Cache third-party downloads
+        uses: actions/cache@v6
+        with:
+          path: tensorflow/lite/micro/tools/make/downloads
+          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc','tensorflow/lite/micro/tools/make/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/*_download.sh','tensorflow/lite/micro/tools/make/download_dependencies.py','tensorflow/lite/micro/tools/make/ext_libs/helia.inc') }}
+
+      - name: Testing (cortex-m55 / gcc / cmsis_nn)
+        run: |
+          /bin/sh -c "tensorflow/lite/micro/tools/ci_build/test_helia.sh \
+          -a cortex-m55 -t gcc -O SPEED -k cmsis_nn"

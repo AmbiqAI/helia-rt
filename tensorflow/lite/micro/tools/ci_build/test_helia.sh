@@ -36,6 +36,7 @@ Options:
   -a, --arch <cortex-m55|cortex-m4|cortex-m4+fp|...>   Target CPU arch (default: cortex-m55)
   -t, --toolchain <gcc|armclang|atfe>                  Toolchain (default: gcc)
   -O, --opt <SPEED|SIZE|BOTH>                          Kernel optimization (default: BOTH)
+  -k, --kernel-dir <helia|cmsis_nn>                    Optimized kernels (default: helia)
       --no-tests | --build-only                        Disable tests; build only
   -L, --arm-ubl-license-id, --arm-ubl-license-identifier <VALUE>
   -h, --help                                           Show this help
@@ -54,6 +55,8 @@ while [[ $# -gt 0 ]]; do
     -t|--toolchain)  TOOLCHAIN="${2:?missing value for --toolchain}"; shift 2 ;;
     -O|--opt)
       OPT_CHOICE="${2:?missing value for --opt}"; shift 2 ;;
+    -k|--kernel-dir)
+      OPTIMIZED_KERNEL_DIR="${2:?missing value for --kernel-dir}"; shift 2 ;;
     --no-tests|--build-only)
       RUN_TESTS=0; shift ;;
      -L|--arm-ubl-license-id|--arm-ubl-license-identifier)
@@ -66,6 +69,13 @@ done
 case "${OPT_CHOICE}" in
   SPEED|SIZE|BOTH) : ;;
   *) echo "Invalid --opt '${OPT_CHOICE}'. Use SPEED|SIZE|BOTH." >&2; exit 2 ;;
+esac
+
+# cmsis_nn builds the upstream-derived kernels/cmsis_nn/ against upstream
+# CMSIS-NN, the backend the CMake build ships. see AmbiqAI/helia-rt#357
+case "${OPTIMIZED_KERNEL_DIR}" in
+  helia|cmsis_nn) : ;;
+  *) echo "Invalid --kernel-dir '${OPTIMIZED_KERNEL_DIR}'. Use helia|cmsis_nn." >&2; exit 2 ;;
 esac
 
 case "${TOOLCHAIN}" in
@@ -214,12 +224,16 @@ for OPTIMIZE_KERNELS_FOR in "${variants[@]}"; do
   # executed FP coverage is still thin. Cheap (one compile + one link) and
   # needs no FVP, which is why it can be unconditional.
   GENDIR="$(make "${ARGS[@]}" list_gendir 2>/dev/null | tail -1)"
-  readable_run tensorflow/lite/micro/tools/ci_build/fp_symbol_link_probe.sh \
-    --lib "${GENDIR}lib/libtensorflow-microlite.a" \
-    --arch "${TARGET_ARCH}" \
-    --toolchain "${TOOLCHAIN}" \
-    --target "${TARGET}" \
-    --label "${TARGET_ARCH}-${TOOLCHAIN}-${OPTIMIZE_KERNELS_FOR}"
+  # The probe lists the ns-cmsis-nn floating-point entry points the helia
+  # kernels call; a cmsis_nn library has none of them.
+  if [[ "${OPTIMIZED_KERNEL_DIR}" == "helia" ]]; then
+    readable_run tensorflow/lite/micro/tools/ci_build/fp_symbol_link_probe.sh \
+      --lib "${GENDIR}lib/libtensorflow-microlite.a" \
+      --arch "${TARGET_ARCH}" \
+      --toolchain "${TOOLCHAIN}" \
+      --target "${TARGET}" \
+      --label "${TARGET_ARCH}-${TOOLCHAIN}-${OPTIMIZE_KERNELS_FOR}"
+  fi
 
   if [[ "${RUN_TESTS}" -eq 1 ]]; then
     # ---- executed-case tally (issue #231) ------------------------------------
@@ -317,7 +331,7 @@ for OPTIMIZE_KERNELS_FOR in "${variants[@]}"; do
                            "${HELIA_TEST_TALLY_FILE}")"
     tally_cases="$(awk -F'\t' '$1 != "" {s += $2} END {print s + 0}' \
                    "${HELIA_TEST_TALLY_FILE}")"
-    echo "==> executed-case tally for ${TARGET_ARCH}/${TOOLCHAIN}/${OPTIMIZE_KERNELS_FOR}:" \
+    echo "==> executed-case tally for ${TARGET_ARCH}/${TOOLCHAIN}/${OPTIMIZED_KERNEL_DIR}/${OPTIMIZE_KERNELS_FOR}:" \
          "${tally_binaries} binaries (${tally_frameworkless} framework-less," \
          "no case count), ${tally_cases} test cases"
 
