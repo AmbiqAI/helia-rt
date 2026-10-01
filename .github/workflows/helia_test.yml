@@ -260,30 +260,32 @@ jobs:
         # fourteen cases on every leg. see AmbiqAI/helia-rt#345
         # Rank-5 MAXIMUM/MINIMUM coverage adds five cases on every leg.
         # see AmbiqAI/helia-rt#356
+        # float32 ARG_MAX/ARG_MIN NaN handling adds two cases on every leg.
+        # see AmbiqAI/helia-rt#359
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 158
-            min-cases: 1314
+            min-cases: 1316
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 158
-            min-cases: 1314
+            min-cases: 1316
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and one case fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 157
-            min-cases: 1313
+            min-cases: 1315
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 158
-            min-cases: 1362
+            min-cases: 1364
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 157
-            min-cases: 1361
+            min-cases: 1363
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}

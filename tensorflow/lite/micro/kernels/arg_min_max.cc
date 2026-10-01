@@ -15,6 +15,8 @@ limitations under the License.
 
 #include "tensorflow/lite/kernels/internal/reference/arg_min_max.h"
 
+#include <cmath>
+
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/kernels/internal/reference/comparisons.h"
@@ -31,11 +33,35 @@ constexpr int kInputTensor = 0;
 constexpr int kAxis = 1;
 constexpr int kOutputTensor = 0;
 
+// helia: TensorFlow/LiteRT NaN semantics for floating-point ARG_MAX and
+// ARG_MIN: a NaN candidate never wins and a finite candidate replaces a NaN
+// accumulator. see AmbiqAI/helia-rt#359
+template <typename T, bool kArgMax>
+struct NanAwareArgCompare {
+  bool operator()(T candidate, T current) const {
+    if (std::isnan(candidate)) return false;
+    if (std::isnan(current)) return true;
+    return kArgMax ? candidate > current : candidate < current;
+  }
+};
+
 template <typename T1, typename T2, typename T3>
 inline void ArgMinMaxHelper(const RuntimeShape& input1_shape,
                             const T1* input1_data, const T3* input2_data,
                             const RuntimeShape& output_shape, T2* output_data,
                             bool is_arg_max) {
+  if (std::is_floating_point<T1>::value) {
+    if (is_arg_max) {
+      reference_ops::ArgMinMax(input1_shape, input1_data, input2_data,
+                               output_shape, output_data,
+                               NanAwareArgCompare<T1, true>());
+    } else {
+      reference_ops::ArgMinMax(input1_shape, input1_data, input2_data,
+                               output_shape, output_data,
+                               NanAwareArgCompare<T1, false>());
+    }
+    return;
+  }
   // Use Greater/Less from comparisons.h (formerly from kernels/micro_utils.h
   // which was deprecated). Same as gtl::Greater but used here to reduce
   // dependencies and binary size for micro environment.
