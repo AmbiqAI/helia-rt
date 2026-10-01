@@ -52,11 +52,12 @@ enum class PrecomputeRoute {
   kCount,
 };
 
-constexpr int kSyntheticActivationBytes = 64;
-constexpr int kSyntheticWeightSumBytes = sizeof(int32_t);
 constexpr int kOutputSentinel = -77;
 
 #if HELIA_CONV_LINK_WRAP
+
+constexpr int kSyntheticActivationBytes = 64;
+constexpr int kSyntheticWeightSumBytes = sizeof(int32_t);
 
 struct LinkState {
   QueryRoute query_override = QueryRoute::kCount;
@@ -523,6 +524,13 @@ RunResult Run(ComputeRoute route, const TFLMRegistration& registration) {
   return {kTfLiteError, kTfLiteError, kOutputSentinel};
 }
 
+void ExpectValid(const RunResult& result) {
+  EXPECT_EQ(kTfLiteOk, result.prepare);
+  EXPECT_EQ(kTfLiteOk, result.invoke);
+  EXPECT_EQ(7, result.output);
+}
+
+#if HELIA_CONV_LINK_WRAP
 QueryRoute QueryFor(ComputeRoute route) {
   switch (route) {
     case ComputeRoute::kConvS8:
@@ -552,14 +560,7 @@ PrecomputeRoute PrecomputeFor(ComputeRoute route) {
                                         : PrecomputeRoute::kDepthwise;
 }
 
-void ExpectValid(const RunResult& result) {
-  EXPECT_EQ(kTfLiteOk, result.prepare);
-  EXPECT_EQ(kTfLiteOk, result.invoke);
-  EXPECT_EQ(7, result.output);
-}
-
 void ExpectContexts(ComputeRoute route) {
-#if HELIA_CONV_LINK_WRAP
   EXPECT_EQ(1, g_link_state.compute_calls[Index(route)]);
   const QueryRoute query = QueryFor(route);
   if (query == QueryRoute::kCount) {
@@ -582,13 +583,9 @@ void ExpectContexts(ComputeRoute route) {
     EXPECT_EQ(size, g_link_state.weight_context_sizes[Index(precompute)]);
     EXPECT_EQ(size > 0, g_link_state.weight_context_buffers[Index(precompute)]);
   }
-#else
-  (void)route;
-#endif
 }
 
 void SetPositiveQueries(ComputeRoute route) {
-#if HELIA_CONV_LINK_WRAP
   const QueryRoute query = QueryFor(route);
   if (query != QueryRoute::kCount) {
     g_link_state.query_override = query;
@@ -598,10 +595,8 @@ void SetPositiveQueries(ComputeRoute route) {
     g_link_state.override_weight_query = true;
     g_link_state.weight_query_result = kSyntheticWeightSumBytes;
   }
-#else
-  (void)route;
-#endif
 }
+#endif  // HELIA_CONV_LINK_WRAP
 
 void ExpectComputeContract(ComputeRoute route,
                            const TFLMRegistration& registration) {

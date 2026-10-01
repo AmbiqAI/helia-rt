@@ -50,6 +50,7 @@ void PopulateCommonParams(
   post_pad->c = data->params.right_padding_count >= 4 ? data->params.right_padding[3] : 0;
 }
 
+#if ARM_NN_ENABLE_F16
 // Places a rank <= 4 input on the last dims of (N, H, W, C): the leading
 // dims are 1 and unpadded, as reference_ops::Pad extends them.
 void PopulateRightAlignedParams(
@@ -75,6 +76,7 @@ void PopulateRightAlignedParams(
   *pre_pad = {pre[0], pre[1], pre[2], pre[3]};
   *post_pad = {post[0], post[1], post[2], post[3]};
 }
+#endif
 
 void *Init(TfLiteContext *context, const char *buffer, size_t length)
 {

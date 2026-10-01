@@ -662,13 +662,13 @@ TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMFloat16) {
 #if defined(NS_CMSIS_NN_VERSION) && NS_CMSIS_NN_VERSION >= 7032000
   // Derived by evaluating the LSTM recurrence in double precision across both
   // invokes and rounding to float16; see the generator named above.
-  constexpr float kExpectedSecondOutput[] = {
+  constexpr float kExpectedSecondOutputF16[] = {
       0.61376953f, 0.61376953f, 0.62402344f, 0.62402344f,
       0.62646484f, 0.62646484f, 0.33593750f, 0.33544922f,
       0.61572266f, 0.61572266f, 0.56884766f, 0.56884766f};
-  constexpr float kExpectedSecondHidden[] = {
+  constexpr float kExpectedSecondHiddenF16[] = {
       0.62646484f, 0.62646484f, 0.56884766f, 0.56884766f};
-  constexpr float kExpectedSecondCell[] = {
+  constexpr float kExpectedSecondCellF16[] = {
       0.94091797f, 0.94091797f, 0.88574219f, 0.88574219f};
   // The second invoke starts from the first invoke's state, so six time steps
   // of the per-step budget above accumulate: 6 * 4.4e-3 = 2.7e-2.
@@ -680,13 +680,13 @@ TEST(UnidirectionalSequenceLstmTest, TestUnidirectionalLSTMFloat16) {
       tensors[kLstmCellStateTensor].data.raw);
   EXPECT_EQ(kTfLiteOk, runner.Invoke());
   for (int i = 0; i < 12; ++i) {
-    EXPECT_NEAR(kExpectedSecondOutput[i], static_cast<float>(out_f16[i]),
+    EXPECT_NEAR(kExpectedSecondOutputF16[i], static_cast<float>(out_f16[i]),
                 kSecondInvokeTolerance);
   }
   for (int i = 0; i < 4; ++i) {
-    EXPECT_NEAR(kExpectedSecondHidden[i], static_cast<float>(hidden_f16[i]),
+    EXPECT_NEAR(kExpectedSecondHiddenF16[i], static_cast<float>(hidden_f16[i]),
                 kSecondInvokeTolerance);
-    EXPECT_NEAR(kExpectedSecondCell[i], static_cast<float>(cell_f16[i]),
+    EXPECT_NEAR(kExpectedSecondCellF16[i], static_cast<float>(cell_f16[i]),
                 kSecondInvokeTolerance);
   }
 #endif

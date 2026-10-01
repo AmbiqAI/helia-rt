@@ -484,7 +484,7 @@ TfLiteStatus EvalSvdf(TfLiteContext* context, TfLiteNode* node) {
                                  &activation_max);
         cmsis_nn_svdf_params_f16 svdf_params = {
             .rank = params->rank,
-            .input_activation = {ARM_NN_F16_FINITE_LOWEST, ARM_NN_F16_FINITE_MAX},
+            .input_activation = {HeliaFloat16FiniteLowest(), ARM_NN_F16_FINITE_MAX},
             .output_activation = {HeliaFloat16ActivationBound(activation_min),
                                   HeliaFloat16ActivationBound(activation_max)}};
         // arm_svdf_f16 reads input_size from input_dims.h and memory from

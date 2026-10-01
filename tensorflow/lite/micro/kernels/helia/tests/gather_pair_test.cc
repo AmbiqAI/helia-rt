@@ -202,13 +202,9 @@ void ExpectCalls(Route route, int expected) {
 #endif
 }
 
-void ForceError(Route route) {
 #if HELIA_GATHER_LINK_WRAP
-  g_forced_error = route;
-#else
-  (void)route;
+void ForceError(Route route) { g_forced_error = route; }
 #endif
-}
 
 template <typename T>
 TfLiteStatus RunGather(const T* input, int* input_dims, const int32_t* indices,

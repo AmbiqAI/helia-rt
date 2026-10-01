@@ -252,7 +252,9 @@ void CheckDirect(const TFLMRegistration& registration, bool maximum,
 #if ARM_NN_ENABLE_F16
   int32_t expected[16] = {};
   OracleTensor(input, input_dims + 1, input_dims[0], *axis, maximum, expected);
+#if HELIA_ARG_EXTREMA_LINK_WRAP
   const int calls_before = CallCount(maximum);
+#endif
   ASSERT_EQ(runner.InitAndPrepare(), kTfLiteOk);
   ASSERT_EQ(runner.Invoke(), kTfLiteOk);
   ExpectArray(expected, output, output_count);
