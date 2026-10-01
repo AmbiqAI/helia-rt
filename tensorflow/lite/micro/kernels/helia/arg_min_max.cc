@@ -309,8 +309,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node, bool is_arg_max) {
   TF_LITE_ENSURE(context,
                  (core_shape.input_count == 0 || input_data != nullptr) &&
                      (core_shape.output_count == 0 || output_data != nullptr));
-  // TODO(AmbiqAI/ns-cmsis-nn#648): the pinned float16 kernels return the
-  // first NaN's index; align with the float32 rule above once the pin moves.
+  // TODO(AmbiqAI/ns-cmsis-nn#648): float16 NaN handling differs from float32.
   const arm_cmsis_nn_status status =
       is_arg_max ? arm_argmax_f16(input_data, &core_shape.input_dims,
                                   core_shape.axis, output_data)
