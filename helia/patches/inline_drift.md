@@ -422,6 +422,14 @@ under "Other approved helia-only locations".
 - `.devcontainer/`, `.github/stale.yml`.
 - `ci/install_qemu.sh`, `ci/check_tflite_files.py`, `ci/issue_on_error.py`.
 
+## Upstream files helia-rt does not carry
+
+The 21 upstream CI workflows (`check_bug_id`, `check_maintainer_edits`,
+`generate_integration_tests`, `merge_group`, `pr_test`, `pypi_build`,
+`run_*`, `suite_*`, `test_*`), `.github/pull_request_template.md` and the
+three `docs/*.md` files are not imported; helia-rt runs its own workflows
+and documentation. An upstream sync skips them.
+
 ## `ci/` upstream-file drift
 
 Resolved — the upstream `ci/` files and `ci/tflite_files.txt` are identical
@@ -498,3 +506,12 @@ Writes the link map to `$(GENDIR)` instead of `gen/`, so parallel builds with
 different `BASE_GENDIR` values do not share one map.
 
 Drop condition: upstream writes target maps under `GENDIR`.
+
+## `tensorflow/lite/micro/kernels/cmsis_nn/maximum_minimum.cc`
+
+MAXIMUM/MINIMUM with any operand above rank 4 run the reference loop. The
+CMSIS-NN kernels take 4-D dims: before upstream #3563 the int8 path collapsed
+rank 5 to one element and returned wrong values; after it, `ExtendedShape(4,
+...)` aborts. See AmbiqAI/helia-rt#356.
+
+Drop condition: upstream's CMSIS-NN MAXIMUM/MINIMUM handle rank above 4.

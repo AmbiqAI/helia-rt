@@ -36,6 +36,52 @@ cmsis_nn_dims FillVariableShape(const RuntimeShape& shape) {
           extended_shape.Dims(2), extended_shape.Dims(3)};
 }
 
+// helia-rt: the CMSIS-NN kernels take 4-D dims and ExtendedShape(4, ...)
+// aborts above rank 4, so higher ranks use the reference loop.
+// see AmbiqAI/helia-rt#356
+bool FitsCmsisNnDims(const RuntimeShape& input_1_shape,
+                     const RuntimeShape& input_2_shape,
+                     const RuntimeShape& output_shape) {
+  return input_1_shape.DimensionsCount() <= 4 &&
+         input_2_shape.DimensionsCount() <= 4 &&
+         output_shape.DimensionsCount() <= 4;
+}
+
+template <typename OpType>
+TfLiteStatus EvalReference(TfLiteContext* context, TfLiteNode* node,
+                           const OpContext& op_context,
+                           const char* int8_registration) {
+  switch (op_context.output->type) {
+    case kTfLiteInt8:
+      TFLiteOperation<int8_t, OpType>(context, node, op_context);
+      return kTfLiteOk;
+    case kTfLiteFloat32:
+      if (int8_registration != nullptr) break;
+      TFLiteOperation<float, OpType>(context, node, op_context);
+      return kTfLiteOk;
+    case kTfLiteInt16:
+      if (int8_registration != nullptr) break;
+      TFLiteOperation<int16_t, OpType>(context, node, op_context);
+      return kTfLiteOk;
+    case kTfLiteInt32:
+      if (int8_registration != nullptr) break;
+      TFLiteOperation<int32_t, OpType>(context, node, op_context);
+      return kTfLiteOk;
+    case kTfLiteInt64:
+      if (int8_registration != nullptr) break;
+      TFLiteOperation<int64_t, OpType>(context, node, op_context);
+      return kTfLiteOk;
+    default:
+      break;
+  }
+  MicroPrintf("Type %s (%d) is not supported by %s.",
+              TfLiteTypeGetName(op_context.output->type),
+              op_context.output->type,
+              int8_registration != nullptr ? int8_registration
+                                           : "Maximum/Minimum");
+  return kTfLiteError;
+}
+
 TfLiteStatus EvalMaximum(TfLiteContext* context, TfLiteNode* node) {
   OpContext op_context(context, node);
   const TfLiteEvalTensor* input1 =
@@ -49,6 +95,9 @@ TfLiteStatus EvalMaximum(TfLiteContext* context, TfLiteNode* node) {
   RuntimeShape input_2_shape = tflite::micro::GetTensorShape(input2);
   RuntimeShape output_shape = tflite::micro::GetTensorShape(output);
 
+  if (!FitsCmsisNnDims(input_1_shape, input_2_shape, output_shape)) {
+    return EvalReference<MaximumOp>(context, node, op_context, nullptr);
+  }
   cmsis_nn_dims input_1_dims = FillVariableShape(input_1_shape);
   cmsis_nn_dims input_2_dims = FillVariableShape(input_2_shape);
   cmsis_nn_dims output_dims = FillVariableShape(output_shape);
@@ -98,6 +147,10 @@ TfLiteStatus EvalMaximumInt8(TfLiteContext* context, TfLiteNode* node) {
   RuntimeShape input_2_shape = tflite::micro::GetTensorShape(input2);
   RuntimeShape output_shape = tflite::micro::GetTensorShape(output);
 
+  if (!FitsCmsisNnDims(input_1_shape, input_2_shape, output_shape)) {
+    return EvalReference<MaximumOp>(context, node, op_context,
+                                    "Maximum Int8 Registration");
+  }
   cmsis_nn_dims input_1_dims = FillVariableShape(input_1_shape);
   cmsis_nn_dims input_2_dims = FillVariableShape(input_2_shape);
   cmsis_nn_dims output_dims = FillVariableShape(output_shape);
@@ -135,6 +188,9 @@ TfLiteStatus EvalMinimum(TfLiteContext* context, TfLiteNode* node) {
   RuntimeShape input_2_shape = tflite::micro::GetTensorShape(input2);
   RuntimeShape output_shape = tflite::micro::GetTensorShape(output);
 
+  if (!FitsCmsisNnDims(input_1_shape, input_2_shape, output_shape)) {
+    return EvalReference<MinimumOp>(context, node, op_context, nullptr);
+  }
   cmsis_nn_dims input_1_dims = FillVariableShape(input_1_shape);
   cmsis_nn_dims input_2_dims = FillVariableShape(input_2_shape);
   cmsis_nn_dims output_dims = FillVariableShape(output_shape);
@@ -184,6 +240,10 @@ TfLiteStatus EvalMinimumInt8(TfLiteContext* context, TfLiteNode* node) {
   RuntimeShape input_2_shape = tflite::micro::GetTensorShape(input2);
   RuntimeShape output_shape = tflite::micro::GetTensorShape(output);
 
+  if (!FitsCmsisNnDims(input_1_shape, input_2_shape, output_shape)) {
+    return EvalReference<MinimumOp>(context, node, op_context,
+                                    "Minimum Int8 registration");
+  }
   cmsis_nn_dims input_1_dims = FillVariableShape(input_1_shape);
   cmsis_nn_dims input_2_dims = FillVariableShape(input_2_shape);
   cmsis_nn_dims output_dims = FillVariableShape(output_shape);

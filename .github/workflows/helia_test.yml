@@ -258,30 +258,32 @@ jobs:
         # see AmbiqAI/helia-rt#348
         # Upstream tflite-micro 85638f0b adds one binary (BASIC_CLASSIFIER) and
         # fourteen cases on every leg. see AmbiqAI/helia-rt#345
+        # Rank-5 MAXIMUM/MINIMUM coverage adds five cases on every leg.
+        # see AmbiqAI/helia-rt#356
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 158
-            min-cases: 1309
+            min-cases: 1314
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 158
-            min-cases: 1309
+            min-cases: 1314
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and one case fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 157
-            min-cases: 1308
+            min-cases: 1313
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 158
-            min-cases: 1357
+            min-cases: 1362
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 157
-            min-cases: 1356
+            min-cases: 1361
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
