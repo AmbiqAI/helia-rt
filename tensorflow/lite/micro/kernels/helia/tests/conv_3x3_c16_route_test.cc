@@ -17,8 +17,8 @@ limitations under the License.
 // reference integer implementation, on layers inside and just outside the gate
 // of arm_convolve_s8_3x3_c16_s1 (input and filter depth 16, 3x3, stride and
 // dilation 1). On MVE builds arm_convolve_wrapper_s8 runs that entry for
-// layers in the gate and arm_convolve_s8 otherwise; GNU links wrap both leaves
-// and each case asserts which one its invoke reached.
+// layers in the gate and arm_convolve_s8 otherwise; GCC and ATfE links wrap
+// both leaves and each case asserts which one its invoke reached.
 // see AmbiqAI/helia-rt#371
 
 #include <cstdint>

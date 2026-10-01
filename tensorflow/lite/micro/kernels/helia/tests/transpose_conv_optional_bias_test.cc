@@ -23,9 +23,10 @@ limitations under the License.
 // tensor" in kernels/transpose_conv_test.cc), which is why the case was never
 // exercised.
 //
-// It also holds the int8 scratch-context contract: on GNU links the heliaCORE
-// wrapper and both size queries are wrapped, and the contexts passed at Invoke
-// must carry the byte counts Prepare requested. see AmbiqAI/helia-rt#238
+// It also holds the int8 scratch-context contract: on GCC and ATfE links the
+// heliaCORE wrapper and both size queries are wrapped, and the contexts passed
+// at Invoke must carry the byte counts Prepare requested.
+// see AmbiqAI/helia-rt#238
 //
 // This lives under kernels/helia/tests/ rather than in the upstream test file
 // because the fix is helia-side; adding it upstream would fail the reference

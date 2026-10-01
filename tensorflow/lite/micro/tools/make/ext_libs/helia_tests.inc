@@ -49,12 +49,12 @@ MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_activation_edge_test.cc \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_elementwise_edge_test.cc
 
-# GNU links wrap the heliaCORE float32 LSTM call so the tail-lane test can
-# assert that heliaCORE, not the reference fallback, ran.
+# GCC and ATfE links wrap the heliaCORE float32 LSTM call so the tail-lane test
+# can assert that heliaCORE, not the reference fallback, ran.
 $(eval $(call microlite_test,kernel_float_lstm_tail_lane_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_lstm_tail_lane_test.cc))
 
-ifeq ($(TOOLCHAIN),gcc)
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
 $(kernel_float_lstm_tail_lane_test_BINARY): CXXFLAGS += \
   -DHELIA_LSTM_F32_LINK_WRAP=1
 $(kernel_float_lstm_tail_lane_test_BINARY): LDFLAGS += \
@@ -82,13 +82,13 @@ MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
 MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/split_v_float_test.cc
 
-# Paired GATHER/GATHER_ND heliaCORE routing and adapter-contract coverage.
-# GNU links wrap each CORE entry point so eligible and fallback cases prove
+# Paired GATHER/GATHER_ND heliaCORE routing and adapter-contract coverage. GCC
+# and ATfE links wrap each CORE entry point so eligible and fallback cases prove
 # their route without adding test hooks to production code.
 $(eval $(call microlite_test,kernel_gather_pair_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/gather_pair_test.cc))
 
-ifeq ($(TOOLCHAIN),gcc)
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
 $(kernel_gather_pair_test_BINARY): CXXFLAGS += -DHELIA_GATHER_LINK_WRAP=1
 $(kernel_gather_pair_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_gather_f32 \
@@ -104,13 +104,13 @@ $(kernel_gather_pair_test_BINARY): LDFLAGS += \
 endif
 endif
 
-# Dilated and 16x8 DEPTHWISE_CONV_2D against the reference kernel. GNU links
-# wrap the heliaCORE depthwise leaves so each case also proves its route.
+# Dilated and 16x8 DEPTHWISE_CONV_2D against the reference kernel. GCC and ATfE
+# links wrap the heliaCORE depthwise leaves so each case also proves its route.
 # see AmbiqAI/helia-rt#318
 $(eval $(call microlite_test,kernel_depthwise_dilated_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/depthwise_dilated_test.cc))
 
-ifeq ($(TOOLCHAIN),gcc)
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
 $(kernel_depthwise_dilated_test_BINARY): CXXFLAGS += \
   -DHELIA_DW_ROUTE_LINK_WRAP=1
 $(kernel_depthwise_dilated_test_BINARY): LDFLAGS += \
@@ -121,12 +121,12 @@ $(kernel_depthwise_dilated_test_BINARY): LDFLAGS += \
 endif
 
 # int8 CONV_2D inside and just outside the arm_convolve_s8_3x3_c16_s1 gate,
-# against the reference kernel. GNU links wrap both leaves so each case also
-# proves its route. see AmbiqAI/helia-rt#371
+# against the reference kernel. GCC and ATfE links wrap both leaves so each case
+# also proves its route. see AmbiqAI/helia-rt#371
 $(eval $(call microlite_test,kernel_conv_3x3_c16_route_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/conv_3x3_c16_route_test.cc))
 
-ifeq ($(TOOLCHAIN),gcc)
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
 $(kernel_conv_3x3_c16_route_test_BINARY): CXXFLAGS += \
   -DHELIA_CONV_ROUTE_LINK_WRAP=1
 $(kernel_conv_3x3_c16_route_test_BINARY): LDFLAGS += \
@@ -134,12 +134,12 @@ $(kernel_conv_3x3_c16_route_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_convolve_s8
 endif
 
-# TRANSPOSE_CONV optional bias, and the int8 scratch-context contract on GNU
-# links. see AmbiqAI/helia-rt#238
+# TRANSPOSE_CONV optional bias, and the int8 scratch-context contract on GCC and
+# ATfE links. see AmbiqAI/helia-rt#238
 $(eval $(call microlite_test,kernel_transpose_conv_optional_bias_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/transpose_conv_optional_bias_test.cc))
 
-ifeq ($(TOOLCHAIN),gcc)
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
 $(kernel_transpose_conv_optional_bias_test_BINARY): CXXFLAGS += \
   -DHELIA_TRANSPOSE_CONV_LINK_WRAP=1
 $(kernel_transpose_conv_optional_bias_test_BINARY): LDFLAGS += \
@@ -153,7 +153,7 @@ endif
 $(eval $(call microlite_test,kernel_convolution_status_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/convolution_status_test.cc))
 
-ifeq ($(TOOLCHAIN),gcc)
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
 $(kernel_convolution_status_test_BINARY): CXXFLAGS += \
   -DHELIA_CONV_LINK_WRAP=1
 $(kernel_convolution_status_test_BINARY): LDFLAGS += \
@@ -179,7 +179,7 @@ endif
 $(eval $(call microlite_test,kernel_fully_connected_context_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/fully_connected_context_test.cc))
 
-ifeq ($(TOOLCHAIN),gcc)
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
 $(kernel_fully_connected_context_test_BINARY): CXXFLAGS += \
   -DHELIA_FC_LINK_WRAP=1
 $(kernel_fully_connected_context_test_BINARY): LDFLAGS += \
@@ -192,7 +192,7 @@ endif
 $(eval $(call microlite_test,kernel_fc_leaky_relu_status_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/fc_leaky_relu_status_test.cc))
 
-ifeq ($(TOOLCHAIN),gcc)
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
 $(kernel_fc_leaky_relu_status_test_BINARY): CXXFLAGS += \
   -DHELIA_FC_LEAKY_LINK_WRAP=1
 $(kernel_fc_leaky_relu_status_test_BINARY): LDFLAGS += \
@@ -218,7 +218,7 @@ $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/status_context_test.
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/testdata/lstm_test_data.cc,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/testdata/lstm_test_data.h))
 
-ifeq ($(TOOLCHAIN),gcc)
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
 $(kernel_status_context_test_BINARY): CXXFLAGS += \
   -DHELIA_STATUS_CONTEXT_LINK_WRAP=1
 $(kernel_status_context_test_BINARY): LDFLAGS += \
@@ -260,7 +260,7 @@ endif
 # see AmbiqAI/helia-rt#285
 $(eval $(call microlite_test,kernel_sqrt_rsqrt_fp16_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/sqrt_rsqrt_fp16_test.cc))
-ifeq ($(TOOLCHAIN),gcc)
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
 ifneq (,$(filter cortex-m55,$(TARGET_ARCH)))
 $(kernel_sqrt_rsqrt_fp16_test_BINARY): CXXFLAGS += \
   -DHELIA_SQRT_RSQRT_LINK_WRAP=1
@@ -271,7 +271,7 @@ endif
 
 $(eval $(call microlite_test,kernel_arg_extrema_fp16_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/arg_extrema_fp16_test.cc))
-ifeq ($(TOOLCHAIN),gcc)
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
 ifneq (,$(filter cortex-m55,$(TARGET_ARCH)))
 $(kernel_arg_extrema_fp16_test_BINARY): CXXFLAGS += \
   -DHELIA_ARG_EXTREMA_LINK_WRAP=1

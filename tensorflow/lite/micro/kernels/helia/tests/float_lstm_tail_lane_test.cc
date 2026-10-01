@@ -66,7 +66,7 @@ limitations under the License.
 #endif
 
 // A failing heliaCORE float32 call falls back to the reference EvalLstm, so on
-// GNU links the float32 case also asserts that heliaCORE is what ran.
+// GCC and ATfE links the float32 case also asserts that heliaCORE is what ran.
 #if HELIA_LSTM_F32_LINK_WRAP
 namespace {
 int g_lstm_f32_calls = 0;
