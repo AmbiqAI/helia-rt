@@ -137,6 +137,11 @@ TfLiteStatus Prepare(TfLiteContext *context, TfLiteNode *node)
   // the flatbuffer:
   TF_LITE_ENSURE_MSG(context, IsConstantTensor(paddings), "Non-constant >paddings< tensor is not supported");
   const int32_t *paddings_data = GetTensorData<int32_t>(paddings);
+  // Paddings must be non-negative. see AmbiqAI/helia-rt#372
+  for (int i = 0; i < output->dims->size * 2; i++)
+  {
+    TF_LITE_ENSURE(context, paddings_data[i] >= 0);
+  }
   for (int i = 0; i < output->dims->size; i++)
   {
     int output_dim = output->dims->data[i];
