@@ -268,7 +268,7 @@ Drop condition: upstream merges the equivalent hook.
 
 ## `tensorflow/lite/micro/testing/test_with_arm_corstone_300.sh`
 
-Three changes:
+Four changes:
 
 1. Adds `-C cpu0.semihosting-enable=1` to the FVP invocation so picolibc's
    `libsemihost` (used by the ATfE toolchain) can route stdout/stderr through
@@ -296,6 +296,14 @@ Three changes:
 
    Drop condition: upstream adopts a per-binary log path (worth an upstream
    PR on its own — the shared path is a latent bug there too).
+
+4. Puts the log directory in the binary's build tree
+   (`$(dirname ${BINARY_TO_TEST})/../logs`, i.e. `<gendir>/logs`) instead of
+   `/tmp/${TARGET}_logs` (issue #368). The pass/fail decision is read back from
+   the log, so two runs of one target on one machine (another toolchain,
+   kernel profile or checkout) must not write the same file. One-line change.
+
+   Drop condition: upstream derives the log path from the build directory.
 
 ## `tensorflow/lite/micro/testing/assert_tests_executed.sh`
 
