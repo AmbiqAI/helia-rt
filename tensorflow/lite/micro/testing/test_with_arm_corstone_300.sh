@@ -26,12 +26,14 @@ BINARY_TO_TEST=${1}
 PASS_STRING=${2}
 TARGET=${3}
 
-RESULTS_DIRECTORY=/tmp/${TARGET}_logs
-# helia-rt: one log per binary, not a single shared logs.txt. The test rules
-# can run under `make -j`, and a shared path also loses the log of a binary
-# that hung or faulted as soon as the next one starts. `tee` truncates on
-# open, so a silent binary leaves an empty log and still fails.
-# see AmbiqAI/helia-rt#231, AmbiqAI/helia-rt#239
+# helia-rt: logs live in the binary's build tree (<gendir>/logs next to
+# <gendir>/bin), not in /tmp/${TARGET}_logs: the verdict below is read back
+# from the log, so two runs of one target (another toolchain, arch or
+# checkout) must not share a path. One log per binary, not a single
+# shared logs.txt, because the test rules run under `make -j`. `tee`
+# truncates on open, so a silent binary leaves an empty log and still fails.
+# see AmbiqAI/helia-rt#231, AmbiqAI/helia-rt#239, AmbiqAI/helia-rt#368
+RESULTS_DIRECTORY="$(dirname "${BINARY_TO_TEST}")/../logs"
 MICRO_LOG_FILENAME=${RESULTS_DIRECTORY}/$(basename "${BINARY_TO_TEST}").txt
 mkdir -p ${RESULTS_DIRECTORY}
 
