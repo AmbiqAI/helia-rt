@@ -114,6 +114,11 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.trigger-sha }}
+      # The container user does not own the checkout, so git refuses the
+      # repository and the diff below would compare nothing.
+      - name: Mark workspace as safe for Git
+        run: git config --global --add safe.directory "*"
+
       - name: Re-run static export
         run: |
           ./zephyr_static_export.sh
@@ -208,6 +213,13 @@ jobs:
           ref: ${{ inputs.trigger-sha }}
       - name: Test
         run: |
+          # The generated Makefile builds host code with clang++, and the image
+          # puts the bare-metal ATfE clang first on PATH, which has no host C++
+          # library. Put only the host clang ahead of it.
+          mkdir -p "${RUNNER_TEMP}/host-clang"
+          ln -sf /usr/bin/clang "${RUNNER_TEMP}/host-clang/clang"
+          ln -sf /usr/bin/clang++ "${RUNNER_TEMP}/host-clang/clang++"
+          export PATH="${RUNNER_TEMP}/host-clang:${PATH}"
           cd ../
           helia-rt/tensorflow/lite/micro/tools/ci_build/test_project_generation.sh helia-rt/
 
