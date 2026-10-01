@@ -278,6 +278,12 @@ void ExpectMatchesReference(const Shape& s, Route route) {
     mismatches += output[i] != expected[i];
   }
   EXPECT_EQ(0, mismatches);
+  // Nothing is written past the output tensor.
+  int overwrites = 0;
+  for (int i = output_count; i < kMaxOutput; ++i) {
+    overwrites += output[i] != 0x55;
+  }
+  EXPECT_EQ(0, overwrites);
 }
 
 }  // namespace
