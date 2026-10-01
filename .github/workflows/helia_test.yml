@@ -254,30 +254,32 @@ jobs:
         # see AmbiqAI/helia-rt#342
         # float16 long reductions add one binary and five cases on every leg.
         # see AmbiqAI/helia-rt#337
+        # float16 PAD below rank 4 adds one binary and three cases on every leg.
+        # see AmbiqAI/helia-rt#348
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 156
-            min-cases: 1292
+            min-binaries: 157
+            min-cases: 1295
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 156
-            min-cases: 1292
+            min-binaries: 157
+            min-cases: 1295
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and one case fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 155
-            min-cases: 1291
+            min-binaries: 156
+            min-cases: 1294
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 156
-            min-cases: 1340
+            min-binaries: 157
+            min-cases: 1343
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 155
-            min-cases: 1339
+            min-binaries: 156
+            min-cases: 1342
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
