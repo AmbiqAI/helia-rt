@@ -4,13 +4,16 @@ name: heliaRT Release
 #
 #   * All 18 build legs link the FP symbol probe against their archive. This
 #     proves symbol resolution, not numerical behavior.
-#   * The semantic gate executes the exact M55/GCC/release_with_logs archive
-#     (the shipped default-SPEED build) on Corstone-300 before packaging. A
-#     separately built SIZE archive qualifies that source profile but is not
-#     shipped. The other 17 archives retain link-probe coverage only.
-#   * release-please creates the GitHub Release before calling this workflow.
-#     A failed semantic gate blocks bundle creation and asset attachment; it
-#     does not remove the already-created Release object.
+#   * The semantic gate executes the exact M55 release_with_logs archive of
+#     each toolchain (gcc, atfe, armclang; the shipped default-SPEED builds)
+#     on Corstone-300 before packaging. A separately built gcc SIZE archive
+#     qualifies that source profile but is not shipped. The cortex-m4+fp and
+#     the debug/release archives retain link-probe coverage only.
+#   * release-please creates the GitHub Release before calling this workflow,
+#     so helia_release_gate.yml runs this workflow without upload on the
+#     release PR when a maintainer adds the release:gate label. That run
+#     does not rerun when the PR head changes; the release guide makes a pass
+#     on the final head a merge precondition. See AmbiqAI/helia-rt#347.
 #
 # PRE-TAG GATE for the first release that runs this workflow (1.19.0): the
 # armclang legs of the "FP symbol link-probe" step have never executed in CI --
@@ -166,7 +169,7 @@ jobs:
           path: out/${{ matrix.arch }}/${{ matrix.toolchain }}/${{ matrix.build }}/**
 
   release-fp-execution:
-    name: Release FP execution (${{ matrix.profile }})
+    name: Release FP execution (${{ matrix.toolchain }} • ${{ matrix.profile }})
     needs: [ci-image, build]
     runs-on: ubuntu-latest-md
     container:
@@ -178,9 +181,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        profile: [ "SPEED", "SIZE" ]
+        include:
+          - { toolchain: gcc, profile: SPEED }
+          - { toolchain: gcc, profile: SIZE }
+          - { toolchain: atfe, profile: SPEED }
+          - { toolchain: armclang, profile: SPEED }
     env:
       FVP_TIMEOUT_SECONDS: "120"
+      ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
 
     steps:
       - name: Check out code
@@ -197,24 +205,34 @@ jobs:
           path: tensorflow/lite/micro/tools/make/downloads
           key: ${{ runner.os }}-third-party-downloads-${{ inputs.ref || github.sha }}-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc','tensorflow/lite/micro/tools/make/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/*_download.sh','tensorflow/lite/micro/tools/make/download_dependencies.py','tensorflow/lite/micro/tools/make/ext_libs/helia.inc') }}
 
+      - name: Validate armclang license
+        if: ${{ matrix.toolchain == 'armclang' }}
+        run: |
+          if [[ -z "${ARM_UBL_LICENSE_IDENTIFIER}" ]]; then
+            echo "::error ::ARM_UBL_LICENSE_IDENTIFIER is required for armclang execution."
+            exit 1
+          fi
+
       - name: Download exact shipped SPEED archive
         if: ${{ matrix.profile == 'SPEED' }}
         uses: actions/download-artifact@v8
         with:
-          name: helia-rt-combo-cortex-m55-gcc-release_with_logs
+          name: helia-rt-combo-cortex-m55-${{ matrix.toolchain }}-release_with_logs
           path: downloaded-speed
 
       - name: Execute release floating-point tests
         run: |
           set -euo pipefail
           profile='${{ matrix.profile }}'
+          toolchain='${{ matrix.toolchain }}'
           args=(
             --profile "${profile}"
-            --out-dir "${RUNNER_TEMP}/helia-release-fp-${profile,,}"
+            --toolchain "${toolchain}"
+            --out-dir "${RUNNER_TEMP}/helia-release-fp-${toolchain}-${profile,,}"
           )
           if [[ "${profile}" == "SPEED" ]]; then
             mapfile -t archives < <(find downloaded-speed -type f \
-              -name 'libhelia-rt-cm55-gcc-release-with-logs.a' -print)
+              -name "libhelia-rt-cm55-${toolchain}-release-with-logs.a" -print)
             if [[ "${#archives[@]}" -ne 1 ]]; then
               echo "::error ::Expected one shipped SPEED archive; found ${#archives[@]}."
               exit 1

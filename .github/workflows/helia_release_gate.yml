@@ -1,0 +1,32 @@
+name: heliaRT Release Gate
+
+# Runs the full release build and floating-point execution gate on the
+# release-please PR before it is merged, because merging that PR is what makes
+# release-please create the tag and the GitHub Release. It runs when a
+# maintainer adds the release:gate label, not on every update of the release PR
+# (release-please rewrites it after each merge to main). It does not rerun on a
+# new head: remove and re-add the label after the PR changes.
+# see AmbiqAI/helia-rt#347
+
+on:
+  pull_request:
+    types:
+      - labeled
+
+# helia_release.yml declares contents: write for its upload job; nothing is
+# uploaded here (upload_to_release: false), but a called workflow cannot be
+# granted less than it declares.
+permissions:
+  contents: write
+
+jobs:
+  release-gate:
+    if: >-
+      github.event.label.name == 'release:gate' &&
+      startsWith(github.event.pull_request.head.ref, 'release-please--') &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    uses: ./.github/workflows/helia_release.yml
+    with:
+      ref: ${{ github.event.pull_request.head.sha }}
+      upload_to_release: false
+    secrets: inherit

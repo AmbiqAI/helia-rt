@@ -15,15 +15,16 @@ The header macro identifies headers used to compile an application; retain archi
 
 [helia_release.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/helia_release.yml) checks out its supplied ref, builds the architecture/toolchain/flavor matrix and packages the outputs. The automatic release caller supplies the release tag, so release artifacts are built from that revision rather than whichever commit later becomes `main`.
 
-The matrix includes `cortex-m4+fp` and `cortex-m55`, GCC/Arm Compiler 6/ATfE, and `debug`/`release_with_logs`/`release`. Packaging combines the outputs with headers and integration assets. Inspect the attached bundle and its contents rather than assuming a tag alone establishes successful delivery.
+The matrix includes `cortex-m4+fp` and `cortex-m55`, GCC/Arm Compiler 6/ATfE, and `debug`/`release_with_logs`/`release`. Every archive is link-probed. Before packaging, the `cortex-m55` `release_with_logs` archive of each toolchain runs the floating-point tests on the Corstone-300 FVP. Packaging combines the outputs with headers and integration assets. Inspect the attached bundle and its contents rather than assuming a tag alone establishes successful delivery.
 
 ## Review a release
 
 1. Review public capability changes, fixes, dependency pins and compatibility requirements in the changelog.
 2. Ensure required checks refer to the release PR's exact head. If GitHub presents an approval gate, resolve it through the normal maintainer flow and wait for the checks.
-3. Check version files and the [support policy](/helia-rt/guide/maintenance/support/), including the current/previous minor window and any withdrawn release.
-4. After the release is created, verify artifact jobs, attached libraries, headers, bundle metadata and documentation delivery independently.
-5. Record target execution evidence and remaining gaps. Do not describe a compiler's link probe as an executed model test.
+3. Add the `release:gate` label to the release PR once its content is final. [helia_release_gate.yml](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/helia_release_gate.yml) then runs the artifact workflow on the PR head without uploading. Merge only after it passes on the current head, because merging creates the tag and the GitHub release. The gate does not rerun when the PR changes, so remove and re-add the label after any update.
+4. Check version files and the [support policy](/helia-rt/guide/maintenance/support/), including the current/previous minor window and any withdrawn release.
+5. After the release is created, verify artifact jobs, attached libraries, headers, bundle metadata and documentation delivery independently.
+6. Record target execution evidence and remaining gaps. Do not describe a compiler's link probe as an executed model test.
 
 The [release list](https://github.com/AmbiqAI/helia-rt/releases) is the source for published assets. A commit on `main`, a tag, a GitHub release and deployed documentation are separate states.
 

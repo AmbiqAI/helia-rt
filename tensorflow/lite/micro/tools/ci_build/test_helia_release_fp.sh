@@ -36,23 +36,46 @@ usage() {
 Usage: test_helia_release_fp.sh --profile <SPEED|SIZE> [options]
 
 Options:
+  --toolchain <gcc|atfe|armclang>
+                    Toolchain the archive was built with (default gcc); SIZE
+                    is gcc only
   --archive <path>  Exact shipped archive; required for SPEED, rejected for SIZE
   --out-dir <path>  Fresh directory for generated objects and receipts
   -h, --help        Show this help
 USAGE
 }
 
-require_map_members() {  # <map> <absolute-archive> <member>...
-  local map_file="$1"
-  local archive="$2"
-  shift 2
+# Each linker names an archive member differently in its map:
+#   GNU ld  "<archive>(<member>)" at the start of a line (archive-member list)
+#   lld     "<archive>(<member>):(.text..." in the section listing
+#   armlink "<archive basename>(<member>)" as the last field of an image
+#           memory map line
+require_map_members() {  # <toolchain> <map> <absolute-archive> <member>...
+  local toolchain="$1"
+  local map_file="$2"
+  local archive="$3"
+  shift 3
 
   [[ -f "${map_file}" ]] || die "link map not found: ${map_file}"
   local member match receipt
   for member in "$@"; do
-    match="${archive}(${member})"
-    receipt="$(awk -v expected="${match}" \
-      'index($0, expected) == 1 { print; exit }' "${map_file}")"
+    case "${toolchain}" in
+      gcc)
+        match="${archive}(${member})"
+        receipt="$(awk -v expected="${match}" \
+          'index($0, expected) == 1 { print; exit }' "${map_file}")"
+        ;;
+      atfe)
+        match="${archive}(${member}):(.text"
+        receipt="$(awk -v expected="${match}" \
+          'index($0, expected) > 0 { print; exit }' "${map_file}")"
+        ;;
+      armclang)
+        match="$(basename "${archive}")(${member})"
+        receipt="$(awk -v expected="${match}" \
+          '$NF == expected { print; exit }' "${map_file}")"
+        ;;
+    esac
     if [[ -z "${receipt}" ]]; then
       die "${map_file} does not attribute ${member} to ${archive}"
     fi
@@ -135,6 +158,7 @@ assert_archive_unchanged() {  # <archive> <resolved-path> <sha256>
 
 main() {
   local profile=""
+  local toolchain="gcc"
   local input_archive=""
   local out_dir=""
 
@@ -143,6 +167,11 @@ main() {
       --profile)
         [[ $# -ge 2 ]] || { usage; exit 2; }
         profile="$2"
+        shift 2
+        ;;
+      --toolchain)
+        [[ $# -ge 2 ]] || { usage; exit 2; }
+        toolchain="$2"
         shift 2
         ;;
       --archive)
@@ -182,12 +211,22 @@ main() {
       ;;
   esac
 
+  case "${toolchain}" in
+    gcc|atfe|armclang) ;;
+    *)
+      echo "Invalid --toolchain '${toolchain}'. Use gcc, atfe or armclang." >&2
+      exit 2
+      ;;
+  esac
+  [[ "${profile}" == "SPEED" || "${toolchain}" == "gcc" ]] || \
+    die "SIZE qualification is gcc only"
+
   local invocation_dir
   invocation_dir="${PWD}"
   if [[ "${profile}" == "SPEED" ]]; then
     [[ -f "${input_archive}" ]] || die "SPEED archive not found: ${input_archive}"
     [[ "$(basename "${input_archive}")" == \
-       "libhelia-rt-cm55-gcc-release-with-logs.a" ]] || \
+       "libhelia-rt-cm55-${toolchain}-release-with-logs.a" ]] || \
       die "unexpected SPEED archive name: $(basename "${input_archive}")"
     input_archive="$(realpath "${input_archive}")"
   fi
@@ -203,7 +242,7 @@ main() {
   cd "${root_dir}"
 
   if [[ -z "${out_dir}" ]]; then
-    out_dir="$(mktemp -d "${TMPDIR:-/tmp}/helia-release-fp-${profile,,}.XXXXXX")"
+    out_dir="$(mktemp -d "${TMPDIR:-/tmp}/helia-release-fp-${toolchain}-${profile,,}.XXXXXX")"
   else
     if [[ -e "${out_dir}" ]] && \
        [[ -n "$(find "${out_dir}" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]; then
@@ -217,7 +256,7 @@ main() {
     -f "${makefile}"
     TARGET=cortex_m_corstone_300
     TARGET_ARCH=cortex-m55
-    TOOLCHAIN=gcc
+    "TOOLCHAIN=${toolchain}"
     OPTIMIZED_KERNEL_DIR=helia
     BUILD_TYPE=release_with_logs
     "GLOBAL_KERNEL_OPTIMIZE=${profile}"
@@ -233,11 +272,22 @@ main() {
     rev-parse HEAD)"
   [[ "${actual_core}" == "${expected_core}" ]] || \
     die "CORE HEAD ${actual_core} does not match pin ${expected_core}"
-  compiler="tensorflow/lite/micro/tools/make/downloads/gcc_embedded/bin/arm-none-eabi-g++"
+  case "${toolchain}" in
+    gcc)
+      compiler="tensorflow/lite/micro/tools/make/downloads/gcc_embedded/bin/arm-none-eabi-g++"
+      ;;
+    atfe)
+      compiler="tensorflow/lite/micro/tools/make/downloads/arm_toolchain_embedded/bin/clang++"
+      ;;
+    armclang)
+      compiler="tensorflow/lite/micro/tools/make/downloads/arm_compiler/bin/armclang"
+      ;;
+  esac
 
   echo "heliaRT head: $(git rev-parse HEAD)"
   echo "CORE head: ${actual_core}"
   echo "kernel profile: ${profile}"
+  echo "toolchain: ${toolchain}"
   compiler_version="$("${compiler}" --version)"
   sed -n '1p' <<<"${compiler_version}"
 
@@ -251,7 +301,7 @@ main() {
       -f "${makefile}"
       TARGET=cortex_m_generic
       TARGET_ARCH=cortex-m55
-      TOOLCHAIN=gcc
+      "TOOLCHAIN=${toolchain}"
       OPTIMIZED_KERNEL_DIR=helia
       BUILD_TYPE=release_with_logs
       GLOBAL_KERNEL_OPTIMIZE=SIZE
@@ -264,7 +314,7 @@ main() {
     [[ -f "${built_archive}" ]] || die "SIZE archive not found: ${built_archive}"
     archive_dir="${out_dir}/archive"
     mkdir -p "${archive_dir}"
-    archive="${archive_dir}/libhelia-rt-cm55-gcc-release-with-logs-size.a"
+    archive="${archive_dir}/libhelia-rt-cm55-${toolchain}-release-with-logs-size.a"
     cp "${built_archive}" "${archive}"
     archive="$(realpath "${archive}")"
   fi
@@ -280,7 +330,11 @@ main() {
   runtime_sources+=" tensorflow/lite/micro/cortex_m_corstone_300/system_setup.cc"
   runtime_sources+=" tensorflow/lite/micro/cortex_m_corstone_300/fault_handlers.cc"
   runtime_sources+=" tensorflow/lite/micro/tools/make/downloads/ethos_u_core_platform/targets/corstone-300/uart.c"
-  runtime_sources+=" tensorflow/lite/micro/tools/make/downloads/ethos_u_core_platform/targets/corstone-300/retarget.c"
+  # The Corstone target links retarget.c for gcc and armclang only; ATfE
+  # uses picolibc semihosting instead.
+  if [[ "${toolchain}" != "atfe" ]]; then
+    runtime_sources+=" tensorflow/lite/micro/tools/make/downloads/ethos_u_core_platform/targets/corstone-300/retarget.c"
+  fi
   runtime_sources+=" tensorflow/lite/micro/tools/make/downloads/cmsis/Cortex_DFP/Device/ARMCM55/Source/system_ARMCM55.c"
   runtime_sources+=" tensorflow/lite/micro/tools/make/downloads/cmsis/Cortex_DFP/Device/ARMCM55/Source/startup_ARMCM55.c"
 
@@ -319,7 +373,8 @@ main() {
     map_copy="${receipt_dir}/${binary}.map"
     cp "${live_map}" "${map_copy}"
     IFS=, read -r -a required_members <<<"${members}"
-    require_map_members "${map_copy}" "${archive}" "${required_members[@]}"
+    require_map_members "${toolchain}" "${map_copy}" "${archive}" \
+      "${required_members[@]}"
     run_command make --old-file="${archive}" \
       "${link_args[@]}" "test_${binary}"
     echo "expected ${binary} tally: ${expected_count}"
@@ -328,7 +383,7 @@ main() {
   validate_tally "${tally_file}"
   assert_archive_unchanged \
     "${archive}" "${archive_path_before}" "${archive_hash_before}"
-  echo "release FP execution receipt: PASS (${profile})"
+  echo "release FP execution receipt: PASS (${profile}, ${toolchain})"
   echo "receipt directory: ${out_dir}"
 }
 

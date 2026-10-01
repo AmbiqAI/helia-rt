@@ -143,7 +143,10 @@ ifeq ($(TOOLCHAIN), armclang)
   # done since the startup object file (containing the entry point) is inside
   # the TFLM library. See:
   # https://developer.arm.com/documentation/ka003125/latest
-  ARMC6_LDFLAGS += -Wl,$(LIBDIR)/$(MICROLITE_LIB_NAME)\(startup_$(ARM_CPU).o\)
+  # helia: skipped when the startup source is a test runtime object instead.
+  ifeq ($(filter %startup_$(ARM_CPU).c,$(MICROLITE_TEST_RUNTIME_SRCS)),)
+    ARMC6_LDFLAGS += -Wl,$(LIBDIR)/$(MICROLITE_LIB_NAME)\(startup_$(ARM_CPU).o\)
+  endif
 
   CXXFLAGS += $(FLAGS_ARMC)
   CCFLAGS += $(FLAGS_ARMC)
