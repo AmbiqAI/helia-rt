@@ -120,6 +120,20 @@ $(kernel_depthwise_dilated_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_depthwise_conv_s16
 endif
 
+# int8 CONV_2D inside and just outside the arm_convolve_s8_3x3_c16_s1 gate,
+# against the reference kernel. GNU links wrap both leaves so each case also
+# proves its route. see AmbiqAI/helia-rt#371
+$(eval $(call microlite_test,kernel_conv_3x3_c16_route_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/conv_3x3_c16_route_test.cc))
+
+ifeq ($(TOOLCHAIN),gcc)
+$(kernel_conv_3x3_c16_route_test_BINARY): CXXFLAGS += \
+  -DHELIA_CONV_ROUTE_LINK_WRAP=1
+$(kernel_conv_3x3_c16_route_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_convolve_s8_3x3_c16_s1 \
+  -Wl,--wrap=arm_convolve_s8
+endif
+
 # TRANSPOSE_CONV optional bias, and the int8 scratch-context contract on GNU
 # links. see AmbiqAI/helia-rt#238
 $(eval $(call microlite_test,kernel_transpose_conv_optional_bias_test,\
