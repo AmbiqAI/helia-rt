@@ -13,6 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#include <limits>
+
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
@@ -121,6 +123,43 @@ TEST(ArgMinMaxTest, GetMinArgFloat) {
   const int32_t goldens[] = {0};
 
   tflite::testing::TestArgMinMaxFloat(input_dims, input_values, axis_dims,
+                                      axis_values, output_dims, output_data,
+                                      goldens, true);
+}
+
+// NaN never wins, as in TensorFlow/LiteRT: a finite value replaces a leading
+// NaN and an all-NaN line returns its first index. see AmbiqAI/helia-rt#359
+constexpr float kNaN = std::numeric_limits<float>::quiet_NaN();
+const float kNaNLines[] = {
+    kNaN, 1,    3,    2,     // leading NaN
+    1,    kNaN, 3,    2,     // NaN in the middle
+    3,    1,    2,    kNaN,  // trailing NaN
+    kNaN, kNaN, kNaN, kNaN,  // all NaN
+    2,    kNaN, -1,   kNaN,  // two NaNs
+};
+
+TEST(ArgMinMaxTest, GetMaxArgFloatNaN) {
+  int32_t output_data[5];
+  int input_dims[] = {2, 5, 4};
+  int axis_dims[] = {1, 1};
+  const int32_t axis_values[] = {1};
+  int output_dims[] = {1, 5};
+  const int32_t goldens[] = {2, 2, 0, 0, 0};
+
+  tflite::testing::TestArgMinMaxFloat(input_dims, kNaNLines, axis_dims,
+                                      axis_values, output_dims, output_data,
+                                      goldens, false);
+}
+
+TEST(ArgMinMaxTest, GetMinArgFloatNaN) {
+  int32_t output_data[5];
+  int input_dims[] = {2, 5, 4};
+  int axis_dims[] = {1, 1};
+  const int32_t axis_values[] = {1};
+  int output_dims[] = {1, 5};
+  const int32_t goldens[] = {1, 0, 1, 0, 2};
+
+  tflite::testing::TestArgMinMaxFloat(input_dims, kNaNLines, axis_dims,
                                       axis_values, output_dims, output_data,
                                       goldens, true);
 }
