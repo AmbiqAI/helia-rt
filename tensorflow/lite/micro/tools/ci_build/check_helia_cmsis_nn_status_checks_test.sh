@@ -90,7 +90,44 @@ run_case "discarded after a closing comment" 1 4 \
   "${OPEN}"$'\n  x = 1;  /* note */\n  arm_one_line(x);\n}'
 run_case "CRLF line ends" 1 3 "${OPEN//$'\n'/$'\r\n'}"$'\r\n  arm_one_line(x);\r\n}'
 
+run_case "discarded after a case label" 1 5 \
+  "${OPEN}"$'\n  switch (x) {\n    case 1:\n      arm_one_line(x);\n      break;\n  }\n}'
+run_case "discarded after default" 1 5 \
+  "${OPEN}"$'\n  switch (x) {\n    default:\n      arm_one_line(x);\n  }\n}'
+run_case "discarded under an unbraced if" 1 4 "${OPEN}"$'\n  if (x > 0)\n    arm_one_line(x);\n}'
+run_case "discarded under an unbraced else if" 1 5 \
+  "${OPEN}"$'\n  if (x > 1) x = 2;\n  else if (x > 0)\n    arm_one_line(x);\n}'
+run_case "discarded under an unbraced for" 1 4 "${OPEN}"$'\n  for (int i = 0; i < 2; ++i)\n    arm_one_line(i);\n}'
+run_case "discarded after a preprocessor line" 1 5 \
+  "${OPEN}"$'\n  x = 1;\n#if defined(X)\n  arm_one_line(x);\n#endif\n}'
+run_case "discarded in TFLITE_DCHECK_EQ" 1 3 \
+  "${OPEN}"$'\n  TFLITE_DCHECK_EQ(arm_one_line(x), ARM_CMSIS_NN_SUCCESS);\n}'
+run_case "discarded in a multi-line TFLITE_DCHECK_EQ" 1 3 \
+  "${OPEN}"$'\n  TFLITE_DCHECK_EQ(\n      arm_split_line(x, x),\n      ARM_CMSIS_NN_SUCCESS);\n}'
+run_case "discarded after a string with comment markers" 1 4 \
+  "${OPEN}"$'\n  const char* s = "a/*b//c";\n  arm_one_line(x);\n}'
+run_case "return type mid-line in the header" 1 3 "${OPEN}"$'\n  arm_mid_line(x);\n}' \
+  "${HEADER}"$'\nstatic inline arm_cmsis_nn_status arm_mid_line(int a) { return 0; }'
+run_case "argument continuation" 0 '' \
+  "${OPEN}"$'\n  TF_LITE_ENSURE_EQ(context,\n      arm_one_line(x), ARM_CMSIS_NN_SUCCESS);\n}'
+run_case "call opening an argument list" 0 '' \
+  "${OPEN}"$'\n  TF_LITE_ENSURE_EQ(\n      arm_one_line(x), ARM_CMSIS_NN_SUCCESS);\n}'
+run_case "brace initializer" 0 '' \
+  "${OPEN}"$'\n  const arm_cmsis_nn_status statuses[] = {\n      arm_one_line(x)};\n}'
 run_case "no status declarations" 2 '' "${OPEN}"$'\n}' 'void arm_only_void(int a);'
+
+for empty in include src; do
+  tree="${WORK}/empty-${empty}"
+  mkdir -p "${tree}/include" "${tree}/src"
+  [[ ${empty} == include ]] || printf '%s\n' "${HEADER}" > "${tree}/include/arm_nnfunctions.h"
+  [[ ${empty} == src ]] || printf 'void f() {}\n' > "${tree}/src/kernel.cc"
+  cases=$((cases + 1))
+  "${CHECK}" "${tree}/include" "${tree}/src" </dev/null >/dev/null 2>&1
+  if [[ $? -ne 2 ]]; then
+    echo "FAIL empty ${empty} directory: expected exit 2"
+    failures=$((failures + 1))
+  fi
+done
 
 tree="${WORK}/missing"
 cases=$((cases + 1))

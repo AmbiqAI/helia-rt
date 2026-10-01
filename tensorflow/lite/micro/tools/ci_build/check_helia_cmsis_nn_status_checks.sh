@@ -22,14 +22,23 @@
 # failed or skipped kernel as success.
 # see AmbiqAI/helia-rt#377 and AmbiqAI/helia-rt#238
 #
-# The status-returning names come from the headers under the given Include
-# directory, with the return type on the same line as the name or alone on the
-# line before it. In each kernel source, outside comments, a call to one of
-# them fails when it starts a statement: it is the first thing on its line,
-# optionally behind (void), and the previous code line ends with ; { or } or
-# is else or do. A call nested in an expression, an assignment or a macro
-# argument is not a discard. The check is line based: a call that follows
-# another statement or an unbraced if on the same line is not seen.
+# The status-returning names come from the top-level headers under the given
+# Include directory (not Include/Internal), with the return type on the same
+# line as the name or alone on the line before it; names built by macros are
+# not seen. In each kernel source directly under the source directory (not
+# tests/), outside comments and string literals, a call to one of them fails
+# when its status is discarded:
+#   * the call starts a statement: it is the first thing on its line,
+#     optionally behind (void), and the previous code line ends with ; { or }
+#     (not a brace initializer), ends a label (case X: or default:), is an
+#     unbraced if, for or while header, or is else or do. Preprocessor lines do
+#     not count as the previous line;
+#   * the call is an argument of a TFLITE_DCHECK* macro, which is compiled out
+#     of a release build.
+# A call nested in an expression, an assignment or another macro is not a
+# discard. The check is line based: a call after another statement on the
+# same line, a control header spread over several lines, and spellings such as
+# static_cast<void>(...) or ::arm_x are not seen.
 #
 # Usage: check_helia_cmsis_nn_status_checks.sh [include-dir [source-dir]]
 #   include-dir defaults to ${NS_CMSIS_NN_PATH}/Include, or the downloaded
@@ -58,6 +67,10 @@ fi
 shopt -s nullglob
 headers=("${INCLUDE_DIR}"/*.h)
 sources=("${SOURCE_DIR}"/*.cc "${SOURCE_DIR}"/*.h)
+if [[ ${#headers[@]} -eq 0 || ${#sources[@]} -eq 0 ]]; then
+  echo "error: no headers under '${INCLUDE_DIR}' or no sources under '${SOURCE_DIR}'" >&2
+  exit 2
+fi
 
 # Removes /* */ and // comments; one code line out per input line.
 # shellcheck disable=SC2016  # awk program text: $ is awk's, not the shell's.
@@ -74,13 +87,20 @@ STRIP='
         in_block = 0
         continue
       }
-      b = index(line, "/*")
-      s = index(line, "//")
-      if (s > 0 && (b == 0 || s < b)) { out = out substr(line, 1, s - 1); line = ""; break }
-      if (b == 0) { out = out line; line = ""; break }
-      out = out substr(line, 1, b - 1)
-      line = substr(line, b + 2)
-      in_block = 1
+      if (!match(line, /\/\*|\/\/|"|\047/)) { out = out line; break }
+      tok = substr(line, RSTART, RLENGTH)
+      out = out substr(line, 1, RSTART - 1)
+      line = substr(line, RSTART + RLENGTH)
+      if (tok == "//") break
+      if (tok == "/*") { in_block = 1; continue }
+      # A string or character literal: keep a placeholder, skip its contents.
+      out = out tok tok
+      while (line != "") {
+        c = substr(line, 1, 1)
+        line = substr(line, 2)
+        if (c == "\\") { line = substr(line, 2); continue }
+        if (c == tok) break
+      }
     }
     code = out
   }
@@ -121,17 +141,35 @@ for file in "${sources[@]}"; do
   rc=0
   hits="$(printf '%s\n' "${names}" | awk -v names_file=/dev/stdin "${STRIP}"'
     BEGIN { while ((getline n < names_file) > 0) known[n] = 1 }
+    function first_call(text,    rest, name) {
+      rest = text
+      while (match(rest, /arm_[A-Za-z0-9_]+[[:space:]]*\(/)) {
+        name = substr(rest, RSTART, RLENGTH)
+        sub(/[[:space:]]*\($/, "", name)
+        if ((name in known) && (RSTART == 1 || substr(rest, RSTART - 1, 1) !~ /[A-Za-z0-9_]/)) return name
+        rest = substr(rest, RSTART + RLENGTH)
+      }
+      return ""
+    }
     {
       text = code
       sub(/^[[:space:]]+/, "", text)
       sub(/[[:space:]]+$/, "", text)
-      if (match(text, /^(\(void\)[[:space:]]*)?arm_[A-Za-z0-9_]+[[:space:]]*\(/)) {
+      if (text == "" || text ~ /^#/) next
+      if (text ~ /TFLITE_DCHECK[A-Z_]*[[:space:]]*\(/) { in_dcheck = 1; dline = FNR }
+      if (in_dcheck) {
+        name = first_call(text)
+        if (name != "") print dline ": " name " in TFLITE_DCHECK"
+        if (text ~ /;$/) in_dcheck = 0
+      } else if (match(text, /^(\(void\)[[:space:]]*)?arm_[A-Za-z0-9_]+[[:space:]]*\(/)) {
         name = substr(text, RSTART, RLENGTH)
         sub(/^\(void\)[[:space:]]*/, "", name); sub(/[[:space:]]*\($/, "", name)
-        if ((name in known) && (prev == "" || prev ~ /[;{}]$/ || prev ~ /(^|[^A-Za-z0-9_])(else|do)$/))
-          print FNR ": " name
+        starts = (prev == "" || prev ~ /[;}]$/ || (prev ~ /\{$/ && prev !~ /=[[:space:]]*\{$/) ||
+                  prev ~ /(^|[^A-Za-z0-9_])(else|do)$/ || prev ~ /[^:]:$/ ||
+                  prev ~ /^(\}[[:space:]]*)?(else[[:space:]]+)?(if|for|while)[[:space:]]*\(.*\)$/)
+        if ((name in known) && starts) print FNR ": " name
       }
-      if (text != "") prev = text
+      prev = text
     }' "${file}")" || rc=$?
   if [[ ${rc} -ne 0 ]]; then
     echo "error: could not read ${file}" >&2
