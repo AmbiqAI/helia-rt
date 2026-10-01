@@ -77,6 +77,26 @@ run_case "a secret named inherit-like" 0 '' \
   "${HEAD}"$'\n    secrets:\n      INHERIT_TOKEN: x'
 run_case "text that mentions it" 0 '' \
   "${HEAD}"$'\n    env:\n      NOTE: "secrets: inherit is not allowed"'
+run_case "commented out at column 0" 0 '' "${HEAD}"$'\n# secrets: inherit'
+run_case "another key, value on the next line" 0 '' "${HEAD}"$'\n    mysecrets:\n      inherit'
+run_case "next-line value that only starts with inherit" 0 '' \
+  "${HEAD}"$'\n    secrets:\n      inheritance'
+run_case "a lone inherit after a mapping entry" 0 '' \
+  "${HEAD}"$'\n    secrets:\n      TOKEN: x\n  other:\n    run: |\n      inherit'
+run_case "two calls, both reported" 1 7 \
+  "${HEAD}"$'\n    secrets: inherit\n  again:\n    uses: ./x.yml\n    secrets: inherit'
+
+# An unreadable workflow is a usage error, not a pass.
+tree="${WORK}/unreadable"
+mkdir -p "${tree}/.github/workflows"
+ln -s missing.yml "${tree}/.github/workflows/case.yml"
+cases=$((cases + 1))
+"${CHECK}" "${tree}" >/dev/null 2>&1
+actual=$?
+if [[ ${actual} -ne 2 ]]; then
+  echo "FAIL unreadable workflow: exit ${actual}, expected 2"
+  failures=$((failures + 1))
+fi
 
 if [[ ${failures} -ne 0 ]]; then
   echo "check_helia_workflow_secrets_test: ${failures} of ${cases} cases failed"
