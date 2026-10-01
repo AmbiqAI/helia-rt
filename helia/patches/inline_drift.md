@@ -300,8 +300,9 @@ Four changes:
 4. Puts the log directory in the binary's build tree
    (`$(dirname ${BINARY_TO_TEST})/../logs`, i.e. `<gendir>/logs`) instead of
    `/tmp/${TARGET}_logs` (issue #368). The pass/fail decision is read back from
-   the log, so two runs of one target on one machine (another toolchain,
-   kernel profile or checkout) must not write the same file. One-line change.
+   the log, so two runs of one target on one machine (another toolchain, arch
+   or checkout) must not write the same file. One code line; the comment above
+   it is extended.
 
    Drop condition: upstream derives the log path from the build directory.
 

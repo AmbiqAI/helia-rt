@@ -28,8 +28,8 @@ TARGET=${3}
 
 # helia-rt: logs live in the binary's build tree (<gendir>/logs next to
 # <gendir>/bin), not in /tmp/${TARGET}_logs: the verdict below is read back
-# from the log, so two runs of one target (another toolchain, kernel
-# profile or checkout) must not share a path. One log per binary, not a single
+# from the log, so two runs of one target (another toolchain, arch or
+# checkout) must not share a path. One log per binary, not a single
 # shared logs.txt, because the test rules run under `make -j`. `tee`
 # truncates on open, so a silent binary leaves an empty log and still fails.
 # see AmbiqAI/helia-rt#231, AmbiqAI/helia-rt#239, AmbiqAI/helia-rt#368
