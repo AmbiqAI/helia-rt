@@ -537,4 +537,34 @@ TEST(PadTest, ExpectFailureInputRankAboveOutputRank) {
                                 kTfLiteError);
 }
 
+// helia: Prepare must reject a negative padding in any slot, even when the
+// output shape agrees with it. see AmbiqAI/helia-rt#372
+TEST(PadTest, ExpectFailureNegativePadding) {
+  int input_dims[] = {2, 2, 3};
+  const float input_values[] = {1, 2, 3, 4, 5, 6};
+  int pad_dims[] = {2, 2, 2};
+  const int32_t pad_cases[][4] = {
+      {-1, 1, 0, 0}, {1, -1, 0, 0}, {0, 0, -1, 1}, {0, 0, 1, -1}};
+  int output_dims[] = {2, 2, 3};
+  for (const auto& pad_values : pad_cases) {
+    float output_data[6];
+    TfLiteTensor tensors[] = {
+        tflite::testing::CreateTensor(
+            input_values, tflite::testing::IntArrayFromInts(input_dims)),
+        tflite::testing::CreateTensor(
+            pad_values, tflite::testing::IntArrayFromInts(pad_dims)),
+        tflite::testing::CreateTensor(
+            output_data, tflite::testing::IntArrayFromInts(output_dims)),
+    };
+    tensors[1].allocation_type = kTfLiteMmapRo;
+    int inputs[] = {2, 0, 1};
+    int outputs[] = {1, 2};
+    const TFLMRegistration registration = tflite::Register_PAD();
+    tflite::micro::KernelRunner runner(
+        registration, tensors, 3, tflite::testing::IntArrayFromInts(inputs),
+        tflite::testing::IntArrayFromInts(outputs), /*builtin_data=*/nullptr);
+    EXPECT_EQ(kTfLiteError, runner.InitAndPrepare());
+  }
+}
+
 TF_LITE_MICRO_TESTS_MAIN
