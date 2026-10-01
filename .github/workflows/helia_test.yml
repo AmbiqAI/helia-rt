@@ -111,6 +111,10 @@ jobs:
       - name: Self-test the heliaCORE status guard
         run: ./tensorflow/lite/micro/tools/ci_build/check_helia_cmsis_nn_status_checks_test.sh
 
+      # helia-rt #366: called workflows get the secrets they declare, by name.
+      - name: Check workflows pass no inherited secrets
+        run: ./tensorflow/lite/micro/tools/ci_build/check_helia_workflow_secrets.sh
+
   armclang_m4_qualification:
     needs: ci-image
     if: ${{ inputs.armclang-m4-qualification }}

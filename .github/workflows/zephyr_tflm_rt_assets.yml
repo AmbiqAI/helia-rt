@@ -22,4 +22,5 @@ jobs:
       ref: ${{ inputs.ref }}
       tag: ${{ inputs.tag }}
       upload_to_release: false
-    secrets: inherit
+    secrets:
+      ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}

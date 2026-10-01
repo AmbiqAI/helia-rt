@@ -43,6 +43,9 @@ on:
         required: false
         type: boolean
         default: true
+    secrets:
+      ARM_UBL_LICENSE_IDENTIFIER:
+        required: false
   workflow_dispatch:
     inputs:
       ref:
