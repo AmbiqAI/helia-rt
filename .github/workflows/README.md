@@ -26,7 +26,7 @@ A digest is immutable, so the image becomes a reviewable part of the diff.
 
 Two rules follow from this and both matter:
 
-- **All five pin points must carry the same digest.** They are separate
+- **All four pin points must carry the same digest.** They are separate
   literals in separate files. If a bump updates some and not others, the test
   matrix and the release build run on *different* images — release artifacts
   built by an image nothing tested. The pin check below fails such a PR; bump
@@ -62,15 +62,11 @@ jobs:
       image: ${{ needs.ci-image.outputs.image }}
 ```
 
-`check_tflite_files.yml` is the one exception: it invokes the image inside
-an inline `docker run` (a `run:` step, where the `env` context *is*
-allowed), so it keeps a workflow-level `env.CI_IMAGE` instead.
-
 The image build workflow ([helia_build_docker_image.yml](helia_build_docker_image.yml))
 publishes immutable `sha-<short>` tags on every Dockerfile change, plus a
 floating `:latest` tag on `main`.
 
-## The five pin points
+## The four pin points
 
 | # | File | Form |
 | - | ---- | ---- |
@@ -78,7 +74,6 @@ floating `:latest` tag on `main`.
 | 2 | [helia_build.yml](helia_build.yml) | `ci-image` setup job |
 | 3 | [helia_release.yml](helia_release.yml) | `ci-image` setup job |
 | 4 | [helia_test.yml](helia_test.yml) | `ci-image` setup job |
-| 5 | [check_tflite_files.yml](check_tflite_files.yml) | workflow-level `env.CI_IMAGE` |
 
 `tensorflow/lite/micro/tools/ci_build/check_helia_ci_image_pins.sh` enforces
 this on every PR, from the `ci-image` job of [helia_test.yml](helia_test.yml).
@@ -133,7 +128,7 @@ When you change `.devcontainer/Dockerfile` (or otherwise want a new image):
    build workflow runs and publishes `ghcr.io/ambiqai/helia-rt-ci:sha-abc1234`
    and, on `main`, repoints `:latest`.
 2. Resolve the new digest with the recipe above.
-3. Open a PR that updates **all five** pin points to that one digest, keeping
+3. Open a PR that updates **all four** pin points to that one digest, keeping
    each trailing `# ghcr.io/ambiqai/helia-rt-ci:<tag> as of <date>` comment in
    step so the provenance of the digest stays visible.
 4. CI runs against the new image *as a PR check*. If anything breaks, the

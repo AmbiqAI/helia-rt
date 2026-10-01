@@ -63,7 +63,6 @@ PIN_POINTS=(
   helia_build.yml
   helia_release.yml
   helia_test.yml
-  check_tflite_files.yml
 )
 PUBLISHER=helia_build_docker_image.yml
 

@@ -136,8 +136,8 @@ helia-specific files:
 | `pyproject.toml`, `uv.lock` | Python lint tooling managed with uv. Runtime Python utilities retain their own dependency manifests. |
 | `astro-site/` | Astro/Starlight documentation source, locked site dependencies and reference generation consumed by `.github/workflows/docs.yml`. |
 | `release-please-config.json`, `.release-please-manifest.json` | release-please config + state. The `extra-files` block bumps `tensorflow/lite/micro/helia_rt_version.h` and `nsx/nsx-module.yaml`. |
-| `ci/install_qemu.sh`, `ci/check_tflite_files.py`, `ci/issue_on_error.py` | helia-rt-only files in an upstream-owned directory; do not rename or move (referenced by helia workflows and by `ci/Dockerfile.micro`). |
-| `codegen/`, `gen/`, `neuralspot/`, `data/`, `astro-site/` | helia-rt-only top-level directories (not present upstream). New helia-only directories at the repo root must be approved here before being added. |
+| `ci/install_qemu.sh`, `ci/check_tflite_files.py`, `ci/issue_on_error.py` | helia-rt-only files in an upstream-owned directory; do not rename or move. `install_qemu.sh` is used by `.devcontainer/Dockerfile` and `issue_on_error.py` by `issue_on_error.yml`; `check_tflite_files.py` has no caller since `check_tflite_files.yml` runs upstream's script. |
+| `gen/`, `neuralspot/`, `data/`, `astro-site/` | helia-rt-only top-level directories (not present upstream). New helia-only directories at the repo root must be approved here before being added. |
 
 ## Where you must NOT put helia-specific code
 

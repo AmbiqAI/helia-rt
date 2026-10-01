@@ -7,7 +7,7 @@ heliaRT is derived from [tensorflow/tflite-micro](https://github.com/tensorflow/
 
 ## Before a sync
 
-Record the starting heliaRT and upstream revisions and inspect the [repository layout policy](https://github.com/AmbiqAI/helia-rt/blob/main/helia/docs/repository_layout.md), [patch instructions](https://github.com/AmbiqAI/helia-rt/blob/main/helia/patches/README.md) and [inline drift inventory](https://github.com/AmbiqAI/helia-rt/blob/main/helia/patches/inline_drift.md). Work on an isolated branch and preserve unrelated changes.
+Record the starting heliaRT and upstream revisions and inspect the [repository layout policy](https://github.com/AmbiqAI/helia-rt/blob/main/helia/docs/repository_layout.md), [patch instructions](https://github.com/AmbiqAI/helia-rt/blob/main/helia/patches/README.md) and [inline drift inventory](https://github.com/AmbiqAI/helia-rt/blob/main/helia/patches/inline_drift.md). Work on an isolated branch and preserve unrelated changes. The upstream revision the tree currently tracks is recorded in [helia/UPSTREAM](https://github.com/AmbiqAI/helia-rt/blob/main/helia/UPSTREAM); update it in the sync.
 
 ## Review the integration boundaries
 

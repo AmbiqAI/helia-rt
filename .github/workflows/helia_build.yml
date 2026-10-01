@@ -30,7 +30,7 @@ permissions:
 # workflow, so a tag lets the image drift from the repo's Dockerfile with no
 # commit recording the change -- and no run recording which image it used.
 #
-# Five workflows pin this image and they must all carry the SAME digest, or
+# Four workflows pin this image and they must all carry the SAME digest, or
 # the test matrix and the release build silently run on different images. See
 # .github/workflows/README.md for the pin-point list and the re-pin recipe.
 
@@ -89,7 +89,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: tensorflow/lite/micro/tools/make/downloads
-          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc','tensorflow/lite/micro/tools/make/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/helia.inc') }}
+          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc','tensorflow/lite/micro/tools/make/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/*_download.sh','tensorflow/lite/micro/tools/make/download_dependencies.py','tensorflow/lite/micro/tools/make/ext_libs/helia.inc') }}
 
       - name: Build (${{ matrix.arch }} / ${{ matrix.toolchain }})
         run: |

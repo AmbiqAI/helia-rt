@@ -1,28 +1,30 @@
-load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 load("@tflm_pip_deps//:requirements.bzl", "requirement")
+load("//python:py_rules.bzl", "tflm_py_binary", "tflm_py_library", "tflm_py_test")
 
 package(
     features = ["-layering_check"],
     licenses = ["notice"],
 )
 
-py_binary(
+tflm_py_binary(
     name = "raw_to_bitmap",
     srcs = ["raw_to_bitmap.py"],
     deps = [
         requirement("numpy"),
+        requirement("pillow"),
     ],
 )
 
-py_library(
+tflm_py_library(
     name = "raw_to_bitmap_lib",
     srcs = ["raw_to_bitmap.py"],
     deps = [
         requirement("numpy"),
+        requirement("pillow"),
     ],
 )
 
-py_test(
+tflm_py_test(
     name = "raw_to_bitmap_test",
     srcs = ["raw_to_bitmap_test.py"],
     data = glob(
@@ -36,8 +38,6 @@ py_test(
     ],
     deps = [
         ":raw_to_bitmap_lib",
-        "//:tflite_micro_shim",
-        requirement("tensorflow"),
         requirement("numpy"),
     ],
 )

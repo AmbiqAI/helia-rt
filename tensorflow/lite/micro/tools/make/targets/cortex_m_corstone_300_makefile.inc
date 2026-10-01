@@ -167,6 +167,8 @@ ifeq ($(TOOLCHAIN), armclang)
   MICRO_LITE_BENCHMARKS := $(filter-out $(EXCLUDED_TESTS), $(MICRO_LITE_BENCHMARKS))
 
 else ifeq ($(TOOLCHAIN), gcc)
+  # helia-rt: always the downloaded Arm GNU toolchain (as cortex_m_generic),
+  # not an arm-none-eabi-gcc on PATH. Pass TARGET_TOOLCHAIN_ROOT to override.
   TARGET_DEFAULT_TOOLCHAIN_ROOT := $(DOWNLOADS_DIR)/gcc_embedded/bin/
   TARGET_TOOLCHAIN_ROOT := $(TARGET_DEFAULT_TOOLCHAIN_ROOT)
   ifeq ($(TARGET_TOOLCHAIN_ROOT), $(TARGET_DEFAULT_TOOLCHAIN_ROOT))

@@ -246,7 +246,7 @@ def stage_pack_files(
     #     repo. Instead derive header roots from the parent directory of
     #     every source file in the manifest, then enumerate *.h/.hpp/.inc
     #     under each. This captures the headers paired with the staged
-    #     sources without dragging in unrelated trees (codegen/, docs/,
+    #     sources without dragging in unrelated trees (docs/,
     #     site/, gen/, third_party/, ...).
     narrow_include_dirs = {d for d in include_dirs if d}
     needs_root_include = "" in include_dirs

@@ -59,7 +59,7 @@ permissions:
 # with no commit recording the change -- and no run records which image it
 # actually used. A digest makes the image a reviewable part of the diff.
 #
-# Five workflows pin this image and they must all carry the SAME digest, or
+# Four workflows pin this image and they must all carry the SAME digest, or
 # the test matrix and the release build silently run on different images.
 # .github/workflows/README.md is authoritative: it lists the pin points and
 # carries this same recipe. To re-pin after a rebuild, resolve the tag's
@@ -126,7 +126,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: tensorflow/lite/micro/tools/make/downloads
-          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc','tensorflow/lite/micro/tools/make/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/helia.inc') }}
+          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc','tensorflow/lite/micro/tools/make/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/*_download.sh','tensorflow/lite/micro/tools/make/download_dependencies.py','tensorflow/lite/micro/tools/make/ext_libs/helia.inc') }}
 
       - name: Run focused Arm Compiler qualification
         shell: bash
@@ -256,30 +256,32 @@ jobs:
         # see AmbiqAI/helia-rt#337
         # float16 PAD below rank 4 adds one binary and three cases on every leg.
         # see AmbiqAI/helia-rt#348
+        # Upstream tflite-micro 85638f0b adds one binary (BASIC_CLASSIFIER) and
+        # fourteen cases on every leg. see AmbiqAI/helia-rt#345
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 157
-            min-cases: 1295
+            min-binaries: 158
+            min-cases: 1309
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 157
-            min-cases: 1295
+            min-binaries: 158
+            min-cases: 1309
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and one case fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 156
-            min-cases: 1294
+            min-binaries: 157
+            min-cases: 1308
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 157
-            min-cases: 1343
+            min-binaries: 158
+            min-cases: 1357
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 156
-            min-cases: 1342
+            min-binaries: 157
+            min-cases: 1356
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
@@ -341,7 +343,7 @@ jobs:
           # identical under an override, so without this a canary run would
           # restore (and then re-save) the pinned clone under the same key and
           # churn the cache the normal matrix depends on.
-          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc','tensorflow/lite/micro/tools/make/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/helia.inc') }}${{ inputs.ns-cmsis-nn-ref && format('-nscnn-{0}', inputs.ns-cmsis-nn-ref) || '' }}
+          key: ${{ runner.os }}-third-party-downloads-${{ hashFiles('tensorflow/lite/micro/tools/make/Makefile','tensorflow/lite/micro/tools/make/third_party_downloads.inc','tensorflow/lite/micro/tools/make/*_download.sh','tensorflow/lite/micro/tools/make/ext_libs/*_download.sh','tensorflow/lite/micro/tools/make/download_dependencies.py','tensorflow/lite/micro/tools/make/ext_libs/helia.inc') }}${{ inputs.ns-cmsis-nn-ref && format('-nscnn-{0}', inputs.ns-cmsis-nn-ref) || '' }}
 
       # ccache is baked into the CI image (.devcontainer/Dockerfile), but
       # keep an apt-get fallback so this workflow still works when the pinned
