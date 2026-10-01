@@ -297,6 +297,136 @@ TEST(MaximumMinimumTest, Int16Test) {
       output_zero_point, dims, output_data);
 }
 
+// Rank-5 counterpart of Int16Test, for the same reason as Int8Rank5Test.
+// see AmbiqAI/helia-rt#356
+TEST(MaximumMinimumTest, Int16Rank5Test) {
+  int dims[] = {5, 1, 1, 1, 2, 3};
+  const int16_t data1[] = {-30, 0, 2124, -123, -32768, 26236};
+  const int16_t data2[] = {24, 0, 1, -4256, 32767, -577};
+  const int16_t golden_max[] = {24, 0, 2124, -123, 32767, 26236};
+  const int16_t golden_min[] = {-30, 0, 1, -4256, -32768, -577};
+
+  const float input_scale = 1.0;
+  const int input_zero_point = 0;
+  const float output_scale = 1.0;
+  const int output_zero_point = 0;
+
+  int16_t output_data[6];
+
+  tflite::testing::TestMaxMinQuantizedInt16(
+      tflite::Register_MAXIMUM(), dims, data1, input_scale, input_zero_point,
+      dims, data2, input_scale, input_zero_point, golden_max, output_scale,
+      output_zero_point, dims, output_data);
+
+  tflite::testing::TestMaxMinQuantizedInt16(
+      tflite::Register_MINIMUM(), dims, data1, input_scale, input_zero_point,
+      dims, data2, input_scale, input_zero_point, golden_min, output_scale,
+      output_zero_point, dims, output_data);
+}
+
+// The int8-only registrations take the same rank-5 fallback.
+// see AmbiqAI/helia-rt#356
+TEST(MaximumMinimumTest, Int8OnlyRegistrationRank5Test) {
+  int dims[] = {5, 1, 1, 1, 2, 3};
+  const int8_t data1[] = {1, -2, 3, 4, 5, -6};
+  const int8_t data2[] = {2, 3, -1, 5, -4, 6};
+  const int8_t golden_max[] = {2, 3, 3, 5, 5, 6};
+  const int8_t golden_min[] = {1, -2, -1, 4, -4, -6};
+
+  const float input_scale = 1.0;
+  const int input_zero_point = 0;
+  const float output_scale = 1.0;
+  const int output_zero_point = 0;
+
+  int8_t output_data[6];
+
+  tflite::testing::TestMaxMinQuantized(
+      tflite::Register_MAXIMUM_INT8(), dims, data1, input_scale,
+      input_zero_point, dims, data2, input_scale, input_zero_point, golden_max,
+      output_scale, output_zero_point, dims, output_data);
+
+  tflite::testing::TestMaxMinQuantized(
+      tflite::Register_MINIMUM_INT8(), dims, data1, input_scale,
+      input_zero_point, dims, data2, input_scale, input_zero_point, golden_min,
+      output_scale, output_zero_point, dims, output_data);
+}
+
+// A rank-5 operand broadcast against a rank-1 operand, in both operand
+// orders: every operand's rank decides the fallback, not only the first.
+// see AmbiqAI/helia-rt#356
+TEST(MaximumMinimumTest, Int8Rank5BroadcastTest) {
+  int dims5[] = {5, 1, 1, 1, 2, 3};
+  int dims1[] = {1, 3};
+  const int8_t data5[] = {1, -2, 3, 4, 5, -6};
+  const int8_t data1[] = {2, 0, -1};
+  const int8_t golden_max[] = {2, 0, 3, 4, 5, -1};
+  const int8_t golden_min[] = {1, -2, -1, 2, 0, -6};
+
+  const float scale = 1.0;
+  const int zero_point = 0;
+
+  int8_t output_data[6];
+
+  tflite::testing::TestMaxMinQuantized(
+      tflite::Register_MAXIMUM(), dims5, data5, scale, zero_point, dims1,
+      data1, scale, zero_point, golden_max, scale, zero_point, dims5,
+      output_data);
+
+  tflite::testing::TestMaxMinQuantized(
+      tflite::Register_MINIMUM(), dims1, data1, scale, zero_point, dims5,
+      data5, scale, zero_point, golden_min, scale, zero_point, dims5,
+      output_data);
+}
+
+// see AmbiqAI/helia-rt#356
+TEST(MaximumMinimumTest, Int32Rank5Test) {
+  int dims[] = {5, 1, 1, 1, 2, 3};
+  const int32_t data1[] = {1, -2, 3, 4, 5, -6};
+  const int32_t data2[] = {2, 3, -1, 5, -4, 6};
+  const int32_t golden_max[] = {2, 3, 3, 5, 5, 6};
+  const int32_t golden_min[] = {1, -2, -1, 4, -4, -6};
+  int32_t output_data[6];
+
+  tflite::testing::TestMaxMinQuantizedInt32(tflite::Register_MAXIMUM(), dims,
+                                            data1, dims, data2, golden_max,
+                                            dims, output_data);
+
+  tflite::testing::TestMaxMinQuantizedInt32(tflite::Register_MINIMUM(), dims,
+                                            data1, dims, data2, golden_min,
+                                            dims, output_data);
+}
+
+#if defined(CMSIS_NN)
+// The int8-only registrations still reject other types on the rank-5
+// fallback. Without CMSIS_NN they alias the generic kernels.
+// see AmbiqAI/helia-rt#356
+TEST(MaximumMinimumTest, Int8OnlyRegistrationRejectsFloatRank5Test) {
+  int dims_data[] = {5, 1, 1, 1, 2, 3};
+  const float data1[] = {1.0, -2.0, 3.0, 4.0, 5.0, -6.0};
+  const float data2[] = {2.0, 3.0, -1.0, 5.0, -4.0, 6.0};
+  float output_data[6];
+  TfLiteIntArray* dims = tflite::testing::IntArrayFromInts(dims_data);
+  TfLiteTensor tensors[] = {
+      tflite::testing::CreateTensor(data1, dims),
+      tflite::testing::CreateTensor(data2, dims),
+      tflite::testing::CreateTensor(output_data, dims),
+  };
+  int inputs_data[] = {2, 0, 1};
+  int outputs_data[] = {1, 2};
+  const TFLMRegistration registrations[] = {tflite::Register_MAXIMUM_INT8(),
+                                            tflite::Register_MINIMUM_INT8()};
+  for (const TFLMRegistration& registration : registrations) {
+    tflite::micro::KernelRunner runner(
+        registration, tensors, 3,
+        tflite::testing::IntArrayFromInts(inputs_data),
+        tflite::testing::IntArrayFromInts(outputs_data),
+        /*builtin_data=*/nullptr);
+    EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+    EXPECT_NE(kTfLiteOk, runner.Invoke());
+  }
+}
+#endif  // defined(CMSIS_NN)
+
 TEST(MaximumMinimumTest, FloatWithBroadcastTest) {
   int dims[] = {3, 3, 1, 2};
   int dims_scalar[] = {1, 2};
