@@ -24,9 +24,9 @@
 #
 # The rule applies to every top-level .yml/.yaml workflow, line by line: a
 # "secrets:" key whose value is inherit, bare or quoted, in a block or flow
-# mapping, fails unless the line is a comment. Line matching also flags the
-# text inside a block scalar (run: |) and after a trailing #, and does not
-# see a quoted key, a value on the next line, or a YAML tag or alias.
+# mapping or alone on the next non-blank, non-comment line, fails. Line
+# matching also flags the text inside a block scalar (run: |), and does not
+# see a quoted key or a YAML tag or alias.
 #
 # Usage: check_helia_workflow_secrets.sh [root]
 #   root defaults to the repository root inferred from this script's location.
@@ -51,13 +51,26 @@ fi
 shopt -s nullglob
 files=("${WORKFLOWS}"/*.yml "${WORKFLOWS}"/*.yaml)
 
-PATTERN='(^|[{,[:space:]])secrets[[:space:]]*:[[:space:]]*["'"'"']?inherit["'"'"']?[[:space:]]*([,}#]|$)'
-
 status=0
 for file in "${files[@]}"; do
   rc=0
-  matches="$(grep -nE "${PATTERN}" "${file}")" || rc=$?
-  if [[ ${rc} -gt 1 ]]; then
+  hits="$(awk '
+    {
+      line = $0
+      sub(/\r$/, "", line)
+      if (line ~ /^[[:space:]]*#/) next
+      sub(/[[:space:]]#.*$/, "", line)
+      if (line ~ /^[[:space:]]*$/) next
+      if (pending) {
+        if (line ~ /^[[:space:]]*["'"'"']?inherit["'"'"']?[[:space:]]*$/) print pending
+        pending = 0
+      }
+      if (line ~ /(^|[{,[:space:]])secrets[[:space:]]*:[[:space:]]*["'"'"']?inherit["'"'"']?[[:space:]]*([,}]|$)/)
+        print NR
+      else if (line ~ /(^|[[:space:]])secrets[[:space:]]*:[[:space:]]*$/)
+        pending = NR
+    }' "${file}")" || rc=$?
+  if [[ ${rc} -ne 0 ]]; then
     echo "error: could not read ${file#"${ROOT}/"}" >&2
     exit 2
   fi
@@ -65,7 +78,7 @@ for file in "${files[@]}"; do
     [[ -n "${hit}" ]] || continue
     echo "${file#"${ROOT}/"}:${hit}: secrets: inherit; pass each secret the called workflow declares by name" >&2
     status=1
-  done < <(printf '%s\n' "${matches}" | grep -vE '^[0-9]+:[[:space:]]*#' | cut -d: -f1)
+  done <<< "${hits}"
 done
 
 if [[ ${status} -eq 0 ]]; then
