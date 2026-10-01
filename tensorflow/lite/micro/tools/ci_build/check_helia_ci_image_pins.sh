@@ -114,6 +114,10 @@ while IFS=$'\037' read -r file lineno text; do
     digests+=("${file}: ${BASH_REMATCH[1]}")
   elif [[ "${file}" == "${PUBLISHER}" && "${text}" == "${PUBLISHER_LINE}" ]]; then
     continue
+  elif [[ "${file}" == "${PUBLISHER}" ]]; then
+    echo "error: ${file}:${lineno} refers to the CI image as '${text}';" \
+         "the publisher has only the line ${PUBLISHER_LINE}" >&2
+    status=1
   elif is_pin_point "${file}"; then
     echo "error: ${file}:${lineno} refers to the CI image as '${text}';" \
          "a pin point has only the line" \
