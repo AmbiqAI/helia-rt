@@ -62,6 +62,10 @@ TfLiteStatus PadPrepare(TfLiteContext* context, TfLiteNode* node) {
     TF_LITE_ENSURE_EQ(context, NumElements(constant_values), 1);
   }
 
+  // helia: dims and paddings below are indexed by both ranks.
+  // see AmbiqAI/helia-rt#350
+  TF_LITE_ENSURE_EQ(context, NumDimensions(input), NumDimensions(output));
+
   // There must be a pair of paddings for each output dimension.
   TF_LITE_ENSURE_EQ(context, GetTensorShape(paddings).FlatSize(),
                     output->dims->size * 2);

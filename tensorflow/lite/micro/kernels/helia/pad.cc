@@ -126,6 +126,9 @@ TfLiteStatus Prepare(TfLiteContext *context, TfLiteNode *node)
     TF_LITE_ENSURE_EQ(context, NumElements(constant_values), 1);
   }
 
+  // Dims and paddings below are indexed by both ranks. see AmbiqAI/helia-rt#350
+  TF_LITE_ENSURE_EQ(context, NumDimensions(input), NumDimensions(output));
+
   // There must be a pair of paddings for each output dimension.
   TF_LITE_ENSURE_EQ(context, GetTensorShape(paddings).FlatSize(), output->dims->size * 2);
 
@@ -211,6 +214,20 @@ TfLiteStatus Eval(TfLiteContext *context, TfLiteNode *node)
         constant_values == nullptr
             ? static_cast<float16_t>(0)
             : *tflite::micro::GetTensorData<float16_t>(constant_values);
+    // An empty tensor has no arena buffer, and arm_pad_f16 rejects a null
+    // input or an empty output: nothing to write, or nothing to copy.
+    // see AmbiqAI/helia-rt#351
+    const int output_size = tflite::micro::GetTensorShape(output).FlatSize();
+    if (output_size == 0) {
+      break;
+    }
+    if (tflite::micro::GetTensorShape(input).FlatSize() == 0) {
+      float16_t *output_data = tflite::micro::GetTensorData<float16_t>(output);
+      for (int i = 0; i < output_size; ++i) {
+        output_data[i] = pad_value;
+      }
+      break;
+    }
     if (tflite::micro::GetTensorShape(input).DimensionsCount() <= 4) {
       cmsis_nn_dims input_size;
       cmsis_nn_dims pre_pad;

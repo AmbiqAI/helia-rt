@@ -577,9 +577,16 @@ path does. `IsRsqrtSupportedType` admits int16, which `RsqrtEval` already
 handles. `kernels/elementwise_test.cc`
 adds a rejected dtype for SIN, ABS, RSQRT and LOGICAL_NOT. The helia copy has
 the same change (AmbiqAI/helia-rt#342). See AmbiqAI/helia-rt#376.
+## `tensorflow/lite/micro/kernels/pad_common.cc`
+PAD/PADV2 Prepare rejects input and output ranks that differ before it
+indexes `input->dims` by the output rank and the paddings by the input rank;
+upstream's loop reads past either array for a malformed model.
+`kernels/pad_test.cc` adds a case for each direction. See
+AmbiqAI/helia-rt#350.
 
 This correctness fix stays in the shared kernel: a build_helia.sh patch would
 leave reference/CMSIS-NN, direct CMake, Bazel and source consumers unfixed.
 
 Drop condition: upstream's elementwise Prepare calls its type predicate and
 releases its temps on that path.
+Drop condition: upstream's PAD Prepare checks that the ranks match.
