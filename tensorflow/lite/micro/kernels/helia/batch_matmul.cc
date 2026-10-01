@@ -592,8 +592,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
         cmsis_nn_context ctx = {nullptr, 0};
         if (data.buffer_idx >= 0) {
         ctx.buf = context->GetScratchBuffer(context, data.buffer_idx);
-        ctx.size = arm_batch_matmul_f16_get_buffer_size(
-          &bmm_params, &lhs_dims, &rhs_dims, &data.output_shape);
+        ctx.size = data.buffer_size;
         }
         if (arm_batch_matmul_f16(&ctx, &bmm_params, &lhs_dims,
                      tflite::micro::GetTensorData<float16_t>(
@@ -652,8 +651,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
         cmsis_nn_context ctx = {nullptr, 0};
         if (data.buffer_idx >= 0) {
         ctx.buf = context->GetScratchBuffer(context, data.buffer_idx);
-        ctx.size = arm_batch_matmul_f32_get_buffer_size(
-          &bmm_params, &lhs_dims, &rhs_dims, &data.output_shape);
+        ctx.size = data.buffer_size;
         }
         if (arm_batch_matmul_f32(
             &ctx, &bmm_params, &lhs_dims,

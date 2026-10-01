@@ -254,6 +254,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     if (size > 0) {
       TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
           context, size, &data->activation_buffer_idx));
+      data->activation_buffer_size = size;
     }
   }
 #endif
@@ -273,6 +274,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     if (size > 0) {
       TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
           context, size, &data->activation_buffer_idx));
+      data->activation_buffer_size = size;
     }
   }
 #endif
@@ -592,8 +594,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
       cmsis_nn_context ctx = {nullptr, 0};
       if (data.activation_buffer_idx >= 0) {
         ctx.buf = context->GetScratchBuffer(context, data.activation_buffer_idx);
-        ctx.size = arm_convolve_wrapper_f16_get_buffer_size(
-            &conv_params, &input_dims, &filter_dims, &output_dims);
+        ctx.size = data.activation_buffer_size;
       }
       // Grouped convolution is rejected at Prepare; keep the guard here so
       // the heliaCore kernel can never see a filter with fewer channels than
@@ -637,8 +638,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
       cmsis_nn_context ctx = {nullptr, 0};
       if (data.activation_buffer_idx >= 0) {
         ctx.buf = context->GetScratchBuffer(context, data.activation_buffer_idx);
-        ctx.size = arm_convolve_wrapper_f32_get_buffer_size(
-            &conv_params, &input_dims, &filter_dims, &output_dims);
+        ctx.size = data.activation_buffer_size;
       }
       // Grouped convolution (input_c != filter_c) is not implemented by the
       // heliaCore float kernels; use the reference fallback for it.

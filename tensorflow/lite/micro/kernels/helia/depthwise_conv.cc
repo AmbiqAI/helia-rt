@@ -300,12 +300,12 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
 #if ARM_NN_ENABLE_F32
   if (input->type == kTfLiteFloat32) {
     data->activation_buffer_idx = -1;
-    cmsis_nn_dims input_dims = {1, input_height, input_width,
-                                input->dims->data[3]};
+    cmsis_nn_dims input_dims = {input->dims->data[0], input_height,
+                                input_width, input->dims->data[3]};
     cmsis_nn_dims filter_dims = {filter->dims->data[0], filter_height,
                                  filter_width, filter->dims->data[3]};
-    cmsis_nn_dims output_dims = {1, output_height, output_width,
-                                 output->dims->data[3]};
+    cmsis_nn_dims output_dims = {output->dims->data[0], output_height,
+                                 output_width, output->dims->data[3]};
     cmsis_nn_dw_conv_params_f32 dw_params = {
         .ch_mult = params.depth_multiplier,
         .stride = {params.stride_width, params.stride_height},
@@ -319,18 +319,19 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     if (size > 0) {
       TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
           context, size, &data->activation_buffer_idx));
+      data->activation_buffer_size = size;
     }
   }
 #endif
 #if ARM_NN_ENABLE_F16
   if (input->type == kTfLiteFloat16) {
     data->activation_buffer_idx = -1;
-    cmsis_nn_dims f16_input_dims = {1, input_height, input_width,
-                                    input->dims->data[3]};
+    cmsis_nn_dims f16_input_dims = {input->dims->data[0], input_height,
+                                    input_width, input->dims->data[3]};
     cmsis_nn_dims f16_filter_dims = {filter->dims->data[0], filter_height,
                                      filter_width, filter->dims->data[3]};
-    cmsis_nn_dims f16_output_dims = {1, output_height, output_width,
-                                     output->dims->data[3]};
+    cmsis_nn_dims f16_output_dims = {output->dims->data[0], output_height,
+                                     output_width, output->dims->data[3]};
     cmsis_nn_dw_conv_params_f16 dw_params = {
         .ch_mult = params.depth_multiplier,
         .stride = {params.stride_width, params.stride_height},
@@ -344,6 +345,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     if (size > 0) {
       TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
           context, size, &data->activation_buffer_idx));
+      data->activation_buffer_size = size;
     }
   }
 #endif
@@ -603,8 +605,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
       cmsis_nn_context ctx = {nullptr, 0};
       if (data.activation_buffer_idx >= 0) {
         ctx.buf = context->GetScratchBuffer(context, data.activation_buffer_idx);
-        ctx.size = arm_depthwise_conv_wrapper_f16_get_buffer_size(
-            &dw_params, &input_dims, &filter_dims, &output_dims);
+        ctx.size = data.activation_buffer_size;
       }
       if (arm_depthwise_conv_wrapper_f16(
               &ctx, &dw_params, &input_dims, tflite::micro::GetTensorData<float16_t>(input),
@@ -644,8 +645,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
       cmsis_nn_context ctx = {nullptr, 0};
       if (data.activation_buffer_idx >= 0) {
         ctx.buf = context->GetScratchBuffer(context, data.activation_buffer_idx);
-        ctx.size = arm_depthwise_conv_wrapper_f32_get_buffer_size(
-            &dw_params, &input_dims, &filter_dims, &output_dims);
+        ctx.size = data.activation_buffer_size;
       }
       if (arm_depthwise_conv_wrapper_f32(
               &ctx, &dw_params, &input_dims,

@@ -267,30 +267,33 @@ jobs:
         # float32 TANH signed zero adds one case on every leg. see AmbiqAI/helia-rt#362
         # int8 CONV_2D through the 3x3_c16_s1 route adds one binary and six cases
         # on every leg. see AmbiqAI/helia-rt#371
+        # Float scratch-context checks add one binary, four cases without F16 and
+        # eight with it; elementwise Prepare dtypes add four cases on every leg.
+        # see AmbiqAI/helia-rt#376
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 159
-            min-cases: 1323
+            min-binaries: 160
+            min-cases: 1331
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 159
-            min-cases: 1323
+            min-binaries: 160
+            min-cases: 1331
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and one case fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 158
-            min-cases: 1322
+            min-binaries: 159
+            min-cases: 1330
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 159
-            min-cases: 1371
+            min-binaries: 160
+            min-cases: 1383
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 158
-            min-cases: 1370
+            min-binaries: 159
+            min-cases: 1382
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
