@@ -29,10 +29,10 @@ Install CMSIS-Toolbox for `packchk` and `cpackget`, then validate the generated 
 ```bash
 python3 tools/cmsis_pack/check_pdsc.py dist/Ambiq.helia-rt.1.21.0.pack
 packchk --disable-validation dist/Ambiq.helia-rt.1.21.0.stage/Ambiq.helia-rt.pdsc
-cpackget add dist/Ambiq.helia-rt.1.21.0.pack
+cpackget add --agree-embedded-license dist/Ambiq.helia-rt.1.21.0.pack
 ```
 
-The `packchk` invocation matches the repository's packaging workflow: semantic checks run with XSD validation disabled. The separate Python check verifies the pack's expected identity and dependency contract. Neither check proves a board application can build or execute.
+The `packchk` invocation matches the repository's packaging workflow: semantic checks run with XSD validation disabled. The separate Python check verifies the pack's expected identity and dependency contract. Neither check builds an application; the example below does.
 
 ## Select a component
 
@@ -46,8 +46,20 @@ In your project's component selection, use the Ambiq `Machine Learning` / `TFLM 
 
 Keep runtime and kernel feature settings consistent. A HELIA component selection does not establish support for every operator, tensor type or model shape. Review [Model compatibility](/helia-rt/guide/model-compatibility/) before enabling float kernels.
 
+## Build the example consumer
+
+[`tools/cmsis_pack/examples/hello_world`](https://github.com/AmbiqAI/helia-rt/tree/main/tools/cmsis_pack/examples/hello_world) is a minimal CMSIS-Toolbox solution. It targets the generic `ARM::ARMCM55` device and selects the `Reference` variant. It links a `MicroInterpreter` against the installed pack. With CMSIS-Toolbox 2.13.0, the Arm GNU and ATfE compilers registered through `GCC_TOOLCHAIN_<version>` and `CLANG_TOOLCHAIN_<version>`, and the pack added with `cpackget`:
+
+```bash
+cd tools/cmsis_pack/examples/hello_world
+cbuild hello_world.csolution.yml --toolchain GCC --update-rte --packs
+cbuild hello_world.csolution.yml --toolchain CLANG --update-rte --packs
+```
+
+`--packs` installs the public `ARM::CMSIS` and `ARM::Cortex_DFP` packs on first use. The example links `--specs=nosys.specs` on GCC and `-lsemihost` on ATfE to satisfy the C library's I/O and exit hooks; a board application supplies its own retarget layer instead. The packaging workflow builds this example on both compilers. It proves the pack's sources compile and link together; it does not run a model.
+
 Your consumer project still provides the device/board support, compiler settings, startup code, memory layout and application sources. Add the model and inference sequence from [First inference](/helia-rt/getting-started/first-inference/), build with your CMSIS toolchain, then verify known inputs and outputs on the board.
 
 ## Distribution scope
 
-The repository workflow generates the pack as a CI artifact. This guide uses a pack built from your checkout; it does not depend on public pack-index availability. The [pack generator](https://github.com/AmbiqAI/helia-rt/blob/main/tools/cmsis_pack/build_pack.py), [contract checker](https://github.com/AmbiqAI/helia-rt/blob/main/tools/cmsis_pack/check_pdsc.py) and [packaging workflow](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/smoke_cmake.yml) define its contents and checks. Consumer project validation is separate from package validation.
+The repository workflow generates the pack as a CI artifact. This guide uses a pack built from your checkout; it does not depend on public pack-index availability. The [pack generator](https://github.com/AmbiqAI/helia-rt/blob/main/tools/cmsis_pack/build_pack.py), [contract checker](https://github.com/AmbiqAI/helia-rt/blob/main/tools/cmsis_pack/check_pdsc.py) and [packaging workflow](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/smoke_cmake.yml) define its contents and checks. Board-level validation of your own project is separate from package validation.
