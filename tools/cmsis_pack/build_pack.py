@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -214,6 +215,36 @@ def _iter_repo_files(
         yield rel
 
 
+_TEXTUAL_INCLUDE = re.compile(r'^\s*#\s*include\s*"([^"]+\.(?:c|cc|cpp))"', re.M)
+
+
+def _textual_source_includes(
+    repo_root: Path, sources: set[str], include_dirs: set[str]
+) -> set[str]:
+    """Return repo-relative sources that staged sources ``#include`` by name.
+
+    Each quoted ``.c``/``.cc``/``.cpp`` include is resolved the way the
+    compiler would: against the including file's directory, then each
+    manifest include dir. An include that resolves nowhere is an error, as
+    the consumer build would fail on it.
+    """
+    found: set[str] = set()
+    for rel in sorted(sources):
+        text = (repo_root / rel).read_text(encoding="utf-8", errors="replace")
+        for name in _TEXTUAL_INCLUDE.findall(text):
+            candidates = [os.path.dirname(rel), *sorted(include_dirs)]
+            for base in candidates:
+                cand = os.path.normpath(os.path.join(base, name))
+                if (repo_root / cand).is_file():
+                    found.add(Path(cand).as_posix())
+                    break
+            else:
+                raise SystemExit(
+                    f"{rel} includes {name!r}, which no include dir resolves"
+                )
+    return found
+
+
 def stage_pack_files(
     repo_root: Path,
     manifests: list[BackendManifest],
@@ -285,6 +316,11 @@ def stage_pack_files(
                 repo_root, tl_subtree, suffixes=(".h", ".hpp", ".inc")
             ):
                 headers.add(rel.as_posix())
+
+    # Sources that #include another source textually (kissfft's wrappers pull
+    # in kiss_fft.c and tools/kiss_fftr.c) need that file in the pack too,
+    # staged like a header so the consumer does not compile it on its own.
+    headers |= _textual_source_includes(repo_root, sources, include_dirs)
 
     # Copy sources + headers into stage.
     for rel in sources | headers:
@@ -410,7 +446,7 @@ def build_pdsc(
                     files,
                     "file",
                     category="preIncludeGlobal",
-                    name=f".cmsis_pack/define_{d}.h",
+                    name=f".cmsis_pack/define_{_define_name(d)}.h",
                 )
 
     # ----- enumerate every staged header for the indexer ----------------
@@ -425,19 +461,30 @@ def build_pdsc(
     return tree
 
 
+def _define_name(define: str) -> str:
+    """Macro name of a manifest define written as ``NAME`` or ``NAME=VALUE``."""
+    return define.split("=", 1)[0]
+
+
 def write_define_stubs(stage_root: Path, manifests: dict[str, BackendManifest]) -> None:
     """Emit the tiny ``define_<X>.h`` files referenced by the pdsc."""
     out_dir = stage_root / ".cmsis_pack"
     out_dir.mkdir(exist_ok=True)
-    seen: set[str] = set()
+    seen: dict[str, str] = {}
     for m in manifests.values():
         for d in m.backend_defines:
-            if d in seen:
+            name, _, value = d.partition("=")
+            if name in seen:
+                # Variants share one stub per macro name, so they must agree.
+                if seen[name] != d:
+                    raise SystemExit(
+                        f"conflicting backend defines {seen[name]!r} and {d!r}"
+                    )
                 continue
-            seen.add(d)
-            (out_dir / f"define_{d}.h").write_text(
+            seen[name] = d
+            (out_dir / f"define_{name}.h").write_text(
                 f"/* heliaRT CMSIS-Pack: backend define for {d}. */\n"
-                f"#ifndef {d}\n#define {d} 1\n#endif\n"
+                f"#ifndef {name}\n#define {name} {value or '1'}\n#endif\n"
             )
 
 

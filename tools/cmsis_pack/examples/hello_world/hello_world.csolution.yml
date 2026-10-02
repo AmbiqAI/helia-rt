@@ -1,0 +1,27 @@
+# Minimal CMSIS-Toolbox consumer of the heliaRT CMSIS-Pack (Reference and HELIA
+# variants).
+# Build: cbuild hello_world.csolution.yml --toolchain GCC (or CLANG for ATfE).
+solution:
+  created-for: CMSIS-Toolbox@2.13.0
+  cdefault:
+  compiler: GCC
+  language-CPP: c++17
+
+  packs:
+    # Pinned so a new upstream release cannot change what this example checks.
+    - pack: ARM::CMSIS@6.3.0
+    - pack: ARM::Cortex_DFP@1.2.0
+    - pack: Ambiq::helia-rt
+
+  target-types:
+    - type: CM55
+      device: ARM::ARMCM55
+
+  build-types:
+    - type: Release
+      optimize: size
+      debug: off
+
+  projects:
+    - project: hello_world.cproject.yml
+    - project: hello_world_helia.cproject.yml

@@ -1,0 +1,32 @@
+# The same application on the HELIA variant, with heliaCORE (ns-cmsis-nn)
+# built from its source pack.
+project:
+  # The HELIA variant's floor; CI installs the release that helia-rt pins.
+  packs:
+    - pack: Ambiq::NS-CMSIS-NN@>=7.35.0
+
+  groups:
+    - group: App
+      files:
+        - file: main.cc
+
+  # heliaRT includes heliaCORE headers as "Include/<name>.h", relative to the
+  # ns-cmsis-nn root, which the ns-cmsis-nn pack does not export.
+  # TODO(AmbiqAI/ns-cmsis-nn#657): drop once the pack exports its root.
+  add-path:
+    - $Pack(Ambiq::NS-CMSIS-NN)$
+
+  components:
+    - component: ARM::CMSIS:CORE
+    - component: ARM::Device:Startup&C Startup
+    - component: Ambiq::Machine Learning:TFLM Runtime:helia-rt&HELIA
+    - component: Ambiq::Machine Learning:NN Lib:heliaCORE&Source
+
+  misc:
+    - for-compiler: GCC
+      Link:
+        - --specs=nosys.specs
+    # picolibc's stdio and exit hooks; an application supplies its own.
+    - for-compiler: CLANG
+      Link:
+        - -lsemihost

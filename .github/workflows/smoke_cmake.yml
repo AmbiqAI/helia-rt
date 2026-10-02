@@ -177,7 +177,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends cmake curl ca-certificates
+          sudo apt-get install -y --no-install-recommends cmake ninja-build curl ca-certificates
           curl -fsSL \
               "https://github.com/Open-CMSIS-Pack/cmsis-toolbox/releases/download/${CMSIS_TOOLBOX_VERSION}/cmsis-toolbox-linux-amd64.tar.gz" \
               -o /tmp/cmsis-toolbox.tar.gz
@@ -242,6 +242,37 @@ jobs:
           PACK="${packs[0]}"
           test -f "${PACK}"
           python3 tools/cmsis_pack/check_pdsc.py "${PACK}"
+      - name: Install consumer toolchains (Arm GNU, ATfE)
+        run: |
+          set -euo pipefail
+          # The same pinned archives the Make build uses.
+          DL="${RUNNER_TEMP}/downloads"
+          mkdir -p "${DL}"
+          tensorflow/lite/micro/tools/make/arm_gcc_download.sh "${DL}"
+          tensorflow/lite/micro/tools/make/arm_toolchain_embedded_download.sh "${DL}"
+          # CMSIS-Toolbox finds a compiler through <NAME>_TOOLCHAIN_<x>_<y>_<z>.
+          gcc_version=$("${DL}/gcc_embedded/bin/arm-none-eabi-gcc" -dumpversion)
+          clang_version=$("${DL}/arm_toolchain_embedded/bin/clang" -dumpversion)
+          echo "GCC_TOOLCHAIN_${gcc_version//./_}=${DL}/gcc_embedded/bin" >> "${GITHUB_ENV}"
+          echo "CLANG_TOOLCHAIN_${clang_version//./_}=${DL}/arm_toolchain_embedded/bin" >> "${GITHUB_ENV}"
+      - name: Build the pack consumer example with cbuild (GCC, ATfE; Reference, HELIA)
+        run: |
+          set -euo pipefail
+          export CMSIS_PACK_ROOT="${RUNNER_TEMP}/packs"
+          cpackget init https://www.keil.com/pack/index.pidx
+          packs=(dist/Ambiq.helia-rt.*.pack)
+          cpackget add --agree-embedded-license "${packs[0]}"
+          # The HELIA variant builds heliaCORE from the ns-cmsis-nn release
+          # pack that this workflow pins.
+          ns_pack="Ambiq.NS-CMSIS-NN.${NS_CMSIS_NN_REF#v}.pack"
+          curl -fsSL --retry 3 -o "${RUNNER_TEMP}/${ns_pack}" \
+              "https://github.com/AmbiqAI/ns-cmsis-nn/releases/download/${NS_CMSIS_NN_REF}/${ns_pack}"
+          cpackget add --agree-embedded-license "${RUNNER_TEMP}/${ns_pack}"
+          cd tools/cmsis_pack/examples/hello_world
+          for toolchain in GCC CLANG; do
+            cbuild hello_world.csolution.yml --toolchain "${toolchain}" \
+                --update-rte --packs --rebuild
+          done
       - name: Upload pack artifact
         uses: actions/upload-artifact@v7
         with:
