@@ -32,7 +32,7 @@ packchk --disable-validation dist/Ambiq.helia-rt.1.21.0.stage/Ambiq.helia-rt.pds
 cpackget add --agree-embedded-license dist/Ambiq.helia-rt.1.21.0.pack
 ```
 
-The `packchk` invocation matches the repository's packaging workflow: semantic checks run with XSD validation disabled. The separate Python check verifies the pack's expected identity and dependency contract. Neither check builds an application; the example below does.
+`--agree-embedded-license` accepts the license file shipped inside the pack, which `cpackget` otherwise asks about interactively. The `packchk` invocation matches the repository's packaging workflow: semantic checks run with XSD validation disabled. The separate Python check verifies the pack's expected identity and dependency contract. Neither check builds an application; the example below does.
 
 ## Select a component
 
@@ -48,7 +48,7 @@ Keep runtime and kernel feature settings consistent. A HELIA component selection
 
 ## Build the example consumer
 
-[`tools/cmsis_pack/examples/hello_world`](https://github.com/AmbiqAI/helia-rt/tree/main/tools/cmsis_pack/examples/hello_world) is a minimal CMSIS-Toolbox solution. It targets the generic `ARM::ARMCM55` device and selects the `Reference` variant. It links a `MicroInterpreter` against the installed pack. With CMSIS-Toolbox 2.13.0, the Arm GNU and ATfE compilers registered through `GCC_TOOLCHAIN_<version>` and `CLANG_TOOLCHAIN_<version>`, and the pack added with `cpackget`:
+[`tools/cmsis_pack/examples/hello_world`](https://github.com/AmbiqAI/helia-rt/tree/main/tools/cmsis_pack/examples/hello_world) is a minimal CMSIS-Toolbox solution. It targets the generic `ARM::ARMCM55` device and selects the `Reference` variant. It links a `MicroInterpreter` against the installed pack. Add the pack with `cpackget`. Then point CMSIS-Toolbox 2.13.0 at each compiler's `bin` directory with a variable named after its version, for example `GCC_TOOLCHAIN_14_3_1` for Arm GNU 14.3.rel1 and `CLANG_TOOLCHAIN_22_1_0` for ATfE 22.1.0. Then build:
 
 ```bash
 cd tools/cmsis_pack/examples/hello_world
