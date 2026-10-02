@@ -118,6 +118,60 @@ run_case "call opening an argument list" 0 '' \
   "${OPEN}"$'\n  TF_LITE_ENSURE_EQ(\n      arm_one_line(x), ARM_CMSIS_NN_SUCCESS);\n}'
 run_case "brace initializer" 0 '' \
   "${OPEN}"$'\n  const arm_cmsis_nn_status statuses[] = {\n      arm_one_line(x)};\n}'
+run_case "returned brace initializer" 0 '' \
+  "${OPEN}"$'\n  return {\n      arm_one_line(x)};\n}'
+run_case "braced argument" 0 '' \
+  "${OPEN}"$'\n  Use({\n      arm_one_line(x)});\n}'
+run_case "direct brace initializer" 0 '' \
+  "${OPEN}"$'\n  arm_cmsis_nn_status statuses[]{\n      arm_one_line(x)};\n}'
+run_case "discarded in a braced case" 1 5 \
+  "${OPEN}"$'\n  switch (x) {\n    case 1: {\n      arm_one_line(x);\n    }\n  }\n}'
+run_case "discarded in a braced else" 1 5 \
+  "${OPEN}"$'\n  if (x) {\n  } else {\n    arm_one_line(x);\n  }\n}'
+run_case "discarded in a lone brace block" 1 4 \
+  "${OPEN}"$'\n  {\n    arm_one_line(x);\n  }\n}'
+run_case "discarded in a const member function" 1 2 \
+  $'int C::Eval() const {\n  arm_one_line(0);\n  return 0;\n}'
+run_case "discarded in a lambda with a return type" 1 4 \
+  "${OPEN}"$'\n  auto f = [](int a) -> int {\n    arm_one_line(a);\n    return 0;\n  };\n}'
+run_case "range-for over a brace list" 0 '' \
+  "${OPEN}"$'\n  for (auto s : {\n      arm_one_line(x)}) {\n  }\n}'
+run_case "subscripted assignment from a brace list" 0 '' \
+  "${OPEN}"$'\n  statuses[Index(x)] = {\n      arm_one_line(x)};\n}'
+run_case "discarded in a do block" 1 4 \
+  "${OPEN}"$'\n  do {\n    arm_one_line(x);\n  } while (x-- > 0);\n}'
+run_case "discarded in a try block" 1 4 \
+  "${OPEN}"$'\n  try {\n    arm_one_line(x);\n  } catch (...) {\n  }\n}'
+run_case "discarded in an override" 1 2 \
+  $'int C::Eval() override {\n  arm_one_line(0);\n  return 0;\n}'
+run_case "discarded in a ref-qualified member function" 1 2 \
+  $'int C::Eval() && {\n  arm_one_line(0);\n  return 0;\n}'
+run_case "discarded in a const member with a return type" 1 2 \
+  $'auto C::Eval() const -> int {\n  arm_one_line(0);\n  return 0;\n}'
+run_case "discarded in a lambda without parameters" 1 4 \
+  "${OPEN}"$'\n  auto f = [&] {\n    arm_one_line(x);\n  };\n}'
+run_case "discarded in an unspaced lambda argument" 1 4 \
+  "${OPEN}"$'\n  Run([&]{\n    arm_one_line(x);\n  });\n}'
+run_case "discarded after brace member initializers" 1 2 \
+  $'C::C() : a_{1}, b_{2} {\n  arm_one_line(0);\n}'
+run_case "brace initializer returned under an if" 0 '' \
+  "${OPEN}"$'\n  if (x) return {\n      arm_one_line(x)};\n}'
+run_case "brace initializer after a call" 0 '' \
+  "${OPEN}"$'\n  auto s = Make(x) + Statuses{\n      arm_one_line(x)};\n}'
+run_case "discarded after a return type with a comma" 1 2 \
+  $'auto C::Eval() -> std::pair<int, int> {\n  arm_one_line(0);\n  return {};\n}'
+run_case "discarded after unspaced brace member initializers" 1 2 \
+  $'C::C() : a_{1}{\n  arm_one_line(0);\n}'
+run_case "discarded in a noexcept function" 1 2 \
+  $'int C::Eval() noexcept {\n  arm_one_line(0);\n  return 0;\n}'
+run_case "discarded in a volatile final member" 1 2 \
+  $'int C::Eval() volatile final {\n  arm_one_line(0);\n  return 0;\n}'
+run_case "discarded in an lvalue-qualified member" 1 2 \
+  $'int C::Eval() & {\n  arm_one_line(0);\n  return 0;\n}'
+run_case "discarded in a mutable lambda" 1 4 \
+  "${OPEN}"$'\n  auto f = [x]() mutable {\n    arm_one_line(x);\n  };\n}'
+run_case "discarded in a constexpr lambda" 1 4 \
+  "${OPEN}"$'\n  auto f = []() constexpr {\n    arm_one_line(0);\n  };\n}'
 run_case "no status declarations" 2 '' "${OPEN}"$'\n}' 'void arm_only_void(int a);'
 
 for empty in include src; do
