@@ -29,17 +29,29 @@
 # tests/), outside comments and string literals, a call to one of them fails
 # when its status is discarded:
 #   * the call starts a statement: it is the first thing on its line,
-#     optionally behind (void), and the previous code line ends with ; { or }
-#     (not an = { initializer), ends a label (case X: or default:), is an
-#     unbraced if, if constexpr, for or while header, or is else or do. A
-#     ternary line ending in : also counts; clang-format never produces one. Preprocessor lines do
-#     not count as the previous line;
+#     optionally behind (void), and the previous code line
+#       - ends with ; or },
+#       - is a lone {, or ends with a { that opens a block: after ) or a
+#         lambda introducer, each followed only by cv, ref, noexcept,
+#         override, final, mutable or constexpr qualifiers and a trailing
+#         return type; after a brace member initializer ending a
+#         constructor's list (} { or }{); or after a label, else, do or try. An
+#         initializer brace such as = {, x{, return {, f({, f(a) + T{ or a
+#         range-for's : { is not a block,
+#       - ends a label (case X: or default:); a ternary line ending in :
+#         also counts, which clang-format never produces,
+#       - is an unbraced if, if constexpr, for or while header, or
+#       - is else or do.
+#     Preprocessor lines do not count as the previous line;
 #   * the call is an argument of a TFLITE_DCHECK* macro, which is compiled out
 #     of a release build.
 # A call nested in an expression, an assignment or another macro is not a
 # discard. The check is line based: a call after another statement on the
-# same line, a control header spread over several lines, and spellings such as
-# static_cast<void>(...) or ::arm_x are not seen.
+# same line, a control header spread over several lines, a block opened after
+# a requires clause, an attribute such as [[likely]], a macro qualifier, a
+# template lambda, a lambda capture with nested brackets or a trailing return
+# type with parentheses, and spellings such as static_cast<void>(...) or
+# ::arm_x are not seen.
 #
 # Usage: check_helia_cmsis_nn_status_checks.sh [include-dir [source-dir]]
 #   include-dir defaults to ${NS_CMSIS_NN_PATH}/Include, or the downloaded
@@ -152,6 +164,24 @@ for file in "${sources[@]}"; do
       }
       return ""
     }
+    # Whether a code line ending in { opens a block rather than an initializer.
+    function opens_block(line,    head, word) {
+      if (line == "{" || line ~ /\}[[:space:]]*\{$/) return 1
+      if (line !~ /\{$/ || line ~ /^for[[:space:]]*\([^)]*:[[:space:]]*\{$/) return 0
+      head = line
+      sub(/[[:space:]]*\{$/, "", head)
+      if (head ~ /[^:]:$/ || head ~ /(^|[^A-Za-z0-9_])(else|do|try)$/) return 1
+      sub(/[[:space:]]*->[^(){};=]*$/, "", head)
+      while (1) {
+        if (sub(/[[:space:]]*&&?$/, "", head)) continue
+        if (!match(head, /[A-Za-z0-9_]+$/)) break
+        word = substr(head, RSTART)
+        if (word !~ /^(const|volatile|noexcept|override|final|mutable|constexpr)$/) break
+        head = substr(head, 1, RSTART - 1)
+        sub(/[[:space:]]+$/, "", head)
+      }
+      return head ~ /\)$/ || head ~ /(^|[^]A-Za-z0-9_])\[[^][]*\]$/
+    }
     {
       text = code
       sub(/^[[:space:]]+/, "", text)
@@ -165,7 +195,7 @@ for file in "${sources[@]}"; do
       } else if (match(text, /^(\(void\)[[:space:]]*)?arm_[A-Za-z0-9_]+[[:space:]]*\(/)) {
         name = substr(text, RSTART, RLENGTH)
         sub(/^\(void\)[[:space:]]*/, "", name); sub(/[[:space:]]*\($/, "", name)
-        starts = (prev == "" || prev ~ /[;}]$/ || (prev ~ /\{$/ && prev !~ /=[[:space:]]*\{$/) ||
+        starts = (prev == "" || prev ~ /[;}]$/ || opens_block(prev) ||
                   prev ~ /(^|[^A-Za-z0-9_])(else|do)$/ || prev ~ /[^:]:$/ ||
                   prev ~ /^(\}[[:space:]]*)?(else[[:space:]]+)?(if([[:space:]]+constexpr)?|for|while)[[:space:]]*\(.*\)$/)
         if ((name in known) && starts) print FNR ": " name
