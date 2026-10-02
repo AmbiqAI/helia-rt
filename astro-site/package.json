@@ -12,6 +12,7 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
+    "precheck": "npm run prepare:docs",
     "check": "astro check",
     "reference:trial": "node scripts/reference-trial.mjs",
     "check:links": "python3 scripts/check-site-links.py",
