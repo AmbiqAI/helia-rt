@@ -279,3 +279,27 @@ $(kernel_arg_extrema_fp16_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_argmin_f16 -Wl,--wrap=arm_argmax_f16
 endif
 endif
+
+# Float CONV_2D, DEPTHWISE_CONV_2D and BATCH_MATMUL hand heliaCORE the scratch
+# size Prepare requested. GNU links wrap the sizers and entry points to prove
+# it. see AmbiqAI/helia-rt#376
+$(eval $(call microlite_test,kernel_float_context_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_context_test.cc))
+
+ifeq ($(TOOLCHAIN),gcc)
+$(kernel_float_context_test_BINARY): CXXFLAGS += \
+  -DHELIA_FLOAT_CONTEXT_LINK_WRAP=1
+$(kernel_float_context_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_convolve_wrapper_f32_get_buffer_size \
+  -Wl,--wrap=arm_convolve_wrapper_f32 \
+  -Wl,--wrap=arm_depthwise_conv_wrapper_f32_get_buffer_size \
+  -Wl,--wrap=arm_depthwise_conv_wrapper_f32 \
+  -Wl,--wrap=arm_batch_matmul_f32_get_buffer_size \
+  -Wl,--wrap=arm_batch_matmul_f32 \
+  -Wl,--wrap=arm_convolve_wrapper_f16_get_buffer_size \
+  -Wl,--wrap=arm_convolve_wrapper_f16 \
+  -Wl,--wrap=arm_depthwise_conv_wrapper_f16_get_buffer_size \
+  -Wl,--wrap=arm_depthwise_conv_wrapper_f16 \
+  -Wl,--wrap=arm_batch_matmul_f16_get_buffer_size \
+  -Wl,--wrap=arm_batch_matmul_f16
+endif

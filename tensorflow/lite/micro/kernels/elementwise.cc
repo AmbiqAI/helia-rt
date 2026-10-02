@@ -55,8 +55,9 @@ bool IsAbsSupportedType(const TfLiteType type) {
   return type == kTfLiteFloat32 || type == kTfLiteInt8 || type == kTfLiteInt16;
 }
 
+// helia: RsqrtEval handles int16, so the predicate admits it.
 bool IsRsqrtSupportedType(const TfLiteType type) {
-  return type == kTfLiteFloat32 || type == kTfLiteInt8;
+  return type == kTfLiteFloat32 || type == kTfLiteInt8 || type == kTfLiteInt16;
 }
 
 inline void SetAbsOutputMultiplier(const float input_scale,
@@ -75,7 +76,10 @@ inline void SetRsqrtOutputMultiplier(const float input_scale,
 }
 
 typedef bool (*IsSupportedType)(TfLiteType);
-template <IsSupportedType>
+// helia: the predicate is named and called (unnamed, `IsSupportedType(type)`
+// is a cast and admits every dtype), and a rejection releases the temps.
+// see AmbiqAI/helia-rt#376
+template <IsSupportedType is_supported_type>
 TfLiteStatus GenericPrepare(TfLiteContext* context, TfLiteNode* node) {
   MicroContext* micro_context = GetMicroContext(context);
   TF_LITE_ENSURE_EQ(context, NumInputs(node), 1);
@@ -87,9 +91,11 @@ TfLiteStatus GenericPrepare(TfLiteContext* context, TfLiteNode* node) {
       micro_context->AllocateTempOutputTensor(node, kElementwiseOutputTensor);
   TF_LITE_ENSURE(context, output != nullptr);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
-  if (!IsSupportedType(input->type)) {
+  if (!is_supported_type(input->type)) {
     MicroPrintf("Input data type %s (%d) is not supported.",
                 TfLiteTypeGetName(input->type), input->type);
+    micro_context->DeallocateTempTfLiteTensor(input);
+    micro_context->DeallocateTempTfLiteTensor(output);
     return kTfLiteError;
   }
 
@@ -99,7 +105,8 @@ TfLiteStatus GenericPrepare(TfLiteContext* context, TfLiteNode* node) {
 }
 
 typedef bool (*IsSupportedType)(TfLiteType);
-template <IsSupportedType, const int op_nameid>
+// helia: named and called, as in GenericPrepare. see AmbiqAI/helia-rt#376
+template <IsSupportedType is_supported_type, const int op_nameid>
 TfLiteStatus PrepareAbsRsqrt(TfLiteContext* context, TfLiteNode* node) {
   MicroContext* micro_context = GetMicroContext(context);
   TF_LITE_ENSURE_EQ(context, NumInputs(node), 1);
@@ -109,9 +116,11 @@ TfLiteStatus PrepareAbsRsqrt(TfLiteContext* context, TfLiteNode* node) {
   TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
   TF_LITE_ENSURE(context, output != nullptr);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
-  if (!IsSupportedType(input->type)) {
+  if (!is_supported_type(input->type)) {
     MicroPrintf("Input data type %s (%d) is not supported.",
                 TfLiteTypeGetName(input->type), input->type);
+    micro_context->DeallocateTempTfLiteTensor(input);
+    micro_context->DeallocateTempTfLiteTensor(output);
     return kTfLiteError;
   }
 
