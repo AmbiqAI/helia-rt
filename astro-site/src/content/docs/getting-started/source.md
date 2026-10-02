@@ -9,11 +9,13 @@ Use source builds to control the backend, floating-point features, kernel profil
 
 Install Git, Python 3 and the build tools for your chosen path. CMake source integration requires CMake 3.21 or newer. Check out the runtime release you intend to use:
 
+<!-- x-release-please-start-version -->
 ```bash
 git clone https://github.com/AmbiqAI/helia-rt.git
 cd helia-rt
-git checkout helia-rt-v1.21.0
+git checkout helia-rt-v1.21.2
 ```
+<!-- x-release-please-end -->
 
 The examples below use this release's interfaces. If you choose another release, use its matching configuration and dependency pins.
 
