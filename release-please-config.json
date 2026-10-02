@@ -26,6 +26,22 @@
         {
           "type": "generic",
           "path": "cmake/README.md"
+        },
+        {
+          "type": "generic",
+          "path": "astro-site/src/content/docs/getting-started/source.md"
+        },
+        {
+          "type": "generic",
+          "path": "astro-site/src/content/docs/getting-started/zephyr.md"
+        },
+        {
+          "type": "generic",
+          "path": "astro-site/src/content/docs/getting-started/cmsis-pack.md"
+        },
+        {
+          "type": "generic",
+          "path": "astro-site/src/content/docs/getting-started/first-model.md"
         }
       ],
 

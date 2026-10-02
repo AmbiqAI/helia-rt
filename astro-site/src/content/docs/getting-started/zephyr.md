@@ -7,16 +7,16 @@ Start with a working Zephyr workspace, a board application that already builds, 
 
 ## Add HELIA source modules
 
-Add these projects to the `manifest.projects` list in your workspace's west manifest. This example pairs runtime v1.21.0 with the heliaCORE version required by its adapters:
+Add these projects to the `manifest.projects` list in your workspace's west manifest. This example pairs runtime v1.21.2 with the ns-cmsis-nn release that tag pins in `tensorflow/lite/micro/tools/make/ext_libs/helia.inc`; check that file when you choose another release: <!-- x-release-please-version -->
 
 ```yaml title="west.yml · projects"
 - name: helia-rt
   url: https://github.com/AmbiqAI/helia-rt
-  revision: helia-rt-v1.21.0
+  revision: helia-rt-v1.21.2 # x-release-please-version
   path: modules/helia-rt
 - name: ns-cmsis-nn
   url: https://github.com/AmbiqAI/ns-cmsis-nn
-  revision: v7.35.0
+  revision: v7.36.0
   path: modules/ns-cmsis-nn
 ```
 
