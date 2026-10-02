@@ -1,5 +1,6 @@
 {
   "bootstrap-sha": "645d1c2164a63368a5c60ec41fe7fbba320951a0",
+  "always-update": true,
   "packages": {
     ".": {
       "component": "helia-rt",
