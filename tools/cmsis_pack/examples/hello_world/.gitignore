@@ -1,0 +1,10 @@
+# cbuild outputs and generated project files
+RTE/
+out/
+tmp/
+*.cbuild-idx.yml
+*.cbuild.yml
+*.cbuild-pack.yml
+*.cbuild-set.yml
+*.cbuild-run.yml
+*.cprj

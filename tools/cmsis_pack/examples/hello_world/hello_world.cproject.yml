@@ -1,0 +1,19 @@
+project:
+  groups:
+    - group: App
+      files:
+        - file: main.cc
+
+  components:
+    - component: ARM::CMSIS:CORE
+    - component: ARM::Device:Startup&C Startup
+    - component: Ambiq::Machine Learning:TFLM Runtime:helia-rt&Reference
+
+  misc:
+    - for-compiler: GCC
+      Link:
+        - --specs=nosys.specs
+    # picolibc's stdio and exit hooks; an application supplies its own.
+    - for-compiler: CLANG
+      Link:
+        - -lsemihost
