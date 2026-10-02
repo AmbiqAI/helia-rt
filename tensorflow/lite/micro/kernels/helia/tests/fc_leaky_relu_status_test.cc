@@ -24,11 +24,11 @@ limitations under the License.
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
 // FULLY_CONNECTED kernel-sum and LEAKY_RELU status contracts: a CORE failure
-// must surface as kTfLiteError and leave the output untouched. A GNU link
-// wrap injects the failure; without the wrap the failure cases assert the
-// valid path only. The FC golden checks the kernel-sum contents only where
-// the kernel consumes them (MVE targets); elsewhere it proves the call and
-// status contract. see AmbiqAI/helia-rt#238
+// must surface as kTfLiteError and leave the output untouched. A GCC or ATfE
+// link wrap injects the failure; without the wrap the failure cases assert the
+// valid path only. The FC golden checks the kernel-sum contents only where the
+// kernel consumes them (MVE targets); elsewhere it proves the call and status
+// contract. see AmbiqAI/helia-rt#238
 
 #ifndef HELIA_FC_LEAKY_LINK_WRAP
 #define HELIA_FC_LEAKY_LINK_WRAP 0

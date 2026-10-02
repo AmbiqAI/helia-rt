@@ -17,8 +17,8 @@ limitations under the License.
 // bit with the reference integer implementation. Dilated 1D layers take the
 // optimized heliaCORE kernels (s8_opt, fast_s16); the non-dilated 16x8 cases
 // pin that routing 16x8 through the wrapper leaves those results unchanged.
-// Both routes are bit-exact, so GCC links also wrap the heliaCORE leaves and
-// each case asserts which one its invoke reached.
+// Both routes are bit-exact, so GCC and ATfE links also wrap the heliaCORE
+// leaves and each case asserts which one its invoke reached.
 // see AmbiqAI/helia-rt#314 and AmbiqAI/helia-rt#318
 
 #include <cstdint>

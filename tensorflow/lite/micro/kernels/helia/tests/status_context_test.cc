@@ -33,11 +33,11 @@ limitations under the License.
 // scratch or persistent buffer must carry the byte count requested for it,
 // since several CORE entry points read size 0 as undeclared and skip their
 // bounds check. The statuses of the int8/int16 elementwise, activation, softmax
-// and data-movement entry points must surface as kTfLiteError at Invoke. GNU
-// link wraps inject the failures, report a positive size on legs whose CORE
-// needs no buffer, and record each context and call; without them the cases
-// assert the valid runs, the golden outputs where a case has them, and the
-// failures CORE reports on its own.
+// and data-movement entry points must surface as kTfLiteError at Invoke. GCC
+// and ATfE link wraps inject the failures, report a positive size on legs whose
+// CORE needs no buffer, and record each context and call; without them the
+// cases assert the valid runs, the golden outputs where a case has them, and
+// the failures CORE reports on its own.
 // see AmbiqAI/helia-rt#238
 
 #ifndef HELIA_STATUS_CONTEXT_LINK_WRAP

@@ -14,8 +14,8 @@ limitations under the License.
 ==============================================================================*/
 
 // HELIA-only adapter coverage for GATHER and GATHER_ND. The wrappers used by
-// GNU links prove whether a case called heliaCORE or stayed on the established
-// LiteRT Micro reference path.
+// GCC and ATfE links prove whether a case called heliaCORE or stayed on the
+// established LiteRT Micro reference path.
 
 #include <cstdint>
 #include <cstring>
