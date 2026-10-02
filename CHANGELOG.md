@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.21.3](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.21.2...helia-rt-v1.21.3) (2026-10-02)
+
+
+### Bug Fixes
+
+* ARG_MAX/ARG_MIN treat NaN as TensorFlow does ([#363](https://github.com/AmbiqAI/helia-rt/issues/363)) ([c1d3e0d](https://github.com/AmbiqAI/helia-rt/commit/c1d3e0de1e89fd0d3f0e3d765b5d1f54ce9083e4)), closes [#359](https://github.com/AmbiqAI/helia-rt/issues/359)
+* **cmsis_nn:** run MAXIMUM/MINIMUM above rank 4 on the reference loop ([#360](https://github.com/AmbiqAI/helia-rt/issues/360)) ([7c04af2](https://github.com/AmbiqAI/helia-rt/commit/7c04af2c1bba7dbf9d8be2f1b563d7c24d1f5c2b)), closes [#356](https://github.com/AmbiqAI/helia-rt/issues/356)
+* **helia:** apply the general int16 SUB scales at rank &gt; 4 ([#336](https://github.com/AmbiqAI/helia-rt/issues/336)) ([7ff1d86](https://github.com/AmbiqAI/helia-rt/commit/7ff1d861d29072d97be532617c92944d6fbd7469)), closes [#334](https://github.com/AmbiqAI/helia-rt/issues/334)
+* **helia:** build cleanly under upstream's -Werror warning set ([#355](https://github.com/AmbiqAI/helia-rt/issues/355)) ([0933c44](https://github.com/AmbiqAI/helia-rt/commit/0933c448b8549f26b2a987b6b4f70e05ad25e870)), closes [#353](https://github.com/AmbiqAI/helia-rt/issues/353)
+* **helia:** pad float16 tensors below rank 4 ([#349](https://github.com/AmbiqAI/helia-rt/issues/349)) ([20bc437](https://github.com/AmbiqAI/helia-rt/commit/20bc4379bd56c62375c4d4ba663af9eac7ce58c4)), closes [#348](https://github.com/AmbiqAI/helia-rt/issues/348)
+* **helia:** pass the requested sizes in the TRANSPOSE_CONV int8 contexts ([#330](https://github.com/AmbiqAI/helia-rt/issues/330)) ([04e0565](https://github.com/AmbiqAI/helia-rt/commit/04e0565cfd659ee19914f78b1603a09b5bf53b1f)), closes [#329](https://github.com/AmbiqAI/helia-rt/issues/329) [#238](https://github.com/AmbiqAI/helia-rt/issues/238)
+* **helia:** pin ns-cmsis-nn v7.39.1 and skip NaN in float16 ARG_MAX/ARG_MIN ([#389](https://github.com/AmbiqAI/helia-rt/issues/389)) ([b696439](https://github.com/AmbiqAI/helia-rt/commit/b6964396de3da824924f32f505e117e55810c122)), closes [#385](https://github.com/AmbiqAI/helia-rt/issues/385) [#359](https://github.com/AmbiqAI/helia-rt/issues/359)
+* **helia:** run the elementwise Prepare type check; skip empty float16 MAX/MIN ([#344](https://github.com/AmbiqAI/helia-rt/issues/344)) ([01b93a0](https://github.com/AmbiqAI/helia-rt/commit/01b93a06b4bc2462a84d017951a90fc44c0f39b9)), closes [#342](https://github.com/AmbiqAI/helia-rt/issues/342)
+* **pack:** build HELIA and kissfft pack consumers and check them with cbuild ([#396](https://github.com/AmbiqAI/helia-rt/issues/396)) ([9e7f7b7](https://github.com/AmbiqAI/helia-rt/commit/9e7f7b7d9b3c396681fb2817a2346ce6dcd9e211)), closes [#124](https://github.com/AmbiqAI/helia-rt/issues/124)
+* pass Prepare's float scratch size and run the elementwise dtype check ([#384](https://github.com/AmbiqAI/helia-rt/issues/384)) ([7cd6cf6](https://github.com/AmbiqAI/helia-rt/commit/7cd6cf69e488cb7971d2753953374118788ebafd)), closes [#376](https://github.com/AmbiqAI/helia-rt/issues/376)
+* reject PAD rank mismatches and negative paddings, handle empty float16 PAD tensors ([#375](https://github.com/AmbiqAI/helia-rt/issues/375)) ([5a2822d](https://github.com/AmbiqAI/helia-rt/commit/5a2822d4026268608b1704fa78547d59078065ca)), closes [#350](https://github.com/AmbiqAI/helia-rt/issues/350) [#351](https://github.com/AmbiqAI/helia-rt/issues/351) [#372](https://github.com/AmbiqAI/helia-rt/issues/372)
+
 ## [1.21.2](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.21.1...helia-rt-v1.21.2) (2026-09-28)
 
 
