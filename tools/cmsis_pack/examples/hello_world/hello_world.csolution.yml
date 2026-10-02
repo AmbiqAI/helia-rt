@@ -12,8 +12,6 @@ solution:
     - pack: ARM::CMSIS@6.3.0
     - pack: ARM::Cortex_DFP@1.2.0
     - pack: Ambiq::helia-rt
-    # The HELIA variant's floor; CI installs the release that helia-rt pins.
-    - pack: Ambiq::NS-CMSIS-NN@>=7.35.0
 
   target-types:
     - type: CM55

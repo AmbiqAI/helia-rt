@@ -58,7 +58,7 @@ cbuild hello_world.csolution.yml --toolchain CLANG --update-rte --packs
 
 `--packs` installs the pinned public `ARM::CMSIS` and `ARM::Cortex_DFP` packs from the public pack index on first use. The example links `--specs=nosys.specs` on GCC and `-lsemihost` on ATfE to satisfy the C library's I/O and exit hooks; a board application supplies its own retarget layer instead. The packaging workflow builds this example on both compilers. It proves the `Reference` and `HELIA` variants compile and link together with their dependencies. It does not build the `CMSIS-NN` variant or run a model.
 
-A project that selects `HELIA` also adds the ns-cmsis-nn pack root to its include path, as `hello_world_helia.cproject.yml` does with `add-path: $Pack(Ambiq::NS-CMSIS-NN)$`. heliaRT includes heliaCORE headers as `Include/<name>.h`, and the ns-cmsis-nn pack exports only its `Include` directory ([ns-cmsis-nn#657](https://github.com/AmbiqAI/ns-cmsis-nn/issues/657) tracks exporting the root).
+A project that selects `HELIA` also adds the ns-cmsis-nn pack root to its include path, as `hello_world_helia.cproject.yml` does with `add-path: $Pack(Ambiq::NS-CMSIS-NN)$`. heliaRT includes heliaCORE headers as `Include/<name>.h`, relative to the ns-cmsis-nn root, which the ns-cmsis-nn pack does not export ([ns-cmsis-nn#657](https://github.com/AmbiqAI/ns-cmsis-nn/issues/657) tracks exporting the root).
 
 Your consumer project still provides the device/board support, compiler settings, startup code, memory layout and application sources. Add the model and inference sequence from [First inference](/helia-rt/getting-started/first-inference/), build with your CMSIS toolchain, then verify known inputs and outputs on the board.
 
