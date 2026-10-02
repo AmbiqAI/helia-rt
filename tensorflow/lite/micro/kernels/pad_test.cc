@@ -509,7 +509,9 @@ namespace {
 // helia: a float PAD whose Prepare must fail and release its temporaries.
 void ExpectPadPrepareRejects(int* input_dims, const float* input_values,
                              int* pad_dims, const int32_t* pad_values,
-                             int* output_dims, float* output_data) {
+                             int* output_dims, float* output_data,
+                             const float* constant_value = nullptr) {
+  int constant_dims[] = {1, 1};
   TfLiteTensor tensors[] = {
       tflite::testing::CreateTensor(
           input_values, tflite::testing::IntArrayFromInts(input_dims)),
@@ -517,13 +519,19 @@ void ExpectPadPrepareRejects(int* input_dims, const float* input_values,
           pad_values, tflite::testing::IntArrayFromInts(pad_dims)),
       tflite::testing::CreateTensor(
           output_data, tflite::testing::IntArrayFromInts(output_dims)),
+      tflite::testing::CreateTensor(
+          constant_value, tflite::testing::IntArrayFromInts(constant_dims)),
   };
   tensors[1].allocation_type = kTfLiteMmapRo;
-  int inputs[] = {2, 0, 1};
+  int pad_inputs[] = {2, 0, 1};
+  int padv2_inputs[] = {3, 0, 1, 3};
   int outputs[] = {1, 2};
-  const TFLMRegistration registration = tflite::Register_PAD();
+  const bool padv2 = constant_value != nullptr;
+  const TFLMRegistration registration =
+      padv2 ? tflite::Register_PADV2() : tflite::Register_PAD();
   tflite::micro::KernelRunner runner(
-      registration, tensors, 3, tflite::testing::IntArrayFromInts(inputs),
+      registration, tensors, padv2 ? 4 : 3,
+      tflite::testing::IntArrayFromInts(padv2 ? padv2_inputs : pad_inputs),
       tflite::testing::IntArrayFromInts(outputs), /*builtin_data=*/nullptr);
   EXPECT_EQ(kTfLiteError, runner.InitAndPrepare());
   EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
@@ -570,6 +578,11 @@ TEST(PadTest, ExpectFailureNegativePadding) {
     ExpectPadPrepareRejects(input_dims, input_values, pad_dims, pad_values,
                             output_dims, output_data);
   }
+  // PADV2 also releases its constant_values temporary on rejection.
+  const float constant_value = 0.5f;
+  float output_data[6];
+  ExpectPadPrepareRejects(input_dims, input_values, pad_dims, pad_cases[0],
+                          output_dims, output_data, &constant_value);
 }
 
 TF_LITE_MICRO_TESTS_MAIN
