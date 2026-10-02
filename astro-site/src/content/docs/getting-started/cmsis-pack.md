@@ -48,7 +48,7 @@ Keep runtime and kernel feature settings consistent. A HELIA component selection
 
 ## Build the example consumer
 
-[`tools/cmsis_pack/examples/hello_world`](https://github.com/AmbiqAI/helia-rt/tree/main/tools/cmsis_pack/examples/hello_world) is a minimal CMSIS-Toolbox solution. It targets the generic `ARM::ARMCM55` device and selects the `Reference` variant. It links a `MicroInterpreter` against the installed pack. Add the pack with `cpackget`. Then point CMSIS-Toolbox 2.13.0 at each compiler's `bin` directory with a variable named after its version, for example `GCC_TOOLCHAIN_14_3_1` for Arm GNU 14.3.rel1 and `CLANG_TOOLCHAIN_22_1_0` for ATfE 22.1.0. Then build:
+[`tools/cmsis_pack/examples/hello_world`](https://github.com/AmbiqAI/helia-rt/tree/main/tools/cmsis_pack/examples/hello_world) is a minimal CMSIS-Toolbox solution. It targets the generic `ARM::ARMCM55` device and builds one project per variant: `hello_world` selects `Reference`, and `hello_world_helia` selects `HELIA` with heliaCORE built from the `Ambiq::NS-CMSIS-NN` source pack. Each links a `MicroInterpreter` against the installed packs. Add the heliaRT pack with `cpackget`, plus the ns-cmsis-nn pack (`Ambiq.NS-CMSIS-NN.<version>.pack` from the [ns-cmsis-nn release](https://github.com/AmbiqAI/ns-cmsis-nn/releases) that heliaRT pins, 7.35.0 or newer). Then point CMSIS-Toolbox 2.13.0 at each compiler's `bin` directory with a variable named after its version, for example `GCC_TOOLCHAIN_14_3_1` for Arm GNU 14.3.rel1 and `CLANG_TOOLCHAIN_22_1_0` for ATfE 22.1.0. Then build:
 
 ```bash
 cd tools/cmsis_pack/examples/hello_world
@@ -56,10 +56,12 @@ cbuild hello_world.csolution.yml --toolchain GCC --update-rte --packs
 cbuild hello_world.csolution.yml --toolchain CLANG --update-rte --packs
 ```
 
-`--packs` installs the pinned public `ARM::CMSIS` and `ARM::Cortex_DFP` packs from the public pack index on first use. The example links `--specs=nosys.specs` on GCC and `-lsemihost` on ATfE to satisfy the C library's I/O and exit hooks; a board application supplies its own retarget layer instead. The packaging workflow builds this example on both compilers. It proves the `Reference` variant's sources compile and link together; it does not build the `CMSIS-NN` or `HELIA` variants or run a model.
+`--packs` installs the pinned public `ARM::CMSIS` and `ARM::Cortex_DFP` packs from the public pack index on first use. The example links `--specs=nosys.specs` on GCC and `-lsemihost` on ATfE to satisfy the C library's I/O and exit hooks; a board application supplies its own retarget layer instead. The packaging workflow builds this example on both compilers. It proves the `Reference` and `HELIA` variants compile and link together with their dependencies. It does not build the `CMSIS-NN` variant or run a model.
+
+A project that selects `HELIA` also adds the ns-cmsis-nn pack root to its include path, as `hello_world_helia.cproject.yml` does with `add-path: $Pack(Ambiq::NS-CMSIS-NN)$`. heliaRT includes heliaCORE headers as `Include/<name>.h`, and the ns-cmsis-nn pack exports only its `Include` directory.
 
 Your consumer project still provides the device/board support, compiler settings, startup code, memory layout and application sources. Add the model and inference sequence from [First inference](/helia-rt/getting-started/first-inference/), build with your CMSIS toolchain, then verify known inputs and outputs on the board.
 
 ## Distribution scope
 
-The repository workflow generates the pack as a CI artifact. This guide uses a pack built from your checkout; only the example's Arm device packs come from the public pack index. The [pack generator](https://github.com/AmbiqAI/helia-rt/blob/main/tools/cmsis_pack/build_pack.py), [contract checker](https://github.com/AmbiqAI/helia-rt/blob/main/tools/cmsis_pack/check_pdsc.py) and [packaging workflow](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/smoke_cmake.yml) define its contents and checks. Board-level validation of your own project is separate from package validation.
+The repository workflow generates the pack as a CI artifact. This guide uses a pack built from your checkout; only the example's Arm device packs come from the public pack index, and the ns-cmsis-nn pack comes from its GitHub release. The [pack generator](https://github.com/AmbiqAI/helia-rt/blob/main/tools/cmsis_pack/build_pack.py), [contract checker](https://github.com/AmbiqAI/helia-rt/blob/main/tools/cmsis_pack/check_pdsc.py) and [packaging workflow](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/smoke_cmake.yml) define its contents and checks. Board-level validation of your own project is separate from package validation.
