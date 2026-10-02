@@ -505,6 +505,31 @@ TEST(PadTest, Test2DInt8ExpectFailureQuantizationRangeExcludesZero) {
       output_zero_point, output_data, kTfLiteError);
 }
 
+namespace {
+// helia: a float PAD whose Prepare must fail and release its temporaries.
+void ExpectPadPrepareRejects(int* input_dims, const float* input_values,
+                             int* pad_dims, const int32_t* pad_values,
+                             int* output_dims, float* output_data) {
+  TfLiteTensor tensors[] = {
+      tflite::testing::CreateTensor(
+          input_values, tflite::testing::IntArrayFromInts(input_dims)),
+      tflite::testing::CreateTensor(
+          pad_values, tflite::testing::IntArrayFromInts(pad_dims)),
+      tflite::testing::CreateTensor(
+          output_data, tflite::testing::IntArrayFromInts(output_dims)),
+  };
+  tensors[1].allocation_type = kTfLiteMmapRo;
+  int inputs[] = {2, 0, 1};
+  int outputs[] = {1, 2};
+  const TFLMRegistration registration = tflite::Register_PAD();
+  tflite::micro::KernelRunner runner(
+      registration, tensors, 3, tflite::testing::IntArrayFromInts(inputs),
+      tflite::testing::IntArrayFromInts(outputs), /*builtin_data=*/nullptr);
+  EXPECT_EQ(kTfLiteError, runner.InitAndPrepare());
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
+}
+}  // namespace
+
 // helia: Prepare must reject input and output ranks that differ before it
 // indexes dims or paddings by the other rank. Each buffer holds the slot an
 // unchecked Prepare would read, consistent with the output, so only the rank
@@ -515,12 +540,9 @@ TEST(PadTest, ExpectFailureOutputRankAboveInputRank) {
   int pad_dims[] = {2, 3, 2};
   const int32_t pad_values[] = {0, 0, 0, 0, 0, 0};
   int output_dims[] = {3, 1, 2, 3};
-  const float golden[] = {1, 2, 3, 4, 5, 6};
   float output_data[6];
-
-  tflite::testing::TestPadFloat(input_dims, input_values, pad_dims, pad_values,
-                                output_dims, golden, output_data,
-                                kTfLiteError);
+  ExpectPadPrepareRejects(input_dims, input_values, pad_dims, pad_values,
+                          output_dims, output_data);
 }
 
 TEST(PadTest, ExpectFailureInputRankAboveOutputRank) {
@@ -529,12 +551,9 @@ TEST(PadTest, ExpectFailureInputRankAboveOutputRank) {
   int pad_dims[] = {2, 2, 2};
   const int32_t pad_values[] = {0, 0, 0, 0, 0, 0};
   int output_dims[] = {2, 1, 2};
-  const float golden[] = {1, 2};
   float output_data[2];
-
-  tflite::testing::TestPadFloat(input_dims, input_values, pad_dims, pad_values,
-                                output_dims, golden, output_data,
-                                kTfLiteError);
+  ExpectPadPrepareRejects(input_dims, input_values, pad_dims, pad_values,
+                          output_dims, output_data);
 }
 
 // helia: Prepare must reject a negative padding in any slot, even when the
@@ -548,22 +567,8 @@ TEST(PadTest, ExpectFailureNegativePadding) {
   int output_dims[] = {2, 2, 3};
   for (const auto& pad_values : pad_cases) {
     float output_data[6];
-    TfLiteTensor tensors[] = {
-        tflite::testing::CreateTensor(
-            input_values, tflite::testing::IntArrayFromInts(input_dims)),
-        tflite::testing::CreateTensor(
-            pad_values, tflite::testing::IntArrayFromInts(pad_dims)),
-        tflite::testing::CreateTensor(
-            output_data, tflite::testing::IntArrayFromInts(output_dims)),
-    };
-    tensors[1].allocation_type = kTfLiteMmapRo;
-    int inputs[] = {2, 0, 1};
-    int outputs[] = {1, 2};
-    const TFLMRegistration registration = tflite::Register_PAD();
-    tflite::micro::KernelRunner runner(
-        registration, tensors, 3, tflite::testing::IntArrayFromInts(inputs),
-        tflite::testing::IntArrayFromInts(outputs), /*builtin_data=*/nullptr);
-    EXPECT_EQ(kTfLiteError, runner.InitAndPrepare());
+    ExpectPadPrepareRejects(input_dims, input_values, pad_dims, pad_values,
+                            output_dims, output_data);
   }
 }
 
