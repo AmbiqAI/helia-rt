@@ -8,6 +8,7 @@ project:
 
   # heliaRT includes heliaCORE headers as "Include/<name>.h", relative to the
   # ns-cmsis-nn root; the ns-cmsis-nn pack exports only its Include directory.
+  # TODO(AmbiqAI/ns-cmsis-nn#657): drop once the pack exports its root.
   add-path:
     - $Pack(Ambiq::NS-CMSIS-NN)$
 
