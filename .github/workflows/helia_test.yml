@@ -271,33 +271,34 @@ jobs:
         # Float scratch-context checks add one binary, four cases without F16 and
         # eight with it; elementwise Prepare dtypes add four cases on every leg.
         # see AmbiqAI/helia-rt#376
-        # PAD rank mismatch and empty float16 PAD add six cases on every leg.
+        # PAD rank mismatch, empty float16 PAD and the rank-5 float16 rejection add
+        # seven cases on every leg.
         # see AmbiqAI/helia-rt#350, AmbiqAI/helia-rt#351
         # Negative PAD paddings add one case on every leg. see AmbiqAI/helia-rt#372
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 160
-            min-cases: 1338
+            min-cases: 1339
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 160
-            min-cases: 1338
+            min-cases: 1339
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and one case fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 159
-            min-cases: 1337
+            min-cases: 1338
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 160
-            min-cases: 1390
+            min-cases: 1391
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 159
-            min-cases: 1389
+            min-cases: 1390
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
