@@ -446,7 +446,7 @@ def build_pdsc(
                     files,
                     "file",
                     category="preIncludeGlobal",
-                    name=f".cmsis_pack/define_{d}.h",
+                    name=f".cmsis_pack/define_{_define_name(d)}.h",
                 )
 
     # ----- enumerate every staged header for the indexer ----------------
@@ -461,6 +461,11 @@ def build_pdsc(
     return tree
 
 
+def _define_name(define: str) -> str:
+    """Macro name of a manifest define written as ``NAME`` or ``NAME=VALUE``."""
+    return define.split("=", 1)[0]
+
+
 def write_define_stubs(stage_root: Path, manifests: dict[str, BackendManifest]) -> None:
     """Emit the tiny ``define_<X>.h`` files referenced by the pdsc."""
     out_dir = stage_root / ".cmsis_pack"
@@ -471,9 +476,10 @@ def write_define_stubs(stage_root: Path, manifests: dict[str, BackendManifest]) 
             if d in seen:
                 continue
             seen.add(d)
-            (out_dir / f"define_{d}.h").write_text(
+            name, _, value = d.partition("=")
+            (out_dir / f"define_{name}.h").write_text(
                 f"/* heliaRT CMSIS-Pack: backend define for {d}. */\n"
-                f"#ifndef {d}\n#define {d} 1\n#endif\n"
+                f"#ifndef {name}\n#define {name} {value or '1'}\n#endif\n"
             )
 
 
