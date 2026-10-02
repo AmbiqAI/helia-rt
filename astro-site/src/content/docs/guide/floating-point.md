@@ -69,6 +69,10 @@ The M55 archive assumes the required floating-point MVE configuration. The archi
 
 When using a separate prebuilt kernel library with a source runtime, retain its feature manifest. The kernel dependency must export the same features the archive contains. A successful static-library build is not a final link check.
 
+## Supported FP16 configurations
+
+FP16 arithmetic is supported and qualified on Cortex-M55 (`cortex-m55`) with MVE floating point and the IEEE half-precision format; the Make build and the cortex-m55 release archives enable it. The `cortex-m4+fp` release archives (for example Apollo3 and Apollo4) are supported targets that ship INT8, INT16 and FP32 without FP16 arithmetic. Other FP16 builds are not supported configurations: heliaCORE rejects the Arm alternative half-precision format at compile time, and Armv8.1-M without MVE is not an FP16 target. FP16 storage widened through `DEQUANTIZE` works on every target, including the `cortex-m4+fp` archives.
+
 ## Adapter and kernel version pairing
 
 Keep the RT release paired with its documented kernel dependency. The Make source pin is recorded in `helia.inc`; separately supplied source targets or archives must be updated deliberately.

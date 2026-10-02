@@ -11,6 +11,8 @@ A compiler name alone is insufficient. Record its version, CPU/architecture flag
 
 The [release matrix](https://github.com/AmbiqAI/helia-rt/blob/main/.github/workflows/helia_release.yml) contains `cortex-m4+fp` and `cortex-m55`, each with the three compilers and three build flavors. Use the matching bundle entry and its headers. Do not infer a SPEED/SIZE choice from a filename or apply a source-build flag to an already built archive.
 
+A prebuilt archive also carries its toolchain's C-library ABI. The ATfE archives are built against picolibc and reference its thread-local `errno`; the GCC archives reference newlib's `__errno()`. DETECTION_POSTPROCESS and the signal FFT and overlap-add operators reach `errno` through FlexBuffers option parsing, so an ATfE archive that includes them does not link into a newlib image. Pair the archive with your application's C library (the GCC archive for newlib), or build from source with the application's toolchain. See [helia-rt#390](https://github.com/AmbiqAI/helia-rt/issues/390).
+
 ## Build with the release entry point
 
 The [release build script](https://github.com/AmbiqAI/helia-rt/blob/main/tensorflow/lite/micro/tools/ci_build/build_helia.sh) accepts:
