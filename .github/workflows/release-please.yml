@@ -12,12 +12,15 @@ permissions:
   contents: write
   pull-requests: write
 
-# release-please force-pushes the release branch whenever the generated PR body
-# changes, and two runs doing that at once is a real race: code-suggester
-# re-parents the branch onto `main`'s current HEAD on every run, so the loser can
-# leave the branch computed from an older `main`. It has already happened -- on
-# 2026-08-19 the runs for two `main` pushes overlapped (22:08:15-22:08:44 and
-# 22:08:31-22:09:05) and both force-pushed, at 22:08:42 and 22:09:02.
+# release-please force-pushes the release branch on every run that builds the
+# release PR, because release-please-config.json sets always-update: without it,
+# merges that leave the release notes unchanged (docs:, build:, chore:) would
+# not reach the release PR's version-file updates. Two runs doing that at once
+# is a real race: code-suggester re-parents the branch onto `main`'s current
+# HEAD on every run, so the loser can leave the branch computed from an older
+# `main`. It has already happened -- on 2026-08-19 the runs for two `main`
+# pushes overlapped (22:08:15-22:08:44 and 22:08:31-22:09:05) and both
+# force-pushed, at 22:08:42 and 22:09:02.
 #
 # Serialise rather than cancel, for the same reason: cancelling a run mid-flight
 # can leave the branch half-computed.
