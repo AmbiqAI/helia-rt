@@ -177,7 +177,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends cmake curl ca-certificates
+          sudo apt-get install -y --no-install-recommends cmake ninja-build curl ca-certificates
           curl -fsSL \
               "https://github.com/Open-CMSIS-Pack/cmsis-toolbox/releases/download/${CMSIS_TOOLBOX_VERSION}/cmsis-toolbox-linux-amd64.tar.gz" \
               -o /tmp/cmsis-toolbox.tar.gz
