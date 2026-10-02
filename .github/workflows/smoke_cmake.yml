@@ -255,13 +255,19 @@ jobs:
           clang_version=$("${DL}/arm_toolchain_embedded/bin/clang" -dumpversion)
           echo "GCC_TOOLCHAIN_${gcc_version//./_}=${DL}/gcc_embedded/bin" >> "${GITHUB_ENV}"
           echo "CLANG_TOOLCHAIN_${clang_version//./_}=${DL}/arm_toolchain_embedded/bin" >> "${GITHUB_ENV}"
-      - name: Build the pack consumer example with cbuild (GCC, ATfE)
+      - name: Build the pack consumer example with cbuild (GCC, ATfE; Reference, HELIA)
         run: |
           set -euo pipefail
           export CMSIS_PACK_ROOT="${RUNNER_TEMP}/packs"
           cpackget init https://www.keil.com/pack/index.pidx
           packs=(dist/Ambiq.helia-rt.*.pack)
           cpackget add --agree-embedded-license "${packs[0]}"
+          # The HELIA variant builds heliaCORE from the ns-cmsis-nn release
+          # pack that this workflow pins.
+          ns_pack="Ambiq.NS-CMSIS-NN.${NS_CMSIS_NN_REF#v}.pack"
+          curl -fsSL --retry 3 -o "${RUNNER_TEMP}/${ns_pack}" \
+              "https://github.com/AmbiqAI/ns-cmsis-nn/releases/download/${NS_CMSIS_NN_REF}/${ns_pack}"
+          cpackget add --agree-embedded-license "${RUNNER_TEMP}/${ns_pack}"
           cd tools/cmsis_pack/examples/hello_world
           for toolchain in GCC CLANG; do
             cbuild hello_world.csolution.yml --toolchain "${toolchain}" \
