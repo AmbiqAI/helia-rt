@@ -392,6 +392,27 @@ Bazel setup). The workflow stays usable via `workflow_dispatch`.
 Drop condition: helia replaces this with a sibling `helia_sync.yml`
 (deferred — see Phase 4 plan).
 
+## `.github/workflows/ci.yml`
+
+Upstream split this workflow into `run_*` / `suite_*` / `test_*` files
+(tensorflow/tflite-micro#3307), which helia-rt does not carry; helia-rt keeps
+the pre-split file as the `ci:run_full` workflow called by `tests_entry.yml`
+and `run_ci.yml`. Beyond the general reshaping (every non-Bazel job runs in
+the CI image and checks out `inputs.trigger-sha`, matrices are unrolled into
+single jobs, `check_code_style` is disabled), helia-specific content includes:
+
+1. The `ci-image` setup job pins `ghcr.io/ambiqai/helia-rt-ci` by digest
+   (one of the pin points in `.github/workflows/README.md`).
+2. `static_export_drift_check` (helia-only job) re-runs
+   `zephyr_static_export.sh` and fails on a `third_party_static/` diff; it
+   marks the container checkout as a git safe directory first.
+3. `project_generation` puts the host `clang`/`clang++` ahead of the ATfE
+   toolchain the CI image puts first on `PATH`, since the generated Makefile
+   builds host code with `clang++`.
+
+Drop condition: helia-rt adopts upstream's split workflows, or moves these
+jobs to a sibling `helia_*.yml`.
+
 ## Action references in upstream-derived workflows
 
 `log_binary_size_pr.yml`, `sync.yml` and `issue_on_error.yml` reference
