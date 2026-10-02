@@ -286,6 +286,7 @@ endif
 $(eval $(call microlite_test,kernel_float_context_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_context_test.cc))
 
+# GCC only: lld would also wrap the depthwise sizer's call into the conv sizer.
 ifeq ($(TOOLCHAIN),gcc)
 $(kernel_float_context_test_BINARY): CXXFLAGS += \
   -DHELIA_FLOAT_CONTEXT_LINK_WRAP=1
