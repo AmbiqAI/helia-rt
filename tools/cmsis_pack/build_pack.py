@@ -470,13 +470,18 @@ def write_define_stubs(stage_root: Path, manifests: dict[str, BackendManifest]) 
     """Emit the tiny ``define_<X>.h`` files referenced by the pdsc."""
     out_dir = stage_root / ".cmsis_pack"
     out_dir.mkdir(exist_ok=True)
-    seen: set[str] = set()
+    seen: dict[str, str] = {}
     for m in manifests.values():
         for d in m.backend_defines:
-            if d in seen:
-                continue
-            seen.add(d)
             name, _, value = d.partition("=")
+            if name in seen:
+                # Variants share one stub per macro name, so they must agree.
+                if seen[name] != d:
+                    raise SystemExit(
+                        f"conflicting backend defines {seen[name]!r} and {d!r}"
+                    )
+                continue
+            seen[name] = d
             (out_dir / f"define_{name}.h").write_text(
                 f"/* heliaRT CMSIS-Pack: backend define for {d}. */\n"
                 f"#ifndef {name}\n#define {name} {value or '1'}\n#endif\n"
