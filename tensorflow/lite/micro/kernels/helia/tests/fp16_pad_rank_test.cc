@@ -13,10 +13,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-// Float16 PAD and PADV2 below rank 4. The helia float16 path runs only on
-// heliaCORE, which pads NHWC tensors, so a rank-r input must land on the last
-// r of (N, H, W, C). The expected outputs are exact in float16.
-// see AmbiqAI/helia-rt#348
+// Float16 PAD and PADV2 below rank 4, empty tensors at any rank, and the
+// rank-5 rejection. The helia float16 path runs only on heliaCORE, which pads
+// NHWC tensors, so a rank-r input must land on the last r of (N, H, W, C).
+// The expected outputs are exact in float16.
+// see AmbiqAI/helia-rt#348, AmbiqAI/helia-rt#351
 
 #include <cstdint>
 
@@ -85,6 +86,7 @@ void RunPad(int* input_dims, uint16_t* input, int* pad_dims,
   (void)expected;
   (void)output_size;
   EXPECT_EQ(kTfLiteError, runner.InitAndPrepare());
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
 #endif
 }
 
@@ -126,6 +128,85 @@ TEST(HeliaFp16PadRankTest, Rank3WithConstant) {
                                k4, k5, k6, k7};
   RunPad(input_dims, input, pad_dims, pads, &constant, output_dims, expected,
          12);
+}
+
+// An empty output has nothing to write, as in the reference kernel.
+// see AmbiqAI/helia-rt#351
+TEST(HeliaFp16PadRankTest, Rank4EmptyOutput) {
+  using namespace tflite::testing;
+  int input_dims[] = {4, 1, 0, 2, 1};
+  uint16_t input[] = {k1};
+  int pad_dims[] = {2, 4, 2};
+  const int32_t pads[] = {0, 0, 0, 0, 1, 1, 0, 0};
+  int output_dims[] = {4, 1, 0, 4, 1};
+  RunPad(input_dims, input, pad_dims, pads, nullptr, output_dims, nullptr, 0);
+}
+
+TEST(HeliaFp16PadRankTest, Rank2EmptyOutputWithConstant) {
+  using namespace tflite::testing;
+  int input_dims[] = {2, 0, 3};
+  uint16_t input[] = {k1};
+  int pad_dims[] = {2, 2, 2};
+  const int32_t pads[] = {0, 0, 1, 0};
+  uint16_t constant = k7;
+  int output_dims[] = {2, 0, 4};
+  RunPad(input_dims, input, pad_dims, pads, &constant, output_dims, nullptr, 0);
+}
+
+TEST(HeliaFp16PadRankTest, Rank2EmptyInput) {
+  using namespace tflite::testing;
+  int input_dims[] = {2, 0, 3};
+  uint16_t input[] = {k1};
+  int pad_dims[] = {2, 2, 2};
+  const int32_t pads[] = {1, 1, 0, 0};
+  int output_dims[] = {2, 2, 3};
+  const uint16_t expected[] = {k0, k0, k0, k0, k0, k0};
+  RunPad(input_dims, input, pad_dims, pads, nullptr, output_dims, expected, 6);
+}
+
+// An empty input has no arena buffer; the output is all padding.
+TEST(HeliaFp16PadRankTest, Rank4EmptyNullInputWithConstant) {
+  using namespace tflite::testing;
+  int input_dims[] = {4, 1, 0, 2, 1};
+  int pad_dims[] = {2, 4, 2};
+  const int32_t pads[] = {0, 0, 1, 1, 0, 0, 0, 0};
+  uint16_t constant = k7;
+  int output_dims[] = {4, 1, 2, 2, 1};
+  const uint16_t expected[] = {k7, k7, k7, k7};
+  RunPad(input_dims, nullptr, pad_dims, pads, &constant, output_dims,
+         expected, 4);
+}
+
+// Prepare rejects a rank-5 float16 PADV2 and releases its temporaries: for
+// the four-dimension limit on float16 legs, and because float16 is disabled
+// on the others.
+TEST(HeliaFp16PadRankTest, Rank5RejectedWithConstant) {
+  using namespace tflite::testing;
+  int input_dims[] = {5, 1, 1, 1, 1, 2};
+  uint16_t input[] = {k1, k2};
+  int pad_dims[] = {2, 5, 2};
+  const int32_t pads[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  uint16_t constant = k7;
+  int output_dims[] = {5, 1, 1, 1, 1, 2};
+  uint16_t output[2];
+  int scalar_dims[] = {0};
+  TfLiteTensor tensors[] = {
+      CreateTensor(input, IntArrayFromInts(input_dims), false, kTfLiteFloat16),
+      CreateTensor(pads, IntArrayFromInts(pad_dims), false, kTfLiteInt32),
+      CreateTensor(output, IntArrayFromInts(output_dims), false,
+                   kTfLiteFloat16),
+      CreateTensor(&constant, IntArrayFromInts(scalar_dims), false,
+                   kTfLiteFloat16),
+  };
+  tensors[1].allocation_type = kTfLiteMmapRo;
+  int inputs[] = {3, 0, 1, 3};
+  int outputs[] = {1, 2};
+  const TFLMRegistration registration = tflite::Register_PADV2();
+  tflite::micro::KernelRunner runner(registration, tensors, 4,
+                                     IntArrayFromInts(inputs),
+                                     IntArrayFromInts(outputs), nullptr);
+  EXPECT_EQ(kTfLiteError, runner.InitAndPrepare());
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
 }
 
 #if !ARM_NN_ENABLE_F16 && defined(__ARM_FEATURE_MVE) && \

@@ -84,6 +84,19 @@ void *Init(TfLiteContext *context, const char *buffer, size_t length)
   return context->AllocatePersistentBuffer(context, sizeof(OpDataPad));
 }
 
+// Releases Prepare's temporary tensors before an early rejection.
+void DeallocatePadTemps(MicroContext *micro_context, TfLiteTensor *input, TfLiteTensor *paddings,
+                        TfLiteTensor *constant_values, TfLiteTensor *output)
+{
+  micro_context->DeallocateTempTfLiteTensor(input);
+  micro_context->DeallocateTempTfLiteTensor(paddings);
+  if (constant_values != nullptr)
+  {
+    micro_context->DeallocateTempTfLiteTensor(constant_values);
+  }
+  micro_context->DeallocateTempTfLiteTensor(output);
+}
+
 TfLiteStatus Prepare(TfLiteContext *context, TfLiteNode *node)
 {
   MicroContext *micro_context = GetMicroContext(context);
@@ -109,14 +122,14 @@ TfLiteStatus Prepare(TfLiteContext *context, TfLiteNode *node)
   TF_LITE_ENSURE(context, NumDimensions(input) <= reference_ops::PadKernelMaxDimensionCount());
 
   // The float16 pad path is optimized-only (no reference fallback) and
-  // heliaCORE pads NHWC tensors, so reject rank 5 here rather than failing
-  // at Invoke time.
-  if (input->type == kTfLiteFloat16)
+  // heliaCORE pads NHWC tensors, so reject float16 on builds without it and
+  // rank 5 here rather than failing at Invoke time.
+  if (input->type == kTfLiteFloat16 && (!kHeliaFloat16Enabled || NumDimensions(input) > 4))
   {
-    TF_LITE_ENSURE_MSG(context, kHeliaFloat16Enabled,
-                       "Float16 PAD requires ARM_NN_ENABLE_F16.");
-    TF_LITE_ENSURE_MSG(context, NumDimensions(input) <= 4,
-                       "Float16 PAD supports up to 4-D tensors.");
+    MicroPrintf(kHeliaFloat16Enabled ? "Float16 PAD supports up to 4-D tensors."
+                                     : "Float16 PAD requires ARM_NN_ENABLE_F16.");
+    DeallocatePadTemps(micro_context, input, paddings, constant_values, output);
+    return kTfLiteError;
   }
 
   if (constant_values != nullptr)
@@ -124,6 +137,14 @@ TfLiteStatus Prepare(TfLiteContext *context, TfLiteNode *node)
     TF_LITE_ENSURE_EQ(context, input->type, constant_values->type);
     // Ensure that constant_values is a scalar.
     TF_LITE_ENSURE_EQ(context, NumElements(constant_values), 1);
+  }
+
+  // Dims and paddings below are indexed by both ranks. see AmbiqAI/helia-rt#350
+  if (NumDimensions(input) != NumDimensions(output))
+  {
+    MicroPrintf("PAD: input rank %d differs from output rank %d.", NumDimensions(input), NumDimensions(output));
+    DeallocatePadTemps(micro_context, input, paddings, constant_values, output);
+    return kTfLiteError;
   }
 
   // There must be a pair of paddings for each output dimension.
@@ -134,6 +155,16 @@ TfLiteStatus Prepare(TfLiteContext *context, TfLiteNode *node)
   // the flatbuffer:
   TF_LITE_ENSURE_MSG(context, IsConstantTensor(paddings), "Non-constant >paddings< tensor is not supported");
   const int32_t *paddings_data = GetTensorData<int32_t>(paddings);
+  // Paddings must be non-negative. see AmbiqAI/helia-rt#372
+  for (int i = 0; i < output->dims->size * 2; i++)
+  {
+    if (paddings_data[i] < 0)
+    {
+      MicroPrintf("PAD: padding %d is negative (%d).", i, static_cast<int>(paddings_data[i]));
+      DeallocatePadTemps(micro_context, input, paddings, constant_values, output);
+      return kTfLiteError;
+    }
+  }
   for (int i = 0; i < output->dims->size; i++)
   {
     int output_dim = output->dims->data[i];
@@ -211,6 +242,20 @@ TfLiteStatus Eval(TfLiteContext *context, TfLiteNode *node)
         constant_values == nullptr
             ? static_cast<float16_t>(0)
             : *tflite::micro::GetTensorData<float16_t>(constant_values);
+    // An empty tensor has no arena buffer, and arm_pad_f16 rejects a null
+    // input or an empty output: nothing to write, or nothing to copy.
+    // see AmbiqAI/helia-rt#351
+    const int output_size = tflite::micro::GetTensorShape(output).FlatSize();
+    if (output_size == 0) {
+      break;
+    }
+    if (tflite::micro::GetTensorShape(input).FlatSize() == 0) {
+      float16_t *output_data = tflite::micro::GetTensorData<float16_t>(output);
+      for (int i = 0; i < output_size; ++i) {
+        output_data[i] = pad_value;
+      }
+      break;
+    }
     if (tflite::micro::GetTensorShape(input).DimensionsCount() <= 4) {
       cmsis_nn_dims input_size;
       cmsis_nn_dims pre_pad;

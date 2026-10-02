@@ -19,12 +19,27 @@ limitations under the License.
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/pad.h"
+#include "tensorflow/lite/micro/micro_log.h"
 
 namespace tflite {
 
 void* PadInit(TfLiteContext* context, const char* buffer, size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
   return context->AllocatePersistentBuffer(context, sizeof(OpData));
+}
+
+// helia: releases PadPrepare's temporaries before an early rejection.
+// see AmbiqAI/helia-rt#350
+static void DeallocatePadTemps(MicroContext* micro_context,
+                               TfLiteTensor* input, TfLiteTensor* paddings,
+                               TfLiteTensor* constant_values,
+                               TfLiteTensor* output) {
+  micro_context->DeallocateTempTfLiteTensor(input);
+  micro_context->DeallocateTempTfLiteTensor(paddings);
+  if (constant_values != nullptr) {
+    micro_context->DeallocateTempTfLiteTensor(constant_values);
+  }
+  micro_context->DeallocateTempTfLiteTensor(output);
 }
 
 TfLiteStatus PadPrepare(TfLiteContext* context, TfLiteNode* node) {
@@ -62,6 +77,16 @@ TfLiteStatus PadPrepare(TfLiteContext* context, TfLiteNode* node) {
     TF_LITE_ENSURE_EQ(context, NumElements(constant_values), 1);
   }
 
+  // helia: dims and paddings below are indexed by both ranks.
+  // see AmbiqAI/helia-rt#350
+  if (NumDimensions(input) != NumDimensions(output)) {
+    MicroPrintf("PAD: input rank %d differs from output rank %d.",
+                NumDimensions(input), NumDimensions(output));
+    DeallocatePadTemps(micro_context, input, paddings, constant_values,
+                       output);
+    return kTfLiteError;
+  }
+
   // There must be a pair of paddings for each output dimension.
   TF_LITE_ENSURE_EQ(context, GetTensorShape(paddings).FlatSize(),
                     output->dims->size * 2);
@@ -72,6 +97,16 @@ TfLiteStatus PadPrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_MSG(context, IsConstantTensor(paddings),
                      "Non-constant >paddings< tensor is not supported");
   const int32_t* paddings_data = GetTensorData<int32_t>(paddings);
+  // helia: paddings must be non-negative. see AmbiqAI/helia-rt#372
+  for (int i = 0; i < output->dims->size * 2; i++) {
+    if (paddings_data[i] < 0) {
+      MicroPrintf("PAD: padding %d is negative (%d).", i,
+                  static_cast<int>(paddings_data[i]));
+      DeallocatePadTemps(micro_context, input, paddings, constant_values,
+                         output);
+      return kTfLiteError;
+    }
+  }
   for (int i = 0; i < output->dims->size; i++) {
     int output_dim = output->dims->data[i];
     int expected_dim =
