@@ -78,6 +78,7 @@ Keep the RT release paired with its documented kernel dependency. The Make sourc
 | Float SPLIT, SPLIT_V, PACK, UNPACK and FILL; FP16 SQRT and RSQRT | `v7.33.0` |
 | GATHER and GATHER_ND | `v7.34.0` |
 | FP16 ARG_MIN and ARG_MAX | `v7.35.0` |
+| FP16 ARG_MIN and ARG_MAX skip NaN, as FP32 does | `v7.39.1` |
 
 These boundaries are recorded in the adapter changes and [RT changelog](https://github.com/AmbiqAI/helia-rt/blob/main/CHANGELOG.md). They do not replace the release's full dependency requirement.
 

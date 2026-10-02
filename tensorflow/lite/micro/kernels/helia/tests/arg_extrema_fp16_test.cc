@@ -113,17 +113,19 @@ bool IsNan(uint16_t bits) {
   return (bits & 0x7c00) == 0x7c00 && (bits & 0x03ff) != 0;
 }
 
+// TensorFlow/LiteRT semantics: a NaN candidate never wins, a number replaces
+// a NaN accumulator, and an all-NaN line gives 0. see AmbiqAI/helia-rt#359
 int32_t OracleLine(const uint16_t* input, size_t base, size_t reduction,
                    size_t inner, bool maximum) {
-  for (size_t k = 0; k < reduction; ++k) {
-    if (IsNan(input[base + k * inner])) return static_cast<int32_t>(k);
-  }
   int32_t best_index = 0;
-  uint32_t best_key = OrderedKey(input[base]);
+  uint16_t best = input[base];
   for (size_t k = 1; k < reduction; ++k) {
-    const uint32_t key = OrderedKey(input[base + k * inner]);
-    if (maximum ? key > best_key : key < best_key) {
-      best_key = key;
+    const uint16_t candidate = input[base + k * inner];
+    if (IsNan(candidate)) continue;
+    const uint32_t key = OrderedKey(candidate);
+    const uint32_t best_key = OrderedKey(best);
+    if (IsNan(best) || (maximum ? key > best_key : key < best_key)) {
+      best = candidate;
       best_index = static_cast<int32_t>(k);
     }
   }
@@ -452,8 +454,13 @@ TEST(HeliaArgExtremaFp16Test, SpecialValuesAndTies) {
     int32_t maximum;
   };
   const Case cases[] = {
-      {{0x3c00, 0x7e01, 0xc000, 0}, 3, 1, 1},
-      {{0x7c01, 0x7e02, 0x4400, 0}, 3, 0, 0},
+      {{0x3c00, 0x7e01, 0xc000, 0}, 3, 2, 0},
+      {{0x7c01, 0x7e02, 0x4400, 0}, 3, 2, 2},
+      {{0x7e00, 0x3c00, 0x4200, 0x4000}, 4, 1, 2},
+      {{0x4200, 0x3c00, 0x4000, 0x7e00}, 4, 1, 0},
+      {{0x4000, 0x7e00, 0xbc00, 0xfe00}, 4, 2, 0},
+      {{0x7e00, 0x7e00, 0xfe00, 0x7c01}, 4, 0, 0},
+      {{0xfe00, 0x3c00, 0x4000, 0xfc01}, 4, 1, 2},
       {{0x4000, 0xbc00, 0xbc00, 0x4000}, 4, 1, 0},
       {{0x0000, 0x8000, 0, 0}, 2, 0, 0},
       {{0x8000, 0x0000, 0, 0}, 2, 0, 0},

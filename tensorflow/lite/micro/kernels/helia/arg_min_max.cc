@@ -206,7 +206,7 @@ TfLiteStatus ArgMinMaxPrepare(TfLiteContext* context, TfLiteNode* node) {
 }
 
 // TensorFlow/LiteRT ARG_MAX/ARG_MIN semantics: a NaN candidate never wins and
-// a finite candidate replaces a NaN accumulator. see AmbiqAI/helia-rt#359
+// a number replaces a NaN accumulator. see AmbiqAI/helia-rt#359
 template <typename T>
 inline bool ArgIsNaN(T) {
   return false;
@@ -309,7 +309,6 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node, bool is_arg_max) {
   TF_LITE_ENSURE(context,
                  (core_shape.input_count == 0 || input_data != nullptr) &&
                      (core_shape.output_count == 0 || output_data != nullptr));
-  // TODO(AmbiqAI/ns-cmsis-nn#648): float16 NaN handling differs from float32.
   const arm_cmsis_nn_status status =
       is_arg_max ? arm_argmax_f16(input_data, &core_shape.input_dims,
                                   core_shape.axis, output_data)
