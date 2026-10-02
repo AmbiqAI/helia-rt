@@ -118,6 +118,12 @@ common_args=(
 # Ensure third_party deps are present (download step)
 readable_run make "${common_args[@]}" third_party_downloads
 
+# The helia kernels keep every heliaCORE status, checked against the headers
+# of the ns-cmsis-nn this leg builds. see AmbiqAI/helia-rt#377
+if [[ "${OPTIMIZED_KERNEL_DIR}" == "helia" ]]; then
+  readable_run tensorflow/lite/micro/tools/ci_build/check_helia_cmsis_nn_status_checks.sh
+fi
+
 # ------------------------- ccache wrappers (optional) -------------------------
 # When CCACHE_WRAP_DIR is set in the environment (typically by CI), generate
 # wrapper scripts that route the toolchain through ccache, and pass the

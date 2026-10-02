@@ -106,6 +106,11 @@ jobs:
           ./tensorflow/lite/micro/tools/ci_build/check_helia_ci_image_pins.sh
           ./tensorflow/lite/micro/tools/ci_build/check_helia_ci_image_pins_test.sh
 
+      # The heliaCORE status guard itself runs in test_helia.sh, which has the
+      # pinned headers. see AmbiqAI/helia-rt#377
+      - name: Self-test the heliaCORE status guard
+        run: ./tensorflow/lite/micro/tools/ci_build/check_helia_cmsis_nn_status_checks_test.sh
+
   armclang_m4_qualification:
     needs: ci-image
     if: ${{ inputs.armclang-m4-qualification }}
