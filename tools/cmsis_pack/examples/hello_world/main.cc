@@ -25,7 +25,8 @@ limitations under the License.
 namespace {
 constexpr int kArenaSize = 16 * 1024;
 alignas(16) uint8_t g_arena[kArenaSize];
-// Set by the application to its .tflite flatbuffer.
+// Replace with your model's .tflite flatbuffer. The volatile read keeps the
+// interpreter linked while no model is supplied.
 const unsigned char* volatile g_model_data = nullptr;
 }  // namespace
 

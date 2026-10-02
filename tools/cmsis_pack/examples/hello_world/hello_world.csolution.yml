@@ -7,8 +7,9 @@ solution:
   language-CPP: c++17
 
   packs:
-    - pack: ARM::CMSIS
-    - pack: ARM::Cortex_DFP
+    # Pinned so a new upstream release cannot change what this example checks.
+    - pack: ARM::CMSIS@6.3.0
+    - pack: ARM::Cortex_DFP@1.2.0
     - pack: Ambiq::helia-rt
 
   target-types:
