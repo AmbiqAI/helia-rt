@@ -3,18 +3,12 @@
 project:
   # The HELIA variant's floor; CI installs the release that helia-rt pins.
   packs:
-    - pack: Ambiq::NS-CMSIS-NN@>=7.35.0
+    - pack: Ambiq::NS-CMSIS-NN@>=7.39.2
 
   groups:
     - group: App
       files:
         - file: main.cc
-
-  # heliaRT includes heliaCORE headers as "Include/<name>.h", relative to the
-  # ns-cmsis-nn root, which the ns-cmsis-nn pack does not export.
-  # TODO(AmbiqAI/ns-cmsis-nn#657): drop once the pack exports its root.
-  add-path:
-    - $Pack(Ambiq::NS-CMSIS-NN)$
 
   components:
     - component: ARM::CMSIS:CORE

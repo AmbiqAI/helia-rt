@@ -92,14 +92,15 @@ CSUB = "helia-rt"
 # consistent. Consumers who need the prebuilt heliaCORE for binary-size
 # reasons can override at integration time.
 #
-# 7.35.0 is the floor because the HELIA source component includes the FP16
-# ARG_MIN and ARG_MAX adapter, which requires APIs first shipped in that release.
+# 7.39.2 is the floor because the HELIA sources include heliaCORE headers as
+# "Include/<name>.h", which resolves only once the ns-cmsis-nn pack exports its
+# root as an include path. see AmbiqAI/ns-cmsis-nn#657
 NS_CMSIS_NN_VENDOR = "Ambiq"
 NS_CMSIS_NN_CCLASS = "Machine Learning"
 NS_CMSIS_NN_CGROUP = "NN Lib"
 NS_CMSIS_NN_CSUB = "heliaCORE"
 NS_CMSIS_NN_CVARIANT = "Source"
-NS_CMSIS_NN_MIN_VERSION = "7.35.0"
+NS_CMSIS_NN_MIN_VERSION = "7.39.2"
 
 
 # ---------------------------------------------------------------------------
