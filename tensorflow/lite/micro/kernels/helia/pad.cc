@@ -84,6 +84,19 @@ void *Init(TfLiteContext *context, const char *buffer, size_t length)
   return context->AllocatePersistentBuffer(context, sizeof(OpDataPad));
 }
 
+// Releases Prepare's temporary tensors before an early rejection.
+void DeallocatePadTemps(MicroContext *micro_context, TfLiteTensor *input, TfLiteTensor *paddings,
+                        TfLiteTensor *constant_values, TfLiteTensor *output)
+{
+  micro_context->DeallocateTempTfLiteTensor(input);
+  micro_context->DeallocateTempTfLiteTensor(paddings);
+  if (constant_values != nullptr)
+  {
+    micro_context->DeallocateTempTfLiteTensor(constant_values);
+  }
+  micro_context->DeallocateTempTfLiteTensor(output);
+}
+
 TfLiteStatus Prepare(TfLiteContext *context, TfLiteNode *node)
 {
   MicroContext *micro_context = GetMicroContext(context);
@@ -127,7 +140,12 @@ TfLiteStatus Prepare(TfLiteContext *context, TfLiteNode *node)
   }
 
   // Dims and paddings below are indexed by both ranks. see AmbiqAI/helia-rt#350
-  TF_LITE_ENSURE_EQ(context, NumDimensions(input), NumDimensions(output));
+  if (NumDimensions(input) != NumDimensions(output))
+  {
+    MicroPrintf("PAD: input rank %d differs from output rank %d.", NumDimensions(input), NumDimensions(output));
+    DeallocatePadTemps(micro_context, input, paddings, constant_values, output);
+    return kTfLiteError;
+  }
 
   // There must be a pair of paddings for each output dimension.
   TF_LITE_ENSURE_EQ(context, GetTensorShape(paddings).FlatSize(), output->dims->size * 2);
@@ -140,7 +158,12 @@ TfLiteStatus Prepare(TfLiteContext *context, TfLiteNode *node)
   // Paddings must be non-negative. see AmbiqAI/helia-rt#372
   for (int i = 0; i < output->dims->size * 2; i++)
   {
-    TF_LITE_ENSURE(context, paddings_data[i] >= 0);
+    if (paddings_data[i] < 0)
+    {
+      MicroPrintf("PAD: padding %d is negative (%d).", i, static_cast<int>(paddings_data[i]));
+      DeallocatePadTemps(micro_context, input, paddings, constant_values, output);
+      return kTfLiteError;
+    }
   }
   for (int i = 0; i < output->dims->size; i++)
   {

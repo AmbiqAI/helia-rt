@@ -577,21 +577,27 @@ path does. `IsRsqrtSupportedType` admits int16, which `RsqrtEval` already
 handles. `kernels/elementwise_test.cc`
 adds a rejected dtype for SIN, ABS, RSQRT and LOGICAL_NOT. The helia copy has
 the same change (AmbiqAI/helia-rt#342). See AmbiqAI/helia-rt#376.
-## `tensorflow/lite/micro/kernels/pad_common.cc`
-PAD/PADV2 Prepare rejects input and output ranks that differ before it
-indexes `input->dims` by the output rank and the paddings by the input rank;
-upstream's loop reads past either array for a malformed model. It also
-rejects a negative padding, as TensorFlow Lite's `kernels/pad.cc` does
-("Pad value has to be greater than equal to 0"); one turns into out-of-range
-indices and copy sizes at Eval. `kernels/pad_test.cc` adds a case for each
-rank direction and a negative padding in each slot of a rank-2 PAD. See AmbiqAI/helia-rt#350 and
-AmbiqAI/helia-rt#372.
 
 This correctness fix stays in the shared kernel: a build_helia.sh patch would
 leave reference/CMSIS-NN, direct CMake, Bazel and source consumers unfixed.
 
 Drop condition: upstream's elementwise Prepare calls its type predicate and
 releases its temps on that path.
-Drop condition: upstream's PAD Prepare checks that the ranks match.
+
+## `tensorflow/lite/micro/kernels/pad_common.cc`
+
+PAD/PADV2 Prepare rejects input and output ranks that differ before it
+indexes `input->dims` by the output rank and the paddings by the input rank;
+upstream's loop reads past either array for a malformed model. It also
+rejects a negative padding, as TensorFlow Lite's `kernels/pad.cc` does
+("Pad value has to be greater than equal to 0"); one turns into out-of-range
+indices and copy sizes at Eval. `kernels/pad_test.cc` adds a case for each
+rank direction and a negative padding in each slot of a rank-2 PAD. Both
+rejections release Prepare's temporaries first. See AmbiqAI/helia-rt#350 and
+AmbiqAI/helia-rt#372.
+
+This correctness fix stays in the shared kernel: a build_helia.sh patch would
+leave reference/CMSIS-NN, direct CMake, Bazel and source consumers unfixed.
+
 Drop condition: upstream's PAD Prepare checks that the ranks match and that
 paddings are non-negative.
