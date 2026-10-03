@@ -635,9 +635,10 @@ AmbiqAI/helia-rt#407.
   BATCH_TO_SPACE_ND and float CONV_2D placeholder cases check the new byte size
   (the conv and depthwise cases are skipped on the upstream cmsis_nn backend);
   `micro_allocator_test.cc` covers the byte sizing, the offline-plan rejection
-  and resizes left to the online planner; `depthwise_conv_test.cc` gains an optional validation length on
-  its per-channel helper and a helia-only case for the depthwise batch limit
-  (heliaCORE takes the batch as `uint16_t`).
+  and resizes left to the online planner; `depthwise_conv_test.cc` gains an
+  optional validation length on its per-channel helper and a helia-only case
+  for the helia depthwise Prepare rejecting a batch above 65,535 (heliaCORE
+  takes the batch as `uint16_t`).
 
 This correctness fix stays in the shared kernels: a helia-only override would
 leave reference, direct CMake, Bazel and source consumers wrong. The cmsis_nn
