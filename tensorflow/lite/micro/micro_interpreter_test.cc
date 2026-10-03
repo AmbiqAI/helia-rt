@@ -788,25 +788,51 @@ TEST(MicroInterpreterTest, TestDynamicTensorFails) {
 }
 
 // A tensor resized at Prepare may only feed kernels that follow or check its
-// batch; RELU would size its output from the stored shape and write past it.
-// see AmbiqAI/helia-rt#407
-TEST(MicroInterpreterTest, ResizedTensorReadByOtherKernelFails) {
-  tflite::MicroMutableOpResolver<2> op_resolver;
+// batch, placed after the op that resizes it; any other reader would size its
+// output from the stored shape and write past it. see AmbiqAI/helia-rt#407
+TfLiteStatus AllocateSpaceToBatchModel(tflite::BuiltinOperator consumer,
+                                       bool consumer_first) {
+  tflite::MicroMutableOpResolver<5> op_resolver;
   EXPECT_EQ(kTfLiteOk, op_resolver.AddSpaceToBatchNd());
   EXPECT_EQ(kTfLiteOk, op_resolver.AddRelu());
-  constexpr size_t kArenaSize = 4096;
+  EXPECT_EQ(kTfLiteOk, op_resolver.AddAdd());
+  EXPECT_EQ(kTfLiteOk, op_resolver.AddBatchToSpaceNd());
+  EXPECT_EQ(kTfLiteOk, op_resolver.AddDepthwiseConv2D());
+  constexpr size_t kArenaSize = 8192;
   alignas(16) static uint8_t arena[kArenaSize];
-  const tflite::Model* model =
-      tflite::testing::GetSpaceToBatchModel(tflite::BuiltinOperator_RELU);
-  tflite::MicroInterpreter interpreter(model, op_resolver, arena, kArenaSize);
-  EXPECT_EQ(kTfLiteError, interpreter.AllocateTensors());
+  tflite::MicroInterpreter interpreter(
+      tflite::testing::GetSpaceToBatchModel(consumer, consumer_first),
+      op_resolver, arena, kArenaSize);
+  return interpreter.AllocateTensors();
+}
+
+TEST(MicroInterpreterTest, ResizedTensorReadByOtherKernelFails) {
+  EXPECT_EQ(kTfLiteError,
+            AllocateSpaceToBatchModel(tflite::BuiltinOperator_RELU, false));
+}
+
+TEST(MicroInterpreterTest, ResizedTensorAsSecondInputFails) {
+  EXPECT_EQ(kTfLiteError,
+            AllocateSpaceToBatchModel(tflite::BuiltinOperator_ADD, false));
+}
+
+TEST(MicroInterpreterTest, ResizedTensorReadBeforeItsProducerFails) {
+  EXPECT_EQ(kTfLiteError,
+            AllocateSpaceToBatchModel(tflite::BuiltinOperator_RELU, true));
+  EXPECT_EQ(kTfLiteError, AllocateSpaceToBatchModel(
+                              tflite::BuiltinOperator_DEPTHWISE_CONV_2D, true));
+}
+
+TEST(MicroInterpreterTest, ResizedTensorReadByDepthwiseIsAccepted) {
+  EXPECT_EQ(kTfLiteOk, AllocateSpaceToBatchModel(
+                           tflite::BuiltinOperator_DEPTHWISE_CONV_2D, false));
 }
 
 TEST(MicroInterpreterTest, ResizedTensorReadByBatchToSpaceRoundTrips) {
   tflite::MicroMutableOpResolver<2> op_resolver;
   EXPECT_EQ(kTfLiteOk, op_resolver.AddSpaceToBatchNd());
   EXPECT_EQ(kTfLiteOk, op_resolver.AddBatchToSpaceNd());
-  constexpr size_t kArenaSize = 4096;
+  constexpr size_t kArenaSize = 8192;
   alignas(16) static uint8_t arena[kArenaSize];
   const tflite::Model* model = tflite::testing::GetSpaceToBatchModel(
       tflite::BuiltinOperator_BATCH_TO_SPACE_ND);
@@ -819,6 +845,29 @@ TEST(MicroInterpreterTest, ResizedTensorReadByBatchToSpaceRoundTrips) {
   ASSERT_EQ(kTfLiteOk, interpreter.Invoke());
   for (int i = 0; i < 4; ++i) {
     EXPECT_EQ(input[i], interpreter.output(0)->data.f[i]);
+  }
+}
+
+// A RESHAPE resolving a stored -1 dim is not a resize: its readers are not
+// restricted. see AmbiqAI/helia-rt#407
+TEST(MicroInterpreterTest, ReshapeResolvingStretchDimFeedsAnyKernel) {
+  tflite::MicroMutableOpResolver<2> op_resolver;
+  EXPECT_EQ(kTfLiteOk, op_resolver.AddReshape());
+  EXPECT_EQ(kTfLiteOk, op_resolver.AddRelu());
+  constexpr size_t kArenaSize = 4096;
+  alignas(16) static uint8_t arena[kArenaSize];
+  tflite::MicroInterpreter interpreter(
+      tflite::testing::GetReshapeWithStretchDimModel(), op_resolver, arena,
+      kArenaSize);
+  ASSERT_EQ(kTfLiteOk, interpreter.AllocateTensors());
+  const float input[] = {-1, 2, -3, 4};
+  for (int i = 0; i < 4; ++i) {
+    interpreter.input(0)->data.f[i] = input[i];
+  }
+  ASSERT_EQ(kTfLiteOk, interpreter.Invoke());
+  const float golden[] = {0, 2, 0, 4};
+  for (int i = 0; i < 4; ++i) {
+    EXPECT_EQ(golden[i], interpreter.output(0)->data.f[i]);
   }
 }
 

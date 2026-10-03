@@ -306,22 +306,19 @@ TEST(SpaceToBatchNdTest, RejectsNonPlaceholderBatchMismatch) {
             tflite::testing::RunSpaceToBatchConstant(output_dims, output, 9));
 }
 
-// The computed batch times the stored spatial dims exceeds INT32_MAX
-// elements, which the allocator cannot size. see AmbiqAI/helia-rt#407
-TEST(SpaceToBatchNdTest, RejectsOutputTooLargeForAllocator) {
+// Prepare only: shapes too large or invalid for the allocator must be
+// rejected before the output is resized. see AmbiqAI/helia-rt#407
+TfLiteStatus PrepareSpaceToBatch(int* input_dims, const int32_t* block,
+                                 const int32_t* paddings, int* output_dims) {
   using tflite::testing::CreateTensor;
   using tflite::testing::IntArrayFromInts;
-  int input_dims[] = {4, 1, 1, 1, 1};
-  const float input_data[] = {1};
   int block_shape_dims[] = {1, 2};
-  const int32_t block_shape_data[] = {65536, 1};
   int paddings_dims[] = {2, 2, 2};
-  const int32_t paddings_data[] = {65535, 0, 65536, 0};
-  int output_dims[] = {4, 1, 1, 65537, 1};
   TfLiteTensor tensors[] = {
-      CreateTensor(input_data, IntArrayFromInts(input_dims)),
-      CreateTensor(block_shape_data, IntArrayFromInts(block_shape_dims)),
-      CreateTensor(paddings_data, IntArrayFromInts(paddings_dims)),
+      CreateTensor(static_cast<const float*>(nullptr),
+                   IntArrayFromInts(input_dims)),
+      CreateTensor(block, IntArrayFromInts(block_shape_dims)),
+      CreateTensor(paddings, IntArrayFromInts(paddings_dims)),
       CreateTensor(static_cast<float*>(nullptr), IntArrayFromInts(output_dims)),
   };
   tensors[1].allocation_type = kTfLiteMmapRo;
@@ -332,8 +329,52 @@ TEST(SpaceToBatchNdTest, RejectsOutputTooLargeForAllocator) {
   tflite::micro::KernelRunner runner(
       registration, tensors, 4, IntArrayFromInts(inputs_array_data),
       IntArrayFromInts(outputs_array_data), nullptr);
-  EXPECT_EQ(kTfLiteError, runner.InitAndPrepare());
+  const TfLiteStatus status = runner.InitAndPrepare();
   EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
+  return status;
+}
+
+// Batch 65536 times the stored width 65537 exceeds INT32_MAX elements.
+TEST(SpaceToBatchNdTest, RejectsOutputTooLargeForAllocator) {
+  int input_dims[] = {4, 1, 1, 1, 1};
+  const int32_t block[] = {65536, 1};
+  const int32_t paddings[] = {65535, 0, 65536, 0};
+  int output_dims[] = {4, 1, 1, 65537, 1};
+  EXPECT_EQ(kTfLiteError,
+            PrepareSpaceToBatch(input_dims, block, paddings, output_dims));
+  EXPECT_EQ(1, output_dims[1]);
+}
+
+// 32768 * 16385 elements fit in an int, but not their float bytes.
+TEST(SpaceToBatchNdTest, RejectsOutputBytesTooLargeForAllocator) {
+  int input_dims[] = {4, 1, 1, 1, 1};
+  const int32_t block[] = {32768, 1};
+  const int32_t paddings[] = {32767, 0, 16384, 0};
+  int output_dims[] = {4, 1, 1, 16385, 1};
+  EXPECT_EQ(kTfLiteError,
+            PrepareSpaceToBatch(input_dims, block, paddings, output_dims));
+  EXPECT_EQ(1, output_dims[1]);
+}
+
+// 2147483640 bytes fit in an int, but not once aligned to 16 for the arena.
+TEST(SpaceToBatchNdTest, RejectsOutputBytesTooLargeOnceAligned) {
+  int input_dims[] = {4, 1, 1, 268435455, 1};
+  const int32_t block[] = {2, 1};
+  const int32_t paddings[] = {1, 0, 0, 0};
+  int output_dims[] = {4, 1, 1, 268435455, 1};
+  EXPECT_EQ(kTfLiteError,
+            PrepareSpaceToBatch(input_dims, block, paddings, output_dims));
+  EXPECT_EQ(1, output_dims[1]);
+}
+
+// A negative input batch times the blocks would overflow int64.
+TEST(SpaceToBatchNdTest, RejectsNegativeInputBatch) {
+  int input_dims[] = {4, -306184046, 1, 1, 1};
+  const int32_t block[] = {92737, 649657};
+  const int32_t paddings[] = {92736, 0, 649656, 0};
+  int output_dims[] = {4, 1, 1, 1, 1};
+  EXPECT_EQ(kTfLiteError,
+            PrepareSpaceToBatch(input_dims, block, paddings, output_dims));
   EXPECT_EQ(1, output_dims[1]);
 }
 

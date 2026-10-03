@@ -1966,13 +1966,16 @@ const Model* GetNoOpModelWithTensorShape(
 }
 
 // helia: see AmbiqAI/helia-rt#407.
-const Model* GetSpaceToBatchModel(BuiltinOperator consumer) {
+const Model* GetSpaceToBatchModel(BuiltinOperator consumer,
+                                  bool consumer_first) {
   using flatbuffers::Offset;
   static ModelBuilderInstance<4096> builder_instance;
   flatbuffers::FlatBufferBuilder& builder = builder_instance.GetBuilder();
   builder.Clear();
   const int32_t block[] = {1, 2};
   const int32_t paddings[] = {0, 0, 0, 0};
+  const float filter[] = {2.0f};
+  const float bias[] = {0.0f};
   const Offset<Buffer> buffers[] = {
       CreateBuffer(builder),
       CreateBuffer(builder,
@@ -1981,11 +1984,19 @@ const Model* GetSpaceToBatchModel(BuiltinOperator consumer) {
       CreateBuffer(builder, builder.CreateVector(
                                 reinterpret_cast<const uint8_t*>(paddings),
                                 sizeof(paddings))),
+      CreateBuffer(builder, builder.CreateVector(
+                                reinterpret_cast<const uint8_t*>(filter),
+                                sizeof(filter))),
+      CreateBuffer(builder,
+                   builder.CreateVector(reinterpret_cast<const uint8_t*>(bias),
+                                        sizeof(bias))),
   };
   const int32_t io_shape[] = {1, 1, 4, 1};
   const int32_t block_shape[] = {2};
   const int32_t paddings_shape[] = {2, 2};
   const int32_t s2b_shape[] = {1, 1, 2, 1};
+  const int32_t filter_shape[] = {1, 1, 1, 1};
+  const int32_t bias_shape[] = {1};
   const bool to_space = consumer == BuiltinOperator_BATCH_TO_SPACE_ND;
   const Offset<Tensor> tensors[] = {
       CreateTensor(builder, builder.CreateVector(io_shape, 4),
@@ -1999,23 +2010,51 @@ const Model* GetSpaceToBatchModel(BuiltinOperator consumer) {
       CreateTensor(builder,
                    builder.CreateVector(to_space ? io_shape : s2b_shape, 4),
                    TensorType_FLOAT32, 0, builder.CreateString("output")),
+      CreateTensor(builder, builder.CreateVector(s2b_shape, 4),
+                   TensorType_FLOAT32, 0, builder.CreateString("addend")),
+      CreateTensor(builder, builder.CreateVector(filter_shape, 4),
+                   TensorType_FLOAT32, 3, builder.CreateString("filter")),
+      CreateTensor(builder, builder.CreateVector(bias_shape, 1),
+                   TensorType_FLOAT32, 4, builder.CreateString("bias")),
   };
   const int32_t s2b_inputs[] = {0, 1, 2};
   const int32_t s2b_outputs[] = {3};
-  const int32_t consumer_inputs[] = {3, 1, 2};
+  const int32_t relu_inputs[] = {3};
+  const int32_t add_inputs[] = {5, 3};
+  const int32_t to_space_inputs[] = {3, 1, 2};
+  const int32_t depthwise_inputs[] = {3, 6, 7};
+  const int32_t* consumer_inputs = relu_inputs;
+  int consumer_inputs_size = 1;
+  BuiltinOptions options_type = BuiltinOptions_NONE;
+  Offset<void> options = 0;
+  if (consumer == BuiltinOperator_ADD) {
+    consumer_inputs = add_inputs;
+    consumer_inputs_size = 2;
+  } else if (to_space) {
+    consumer_inputs = to_space_inputs;
+    consumer_inputs_size = 3;
+  } else if (consumer == BuiltinOperator_DEPTHWISE_CONV_2D) {
+    consumer_inputs = depthwise_inputs;
+    consumer_inputs_size = 3;
+    options_type = BuiltinOptions_DepthwiseConv2DOptions;
+    options =
+        CreateDepthwiseConv2DOptions(builder, Padding_VALID, 1, 1, 1).Union();
+  }
   const int32_t consumer_outputs[] = {4};
-  const Offset<Operator> operators[] = {
+  const Offset<Operator> s2b_op =
       CreateOperator(builder, 0, builder.CreateVector(s2b_inputs, 3),
-                     builder.CreateVector(s2b_outputs, 1)),
-      CreateOperator(builder, 1,
-                     builder.CreateVector(consumer_inputs, to_space ? 3 : 1),
-                     builder.CreateVector(consumer_outputs, 1)),
-  };
-  const int32_t graph_inputs[] = {0};
+                     builder.CreateVector(s2b_outputs, 1));
+  const Offset<Operator> consumer_op = CreateOperator(
+      builder, 1, builder.CreateVector(consumer_inputs, consumer_inputs_size),
+      builder.CreateVector(consumer_outputs, 1), options_type, options);
+  const Offset<Operator> operators[] = {consumer_first ? consumer_op : s2b_op,
+                                        consumer_first ? s2b_op : consumer_op};
+  const int32_t graph_inputs[] = {0, 5};
   const int32_t graph_outputs[] = {4};
   const Offset<SubGraph> subgraphs[] = {CreateSubGraph(
-      builder, builder.CreateVector(tensors, 5),
-      builder.CreateVector(graph_inputs, 1),
+      builder, builder.CreateVector(tensors, 8),
+      builder.CreateVector(graph_inputs,
+                           consumer == BuiltinOperator_ADD ? 2 : 1),
       builder.CreateVector(graph_outputs, 1),
       builder.CreateVector(operators, 2), builder.CreateString("main"))};
   const Offset<OperatorCode> operator_codes[] = {
@@ -2025,7 +2064,63 @@ const Model* GetSpaceToBatchModel(BuiltinOperator consumer) {
   const Offset<Model> model = CreateModel(
       builder, 0, builder.CreateVector(operator_codes, 2),
       builder.CreateVector(subgraphs, 1), builder.CreateString("s2b"),
-      builder.CreateVector(buffers, 3));
+      builder.CreateVector(buffers, 5));
+  FinishModelBuffer(builder, model);
+  return GetModel(builder.GetBufferPointer());
+}
+
+// helia: see AmbiqAI/helia-rt#407.
+const Model* GetReshapeWithStretchDimModel() {
+  using flatbuffers::Offset;
+  static ModelBuilderInstance<2048> builder_instance;
+  flatbuffers::FlatBufferBuilder& builder = builder_instance.GetBuilder();
+  builder.Clear();
+  const int32_t new_shape[] = {-1, 2};
+  const Offset<Buffer> buffers[] = {
+      CreateBuffer(builder),
+      CreateBuffer(builder, builder.CreateVector(
+                                reinterpret_cast<const uint8_t*>(new_shape),
+                                sizeof(new_shape))),
+  };
+  const int32_t input_shape[] = {1, 4};
+  const int32_t shape_shape[] = {2};
+  const int32_t reshaped_shape[] = {-1, 2};
+  const int32_t output_shape[] = {2, 2};
+  const Offset<Tensor> tensors[] = {
+      CreateTensor(builder, builder.CreateVector(input_shape, 2),
+                   TensorType_FLOAT32, 0, builder.CreateString("input")),
+      CreateTensor(builder, builder.CreateVector(shape_shape, 1),
+                   TensorType_INT32, 1, builder.CreateString("shape")),
+      CreateTensor(builder, builder.CreateVector(reshaped_shape, 2),
+                   TensorType_FLOAT32, 0, builder.CreateString("reshaped")),
+      CreateTensor(builder, builder.CreateVector(output_shape, 2),
+                   TensorType_FLOAT32, 0, builder.CreateString("output")),
+  };
+  const int32_t reshape_inputs[] = {0, 1};
+  const int32_t reshape_outputs[] = {2};
+  const int32_t relu_inputs[] = {2};
+  const int32_t relu_outputs[] = {3};
+  const Offset<Operator> operators[] = {
+      CreateOperator(builder, 0, builder.CreateVector(reshape_inputs, 2),
+                     builder.CreateVector(reshape_outputs, 1)),
+      CreateOperator(builder, 1, builder.CreateVector(relu_inputs, 1),
+                     builder.CreateVector(relu_outputs, 1)),
+  };
+  const int32_t graph_inputs[] = {0};
+  const int32_t graph_outputs[] = {3};
+  const Offset<SubGraph> subgraphs[] = {CreateSubGraph(
+      builder, builder.CreateVector(tensors, 4),
+      builder.CreateVector(graph_inputs, 1),
+      builder.CreateVector(graph_outputs, 1),
+      builder.CreateVector(operators, 2), builder.CreateString("main"))};
+  const Offset<OperatorCode> operator_codes[] = {
+      CreateOperatorCode(builder, 0, 0, 1, BuiltinOperator_RESHAPE),
+      CreateOperatorCode(builder, 0, 0, 1, BuiltinOperator_RELU),
+  };
+  const Offset<Model> model = CreateModel(
+      builder, 0, builder.CreateVector(operator_codes, 2),
+      builder.CreateVector(subgraphs, 1), builder.CreateString("reshape"),
+      builder.CreateVector(buffers, 2));
   FinishModelBuffer(builder, model);
   return GetModel(builder.GetBufferPointer());
 }

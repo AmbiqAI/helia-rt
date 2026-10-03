@@ -683,6 +683,11 @@ TEST(DepthwiseConvTest, RejectsInt8BatchAboveHeliaCoreLimit) {
             (PrepareDepthwiseWithBatch65536<int8_t, int8_t, int32_t>()));
 }
 
+TEST(DepthwiseConvTest, RejectsInt16BatchAboveHeliaCoreLimit) {
+  EXPECT_EQ(kTfLiteError,
+            (PrepareDepthwiseWithBatch65536<int16_t, int8_t, int64_t>()));
+}
+
 TEST(DepthwiseConvTest, AcceptsFloatBatchAboveHeliaCoreLimit) {
   EXPECT_EQ(kTfLiteOk, (PrepareDepthwiseWithBatch65536<float, float, float>()));
 }
