@@ -15,6 +15,7 @@ limitations under the License.
 
 #include "tensorflow/lite/micro/memory_helpers.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 
@@ -141,20 +142,30 @@ TfLiteStatus TfLiteEvalTensorByteLength(const TfLiteEvalTensor* eval_tensor,
 }
 
 // helia: see AmbiqAI/helia-rt#407.
-bool EvalDimsMatchStoredShape(const TfLiteEvalTensor& eval_tensor,
-                              const tflite::Tensor& stored) {
-  const int rank = eval_tensor.dims == nullptr ? 0 : eval_tensor.dims->size;
-  const int stored_rank =
-      stored.shape() == nullptr ? 0 : static_cast<int>(stored.shape()->size());
-  if (rank != stored_rank) {
-    return false;
-  }
-  for (int d = 0; d < rank; ++d) {
-    if (eval_tensor.dims->data[d] != stored.shape()->Get(d)) {
-      return false;
+bool ResizedAtPrepare(const TfLiteEvalTensor& eval_tensor,
+                      const tflite::Tensor& stored) {
+  // Counts saturate just above INT32_MAX, so they cannot overflow.
+  constexpr int64_t kSaturated = static_cast<int64_t>(INT32_MAX) + 1;
+  int64_t stored_count = 1;
+  if (stored.shape() != nullptr) {
+    for (const int32_t dim : *stored.shape()) {
+      if (dim < 0) {
+        return false;
+      }
+      stored_count = std::min(stored_count * dim, kSaturated);
     }
   }
-  return true;
+  int64_t eval_count = 1;
+  if (eval_tensor.dims != nullptr) {
+    for (int d = 0; d < eval_tensor.dims->size; ++d) {
+      const int dim = eval_tensor.dims->data[d];
+      if (dim < 0) {
+        return true;
+      }
+      eval_count = std::min(eval_count * dim, kSaturated);
+    }
+  }
+  return eval_count != stored_count;
 }
 
 TfLiteStatus AllocateOutputDimensionsFromInput(TfLiteContext* context,

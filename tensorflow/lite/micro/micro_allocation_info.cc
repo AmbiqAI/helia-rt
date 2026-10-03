@@ -212,8 +212,7 @@ TfLiteStatus AllocationInfoBuilder::InitializeAllocationInfo(
         // a kernel resized at Prepare would outgrow its planned slot.
         // see AmbiqAI/helia-rt#407
         if (current->offline_offset != kOnlinePlannedBuffer &&
-            !EvalDimsMatchStoredShape(eval_tensors[i],
-                                      *subgraph->tensors()->Get(i))) {
+            ResizedAtPrepare(eval_tensors[i], *subgraph->tensors()->Get(i))) {
           MicroPrintf(
               "Tensor %d was resized at Prepare, but the model's offline "
               "memory plan was computed for its stored shape.",

@@ -91,6 +91,7 @@ TfLiteStatus CheckConstantOutputShape(TfLiteContext* context, TfLiteNode* node,
   const int32_t* block = GetTensorData<int32_t>(block_shape);
   const int32_t* pad = GetTensorData<int32_t>(paddings);
   int64_t batch = input->dims->data[0];
+  TF_LITE_ENSURE(context, batch > 0);
   for (int i = 0; i < spatial_dims; ++i) {
     TF_LITE_ENSURE(context, block[i] > 0);
     TF_LITE_ENSURE(context, pad[2 * i] >= 0 && pad[2 * i + 1] >= 0);

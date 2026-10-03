@@ -52,10 +52,12 @@ TfLiteStatus TfLiteEvalTensorByteLength(const TfLiteEvalTensor* eval_tensor,
                                         size_t* out_bytes);
 
 // helia: see AmbiqAI/helia-rt#407.
-// Whether an eval tensor's dims equal the shape stored in the flatbuffer. A
-// kernel may rewrite eval dims at Prepare (a dynamic batch).
-bool EvalDimsMatchStoredShape(const TfLiteEvalTensor& eval_tensor,
-                              const tflite::Tensor& stored);
+// Whether a kernel resized the tensor at Prepare (a dynamic batch): its eval
+// dims hold a different element count than the shape stored in the
+// flatbuffer. A stored shape with a negative (unknown) dim never counts, so
+// e.g. a RESHAPE resolving a -1 dim is not a resize.
+bool ResizedAtPrepare(const TfLiteEvalTensor& eval_tensor,
+                      const tflite::Tensor& stored);
 
 // Deduce output dimensions from input and allocate given size.
 // Useful for operators with two inputs where the largest input should equal the

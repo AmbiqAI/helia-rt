@@ -18,6 +18,7 @@ limitations under the License.
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/kernels/internal/portable_tensor_utils.h"
 #include "tensorflow/lite/micro/memory_helpers.h"
+#include "tensorflow/lite/micro/micro_arena_constants.h"
 #include "tensorflow/lite/micro/micro_log.h"
 
 namespace tflite {
@@ -181,6 +182,9 @@ bool BatchedTensorSizeFits(const TfLiteTensor* tensor, int64_t batch) {
   }
   int64_t elements = batch;
   for (int i = 1; i < tensor->dims->size; ++i) {
+    if (tensor->dims->data[i] < 0) {
+      return false;
+    }
     elements *= tensor->dims->data[i];
     if (elements > INT32_MAX) {
       return false;
@@ -190,7 +194,10 @@ bool BatchedTensorSizeFits(const TfLiteTensor* tensor, int64_t batch) {
   if (TfLiteTypeSizeOf(tensor->type, &type_size) != kTfLiteOk) {
     return false;
   }
-  return elements * static_cast<int64_t>(type_size) <= INT32_MAX;
+  // The planner aligns each buffer up and holds the size in an int.
+  constexpr int64_t kMaxBytes =
+      INT32_MAX / MicroArenaBufferAlignment() * MicroArenaBufferAlignment();
+  return elements * static_cast<int64_t>(type_size) <= kMaxBytes;
 }
 
 // Verify that both tensors have the same type and size, then return the size

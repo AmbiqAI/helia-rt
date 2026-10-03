@@ -163,6 +163,8 @@ tflm_cc_library(
         "//tensorflow/lite/kernels/internal:tensor_utils_no_eigen",
         "//tensorflow/lite/kernels/internal:types",
         "//tensorflow/lite/micro:debug_log",
+        "//tensorflow/lite/micro:memory_helpers",
+        "//tensorflow/lite/micro:micro_arena_constants",
         "//tensorflow/lite/micro:micro_context",
     ],
 )

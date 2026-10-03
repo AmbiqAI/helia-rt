@@ -602,14 +602,15 @@ leave reference/CMSIS-NN, direct CMake, Bazel and source consumers unfixed.
 Drop condition: upstream's PAD Prepare checks that the ranks match and that
 paddings are non-negative.
 
-## Dynamic-batch shapes: `kernels/space_to_batch_nd.cc`, `kernels/batch_to_space_nd.cc`, `kernels/depthwise_conv_common.cc`, `kernels/conv_common.cc`, `kernels/kernel_util.{h,cc}`, `micro_allocator.cc`, `micro_allocation_info.cc`, `micro_interpreter_graph.cc`, `memory_helpers.{h,cc}`, `test_helpers.{h,cc}` and tests
+## Dynamic-batch shapes: `kernels/space_to_batch_nd.cc`, `kernels/batch_to_space_nd.cc`, `kernels/depthwise_conv_common.cc`, `kernels/conv_common.cc`, `kernels/kernel_util.{h,cc}`, `kernels/BUILD`, `micro_allocator.cc`, `micro_allocation_info.cc`, `micro_interpreter_graph.cc`, `memory_helpers.{h,cc}`, `test_helpers.{h,cc}` and tests
 
 A model exported with a dynamic batch stores batch 1 for tensors whose real
 batch comes from the graph: the SPACE_TO_BATCH_ND output of a dilated
 convolution, and the DEPTHWISE_CONV_2D or CONV_2D output after it. TensorFlow
 Lite resizes these at runtime; TFLM computed into the stored shape, so S2B
 filled one batch, the convolution ran on batch 1 (its batch check is a DCHECK)
-and BATCH_TO_SPACE_ND wrote nothing, giving silent wrong outputs. See
+and BATCH_TO_SPACE_ND filled only part of its output, giving silent wrong
+outputs. See
 AmbiqAI/helia-rt#407.
 
 - SPACE_TO_BATCH_ND and BATCH_TO_SPACE_ND Prepare compute the output shape from
@@ -624,16 +625,23 @@ AmbiqAI/helia-rt#407.
   the reference DEPTHWISE_CONV_2D and CONV_2D Prepare call it, as do the helia
   overrides.
 - Before writing a batch, SPACE_TO_BATCH_ND and `MatchOutputBatchToInput`
-  check with `micro::BatchedTensorSizeFits` that the resized tensor's element
-  count and byte size stay within INT32_MAX, which the allocator's size
-  arithmetic needs. BATCH_TO_SPACE_ND needs no such check: with non-negative
-  crops its output holds no more elements than its input.
+  check with `micro::BatchedTensorSizeFits` that the resized tensor has no
+  negative dims, at most INT32_MAX elements, and a byte size that stays within
+  INT32_MAX once aligned for the arena, as the allocator's size arithmetic
+  needs. SPACE_TO_BATCH_ND also requires a positive input batch.
+  BATCH_TO_SPACE_ND needs no size check: with non-negative crops its output
+  holds no more elements than its input.
 - `MicroInterpreterGraph::PrepareSubgraphs` rejects a node that reads a tensor
   resized at Prepare unless it is CONV_2D, DEPTHWISE_CONV_2D or
-  BATCH_TO_SPACE_ND; any other kernel would size its output from the stored
-  shape and write past it. `EvalDimsMatchStoredShape` (`memory_helpers`)
-  compares eval dims with the stored shape for this check and the offline-plan
-  check below.
+  BATCH_TO_SPACE_ND placed after the op that resized it; any other kernel, or
+  one prepared before the resize, would size its output from the stored shape
+  and write past it. It checks before each node's Prepare and again once every
+  node is prepared. `ResizedAtPrepare` (`memory_helpers`) decides what counts
+  as resized, for this check and the offline-plan check below: a different
+  element count than a stored shape with no negative dims, so a RESHAPE
+  resolving a stored -1 is not a resize.
+- `kernels/BUILD`: `kernel_util` depends on `memory_helpers` and
+  `micro_arena_constants`, which `BatchedTensorSizeFits` uses.
 - A batch rewrite also scales the tensor's `bytes`, and `MicroAllocator` sizes
   the persistent and temp `TfLiteTensor`s it rebuilds from rewritten eval dims,
   so `output()->bytes` matches a resized graph output.
@@ -651,9 +659,12 @@ AmbiqAI/helia-rt#407.
   for the helia depthwise Prepare rejecting an int8 batch above 65,535
   (heliaCORE's int8 and int16 kernels take the batch as `uint16_t`) and
   accepting that batch for float32. The SPACE_TO_BATCH_ND and CONV_2D tests
-  reject outputs too large for the allocator; `micro_interpreter_test.cc`, with
-  a model from `test_helpers`, rejects RELU reading a resized tensor and runs a
-  SPACE_TO_BATCH_ND to BATCH_TO_SPACE_ND round trip.
+  reject outputs too large for the allocator (by element count and, for
+  SPACE_TO_BATCH_ND, by bytes) and a negative SPACE_TO_BATCH_ND batch;
+  `micro_interpreter_test.cc`, with models from `test_helpers`, rejects RELU or
+  ADD reading a resized tensor and readers listed before its producer, accepts
+  DEPTHWISE_CONV_2D, runs a SPACE_TO_BATCH_ND to BATCH_TO_SPACE_ND round trip,
+  and runs RELU after a RESHAPE that resolves a stored -1.
 
 This correctness fix stays in the shared kernels: a helia-only override would
 leave reference, direct CMake, Bazel and source consumers wrong. The cmsis_nn

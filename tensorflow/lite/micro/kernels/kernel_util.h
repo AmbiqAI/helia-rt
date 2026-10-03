@@ -171,8 +171,9 @@ TfLiteStatus MatchOutputBatchToInput(TfLiteContext* context, TfLiteNode* node,
                                      TfLiteTensor* output);
 
 // helia: see AmbiqAI/helia-rt#407.
-// Whether `tensor` with its batch set to `batch` keeps its element count and
-// byte size within INT32_MAX, which the allocator's size arithmetic needs.
+// Whether `tensor` with its batch set to `batch` keeps its element count
+// within INT32_MAX and its byte size, aligned for the arena, within INT32_MAX,
+// which the allocator's size arithmetic needs.
 bool BatchedTensorSizeFits(const TfLiteTensor* tensor, int64_t batch);
 
 // Copy all op input tensors to op output tensors. Requires all op input tensor

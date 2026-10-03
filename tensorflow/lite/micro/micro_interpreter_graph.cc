@@ -59,24 +59,55 @@ bool MayReadResizedTensor(const TFLMRegistration* registration) {
   }
 }
 
-// Returns the index of the first input resized at Prepare, otherwise -1.
-int FindResizedInput(const TfLiteIntArray* const tensor_indices,
-                     const TfLiteEvalTensor* const eval_tensors,
-                     const SubGraph* subgraph) {
-  if (tensor_indices == nullptr) {
+bool ProducedBefore(const NodeAndRegistration* nodes, uint32_t node_index,
+                    int tensor_index) {
+  for (uint32_t j = 0; j < node_index; ++j) {
+    const TfLiteIntArray* outputs = nodes[j].node.outputs;
+    for (int k = 0; outputs != nullptr && k < outputs->size; ++k) {
+      if (outputs->data[k] == tensor_index) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// Returns the first input of node `node_index` that was resized at Prepare
+// and that the node may not read, otherwise -1. Only an allowed kernel placed
+// after the op that resized the tensor may read it: a reader prepared before
+// that op saw the stored shape.
+int FindUnsupportedResizedInput(const NodeAndRegistration* nodes,
+                                uint32_t node_index,
+                                const TfLiteEvalTensor* eval_tensors,
+                                const SubGraph* subgraph) {
+  const TfLiteIntArray* inputs = nodes[node_index].node.inputs;
+  if (inputs == nullptr) {
     return -1;
   }
-  for (int i = 0; i < tensor_indices->size; i++) {
-    const int tensor_index = tensor_indices->data[i];
-    if (tensor_index < 0) {
+  const bool may_read = MayReadResizedTensor(nodes[node_index].registration);
+  for (int i = 0; i < inputs->size; ++i) {
+    const int tensor_index = inputs->data[i];
+    if (tensor_index < 0 ||
+        !ResizedAtPrepare(eval_tensors[tensor_index],
+                          *subgraph->tensors()->Get(tensor_index))) {
       continue;
     }
-    if (!EvalDimsMatchStoredShape(eval_tensors[tensor_index],
-                                  *subgraph->tensors()->Get(tensor_index))) {
+    if (!may_read || !ProducedBefore(nodes, node_index, tensor_index)) {
       return tensor_index;
     }
   }
   return -1;
+}
+
+void ReportUnsupportedResizedInput(uint32_t node_index,
+                                   const TFLMRegistration* registration,
+                                   size_t subgraph_index, int tensor_index) {
+  MicroPrintf(
+      "Op#%u (%s) of subgraph %u reads tensor #%d, which was resized at "
+      "Prepare; only CONV_2D, DEPTHWISE_CONV_2D and BATCH_TO_SPACE_ND placed "
+      "after the op that resizes it accept a resized input.",
+      node_index, OpNameFromRegistration(registration),
+      static_cast<unsigned>(subgraph_index), tensor_index);
 }
 
 // Check tensor shapes to determine if there are dynamic tensors present.
@@ -184,20 +215,16 @@ TfLiteStatus MicroInterpreterGraph::PrepareSubgraphs() {
           subgraph_allocations_[subgraph_idx]
               .node_and_registrations[current_operator_index_]
               .registration;
-      // helia: see AmbiqAI/helia-rt#407.
-      if (!MayReadResizedTensor(registration)) {
-        const int resized_index = FindResizedInput(
-            node->inputs, subgraph_allocations_[subgraph_idx].tensors,
-            subgraphs_->Get(subgraph_idx));
-        if (resized_index != -1) {
-          MicroPrintf(
-              "Op#%u (%s) of subgraph %u reads tensor #%d, which was resized "
-              "at Prepare; only CONV_2D, DEPTHWISE_CONV_2D and "
-              "BATCH_TO_SPACE_ND accept a resized input.",
-              current_operator_index_, OpNameFromRegistration(registration),
-              current_subgraph_index_, resized_index);
-          return kTfLiteError;
-        }
+      // helia: checked before Prepare, so the kernel never sees an input it
+      // cannot handle. see AmbiqAI/helia-rt#407
+      const int resized_index = FindUnsupportedResizedInput(
+          subgraph_allocations_[subgraph_idx].node_and_registrations,
+          current_operator_index_, subgraph_allocations_[subgraph_idx].tensors,
+          subgraphs_->Get(subgraph_idx));
+      if (resized_index != -1) {
+        ReportUnsupportedResizedInput(current_operator_index_, registration,
+                                      subgraph_idx, resized_index);
+        return kTfLiteError;
       }
       if (registration->prepare != nullptr) {
         TfLiteStatus prepare_status = registration->prepare(context_, node);
@@ -225,6 +252,26 @@ TfLiteStatus MicroInterpreterGraph::PrepareSubgraphs() {
 
       allocator_->FinishPrepareNodeAllocations(
           /*node_id=*/current_operator_index_);
+    }
+  }
+  // helia: again once every node is prepared, for a reader listed before the
+  // op that resizes its input. see AmbiqAI/helia-rt#407
+  for (size_t subgraph_idx = 0; subgraph_idx < subgraphs_->size();
+       subgraph_idx++) {
+    const uint32_t operators_size = NumSubgraphOperators(model_, subgraph_idx);
+    for (uint32_t op_idx = 0; op_idx < operators_size; ++op_idx) {
+      const int resized_index = FindUnsupportedResizedInput(
+          subgraph_allocations_[subgraph_idx].node_and_registrations, op_idx,
+          subgraph_allocations_[subgraph_idx].tensors,
+          subgraphs_->Get(subgraph_idx));
+      if (resized_index != -1) {
+        ReportUnsupportedResizedInput(op_idx,
+                                      subgraph_allocations_[subgraph_idx]
+                                          .node_and_registrations[op_idx]
+                                          .registration,
+                                      subgraph_idx, resized_index);
+        return kTfLiteError;
+      }
     }
   }
   current_subgraph_index_ = previous_subgraph_idx;
