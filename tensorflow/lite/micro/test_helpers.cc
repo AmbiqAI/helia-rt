@@ -2057,11 +2057,13 @@ const Model* GetSpaceToBatchModel(BuiltinOperator consumer, bool consumer_first,
   const int operators_size = second_producer ? 3 : 2;
   const int32_t graph_inputs[] = {0, 5};
   const bool second_input = consumer == BuiltinOperator_ADD || second_producer;
-  const int32_t graph_outputs[] = {4};
+  // With BATCH_TO_SPACE_ND, the input is also an output, so the planner
+  // cannot place the output in the input's buffer.
+  const int32_t graph_outputs[] = {4, 0};
   const Offset<SubGraph> subgraphs[] = {CreateSubGraph(
       builder, builder.CreateVector(tensors, 8),
       builder.CreateVector(graph_inputs, second_input ? 2 : 1),
-      builder.CreateVector(graph_outputs, 1),
+      builder.CreateVector(graph_outputs, to_space ? 2 : 1),
       builder.CreateVector(second_producer ? operators : operators + 1,
                            operators_size),
       builder.CreateString("main"))};

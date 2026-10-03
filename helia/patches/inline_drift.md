@@ -652,7 +652,8 @@ AmbiqAI/helia-rt#407.
 - The four kernel tests cover the placeholder batch, the rejections, temporary
   release and untouched model dims, and the SPACE_TO_BATCH_ND,
   BATCH_TO_SPACE_ND and float CONV_2D placeholder cases check the new byte size
-  (the conv and depthwise cases are skipped on the upstream cmsis_nn backend);
+  (the conv and depthwise cases, and the interpreter test that runs depthwise
+  on a batched tensor, are skipped on the upstream cmsis_nn backend);
   `micro_allocator_test.cc` covers the byte sizing, the offline-plan rejection
   and resizes left to the online planner; `depthwise_conv_test.cc` gains an
   optional validation length on its per-channel helper and helia-only cases

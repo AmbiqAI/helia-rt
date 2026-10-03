@@ -831,6 +831,8 @@ TEST(MicroInterpreterTest, ResizedTensorWithTwoProducersFails) {
                                       false, true));
 }
 
+// The upstream cmsis_nn backend's own Prepare does not carry the batch.
+#if !defined(CMSIS_NN) || defined(HELIA)
 TEST(MicroInterpreterTest, ResizedTensorReadByDepthwiseFollowsBatch) {
   tflite::MicroMutableOpResolver<2> op_resolver;
   EXPECT_EQ(kTfLiteOk, op_resolver.AddSpaceToBatchNd());
@@ -854,6 +856,7 @@ TEST(MicroInterpreterTest, ResizedTensorReadByDepthwiseFollowsBatch) {
     EXPECT_EQ(golden[i], interpreter.output(0)->data.f[i]);
   }
 }
+#endif  // !defined(CMSIS_NN) || defined(HELIA)
 
 TEST(MicroInterpreterTest, ResizedTensorReadByBatchToSpaceRoundTrips) {
   tflite::MicroMutableOpResolver<2> op_resolver;
