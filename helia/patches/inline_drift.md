@@ -628,11 +628,14 @@ AmbiqAI/helia-rt#407.
   so `output()->bytes` matches a resized graph output.
 - `AllocationInfoBuilder` rejects an offline-planned tensor whose dims were
   rewritten at Prepare: the offline plan was computed for the stored shape.
-- The four kernel tests cover the placeholder batch, the rejections, the new
-  byte size, temporary release and untouched model dims (the conv and depthwise
-  cases are skipped on the upstream cmsis_nn backend);
-  `micro_allocator_test.cc` covers the byte sizing and the offline-plan
-  rejection; `depthwise_conv_test.cc` gains an optional validation length on
+  Tensors the plan leaves online may be resized. Full support for resized
+  offline-planned tensors is AmbiqAI/helia-rt#410.
+- The four kernel tests cover the placeholder batch, the rejections, temporary
+  release and untouched model dims, and the SPACE_TO_BATCH_ND,
+  BATCH_TO_SPACE_ND and float CONV_2D placeholder cases check the new byte size
+  (the conv and depthwise cases are skipped on the upstream cmsis_nn backend);
+  `micro_allocator_test.cc` covers the byte sizing, the offline-plan rejection
+  and resizes left to the online planner; `depthwise_conv_test.cc` gains an optional validation length on
   its per-channel helper and a helia-only case for the depthwise batch limit
   (heliaCORE takes the batch as `uint16_t`).
 
@@ -641,4 +644,5 @@ leave reference, direct CMake, Bazel and source consumers wrong. The cmsis_nn
 backend's own convolution Prepare is upstream and unchanged.
 
 Drop condition: upstream TFLM checks SPACE_TO_BATCH_ND/BATCH_TO_SPACE_ND output
-shapes at Prepare and propagates a dynamic batch through the convolution.
+shapes at Prepare, propagates a dynamic batch through the convolution and keeps
+`bytes` and offline memory plans consistent with resized tensors.

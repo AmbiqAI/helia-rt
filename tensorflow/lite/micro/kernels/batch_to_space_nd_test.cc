@@ -123,8 +123,8 @@ TfLiteStatus TestBatchToSpaceNdQuantized(
 // see AmbiqAI/helia-rt#407
 TfLiteStatus RunBatchToSpaceConstant(int* input_dims_data,
                                      const float* input_data,
-                                     int* output_dims_data,
-                                     float* output_data) {
+                                     int* output_dims_data, float* output_data,
+                                     size_t* output_bytes = nullptr) {
   int block_shape_dims_data[] = {1, 2};
   const int32_t block_shape_data[] = {1, 2};
   int crops_dims_data[] = {2, 2, 2};
@@ -147,6 +147,9 @@ TfLiteStatus RunBatchToSpaceConstant(int* input_dims_data,
   if (status != kTfLiteOk) {
     EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
     return status;
+  }
+  if (output_bytes != nullptr) {
+    *output_bytes = tensors[3].bytes;
   }
   return runner.Invoke();
 }
@@ -204,8 +207,11 @@ TEST(BatchToSpaceNdTest, PlaceholderBatchFollowsBlockShape) {
   for (int i = 0; i < 8; ++i) {
     output[i] = -100.0f;
   }
-  ASSERT_EQ(kTfLiteOk, tflite::testing::RunBatchToSpaceConstant(
-                           input_dims, input, output_dims, output));
+  size_t output_bytes = 0;
+  ASSERT_EQ(kTfLiteOk,
+            tflite::testing::RunBatchToSpaceConstant(
+                input_dims, input, output_dims, output, &output_bytes));
+  EXPECT_EQ(8 * sizeof(float), output_bytes);
   // The batch is written into a copy; the model's dims stay untouched.
   EXPECT_EQ(1, output_dims[1]);
   const float golden[] = {1, 2, 3, 4, 11, 12, 13, 14};
