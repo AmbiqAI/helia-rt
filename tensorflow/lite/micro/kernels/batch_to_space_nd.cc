@@ -15,6 +15,8 @@ limitations under the License.
 
 #include "tensorflow/lite/kernels/internal/reference/batch_to_space_nd.h"
 
+#include <cstdint>
+
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
@@ -38,6 +40,84 @@ constexpr int kOutputTensor = 0;
 const int kInputOutputMinDimensionNum = 3;
 const int kInputOutputMaxDimensionNum = 4;
 
+// helia: see AmbiqAI/helia-rt#407.
+// TFLM sizes every tensor from the shape stored in the model. A model
+// exported with a dynamic batch stores placeholder batches that do not follow
+// from the graph, so it would compute wrong outputs; reject any output shape
+// the input, block shape and crops do not give.
+TfLiteStatus CheckConstantOutputShape(const TfLiteTensor* input,
+                                      const TfLiteTensor* block_shape,
+                                      const TfLiteTensor* crops,
+                                      const TfLiteTensor* output) {
+  const int rank = NumDimensions(input);
+  const int spatial_dims = rank - 2;
+  if (NumDimensions(output) != rank || block_shape->type != kTfLiteInt32 ||
+      crops->type != kTfLiteInt32 || NumElements(block_shape) != spatial_dims ||
+      NumElements(crops) != 2 * spatial_dims) {
+    MicroPrintf("BATCH_TO_SPACE_ND: unsupported block shape or crops.");
+    return kTfLiteError;
+  }
+  const int32_t* block = GetTensorData<int32_t>(block_shape);
+  const int32_t* crop = GetTensorData<int32_t>(crops);
+  int64_t expected[kInputOutputMaxDimensionNum];
+  expected[rank - 1] = input->dims->data[rank - 1];
+  int64_t block_product = 1;
+  bool valid = input->dims->data[0] > 0;
+  for (int i = 0; valid && i < spatial_dims; ++i) {
+    const int64_t uncropped =
+        static_cast<int64_t>(input->dims->data[i + 1]) * block[i];
+    expected[i + 1] = uncropped - crop[2 * i] - crop[2 * i + 1];
+    valid = block[i] > 0 && crop[2 * i] >= 0 && crop[2 * i + 1] >= 0 &&
+            input->dims->data[i + 1] >= 0 && expected[i + 1] >= 0 &&
+            expected[i + 1] <= INT32_MAX;
+    block_product *= block[i];
+    valid = valid && block_product <= INT32_MAX;
+  }
+  if (!valid || input->dims->data[0] % block_product != 0) {
+    MicroPrintf(
+        "BATCH_TO_SPACE_ND: invalid input batch, block shape or crops.");
+    return kTfLiteError;
+  }
+  expected[0] = input->dims->data[0] / block_product;
+  for (int i = 0; i < rank; ++i) {
+    if (output->dims->data[i] != expected[i]) {
+      MicroPrintf(
+          "BATCH_TO_SPACE_ND: output dim %d is %d in the model, but the "
+          "input, block shape and crops give %d. The model was likely "
+          "exported with a dynamic batch; re-export it with a fixed batch "
+          "size (for example 1).",
+          i, output->dims->data[i], static_cast<int>(expected[i]));
+      return kTfLiteError;
+    }
+  }
+  return kTfLiteOk;
+}
+
+// helia: see AmbiqAI/helia-rt#407.
+// The shape is only checked when the block shape and crops are constant;
+// otherwise it is not known before Eval.
+TfLiteStatus CheckOutputShape(TfLiteContext* context, TfLiteNode* node,
+                              const TfLiteTensor* input,
+                              const TfLiteTensor* output) {
+  MicroContext* micro_context = GetMicroContext(context);
+  TfLiteTensor* block_shape =
+      micro_context->AllocateTempInputTensor(node, kBlockShapeTensor);
+  TfLiteTensor* crops =
+      micro_context->AllocateTempInputTensor(node, kCropsTensor);
+  TfLiteStatus status = kTfLiteOk;
+  if (block_shape != nullptr && crops != nullptr &&
+      IsConstantTensor(block_shape) && IsConstantTensor(crops)) {
+    status = CheckConstantOutputShape(input, block_shape, crops, output);
+  }
+  if (block_shape != nullptr) {
+    micro_context->DeallocateTempTfLiteTensor(block_shape);
+  }
+  if (crops != nullptr) {
+    micro_context->DeallocateTempTfLiteTensor(crops);
+  }
+  return status;
+}
+
 TfLiteStatus BatchToSpaceNDPrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, NumInputs(node), 3);
   TF_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
@@ -56,10 +136,10 @@ TfLiteStatus BatchToSpaceNDPrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE(context, NumDimensions(output) <= kInputOutputMaxDimensionNum);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
 
+  const TfLiteStatus status = CheckOutputShape(context, node, input, output);
   micro_context->DeallocateTempTfLiteTensor(input);
   micro_context->DeallocateTempTfLiteTensor(output);
-
-  return kTfLiteOk;
+  return status;
 }
 
 TfLiteStatus BatchToSpaceNDEval(TfLiteContext* context, TfLiteNode* node) {

@@ -601,3 +601,28 @@ leave reference/CMSIS-NN, direct CMake, Bazel and source consumers unfixed.
 
 Drop condition: upstream's PAD Prepare checks that the ranks match and that
 paddings are non-negative.
+
+## `tensorflow/lite/micro/kernels/space_to_batch_nd.cc`, `kernels/batch_to_space_nd.cc` and tests
+
+A model exported with a dynamic batch stores batch 1 for the
+SPACE_TO_BATCH_ND output of a dilated convolution, and for the convolution
+output after it, while the real batch is the block product. TFLM sizes
+tensors from the stored shapes, so such a model returned silent wrong outputs
+on every backend. With constant block shape and paddings/crops, both Prepare
+functions now compute the output shape and fail on any difference from the
+stored one, naming the dimension and asking for a fixed-batch re-export. The
+arithmetic rejects a non-positive input batch, non-positive blocks, negative
+paddings/crops and values beyond int32 without overflowing. Non-constant
+inputs keep upstream's behaviour. Both checks release Prepare's temporaries.
+The kernel tests cover the matching shapes (including a rank-3 input), the
+placeholder batch, spatial mismatches and hostile values;
+`micro_interpreter_test.cc`, with a model from `test_helpers`, shows a
+dynamic-batch export failing to load and the fixed-batch export
+round-tripping. See AmbiqAI/helia-rt#407.
+
+This correctness fix stays in the shared kernels: a helia-only override would
+leave reference, direct CMake, Bazel and source consumers unfixed.
+
+Drop condition: upstream's SPACE_TO_BATCH_ND and BATCH_TO_SPACE_ND Prepare
+check the stored output shape against constant block shape and
+paddings/crops.

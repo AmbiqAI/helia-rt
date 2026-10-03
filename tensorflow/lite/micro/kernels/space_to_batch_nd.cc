@@ -15,6 +15,8 @@ limitations under the License.
 
 #include "tensorflow/lite/kernels/internal/reference/space_to_batch_nd.h"
 
+#include <cstdint>
+
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/internal/types.h"
@@ -38,6 +40,87 @@ constexpr int kOutputTensor = 0;
 // TODO(b/149952582): Support arbitrary dimension in SpaceToBatchND.
 const int kInputOutputMinDimensionNum = 3;
 const int kInputOutputMaxDimensionNum = 4;
+
+// helia: see AmbiqAI/helia-rt#407.
+// TFLM sizes every tensor from the shape stored in the model. A model
+// exported with a dynamic batch stores batch 1 for this output while the real
+// batch is the input batch times the block product, so it would compute wrong
+// outputs; reject any output shape the input, block shape and paddings do not
+// give.
+TfLiteStatus CheckConstantOutputShape(const TfLiteTensor* input,
+                                      const TfLiteTensor* block_shape,
+                                      const TfLiteTensor* paddings,
+                                      const TfLiteTensor* output) {
+  const int rank = NumDimensions(input);
+  const int spatial_dims = rank - 2;
+  if (NumDimensions(output) != rank || block_shape->type != kTfLiteInt32 ||
+      paddings->type != kTfLiteInt32 ||
+      NumElements(block_shape) != spatial_dims ||
+      NumElements(paddings) != 2 * spatial_dims) {
+    MicroPrintf("SPACE_TO_BATCH_ND: unsupported block shape or paddings.");
+    return kTfLiteError;
+  }
+  const int32_t* block = GetTensorData<int32_t>(block_shape);
+  const int32_t* pad = GetTensorData<int32_t>(paddings);
+  int64_t expected[kInputOutputMaxDimensionNum];
+  expected[0] = input->dims->data[0];
+  expected[rank - 1] = input->dims->data[rank - 1];
+  bool valid = expected[0] > 0;
+  for (int i = 0; valid && i < spatial_dims; ++i) {
+    const int64_t padded = static_cast<int64_t>(input->dims->data[i + 1]) +
+                           pad[2 * i] + pad[2 * i + 1];
+    valid = block[i] > 0 && pad[2 * i] >= 0 && pad[2 * i + 1] >= 0 &&
+            padded >= 0 && padded % block[i] == 0 &&
+            padded / block[i] <= INT32_MAX;
+    if (valid) {
+      expected[i + 1] = padded / block[i];
+      expected[0] *= block[i];
+      valid = expected[0] <= INT32_MAX;
+    }
+  }
+  if (!valid) {
+    MicroPrintf(
+        "SPACE_TO_BATCH_ND: invalid input batch, block shape or paddings.");
+    return kTfLiteError;
+  }
+  for (int i = 0; i < rank; ++i) {
+    if (output->dims->data[i] != expected[i]) {
+      MicroPrintf(
+          "SPACE_TO_BATCH_ND: output dim %d is %d in the model, but the "
+          "input, block shape and paddings give %d. The model was likely "
+          "exported with a dynamic batch; re-export it with a fixed batch "
+          "size (for example 1).",
+          i, output->dims->data[i], static_cast<int>(expected[i]));
+      return kTfLiteError;
+    }
+  }
+  return kTfLiteOk;
+}
+
+// helia: see AmbiqAI/helia-rt#407.
+// The shape is only checked when the block shape and paddings are constant;
+// otherwise it is not known before Eval.
+TfLiteStatus CheckOutputShape(TfLiteContext* context, TfLiteNode* node,
+                              const TfLiteTensor* input,
+                              const TfLiteTensor* output) {
+  MicroContext* micro_context = GetMicroContext(context);
+  TfLiteTensor* block_shape =
+      micro_context->AllocateTempInputTensor(node, kBlockShapeTensor);
+  TfLiteTensor* paddings =
+      micro_context->AllocateTempInputTensor(node, kCropsTensor);
+  TfLiteStatus status = kTfLiteOk;
+  if (block_shape != nullptr && paddings != nullptr &&
+      IsConstantTensor(block_shape) && IsConstantTensor(paddings)) {
+    status = CheckConstantOutputShape(input, block_shape, paddings, output);
+  }
+  if (block_shape != nullptr) {
+    micro_context->DeallocateTempTfLiteTensor(block_shape);
+  }
+  if (paddings != nullptr) {
+    micro_context->DeallocateTempTfLiteTensor(paddings);
+  }
+  return status;
+}
 
 void* SpaceToBatchNDInit(TfLiteContext* context, const char* buffer,
                          size_t length) {
@@ -73,9 +156,10 @@ TfLiteStatus SpaceToBatchNDPrepare(TfLiteContext* context, TfLiteNode* node) {
     params->output_offset = output->params.zero_point;
   }
 
+  const TfLiteStatus status = CheckOutputShape(context, node, input, output);
   micro_context->DeallocateTempTfLiteTensor(input);
   micro_context->DeallocateTempTfLiteTensor(output);
-  return kTfLiteOk;
+  return status;
 }
 
 TfLiteStatus SpaceToBatchNDEval(TfLiteContext* context, TfLiteNode* node) {
