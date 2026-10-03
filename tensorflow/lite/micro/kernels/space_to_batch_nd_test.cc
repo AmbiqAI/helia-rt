@@ -132,6 +132,44 @@ TfLiteStatus TestSpaceToBatchNdQuantized(
                                        invoke);
 }
 
+// helia: constant block shape and paddings, as converter output has them; the
+// output's stored shape must be the one they give. Prepare-only cases pass no
+// data. see AmbiqAI/helia-rt#407
+template <typename BlockT = int32_t>
+TfLiteStatus RunSpaceToBatchConstant(int* input_dims, const float* input,
+                                     const BlockT* block,
+                                     const int32_t* paddings, int* output_dims,
+                                     float* output, bool constant_block = true,
+                                     bool constant_paddings = true,
+                                     int block_size = -1) {
+  int block_dims[] = {1, block_size >= 0 ? block_size : input_dims[0] - 2};
+  int paddings_dims[] = {2, input_dims[0] - 2, 2};
+  TfLiteTensor tensors[] = {
+      CreateTensor(input, IntArrayFromInts(input_dims)),
+      CreateTensor(block, IntArrayFromInts(block_dims)),
+      CreateTensor(paddings, IntArrayFromInts(paddings_dims)),
+      CreateTensor(output, IntArrayFromInts(output_dims)),
+  };
+  if (constant_block) {
+    tensors[1].allocation_type = kTfLiteMmapRo;
+  }
+  if (constant_paddings) {
+    tensors[2].allocation_type = kTfLiteMmapRo;
+  }
+  int inputs_array_data[] = {3, 0, 1, 2};
+  int outputs_array_data[] = {1, 3};
+  const TFLMRegistration registration = Register_SPACE_TO_BATCH_ND();
+  micro::KernelRunner runner(registration, tensors, 4,
+                             IntArrayFromInts(inputs_array_data),
+                             IntArrayFromInts(outputs_array_data), nullptr);
+  const TfLiteStatus status = runner.InitAndPrepare();
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
+  if (status != kTfLiteOk || input == nullptr) {
+    return status;
+  }
+  return runner.Invoke();
+}
+
 }  // namespace
 }  // namespace testing
 }  // namespace tflite
@@ -235,6 +273,233 @@ TEST(SpaceToBatchNdTest, RejectMismatchedInt8Quantization) {
             golden_quantized, output_scales[i], output_zero_points[i], output,
             false));
   }
+}
+
+TEST(SpaceToBatchNdTest, ConstantBlockShapeAndPaddingsMatchGolden) {
+  // [1,1,4,1] padded to width 6, block [1,2]: batch 2, width 3.
+  int input_dims[] = {4, 1, 1, 4, 1};
+  const float input[] = {1, 2, 3, 4};
+  const int32_t block[] = {1, 2};
+  const int32_t paddings[] = {0, 0, 1, 1};
+  int output_dims[] = {4, 2, 1, 3, 1};
+  float output[6];
+  ASSERT_EQ(kTfLiteOk,
+            tflite::testing::RunSpaceToBatchConstant(
+                input_dims, input, block, paddings, output_dims, output));
+  const float golden[] = {0, 2, 4, 1, 3, 0};
+  for (int i = 0; i < 6; ++i) {
+    EXPECT_EQ(golden[i], output[i]);
+  }
+}
+
+TEST(SpaceToBatchNdTest, ConstantBlockShapeMatchesGoldenThreeDimensions) {
+  int input_dims[] = {3, 1, 4, 1};
+  const float input[] = {1, 2, 3, 4};
+  const int32_t block[] = {2};
+  const int32_t paddings[] = {0, 0};
+  int output_dims[] = {3, 2, 2, 1};
+  float output[4];
+  ASSERT_EQ(kTfLiteOk,
+            tflite::testing::RunSpaceToBatchConstant(
+                input_dims, input, block, paddings, output_dims, output));
+  const float golden[] = {1, 3, 2, 4};
+  for (int i = 0; i < 4; ++i) {
+    EXPECT_EQ(golden[i], output[i]);
+  }
+}
+
+// A dynamic-batch export stores batch 1 where the block shape makes 2.
+TEST(SpaceToBatchNdTest, RejectsPlaceholderOutputBatch) {
+  int input_dims[] = {4, 1, 1, 4, 1};
+  const float input[] = {1, 2, 3, 4};
+  const int32_t block[] = {1, 2};
+  const int32_t paddings[] = {0, 0, 1, 1};
+  int output_dims[] = {4, 1, 1, 3, 1};
+  float output[6];
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunSpaceToBatchConstant(
+                input_dims, input, block, paddings, output_dims, output));
+}
+
+TEST(SpaceToBatchNdTest, RejectsPlaceholderOutputBatchThreeDimensions) {
+  int input_dims[] = {3, 1, 4, 1};
+  const float input[] = {1, 2, 3, 4};
+  const int32_t block[] = {2};
+  const int32_t paddings[] = {0, 0};
+  int output_dims[] = {3, 1, 2, 1};
+  float output[4];
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunSpaceToBatchConstant(
+                input_dims, input, block, paddings, output_dims, output));
+}
+
+TEST(SpaceToBatchNdTest, RejectsMismatchedSpatialOutputDim) {
+  int input_dims[] = {4, 1, 1, 4, 1};
+  const float input[] = {1, 2, 3, 4};
+  const int32_t block[] = {1, 2};
+  const int32_t paddings[] = {0, 0, 1, 1};
+  int output_dims[] = {4, 2, 1, 4, 1};
+  float output[8];
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunSpaceToBatchConstant(
+                input_dims, input, block, paddings, output_dims, output));
+}
+
+// The batch product exceeds INT32_MAX; checked without overflow.
+TEST(SpaceToBatchNdTest, RejectsBatchAboveInt32) {
+  int input_dims[] = {4, 1, 1, 1, 1};
+  const float input[] = {1};
+  const int32_t block[] = {65536, 65536};
+  const int32_t paddings[] = {65535, 0, 65535, 0};
+  int output_dims[] = {4, 1, 1, 1, 1};
+  float output[1];
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunSpaceToBatchConstant(
+                input_dims, input, block, paddings, output_dims, output));
+}
+
+// Unbounded, 2^20 * 2^30 * 2^30 would wrap int64 to the stored batch 0.
+TEST(SpaceToBatchNdTest, RejectsBatchProductThatWouldOverflow) {
+  int input_dims[] = {4, 1048576, 1, 1, 1};
+  const int32_t block[] = {1073741824, 1073741824};
+  const int32_t paddings[] = {1073741823, 0, 1073741823, 0};
+  int output_dims[] = {4, 0, 1, 1, 1};
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunSpaceToBatchConstant(
+                input_dims, nullptr, block, paddings, output_dims, nullptr));
+}
+
+// A negative batch times the blocks would overflow int64.
+TEST(SpaceToBatchNdTest, RejectsNegativeInputBatch) {
+  int input_dims[] = {4, -306184046, 1, 1, 1};
+  const int32_t block[] = {92737, 649657};
+  const int32_t paddings[] = {92736, 0, 649656, 0};
+  int output_dims[] = {4, 2, 1, 1, 1};
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunSpaceToBatchConstant(
+                input_dims, nullptr, block, paddings, output_dims, nullptr));
+}
+
+TEST(SpaceToBatchNdTest, RejectsZeroBlock) {
+  int input_dims[] = {4, 1, 1, 4, 1};
+  const int32_t block[] = {1, 0};
+  const int32_t paddings[] = {0, 0, 0, 0};
+  int output_dims[] = {4, 1, 1, 4, 1};
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunSpaceToBatchConstant(
+                input_dims, nullptr, block, paddings, output_dims, nullptr));
+}
+
+TEST(SpaceToBatchNdTest, RejectsNegativeBlock) {
+  int input_dims[] = {4, 1, 1, 4, 1};
+  const int32_t block[] = {1, -2};
+  const int32_t paddings[] = {0, 0, 0, 0};
+  int output_dims[] = {4, -2, 1, -2, 1};
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunSpaceToBatchConstant(
+                input_dims, nullptr, block, paddings, output_dims, nullptr));
+}
+
+TEST(SpaceToBatchNdTest, RejectsNegativePadding) {
+  int input_dims[] = {4, 1, 1, 4, 1};
+  const int32_t block[] = {1, 2};
+  const int32_t paddings[] = {0, 0, -1, -1};
+  int output_dims[] = {4, 2, 1, 1, 1};
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunSpaceToBatchConstant(
+                input_dims, nullptr, block, paddings, output_dims, nullptr));
+}
+
+TEST(SpaceToBatchNdTest, RejectsPaddedSizeNotMultipleOfBlock) {
+  int input_dims[] = {4, 1, 1, 5, 1};
+  const int32_t block[] = {1, 2};
+  const int32_t paddings[] = {0, 0, 0, 0};
+  int output_dims[] = {4, 2, 1, 2, 1};
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunSpaceToBatchConstant(
+                input_dims, nullptr, block, paddings, output_dims, nullptr));
+}
+
+TEST(SpaceToBatchNdTest, RejectsNegativeInputSpatialDim) {
+  int input_dims[] = {4, 1, 1, -2, 1};
+  const int32_t block[] = {1, 2};
+  const int32_t paddings[] = {0, 0, 2, 2};
+  int output_dims[] = {4, 2, 1, 1, 1};
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunSpaceToBatchConstant(
+                input_dims, nullptr, block, paddings, output_dims, nullptr));
+}
+
+TEST(SpaceToBatchNdTest, RejectsNegativeChannelDim) {
+  int input_dims[] = {4, 1, 1, 4, -1};
+  const int32_t block[] = {1, 2};
+  const int32_t paddings[] = {0, 0, 0, 0};
+  int output_dims[] = {4, 2, 1, 2, -1};
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunSpaceToBatchConstant(
+                input_dims, nullptr, block, paddings, output_dims, nullptr));
+}
+
+TEST(SpaceToBatchNdTest, RejectsInt64BlockShape) {
+  int input_dims[] = {3, 1, 4, 1};
+  const int64_t block[] = {2};
+  const int32_t paddings[] = {0, 0};
+  int output_dims[] = {3, 2, 2, 1};
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunSpaceToBatchConstant(
+                input_dims, nullptr, block, paddings, output_dims, nullptr));
+}
+
+TEST(SpaceToBatchNdTest, RejectsBlockShapeOfWrongLength) {
+  int input_dims[] = {4, 1, 1, 4, 1};
+  const int32_t block[] = {1, 2};
+  const int32_t paddings[] = {0, 0, 0, 0};
+  int output_dims[] = {4, 2, 1, 2, 1};
+  EXPECT_EQ(kTfLiteError, tflite::testing::RunSpaceToBatchConstant(
+                              input_dims, nullptr, block, paddings, output_dims,
+                              nullptr, true, true, 1));
+}
+
+TEST(SpaceToBatchNdTest, RejectsOutputRankMismatch) {
+  int input_dims[] = {3, 1, 4, 1};
+  const int32_t block[] = {2};
+  const int32_t paddings[] = {0, 0};
+  int output_dims[] = {4, 2, 2, 1, 1};
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunSpaceToBatchConstant(
+                input_dims, nullptr, block, paddings, output_dims, nullptr));
+}
+
+TEST(SpaceToBatchNdTest, RejectsChannelMismatch) {
+  int input_dims[] = {4, 1, 1, 4, 1};
+  const int32_t block[] = {1, 2};
+  const int32_t paddings[] = {0, 0, 0, 0};
+  int output_dims[] = {4, 2, 1, 2, 2};
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunSpaceToBatchConstant(
+                input_dims, nullptr, block, paddings, output_dims, nullptr));
+}
+
+// The batch depends only on the block shape.
+TEST(SpaceToBatchNdTest, RejectsPlaceholderBatchWithRuntimePaddings) {
+  int input_dims[] = {4, 1, 1, 4, 1};
+  const int32_t block[] = {1, 2};
+  const int32_t paddings[] = {0, 0, 0, 0};
+  int output_dims[] = {4, 1, 1, 2, 1};
+  EXPECT_EQ(kTfLiteError, tflite::testing::RunSpaceToBatchConstant(
+                              input_dims, nullptr, block, paddings, output_dims,
+                              nullptr, true, false));
+}
+
+// Not known before Eval: upstream behaviour.
+TEST(SpaceToBatchNdTest, AcceptsAnyStoredShapeWithRuntimeBlockShape) {
+  int input_dims[] = {4, 1, 1, 4, 1};
+  const int32_t block[] = {1, 2};
+  const int32_t paddings[] = {0, 0, 0, 0};
+  int output_dims[] = {4, 1, 1, 3, 1};
+  EXPECT_EQ(kTfLiteOk, tflite::testing::RunSpaceToBatchConstant(
+                           input_dims, nullptr, block, paddings, output_dims,
+                           nullptr, false, false));
 }
 
 TF_LITE_MICRO_TESTS_MAIN
