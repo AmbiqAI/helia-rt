@@ -480,16 +480,29 @@ TfLiteStatus RunBatch2Conv1x1(int* output_shape, float* output_data) {
       CreateTensor(bias_data, IntArrayFromInts(bias_shape)),
       CreateTensor(output_data, IntArrayFromInts(output_shape)),
   };
-  TfLiteConvParams conv_params = {kTfLitePaddingValid, 1, 1, kTfLiteActNone,
-                                  1, 1, kTfLiteNoType};
-  return tflite::testing::InvokeConv(tensors, 4, 2, &conv_params,
-                                     tflite::Register_CONV_2D(), output_data);
+  TfLiteConvParams conv_params = {
+      kTfLitePaddingValid, 1, 1, kTfLiteActNone, 1, 1, kTfLiteNoType};
+  int inputs_array_data[] = {3, 0, 1, 2};
+  int outputs_array_data[] = {1, 3};
+  const TFLMRegistration registration = tflite::Register_CONV_2D();
+  tflite::micro::KernelRunner runner(
+      registration, tensors, 4, IntArrayFromInts(inputs_array_data),
+      IntArrayFromInts(outputs_array_data), &conv_params);
+  const TfLiteStatus status =
+      runner.InitAndPrepare(reinterpret_cast<const char*>(&conv_params));
+  if (status != kTfLiteOk) {
+    EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
+    return status;
+  }
+  return runner.Invoke();
 }
 
 TEST(ConvTest, PlaceholderOutputBatchFollowsInputBatch) {
   int output_shape[] = {4, 1, 1, 1, 1};
   float output_data[] = {-100, -100};
   ASSERT_EQ(kTfLiteOk, RunBatch2Conv1x1(output_shape, output_data));
+  // The batch is written into a copy; the model's dims stay untouched.
+  EXPECT_EQ(1, output_shape[1]);
   EXPECT_NEAR(7.0f, output_data[0], 1e-5f);
   EXPECT_NEAR(11.0f, output_data[1], 1e-5f);
 }
@@ -498,6 +511,48 @@ TEST(ConvTest, RejectsNonPlaceholderOutputBatchMismatch) {
   int output_shape[] = {4, 3, 1, 1, 1};
   float output_data[3];
   EXPECT_EQ(kTfLiteError, RunBatch2Conv1x1(output_shape, output_data));
+}
+
+TEST(ConvTest, PlaceholderOutputBatchFollowsInputBatchInt8) {
+  // Kernel1x1QuantizedPerChannel as batch 2; the output stores batch 1.
+  TfLiteConvParams conv_params = {
+      kTfLitePaddingValid, 1, 1, kTfLiteActNone, 1, 1, kTfLiteNoType};
+  int input_shape[] = {4, 2, 1, 2, 4};
+  constexpr int input_elements = 2 * 1 * 2 * 4;
+  constexpr float input_data[input_elements] = {1, 1, 1, 1, 2, 2, 2, 2,
+                                                1, 2, 3, 4, 1, 2, 3, 4};
+  int filter_shape[] = {4, 3, 1, 1, 4};
+  constexpr int filter_elements = 3 * 1 * 1 * 4;
+  const float filter_data[filter_elements] = {1,  2, 3,  4,  -1, 1,
+                                              -1, 1, -1, -1, 1,  1};
+  constexpr int bias_elements = 3;
+  int bias_shape[] = {1, bias_elements};
+  constexpr float bias_data[bias_elements] = {1, 2, 3};
+  int output_shape[] = {4, 1, 1, 2, bias_elements};
+  constexpr int output_elements = 2 * 2 * 3;
+  int8_t output_data[output_elements];
+  for (int i = 0; i < output_elements; ++i) {
+    output_data[i] = 99;
+  }
+  const float golden_data[output_elements] = {11, 2, 3, 21, 2, 3,
+                                              31, 4, 7, 31, 4, 7};
+  int8_t input_quantized[input_elements];
+  int8_t filter_quantized[filter_elements];
+  int32_t bias_quantized[bias_elements];
+  int8_t golden_quantized[output_elements];
+  int zero_points[bias_elements + 1];
+  float scales[bias_elements + 1];
+  // The helper checks the stored batch 1 (the first six values).
+  tflite::testing::TestConvQuantizedPerChannel(
+      input_shape, input_data, input_quantized, 0.5f, 0, filter_shape,
+      filter_data, filter_quantized, bias_shape, bias_data, bias_quantized,
+      scales, zero_points, output_shape, golden_data, golden_quantized, 1.0f, 0,
+      &conv_params, tflite::Register_CONV_2D(), output_data);
+  EXPECT_EQ(1, output_shape[1]);
+  // Output scale 1 and zero point 0: the second batch is exact.
+  for (int i = output_elements / 2; i < output_elements; ++i) {
+    EXPECT_EQ(static_cast<int8_t>(golden_data[i]), output_data[i]);
+  }
 }
 
 TEST(ConvTest, InputOutputDifferentTypeIsError) {

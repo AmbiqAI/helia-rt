@@ -560,7 +560,7 @@ TEST(DepthwiseConvTest, PlaceholderOutputBatchFollowsInputBatch) {
   // Batch 0 as in SimpleTestQuantizedPerChannelDepthMultiplier1; batch 1 is
   // all zeros, so its output is the bias.
   const float input_values[] = {1, 2, 7, 8, 3, 4, 9, 10, 5, 6, 11, 12,
-                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+                                0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0,  0};
   const int filter_elements = 8;
   int filter_shape[] = {4, 1, 2, 2, 2};
   const float filter_values[] = {1, 2, 3, 4, -9, 10, -11, 12};
@@ -592,6 +592,8 @@ TEST(DepthwiseConvTest, PlaceholderOutputBatchFollowsInputBatch) {
       filter_values, filter_quantized, bias_shape, bias_values, bias_quantized,
       output_shape, golden, golden_quantized, output_data, 1.0f, 0,
       &conv_params, kTfLiteNoType, output_elements);
+  // The batch is written into a copy; the model's dims stay untouched.
+  EXPECT_EQ(1, output_shape[1]);
 }
 
 TEST(DepthwiseConvTest, RejectsNonPlaceholderOutputBatchMismatch) {
@@ -622,12 +624,13 @@ TEST(DepthwiseConvTest, RejectsNonPlaceholderOutputBatchMismatch) {
   int inputs_array_data[] = {3, 0, 1, 2};
   int outputs_array_data[] = {1, 3};
   const TFLMRegistration registration = tflite::Register_DEPTHWISE_CONV_2D();
-  tflite::micro::KernelRunner runner(
-      registration, tensors, 4, IntArrayFromInts(inputs_array_data),
-      IntArrayFromInts(outputs_array_data),
-      reinterpret_cast<void*>(&conv_params));
-  EXPECT_EQ(kTfLiteError, runner.InitAndPrepare(
-                              reinterpret_cast<const char*>(&conv_params)));
+  tflite::micro::KernelRunner runner(registration, tensors, 4,
+                                     IntArrayFromInts(inputs_array_data),
+                                     IntArrayFromInts(outputs_array_data),
+                                     reinterpret_cast<void*>(&conv_params));
+  EXPECT_EQ(kTfLiteError,
+            runner.InitAndPrepare(reinterpret_cast<const char*>(&conv_params)));
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
 }
 
 TEST(DepthwiseConvTest, SimpleTestQuantizedPerChannelDepthMultiplier1) {

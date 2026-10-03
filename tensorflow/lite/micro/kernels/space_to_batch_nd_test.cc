@@ -132,7 +132,6 @@ TfLiteStatus TestSpaceToBatchNdQuantized(
                                        invoke);
 }
 
-
 // A dynamic-batch export stores batch 1 for this output; the real batch is
 // the block product. see AmbiqAI/helia-rt#407
 TfLiteStatus RunSpaceToBatchConstant(int* output_dims_data, float* output_data,
@@ -160,7 +159,11 @@ TfLiteStatus RunSpaceToBatchConstant(int* output_dims_data, float* output_data,
   micro::KernelRunner runner(registration, tensors, 4,
                              IntArrayFromInts(inputs_array_data),
                              IntArrayFromInts(outputs_array_data), nullptr);
-  TF_LITE_ENSURE_STATUS(runner.InitAndPrepare());
+  const TfLiteStatus status = runner.InitAndPrepare();
+  if (status != kTfLiteOk) {
+    EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
+    return status;
+  }
   return runner.Invoke();
 }
 
@@ -273,8 +276,10 @@ TEST(SpaceToBatchNdTest, PlaceholderBatchFollowsBlockShape) {
   // Input [1,1,4,1] padded to width 6 with block [1,2] is [2,1,3,1].
   int output_dims[] = {4, 1, 1, 3, 1};
   float output[6];
-  ASSERT_EQ(kTfLiteOk, tflite::testing::RunSpaceToBatchConstant(output_dims,
-                                                                 output, 6));
+  ASSERT_EQ(kTfLiteOk,
+            tflite::testing::RunSpaceToBatchConstant(output_dims, output, 6));
+  // The batch is written into a copy; the model's dims stay untouched.
+  EXPECT_EQ(1, output_dims[1]);
   const float golden[] = {0, 2, 4, 1, 3, 0};
   for (int i = 0; i < 6; ++i) {
     EXPECT_EQ(golden[i], output[i]);
@@ -284,15 +289,15 @@ TEST(SpaceToBatchNdTest, PlaceholderBatchFollowsBlockShape) {
 TEST(SpaceToBatchNdTest, RejectsMismatchedSpatialOutputDim) {
   int output_dims[] = {4, 2, 1, 4, 1};
   float output[8];
-  EXPECT_EQ(kTfLiteError, tflite::testing::RunSpaceToBatchConstant(
-                              output_dims, output, 8));
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunSpaceToBatchConstant(output_dims, output, 8));
 }
 
 TEST(SpaceToBatchNdTest, RejectsNonPlaceholderBatchMismatch) {
   int output_dims[] = {4, 3, 1, 3, 1};
   float output[9];
-  EXPECT_EQ(kTfLiteError, tflite::testing::RunSpaceToBatchConstant(
-                              output_dims, output, 9));
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunSpaceToBatchConstant(output_dims, output, 9));
 }
 
 TF_LITE_MICRO_TESTS_MAIN

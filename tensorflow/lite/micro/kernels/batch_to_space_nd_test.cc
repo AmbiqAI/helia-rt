@@ -119,7 +119,6 @@ TfLiteStatus TestBatchToSpaceNdQuantized(
                                        output_data, ElementCount(*output_dims));
 }
 
-
 // Constant block shape and crops, as converter output has them.
 // see AmbiqAI/helia-rt#407
 TfLiteStatus RunBatchToSpaceConstant(int* input_dims_data,
@@ -144,7 +143,11 @@ TfLiteStatus RunBatchToSpaceConstant(int* input_dims_data,
   micro::KernelRunner runner(registration, tensors, 4,
                              IntArrayFromInts(inputs_array_data),
                              IntArrayFromInts(outputs_array_data), nullptr);
-  TF_LITE_ENSURE_STATUS(runner.InitAndPrepare());
+  const TfLiteStatus status = runner.InitAndPrepare();
+  if (status != kTfLiteOk) {
+    EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
+    return status;
+  }
   return runner.Invoke();
 }
 
@@ -192,12 +195,49 @@ TEST(BatchToSpaceNdTest, ConstantBlockShapeAndCropsMatchGolden) {
   }
 }
 
+TEST(BatchToSpaceNdTest, PlaceholderBatchFollowsBlockShape) {
+  // [4,1,3,1] with block [1,2] gives batch 2; the output stores batch 1.
+  int input_dims[] = {4, 4, 1, 3, 1};
+  const float input[] = {0, 2, 4, 10, 12, 14, 1, 3, 0, 11, 13, 0};
+  int output_dims[] = {4, 1, 1, 4, 1};
+  float output[8];
+  for (int i = 0; i < 8; ++i) {
+    output[i] = -100.0f;
+  }
+  ASSERT_EQ(kTfLiteOk, tflite::testing::RunBatchToSpaceConstant(
+                           input_dims, input, output_dims, output));
+  // The batch is written into a copy; the model's dims stay untouched.
+  EXPECT_EQ(1, output_dims[1]);
+  const float golden[] = {1, 2, 3, 4, 11, 12, 13, 14};
+  for (int i = 0; i < 8; ++i) {
+    EXPECT_EQ(golden[i], output[i]);
+  }
+}
+
 TEST(BatchToSpaceNdTest, RejectsInputBatchNotMultipleOfBlockProduct) {
-  // An op between SPACE_TO_BATCH_ND and here that kept the stored batch 1.
-  int input_dims[] = {4, 1, 1, 3, 1};
-  const float input[] = {0, 2, 4};
+  // An op between SPACE_TO_BATCH_ND and here that did not carry the batch.
+  int input_dims[] = {4, 3, 1, 3, 1};
+  const float input[9] = {};
   int output_dims[] = {4, 1, 1, 4, 1};
   float output[4];
+  EXPECT_EQ(kTfLiteError, tflite::testing::RunBatchToSpaceConstant(
+                              input_dims, input, output_dims, output));
+}
+
+TEST(BatchToSpaceNdTest, RejectsNonPlaceholderBatchMismatch) {
+  int input_dims[] = {4, 4, 1, 3, 1};
+  const float input[12] = {};
+  int output_dims[] = {4, 3, 1, 4, 1};
+  float output[12];
+  EXPECT_EQ(kTfLiteError, tflite::testing::RunBatchToSpaceConstant(
+                              input_dims, input, output_dims, output));
+}
+
+TEST(BatchToSpaceNdTest, RejectsMismatchedSpatialOutputDim) {
+  int input_dims[] = {4, 2, 1, 3, 1};
+  const float input[6] = {};
+  int output_dims[] = {4, 1, 1, 5, 1};
+  float output[5];
   EXPECT_EQ(kTfLiteError, tflite::testing::RunBatchToSpaceConstant(
                               input_dims, input, output_dims, output));
 }
