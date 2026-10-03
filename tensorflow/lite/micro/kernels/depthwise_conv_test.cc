@@ -173,12 +173,15 @@ void TestDepthwiseConvQuantizedPerChannel(
     int* output_dims_data, const float* expected_output_data,
     T* expected_output_data_quantized, T* output_data, float output_scale,
     int output_zero_point, TfLiteDepthwiseConvParams* conv_params,
-    TfLiteType filter_packed_type = kTfLiteNoType) {
+    TfLiteType filter_packed_type = kTfLiteNoType, int validate_length = 0) {
   TfLiteIntArray* input_dims = IntArrayFromInts(input_dims_data);
   TfLiteIntArray* filter_dims = IntArrayFromInts(filter_dims_data);
   TfLiteIntArray* bias_dims = IntArrayFromInts(bias_dims_data);
   TfLiteIntArray* output_dims = IntArrayFromInts(output_dims_data);
-  const int output_dims_count = ElementCount(*output_dims);
+  // helia: a placeholder output batch is resized at Prepare, so a caller can
+  // validate more elements than the stored dims hold. see AmbiqAI/helia-rt#407
+  const int output_dims_count =
+      validate_length > 0 ? validate_length : ElementCount(*output_dims);
 
   int filter_zero_points[kMaxFilterChannels];
   float filter_scales[kMaxFilterChannels];
@@ -547,6 +550,84 @@ TEST(DepthwiseConvTest, SimpleTestRelu) {
   tflite::testing::TestDepthwiseConvFloat(
       input_shape, input_values, filter_shape, filter_values, bias_shape,
       bias_values, golden_relu, output_shape, &conv_params, output_data);
+}
+
+// A dynamic-batch export stores batch 1 for the output while the input
+// carries the batch SPACE_TO_BATCH_ND made. see AmbiqAI/helia-rt#407
+TEST(DepthwiseConvTest, PlaceholderOutputBatchFollowsInputBatch) {
+  const int input_elements = 24;
+  int input_shape[] = {4, 2, 3, 2, 2};
+  // Batch 0 as in SimpleTestQuantizedPerChannelDepthMultiplier1; batch 1 is
+  // all zeros, so its output is the bias.
+  const float input_values[] = {1, 2, 7, 8, 3, 4, 9, 10, 5, 6, 11, 12,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  const int filter_elements = 8;
+  int filter_shape[] = {4, 1, 2, 2, 2};
+  const float filter_values[] = {1, 2, 3, 4, -9, 10, -11, 12};
+  const int bias_elements = 2;
+  int bias_shape[] = {4, 1, 1, 1, 2};
+  const float bias_values[] = {1, 2};
+  const int output_elements = 8;
+  const float golden[] = {-103, 127, -128, 127, 1, 2, 1, 2};
+  int output_shape[] = {4, 1, 2, 1, 2};
+  int8_t output_data[output_elements];
+  for (int i = 0; i < output_elements; ++i) {
+    output_data[i] = 99;
+  }
+
+  int8_t input_quantized[input_elements];
+  int8_t filter_quantized[filter_elements];
+  int32_t bias_quantized[bias_elements];
+  int8_t golden_quantized[output_elements];
+
+  TfLiteDepthwiseConvParams conv_params;
+  conv_params.activation = kTfLiteActNone;
+  conv_params.dilation_width_factor = 1;
+  conv_params.dilation_height_factor = 1;
+  conv_params.stride_height = 1;
+  conv_params.stride_width = 1;
+
+  tflite::testing::TestDepthwiseConvQuantizedPerChannel(
+      input_shape, input_values, input_quantized, 1.0f, 0, filter_shape,
+      filter_values, filter_quantized, bias_shape, bias_values, bias_quantized,
+      output_shape, golden, golden_quantized, output_data, 1.0f, 0,
+      &conv_params, kTfLiteNoType, output_elements);
+}
+
+TEST(DepthwiseConvTest, RejectsNonPlaceholderOutputBatchMismatch) {
+  using tflite::testing::CreateTensor;
+  using tflite::testing::IntArrayFromInts;
+  int input_shape[] = {4, 2, 3, 2, 2};
+  const float input_data[24] = {};
+  int filter_shape[] = {4, 1, 2, 2, 2};
+  const float filter_data[8] = {};
+  int bias_shape[] = {1, 2};
+  const float bias_data[2] = {};
+  int output_shape[] = {4, 3, 2, 1, 2};
+  float output_data[12];
+  TfLiteTensor tensors[] = {
+      CreateTensor(input_data, IntArrayFromInts(input_shape)),
+      CreateTensor(filter_data, IntArrayFromInts(filter_shape)),
+      CreateTensor(bias_data, IntArrayFromInts(bias_shape)),
+      CreateTensor(output_data, IntArrayFromInts(output_shape)),
+  };
+  TfLiteDepthwiseConvParams conv_params;
+  conv_params.padding = kTfLitePaddingValid;
+  conv_params.activation = kTfLiteActNone;
+  conv_params.dilation_width_factor = 1;
+  conv_params.dilation_height_factor = 1;
+  conv_params.stride_height = 1;
+  conv_params.stride_width = 1;
+  conv_params.depth_multiplier = 1;
+  int inputs_array_data[] = {3, 0, 1, 2};
+  int outputs_array_data[] = {1, 3};
+  const TFLMRegistration registration = tflite::Register_DEPTHWISE_CONV_2D();
+  tflite::micro::KernelRunner runner(
+      registration, tensors, 4, IntArrayFromInts(inputs_array_data),
+      IntArrayFromInts(outputs_array_data),
+      reinterpret_cast<void*>(&conv_params));
+  EXPECT_EQ(kTfLiteError, runner.InitAndPrepare(
+                              reinterpret_cast<const char*>(&conv_params)));
 }
 
 TEST(DepthwiseConvTest, SimpleTestQuantizedPerChannelDepthMultiplier1) {

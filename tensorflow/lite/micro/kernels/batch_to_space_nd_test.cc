@@ -119,6 +119,35 @@ TfLiteStatus TestBatchToSpaceNdQuantized(
                                        output_data, ElementCount(*output_dims));
 }
 
+
+// Constant block shape and crops, as converter output has them.
+// see AmbiqAI/helia-rt#407
+TfLiteStatus RunBatchToSpaceConstant(int* input_dims_data,
+                                     const float* input_data,
+                                     int* output_dims_data,
+                                     float* output_data) {
+  int block_shape_dims_data[] = {1, 2};
+  const int32_t block_shape_data[] = {1, 2};
+  int crops_dims_data[] = {2, 2, 2};
+  const int32_t crops_data[] = {0, 0, 1, 1};
+  TfLiteTensor tensors[] = {
+      CreateTensor(input_data, IntArrayFromInts(input_dims_data)),
+      CreateTensor(block_shape_data, IntArrayFromInts(block_shape_dims_data)),
+      CreateTensor(crops_data, IntArrayFromInts(crops_dims_data)),
+      CreateTensor(output_data, IntArrayFromInts(output_dims_data)),
+  };
+  tensors[1].allocation_type = kTfLiteMmapRo;
+  tensors[2].allocation_type = kTfLiteMmapRo;
+  int inputs_array_data[] = {3, 0, 1, 2};
+  int outputs_array_data[] = {1, 3};
+  const TFLMRegistration registration = Register_BATCH_TO_SPACE_ND();
+  micro::KernelRunner runner(registration, tensors, 4,
+                             IntArrayFromInts(inputs_array_data),
+                             IntArrayFromInts(outputs_array_data), nullptr);
+  TF_LITE_ENSURE_STATUS(runner.InitAndPrepare());
+  return runner.Invoke();
+}
+
 }  // namespace
 }  // namespace testing
 }  // namespace tflite
@@ -147,6 +176,30 @@ TEST(BatchToSpaceNdTest, BatchToSpaceBasicInt8) {
           tflite::testing::basic_block_shape, tflite::testing::basic_crops_dims,
           tflite::testing::basic_crops, tflite::testing::basic_output_dims,
           tflite::testing::basic_golden, golden_quantized, 1.0f, 0, output));
+}
+
+TEST(BatchToSpaceNdTest, ConstantBlockShapeAndCropsMatchGolden) {
+  // [2,1,3,1] with block [1,2] is width 6, cropped by 1 on each side.
+  int input_dims[] = {4, 2, 1, 3, 1};
+  const float input[] = {0, 2, 4, 1, 3, 0};
+  int output_dims[] = {4, 1, 1, 4, 1};
+  float output[4];
+  ASSERT_EQ(kTfLiteOk, tflite::testing::RunBatchToSpaceConstant(
+                           input_dims, input, output_dims, output));
+  const float golden[] = {1, 2, 3, 4};
+  for (int i = 0; i < 4; ++i) {
+    EXPECT_EQ(golden[i], output[i]);
+  }
+}
+
+TEST(BatchToSpaceNdTest, RejectsInputBatchNotMultipleOfBlockProduct) {
+  // An op between SPACE_TO_BATCH_ND and here that kept the stored batch 1.
+  int input_dims[] = {4, 1, 1, 3, 1};
+  const float input[] = {0, 2, 4};
+  int output_dims[] = {4, 1, 1, 4, 1};
+  float output[4];
+  EXPECT_EQ(kTfLiteError, tflite::testing::RunBatchToSpaceConstant(
+                              input_dims, input, output_dims, output));
 }
 
 TF_LITE_MICRO_TESTS_MAIN

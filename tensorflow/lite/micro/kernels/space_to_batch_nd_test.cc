@@ -132,6 +132,38 @@ TfLiteStatus TestSpaceToBatchNdQuantized(
                                        invoke);
 }
 
+
+// A dynamic-batch export stores batch 1 for this output; the real batch is
+// the block product. see AmbiqAI/helia-rt#407
+TfLiteStatus RunSpaceToBatchConstant(int* output_dims_data, float* output_data,
+                                     int output_capacity) {
+  int input_dims_data[] = {4, 1, 1, 4, 1};
+  const float input_data[] = {1, 2, 3, 4};
+  int block_shape_dims_data[] = {1, 2};
+  const int32_t block_shape_data[] = {1, 2};
+  int paddings_dims_data[] = {2, 2, 2};
+  const int32_t paddings_data[] = {0, 0, 1, 1};
+  for (int i = 0; i < output_capacity; ++i) {
+    output_data[i] = -100.0f;
+  }
+  TfLiteTensor tensors[] = {
+      CreateTensor(input_data, IntArrayFromInts(input_dims_data)),
+      CreateTensor(block_shape_data, IntArrayFromInts(block_shape_dims_data)),
+      CreateTensor(paddings_data, IntArrayFromInts(paddings_dims_data)),
+      CreateTensor(output_data, IntArrayFromInts(output_dims_data)),
+  };
+  tensors[1].allocation_type = kTfLiteMmapRo;
+  tensors[2].allocation_type = kTfLiteMmapRo;
+  int inputs_array_data[] = {3, 0, 1, 2};
+  int outputs_array_data[] = {1, 3};
+  const TFLMRegistration registration = Register_SPACE_TO_BATCH_ND();
+  micro::KernelRunner runner(registration, tensors, 4,
+                             IntArrayFromInts(inputs_array_data),
+                             IntArrayFromInts(outputs_array_data), nullptr);
+  TF_LITE_ENSURE_STATUS(runner.InitAndPrepare());
+  return runner.Invoke();
+}
+
 }  // namespace
 }  // namespace testing
 }  // namespace tflite
@@ -235,6 +267,32 @@ TEST(SpaceToBatchNdTest, RejectMismatchedInt8Quantization) {
             golden_quantized, output_scales[i], output_zero_points[i], output,
             false));
   }
+}
+
+TEST(SpaceToBatchNdTest, PlaceholderBatchFollowsBlockShape) {
+  // Input [1,1,4,1] padded to width 6 with block [1,2] is [2,1,3,1].
+  int output_dims[] = {4, 1, 1, 3, 1};
+  float output[6];
+  ASSERT_EQ(kTfLiteOk, tflite::testing::RunSpaceToBatchConstant(output_dims,
+                                                                 output, 6));
+  const float golden[] = {0, 2, 4, 1, 3, 0};
+  for (int i = 0; i < 6; ++i) {
+    EXPECT_EQ(golden[i], output[i]);
+  }
+}
+
+TEST(SpaceToBatchNdTest, RejectsMismatchedSpatialOutputDim) {
+  int output_dims[] = {4, 2, 1, 4, 1};
+  float output[8];
+  EXPECT_EQ(kTfLiteError, tflite::testing::RunSpaceToBatchConstant(
+                              output_dims, output, 8));
+}
+
+TEST(SpaceToBatchNdTest, RejectsNonPlaceholderBatchMismatch) {
+  int output_dims[] = {4, 3, 1, 3, 1};
+  float output[9];
+  EXPECT_EQ(kTfLiteError, tflite::testing::RunSpaceToBatchConstant(
+                              output_dims, output, 9));
 }
 
 TF_LITE_MICRO_TESTS_MAIN

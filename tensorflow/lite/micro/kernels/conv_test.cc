@@ -463,6 +463,43 @@ TEST(ConvTest, InputAndFilterSameWidthHeight) {
       output_data);
 }
 
+// A dynamic-batch export stores batch 1 for the output while the input
+// carries the batch SPACE_TO_BATCH_ND made. see AmbiqAI/helia-rt#407
+TfLiteStatus RunBatch2Conv1x1(int* output_shape, float* output_data) {
+  using tflite::testing::CreateTensor;
+  using tflite::testing::IntArrayFromInts;
+  int input_shape[] = {4, 2, 1, 1, 1};
+  const float input_data[] = {3, 5};
+  int filter_shape[] = {4, 1, 1, 1, 1};
+  const float filter_data[] = {2};
+  int bias_shape[] = {1, 1};
+  const float bias_data[] = {1};
+  TfLiteTensor tensors[] = {
+      CreateTensor(input_data, IntArrayFromInts(input_shape)),
+      CreateTensor(filter_data, IntArrayFromInts(filter_shape)),
+      CreateTensor(bias_data, IntArrayFromInts(bias_shape)),
+      CreateTensor(output_data, IntArrayFromInts(output_shape)),
+  };
+  TfLiteConvParams conv_params = {kTfLitePaddingValid, 1, 1, kTfLiteActNone,
+                                  1, 1, kTfLiteNoType};
+  return tflite::testing::InvokeConv(tensors, 4, 2, &conv_params,
+                                     tflite::Register_CONV_2D(), output_data);
+}
+
+TEST(ConvTest, PlaceholderOutputBatchFollowsInputBatch) {
+  int output_shape[] = {4, 1, 1, 1, 1};
+  float output_data[] = {-100, -100};
+  ASSERT_EQ(kTfLiteOk, RunBatch2Conv1x1(output_shape, output_data));
+  EXPECT_NEAR(7.0f, output_data[0], 1e-5f);
+  EXPECT_NEAR(11.0f, output_data[1], 1e-5f);
+}
+
+TEST(ConvTest, RejectsNonPlaceholderOutputBatchMismatch) {
+  int output_shape[] = {4, 3, 1, 1, 1};
+  float output_data[3];
+  EXPECT_EQ(kTfLiteError, RunBatch2Conv1x1(output_shape, output_data));
+}
+
 TEST(ConvTest, InputOutputDifferentTypeIsError) {
   using tflite::testing::CreateQuantizedTensor;
   using tflite::testing::CreateTensor;
