@@ -53,7 +53,12 @@ TfLiteStatus CheckConstantOutputShape(const TfLiteTensor* input,
                                       const TfLiteTensor* output) {
   const int rank = NumDimensions(input);
   const int spatial_dims = rank - 2;
-  if (NumDimensions(output) != rank || block_shape->type != kTfLiteInt32 ||
+  if (NumDimensions(output) != rank) {
+    MicroPrintf("SPACE_TO_BATCH_ND: output rank %d differs from input rank %d.",
+                NumDimensions(output), rank);
+    return kTfLiteError;
+  }
+  if (block_shape->type != kTfLiteInt32 ||
       NumElements(block_shape) != spatial_dims ||
       (paddings != nullptr && (paddings->type != kTfLiteInt32 ||
                                NumElements(paddings) != 2 * spatial_dims))) {
