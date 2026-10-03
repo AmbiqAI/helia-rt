@@ -201,9 +201,11 @@ const Model* GetNoOpModelWithTensorShape(
 // output stored with the placeholder batch 1, read by `consumer`: RELU, ADD
 // (as its second input), BATCH_TO_SPACE_ND with the same block, or a 1x1
 // DEPTHWISE_CONV_2D scaling by 2. `consumer_first` lists the consumer before
-// SPACE_TO_BATCH_ND. Not cached.
+// SPACE_TO_BATCH_ND; `second_producer` first lists a RELU that also writes the
+// batched tensor. Not cached.
 const Model* GetSpaceToBatchModel(BuiltinOperator consumer,
-                                  bool consumer_first = false);
+                                  bool consumer_first = false,
+                                  bool second_producer = false);
 
 // helia: see AmbiqAI/helia-rt#407.
 // Returns RESHAPE of a [1, 4] input to a stored [-1, 2], read by RELU into a

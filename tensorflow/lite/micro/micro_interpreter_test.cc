@@ -791,7 +791,8 @@ TEST(MicroInterpreterTest, TestDynamicTensorFails) {
 // batch, placed after the op that resizes it; any other reader would size its
 // output from the stored shape and write past it. see AmbiqAI/helia-rt#407
 TfLiteStatus AllocateSpaceToBatchModel(tflite::BuiltinOperator consumer,
-                                       bool consumer_first) {
+                                       bool consumer_first,
+                                       bool second_producer = false) {
   tflite::MicroMutableOpResolver<5> op_resolver;
   EXPECT_EQ(kTfLiteOk, op_resolver.AddSpaceToBatchNd());
   EXPECT_EQ(kTfLiteOk, op_resolver.AddRelu());
@@ -801,7 +802,8 @@ TfLiteStatus AllocateSpaceToBatchModel(tflite::BuiltinOperator consumer,
   constexpr size_t kArenaSize = 8192;
   alignas(16) static uint8_t arena[kArenaSize];
   tflite::MicroInterpreter interpreter(
-      tflite::testing::GetSpaceToBatchModel(consumer, consumer_first),
+      tflite::testing::GetSpaceToBatchModel(consumer, consumer_first,
+                                            second_producer),
       op_resolver, arena, kArenaSize);
   return interpreter.AllocateTensors();
 }
@@ -823,9 +825,34 @@ TEST(MicroInterpreterTest, ResizedTensorReadBeforeItsProducerFails) {
                               tflite::BuiltinOperator_DEPTHWISE_CONV_2D, true));
 }
 
-TEST(MicroInterpreterTest, ResizedTensorReadByDepthwiseIsAccepted) {
-  EXPECT_EQ(kTfLiteOk, AllocateSpaceToBatchModel(
-                           tflite::BuiltinOperator_DEPTHWISE_CONV_2D, false));
+TEST(MicroInterpreterTest, ResizedTensorWithTwoProducersFails) {
+  EXPECT_EQ(kTfLiteError,
+            AllocateSpaceToBatchModel(tflite::BuiltinOperator_DEPTHWISE_CONV_2D,
+                                      false, true));
+}
+
+TEST(MicroInterpreterTest, ResizedTensorReadByDepthwiseFollowsBatch) {
+  tflite::MicroMutableOpResolver<2> op_resolver;
+  EXPECT_EQ(kTfLiteOk, op_resolver.AddSpaceToBatchNd());
+  EXPECT_EQ(kTfLiteOk, op_resolver.AddDepthwiseConv2D());
+  constexpr size_t kArenaSize = 8192;
+  alignas(16) static uint8_t arena[kArenaSize];
+  tflite::MicroInterpreter interpreter(
+      tflite::testing::GetSpaceToBatchModel(
+          tflite::BuiltinOperator_DEPTHWISE_CONV_2D),
+      op_resolver, arena, kArenaSize);
+  ASSERT_EQ(kTfLiteOk, interpreter.AllocateTensors());
+  const float input[] = {1, 2, 3, 4};
+  for (int i = 0; i < 4; ++i) {
+    interpreter.input(0)->data.f[i] = input[i];
+  }
+  ASSERT_EQ(kTfLiteOk, interpreter.Invoke());
+  // Batch 0 holds the even columns, batch 1 the odd ones, each scaled by 2.
+  EXPECT_EQ(2, interpreter.output(0)->dims->data[0]);
+  const float golden[] = {2, 6, 4, 8};
+  for (int i = 0; i < 4; ++i) {
+    EXPECT_EQ(golden[i], interpreter.output(0)->data.f[i]);
+  }
 }
 
 TEST(MicroInterpreterTest, ResizedTensorReadByBatchToSpaceRoundTrips) {

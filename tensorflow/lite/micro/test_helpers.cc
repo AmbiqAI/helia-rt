@@ -1966,8 +1966,8 @@ const Model* GetNoOpModelWithTensorShape(
 }
 
 // helia: see AmbiqAI/helia-rt#407.
-const Model* GetSpaceToBatchModel(BuiltinOperator consumer,
-                                  bool consumer_first) {
+const Model* GetSpaceToBatchModel(BuiltinOperator consumer, bool consumer_first,
+                                  bool second_producer) {
   using flatbuffers::Offset;
   static ModelBuilderInstance<4096> builder_instance;
   flatbuffers::FlatBufferBuilder& builder = builder_instance.GetBuilder();
@@ -2047,22 +2047,31 @@ const Model* GetSpaceToBatchModel(BuiltinOperator consumer,
   const Offset<Operator> consumer_op = CreateOperator(
       builder, 1, builder.CreateVector(consumer_inputs, consumer_inputs_size),
       builder.CreateVector(consumer_outputs, 1), options_type, options);
-  const Offset<Operator> operators[] = {consumer_first ? consumer_op : s2b_op,
+  const int32_t relu_producer_inputs[] = {5};
+  const Offset<Operator> relu_producer_op =
+      CreateOperator(builder, 2, builder.CreateVector(relu_producer_inputs, 1),
+                     builder.CreateVector(s2b_outputs, 1));
+  const Offset<Operator> operators[] = {relu_producer_op,
+                                        consumer_first ? consumer_op : s2b_op,
                                         consumer_first ? s2b_op : consumer_op};
+  const int operators_size = second_producer ? 3 : 2;
   const int32_t graph_inputs[] = {0, 5};
+  const bool second_input = consumer == BuiltinOperator_ADD || second_producer;
   const int32_t graph_outputs[] = {4};
   const Offset<SubGraph> subgraphs[] = {CreateSubGraph(
       builder, builder.CreateVector(tensors, 8),
-      builder.CreateVector(graph_inputs,
-                           consumer == BuiltinOperator_ADD ? 2 : 1),
+      builder.CreateVector(graph_inputs, second_input ? 2 : 1),
       builder.CreateVector(graph_outputs, 1),
-      builder.CreateVector(operators, 2), builder.CreateString("main"))};
+      builder.CreateVector(second_producer ? operators : operators + 1,
+                           operators_size),
+      builder.CreateString("main"))};
   const Offset<OperatorCode> operator_codes[] = {
       CreateOperatorCode(builder, 0, 0, 1, BuiltinOperator_SPACE_TO_BATCH_ND),
       CreateOperatorCode(builder, 0, 0, 1, consumer),
+      CreateOperatorCode(builder, 0, 0, 1, BuiltinOperator_RELU),
   };
   const Offset<Model> model = CreateModel(
-      builder, 0, builder.CreateVector(operator_codes, 2),
+      builder, 0, builder.CreateVector(operator_codes, 3),
       builder.CreateVector(subgraphs, 1), builder.CreateString("s2b"),
       builder.CreateVector(buffers, 5));
   FinishModelBuffer(builder, model);

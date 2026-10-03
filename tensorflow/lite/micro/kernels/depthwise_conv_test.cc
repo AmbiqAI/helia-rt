@@ -678,14 +678,79 @@ TfLiteStatus PrepareDepthwiseWithBatch65536() {
   return status;
 }
 
-TEST(DepthwiseConvTest, RejectsInt8BatchAboveHeliaCoreLimit) {
-  EXPECT_EQ(kTfLiteError,
-            (PrepareDepthwiseWithBatch65536<int8_t, int8_t, int32_t>()));
+// Valid per-channel quantization, so only the batch decides.
+template <typename T, typename BiasT>
+TfLiteStatus PrepareQuantizedDepthwiseWithBatch(int batch) {
+  using tflite::testing::CreatePerChannelQuantizedBiasTensor;
+  using tflite::testing::CreateQuantizedTensor;
+  using tflite::testing::CreateSymmetricPerChannelQuantizedTensor;
+  using tflite::testing::FloatArrayFromFloats;
+  using tflite::testing::IntArrayFromInts;
+  int input_shape[] = {4, batch, 1, 1, 1};
+  int filter_shape[] = {4, 1, 1, 1, 1};
+  int bias_shape[] = {4, 1, 1, 1, 1};
+  int output_shape[] = {4, batch, 1, 1, 1};
+  const float filter_values[] = {1};
+  const float bias_values[] = {0};
+  int8_t filter_quantized[1];
+  BiasT bias_quantized[1];
+  float filter_scales[2];
+  int filter_zero_points[2];
+  float bias_scales[2];
+  int bias_zero_points[2];
+  TfLiteAffineQuantization filter_quant;
+  TfLiteAffineQuantization bias_quant;
+  float io_scales[] = {1, 1.0f};
+  int io_zero_points[] = {1, 0};
+  TfLiteAffineQuantization io_quant = {FloatArrayFromFloats(io_scales),
+                                       IntArrayFromInts(io_zero_points), 0};
+  TfLiteTensor tensors[] = {
+      CreateQuantizedTensor(static_cast<const T*>(nullptr),
+                            IntArrayFromInts(input_shape), 1.0f, 0),
+      CreateSymmetricPerChannelQuantizedTensor(
+          filter_values, filter_quantized, IntArrayFromInts(filter_shape),
+          filter_scales, filter_zero_points, &filter_quant, 3),
+      CreatePerChannelQuantizedBiasTensor(
+          bias_values, bias_quantized, IntArrayFromInts(bias_shape), 1.0f,
+          &filter_scales[1], bias_scales, bias_zero_points, &bias_quant, 3),
+      CreateQuantizedTensor(static_cast<T*>(nullptr),
+                            IntArrayFromInts(output_shape), 1.0f, 0),
+  };
+  tensors[0].quantization = {kTfLiteAffineQuantization, &io_quant};
+  tensors[3].quantization = {kTfLiteAffineQuantization, &io_quant};
+  TfLiteDepthwiseConvParams conv_params;
+  conv_params.padding = kTfLitePaddingValid;
+  conv_params.activation = kTfLiteActNone;
+  conv_params.dilation_width_factor = 1;
+  conv_params.dilation_height_factor = 1;
+  conv_params.stride_height = 1;
+  conv_params.stride_width = 1;
+  conv_params.depth_multiplier = 1;
+  int inputs_array_data[] = {3, 0, 1, 2};
+  int outputs_array_data[] = {1, 3};
+  const TFLMRegistration registration = tflite::Register_DEPTHWISE_CONV_2D();
+  tflite::micro::KernelRunner runner(registration, tensors, 4,
+                                     IntArrayFromInts(inputs_array_data),
+                                     IntArrayFromInts(outputs_array_data),
+                                     reinterpret_cast<void*>(&conv_params));
+  const TfLiteStatus status =
+      runner.InitAndPrepare(reinterpret_cast<const char*>(&conv_params));
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
+  return status;
 }
 
-TEST(DepthwiseConvTest, RejectsInt16BatchAboveHeliaCoreLimit) {
+TEST(DepthwiseConvTest, Int8BatchAtHeliaCoreLimit) {
+  EXPECT_EQ(kTfLiteOk,
+            (PrepareQuantizedDepthwiseWithBatch<int8_t, int32_t>(65535)));
   EXPECT_EQ(kTfLiteError,
-            (PrepareDepthwiseWithBatch65536<int16_t, int8_t, int64_t>()));
+            (PrepareQuantizedDepthwiseWithBatch<int8_t, int32_t>(65536)));
+}
+
+TEST(DepthwiseConvTest, Int16BatchAtHeliaCoreLimit) {
+  EXPECT_EQ(kTfLiteOk,
+            (PrepareQuantizedDepthwiseWithBatch<int16_t, int64_t>(65535)));
+  EXPECT_EQ(kTfLiteError,
+            (PrepareQuantizedDepthwiseWithBatch<int16_t, int64_t>(65536)));
 }
 
 TEST(DepthwiseConvTest, AcceptsFloatBatchAboveHeliaCoreLimit) {
