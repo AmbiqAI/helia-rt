@@ -44,7 +44,8 @@ const int kInputOutputMaxDimensionNum = 4;
 // TFLM sizes every tensor from the shape stored in the model. A model
 // exported with a dynamic batch stores placeholder batches that do not follow
 // from the graph, so it would compute wrong outputs; reject any output shape
-// the input, block shape and crops do not give.
+// the input, block shape and crops do not give. With runtime crops (nullptr
+// here), only the batch is checked.
 TfLiteStatus CheckConstantOutputShape(const TfLiteTensor* input,
                                       const TfLiteTensor* block_shape,
                                       const TfLiteTensor* crops,
@@ -52,41 +53,59 @@ TfLiteStatus CheckConstantOutputShape(const TfLiteTensor* input,
   const int rank = NumDimensions(input);
   const int spatial_dims = rank - 2;
   if (NumDimensions(output) != rank || block_shape->type != kTfLiteInt32 ||
-      crops->type != kTfLiteInt32 || NumElements(block_shape) != spatial_dims ||
-      NumElements(crops) != 2 * spatial_dims) {
+      NumElements(block_shape) != spatial_dims ||
+      (crops != nullptr && (crops->type != kTfLiteInt32 ||
+                            NumElements(crops) != 2 * spatial_dims))) {
     MicroPrintf("BATCH_TO_SPACE_ND: unsupported block shape or crops.");
     return kTfLiteError;
   }
   const int32_t* block = GetTensorData<int32_t>(block_shape);
-  const int32_t* crop = GetTensorData<int32_t>(crops);
-  int64_t expected[kInputOutputMaxDimensionNum];
-  expected[rank - 1] = input->dims->data[rank - 1];
-  int64_t block_product = 1;
+  const int32_t* crop =
+      crops != nullptr ? GetTensorData<int32_t>(crops) : nullptr;
   bool valid = input->dims->data[0] > 0;
+  for (int i = 1; i < rank; ++i) {
+    valid = valid && input->dims->data[i] >= 0;
+  }
+  int64_t expected[kInputOutputMaxDimensionNum];
+  int64_t block_product = 1;
   for (int i = 0; valid && i < spatial_dims; ++i) {
-    const int64_t uncropped =
-        static_cast<int64_t>(input->dims->data[i + 1]) * block[i];
-    expected[i + 1] = uncropped - crop[2 * i] - crop[2 * i + 1];
-    valid = block[i] > 0 && crop[2 * i] >= 0 && crop[2 * i + 1] >= 0 &&
-            input->dims->data[i + 1] >= 0 && expected[i + 1] >= 0 &&
-            expected[i + 1] <= INT32_MAX;
+    valid = block[i] > 0;
     block_product *= block[i];
     valid = valid && block_product <= INT32_MAX;
+    if (valid && crop != nullptr) {
+      expected[i + 1] =
+          static_cast<int64_t>(input->dims->data[i + 1]) * block[i] -
+          crop[2 * i] - crop[2 * i + 1];
+      valid = crop[2 * i] >= 0 && crop[2 * i + 1] >= 0 &&
+              expected[i + 1] >= 0 && expected[i + 1] <= INT32_MAX;
+    }
   }
-  if (!valid || input->dims->data[0] % block_product != 0) {
+  if (!valid) {
     MicroPrintf(
-        "BATCH_TO_SPACE_ND: invalid input batch, block shape or crops.");
+        "BATCH_TO_SPACE_ND: invalid input shape, block shape or crops.");
     return kTfLiteError;
   }
-  expected[0] = input->dims->data[0] / block_product;
-  for (int i = 0; i < rank; ++i) {
+  const int32_t product = static_cast<int32_t>(block_product);
+  if (input->dims->data[0] % product != 0) {
+    MicroPrintf(
+        "BATCH_TO_SPACE_ND: input batch %d is not a multiple of the block "
+        "product %d. The model was likely exported with a dynamic batch; "
+        "re-export it with a fixed batch size (for example 1).",
+        input->dims->data[0], static_cast<int>(product));
+    return kTfLiteError;
+  }
+  expected[0] = input->dims->data[0] / product;
+  expected[rank - 1] = input->dims->data[rank - 1];
+  const int checked_dims = crop != nullptr ? rank : 1;
+  for (int i = 0; i < checked_dims; ++i) {
     if (output->dims->data[i] != expected[i]) {
       MicroPrintf(
           "BATCH_TO_SPACE_ND: output dim %d is %d in the model, but the "
-          "input, block shape and crops give %d. The model was likely "
-          "exported with a dynamic batch; re-export it with a fixed batch "
-          "size (for example 1).",
-          i, output->dims->data[i], static_cast<int>(expected[i]));
+          "input, block shape and crops give %d.%s",
+          i, output->dims->data[i], static_cast<int>(expected[i]),
+          i == 0 ? " The model was likely exported with a dynamic batch; "
+                   "re-export it with a fixed batch size (for example 1)."
+                 : "");
       return kTfLiteError;
     }
   }
@@ -94,8 +113,8 @@ TfLiteStatus CheckConstantOutputShape(const TfLiteTensor* input,
 }
 
 // helia: see AmbiqAI/helia-rt#407.
-// The shape is only checked when the block shape and crops are constant;
-// otherwise it is not known before Eval.
+// The shape is only checked when the block shape is constant; otherwise it is
+// not known before Eval.
 TfLiteStatus CheckOutputShape(TfLiteContext* context, TfLiteNode* node,
                               const TfLiteTensor* input,
                               const TfLiteTensor* output) {
@@ -105,9 +124,11 @@ TfLiteStatus CheckOutputShape(TfLiteContext* context, TfLiteNode* node,
   TfLiteTensor* crops =
       micro_context->AllocateTempInputTensor(node, kCropsTensor);
   TfLiteStatus status = kTfLiteOk;
-  if (block_shape != nullptr && crops != nullptr &&
-      IsConstantTensor(block_shape) && IsConstantTensor(crops)) {
-    status = CheckConstantOutputShape(input, block_shape, crops, output);
+  if (block_shape == nullptr || crops == nullptr) {
+    status = kTfLiteError;
+  } else if (IsConstantTensor(block_shape)) {
+    status = CheckConstantOutputShape(
+        input, block_shape, IsConstantTensor(crops) ? crops : nullptr, output);
   }
   if (block_shape != nullptr) {
     micro_context->DeallocateTempTfLiteTensor(block_shape);

@@ -46,7 +46,7 @@ const int kInputOutputMaxDimensionNum = 4;
 // exported with a dynamic batch stores batch 1 for this output while the real
 // batch is the input batch times the block product, so it would compute wrong
 // outputs; reject any output shape the input, block shape and paddings do not
-// give.
+// give. With runtime paddings (nullptr here), only the batch is checked.
 TfLiteStatus CheckConstantOutputShape(const TfLiteTensor* input,
                                       const TfLiteTensor* block_shape,
                                       const TfLiteTensor* paddings,
@@ -54,43 +54,49 @@ TfLiteStatus CheckConstantOutputShape(const TfLiteTensor* input,
   const int rank = NumDimensions(input);
   const int spatial_dims = rank - 2;
   if (NumDimensions(output) != rank || block_shape->type != kTfLiteInt32 ||
-      paddings->type != kTfLiteInt32 ||
       NumElements(block_shape) != spatial_dims ||
-      NumElements(paddings) != 2 * spatial_dims) {
+      (paddings != nullptr && (paddings->type != kTfLiteInt32 ||
+                               NumElements(paddings) != 2 * spatial_dims))) {
     MicroPrintf("SPACE_TO_BATCH_ND: unsupported block shape or paddings.");
     return kTfLiteError;
   }
   const int32_t* block = GetTensorData<int32_t>(block_shape);
-  const int32_t* pad = GetTensorData<int32_t>(paddings);
+  const int32_t* pad =
+      paddings != nullptr ? GetTensorData<int32_t>(paddings) : nullptr;
+  bool valid = input->dims->data[0] > 0;
+  for (int i = 1; i < rank; ++i) {
+    valid = valid && input->dims->data[i] >= 0;
+  }
   int64_t expected[kInputOutputMaxDimensionNum];
   expected[0] = input->dims->data[0];
-  expected[rank - 1] = input->dims->data[rank - 1];
-  bool valid = expected[0] > 0;
   for (int i = 0; valid && i < spatial_dims; ++i) {
-    const int64_t padded = static_cast<int64_t>(input->dims->data[i + 1]) +
-                           pad[2 * i] + pad[2 * i + 1];
-    valid = block[i] > 0 && pad[2 * i] >= 0 && pad[2 * i + 1] >= 0 &&
-            padded >= 0 && padded % block[i] == 0 &&
-            padded / block[i] <= INT32_MAX;
-    if (valid) {
-      expected[i + 1] = padded / block[i];
-      expected[0] *= block[i];
-      valid = expected[0] <= INT32_MAX;
+    valid = block[i] > 0;
+    expected[0] *= block[i];
+    valid = valid && expected[0] <= INT32_MAX;
+    if (valid && pad != nullptr) {
+      const int64_t padded = static_cast<int64_t>(input->dims->data[i + 1]) +
+                             pad[2 * i] + pad[2 * i + 1];
+      valid = pad[2 * i] >= 0 && pad[2 * i + 1] >= 0 && padded <= INT32_MAX &&
+              static_cast<int32_t>(padded) % block[i] == 0;
+      expected[i + 1] = valid ? static_cast<int32_t>(padded) / block[i] : 0;
     }
   }
   if (!valid) {
     MicroPrintf(
-        "SPACE_TO_BATCH_ND: invalid input batch, block shape or paddings.");
+        "SPACE_TO_BATCH_ND: invalid input shape, block shape or paddings.");
     return kTfLiteError;
   }
-  for (int i = 0; i < rank; ++i) {
+  expected[rank - 1] = input->dims->data[rank - 1];
+  const int checked_dims = pad != nullptr ? rank : 1;
+  for (int i = 0; i < checked_dims; ++i) {
     if (output->dims->data[i] != expected[i]) {
       MicroPrintf(
           "SPACE_TO_BATCH_ND: output dim %d is %d in the model, but the "
-          "input, block shape and paddings give %d. The model was likely "
-          "exported with a dynamic batch; re-export it with a fixed batch "
-          "size (for example 1).",
-          i, output->dims->data[i], static_cast<int>(expected[i]));
+          "input, block shape and paddings give %d.%s",
+          i, output->dims->data[i], static_cast<int>(expected[i]),
+          i == 0 ? " The model was likely exported with a dynamic batch; "
+                   "re-export it with a fixed batch size (for example 1)."
+                 : "");
       return kTfLiteError;
     }
   }
@@ -98,8 +104,8 @@ TfLiteStatus CheckConstantOutputShape(const TfLiteTensor* input,
 }
 
 // helia: see AmbiqAI/helia-rt#407.
-// The shape is only checked when the block shape and paddings are constant;
-// otherwise it is not known before Eval.
+// The shape is only checked when the block shape is constant; otherwise it is
+// not known before Eval.
 TfLiteStatus CheckOutputShape(TfLiteContext* context, TfLiteNode* node,
                               const TfLiteTensor* input,
                               const TfLiteTensor* output) {
@@ -109,9 +115,12 @@ TfLiteStatus CheckOutputShape(TfLiteContext* context, TfLiteNode* node,
   TfLiteTensor* paddings =
       micro_context->AllocateTempInputTensor(node, kCropsTensor);
   TfLiteStatus status = kTfLiteOk;
-  if (block_shape != nullptr && paddings != nullptr &&
-      IsConstantTensor(block_shape) && IsConstantTensor(paddings)) {
-    status = CheckConstantOutputShape(input, block_shape, paddings, output);
+  if (block_shape == nullptr || paddings == nullptr) {
+    status = kTfLiteError;
+  } else if (IsConstantTensor(block_shape)) {
+    status = CheckConstantOutputShape(
+        input, block_shape, IsConstantTensor(paddings) ? paddings : nullptr,
+        output);
   }
   if (block_shape != nullptr) {
     micro_context->DeallocateTempTfLiteTensor(block_shape);
