@@ -200,7 +200,8 @@ const Model* GetNoOpModelWithTensorShape(
 // Returns SPACE_TO_BATCH_ND with block [1, 2] on a [1, 1, 4, 1] input, then
 // BATCH_TO_SPACE_ND back. With `placeholder_batch` the batched tensor stores
 // batch 1, as a dynamic-batch export does, instead of the real batch 2. The
-// input is also the second graph output. Not cached.
+// input is also the second graph output. Each call rebuilds the model in the
+// same buffer, invalidating the one returned before.
 const Model* GetSpaceToBatchRoundTripModel(bool placeholder_batch);
 
 // Builds a one-dimensional flatbuffer tensor of the given size.

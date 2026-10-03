@@ -235,8 +235,8 @@ TEST(BatchToSpaceNdTest, RejectsMismatchedSpatialOutputDim) {
                 input_dims, nullptr, block, crops, output_dims, nullptr));
 }
 
-// A block product larger than the input batch cannot divide it.
-TEST(BatchToSpaceNdTest, RejectsBlockProductLargerThanInputBatch) {
+// The int32 bound keeps the divisibility check in range.
+TEST(BatchToSpaceNdTest, RejectsBlockProductAboveInt32) {
   int input_dims[] = {4, 1, 1, 1, 1};
   const int32_t block[] = {65536, 65536};
   const int32_t crops[] = {65535, 0, 65535, 0};

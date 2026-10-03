@@ -787,10 +787,10 @@ TEST(MicroInterpreterTest, TestDynamicTensorFails) {
   }
 }
 
-// A dynamic-batch export stores batch 1 for the SPACE_TO_BATCH_ND output;
-// TFLM would compute wrong outputs, so the model must fail to load, while the
-// fixed-batch export loads and round-trips. see AmbiqAI/helia-rt#407
-TfLiteStatus RunSpaceToBatchRoundTrip(bool placeholder_batch) {
+// helia: a dynamic-batch export stores batch 1 for the SPACE_TO_BATCH_ND
+// output; TFLM would compute wrong outputs, so the model must fail to load,
+// while the fixed-batch export loads and round-trips. see AmbiqAI/helia-rt#407
+static TfLiteStatus RunSpaceToBatchRoundTrip(bool placeholder_batch) {
   tflite::MicroMutableOpResolver<2> op_resolver;
   EXPECT_EQ(kTfLiteOk, op_resolver.AddSpaceToBatchNd());
   EXPECT_EQ(kTfLiteOk, op_resolver.AddBatchToSpaceNd());
