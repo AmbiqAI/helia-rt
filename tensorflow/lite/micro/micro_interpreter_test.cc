@@ -22,6 +22,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/arena_allocator/recording_single_arena_buffer_allocator.h"
 #include "tensorflow/lite/micro/compatibility.h"
 #include "tensorflow/lite/micro/micro_arena_constants.h"
+#include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/micro/micro_profiler_interface.h"
 #include "tensorflow/lite/micro/recording_micro_allocator.h"
 #include "tensorflow/lite/micro/test_helpers.h"
@@ -784,6 +785,38 @@ TEST(MicroInterpreterTest, TestDynamicTensorFails) {
                                          kAllocatorBufferSize);
     EXPECT_EQ(interpreter.AllocateTensors(), kTfLiteError);
   }
+}
+
+// A dynamic-batch export stores batch 1 for the SPACE_TO_BATCH_ND output;
+// TFLM would compute wrong outputs, so the model must fail to load, while the
+// fixed-batch export loads and round-trips. see AmbiqAI/helia-rt#407
+TfLiteStatus RunSpaceToBatchRoundTrip(bool placeholder_batch) {
+  tflite::MicroMutableOpResolver<2> op_resolver;
+  EXPECT_EQ(kTfLiteOk, op_resolver.AddSpaceToBatchNd());
+  EXPECT_EQ(kTfLiteOk, op_resolver.AddBatchToSpaceNd());
+  constexpr size_t kArenaSize = 4096;
+  alignas(16) static uint8_t arena[kArenaSize];
+  tflite::MicroInterpreter interpreter(
+      tflite::testing::GetSpaceToBatchRoundTripModel(placeholder_batch),
+      op_resolver, arena, kArenaSize);
+  TF_LITE_ENSURE_STATUS(interpreter.AllocateTensors());
+  const float input[] = {1, 2, 3, 4};
+  for (int i = 0; i < 4; ++i) {
+    interpreter.input(0)->data.f[i] = input[i];
+  }
+  TF_LITE_ENSURE_STATUS(interpreter.Invoke());
+  for (int i = 0; i < 4; ++i) {
+    EXPECT_EQ(input[i], interpreter.output(0)->data.f[i]);
+  }
+  return kTfLiteOk;
+}
+
+TEST(MicroInterpreterTest, DynamicBatchSpaceToBatchFailsToLoad) {
+  EXPECT_EQ(kTfLiteError, RunSpaceToBatchRoundTrip(true));
+}
+
+TEST(MicroInterpreterTest, FixedBatchSpaceToBatchRoundTrips) {
+  EXPECT_EQ(kTfLiteOk, RunSpaceToBatchRoundTrip(false));
 }
 
 TF_LITE_MICRO_TESTS_MAIN
