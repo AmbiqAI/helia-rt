@@ -602,7 +602,7 @@ leave reference/CMSIS-NN, direct CMake, Bazel and source consumers unfixed.
 Drop condition: upstream's PAD Prepare checks that the ranks match and that
 paddings are non-negative.
 
-## Dynamic-batch shapes: `kernels/space_to_batch_nd.cc`, `kernels/batch_to_space_nd.cc`, `kernels/depthwise_conv_common.cc`, `kernels/conv_common.cc`, `kernels/kernel_util.{h,cc}` and tests
+## Dynamic-batch shapes: `kernels/space_to_batch_nd.cc`, `kernels/batch_to_space_nd.cc`, `kernels/depthwise_conv_common.cc`, `kernels/conv_common.cc`, `kernels/kernel_util.{h,cc}`, `micro_allocator.cc`, `micro_allocation_info.cc` and tests
 
 A model exported with a dynamic batch stores batch 1 for tensors whose real
 batch comes from the graph: the SPACE_TO_BATCH_ND output of a dilated
@@ -623,9 +623,18 @@ AmbiqAI/helia-rt#407.
   input batch when the output stores batch 1, and rejects any other mismatch;
   the reference DEPTHWISE_CONV_2D and CONV_2D Prepare call it, as do the helia
   overrides.
-- The four kernel tests cover the placeholder batch, the rejections, and a
-  batch-2 depthwise and conv; `depthwise_conv_test.cc` gains an optional
-  validation length on its per-channel helper.
+- A batch rewrite also scales the tensor's `bytes`, and `MicroAllocator` sizes
+  the persistent and temp `TfLiteTensor`s it rebuilds from rewritten eval dims,
+  so `output()->bytes` matches a resized graph output.
+- `AllocationInfoBuilder` rejects an offline-planned tensor whose dims were
+  rewritten at Prepare: the offline plan was computed for the stored shape.
+- The four kernel tests cover the placeholder batch, the rejections, the new
+  byte size, temporary release and untouched model dims (the conv and depthwise
+  cases are skipped on the upstream cmsis_nn backend);
+  `micro_allocator_test.cc` covers the byte sizing and the offline-plan
+  rejection; `depthwise_conv_test.cc` gains an optional validation length on
+  its per-channel helper and a helia-only case for the depthwise batch limit
+  (heliaCORE takes the batch as `uint16_t`).
 
 This correctness fix stays in the shared kernels: a helia-only override would
 leave reference, direct CMake, Bazel and source consumers wrong. The cmsis_nn

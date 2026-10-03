@@ -15,6 +15,8 @@ limitations under the License.
 
 #include "tensorflow/lite/micro/kernels/depthwise_conv.h"
 
+#include <cstdint>
+
 #include "Include/arm_nnfunctions.h"
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
@@ -86,6 +88,19 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   // helia: see AmbiqAI/helia-rt#407.
   if (micro::MatchOutputBatchToInput(context, node, kDepthwiseConvOutputTensor,
                                      input, output) != kTfLiteOk) {
+    micro_context->DeallocateTempTfLiteTensor(input);
+    micro_context->DeallocateTempTfLiteTensor(filter);
+    micro_context->DeallocateTempTfLiteTensor(output);
+    if (bias != nullptr) {
+      micro_context->DeallocateTempTfLiteTensor(bias);
+    }
+    return kTfLiteError;
+  }
+  // heliaCORE's generic depthwise kernels take the batch as uint16_t.
+  // see AmbiqAI/helia-rt#407
+  if (input->dims->data[0] > UINT16_MAX) {
+    MicroPrintf("DEPTHWISE_CONV_2D: batch %d exceeds heliaCORE's limit of %d.",
+                input->dims->data[0], static_cast<int>(UINT16_MAX));
     micro_context->DeallocateTempTfLiteTensor(input);
     micro_context->DeallocateTempTfLiteTensor(filter);
     micro_context->DeallocateTempTfLiteTensor(output);

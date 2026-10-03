@@ -829,8 +829,17 @@ TfLiteTensor* MicroAllocator::AllocatePersistentTfLiteTensor(
         subgraph_allocations[subgraph_index].tensors[tensor_index].data.data;
     // TfLiteEvalTensor structs must also be the source of truth for the
     // TfLiteTensor dims.
-    tensor->dims =
-        subgraph_allocations[subgraph_index].tensors[tensor_index].dims;
+    const TfLiteEvalTensor& eval_tensor =
+        subgraph_allocations[subgraph_index].tensors[tensor_index];
+    // helia: a kernel may have rewritten the eval dims at Prepare (e.g. a
+    // dynamic batch), so size the tensor from them. see AmbiqAI/helia-rt#407
+    if (eval_tensor.dims != tensor->dims) {
+      size_t bytes = 0;
+      if (TfLiteEvalTensorByteLength(&eval_tensor, &bytes) == kTfLiteOk) {
+        tensor->bytes = bytes;
+      }
+    }
+    tensor->dims = eval_tensor.dims;
   }
   return tensor;
 }
@@ -897,8 +906,17 @@ TfLiteTensor* MicroAllocator::AllocateTempTfLiteTensor(
         subgraph_allocations[subgraph_index].tensors[tensor_index].data.data;
     // TfLiteEvalTensor structs must also be the source of truth for the
     // TfLiteTensor dims.
-    tensor->dims =
-        subgraph_allocations[subgraph_index].tensors[tensor_index].dims;
+    const TfLiteEvalTensor& eval_tensor =
+        subgraph_allocations[subgraph_index].tensors[tensor_index];
+    // helia: a kernel may have rewritten the eval dims at Prepare (e.g. a
+    // dynamic batch), so size the tensor from them. see AmbiqAI/helia-rt#407
+    if (eval_tensor.dims != tensor->dims) {
+      size_t bytes = 0;
+      if (TfLiteEvalTensorByteLength(&eval_tensor, &bytes) == kTfLiteOk) {
+        tensor->bytes = bytes;
+      }
+    }
+    tensor->dims = eval_tensor.dims;
   }
   return tensor;
 }

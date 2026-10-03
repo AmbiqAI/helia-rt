@@ -166,6 +166,7 @@ TfLiteStatus MatchOutputBatchToInput(TfLiteContext* context, TfLiteNode* node,
   TF_LITE_ENSURE_OK(
       context, CreateWritableTensorDimsWithCopy(context, output, output_eval));
   output->dims->data[0] = input_batch;
+  output->bytes *= input_batch;
   return kTfLiteOk;
 }
 

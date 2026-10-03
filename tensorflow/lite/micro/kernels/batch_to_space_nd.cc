@@ -57,6 +57,7 @@ TfLiteStatus SetComputedBatch(TfLiteContext* context, TfLiteNode* node,
   TF_LITE_ENSURE_OK(context, tflite::micro::CreateWritableTensorDimsWithCopy(
                                  context, output, output_eval));
   output->dims->data[0] = static_cast<int>(batch);
+  output->bytes *= static_cast<size_t>(batch);
   return kTfLiteOk;
 }
 
