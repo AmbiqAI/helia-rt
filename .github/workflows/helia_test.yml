@@ -282,30 +282,32 @@ jobs:
         # seven cases on every leg.
         # see AmbiqAI/helia-rt#350, AmbiqAI/helia-rt#351
         # Negative PAD paddings add one case on every leg. see AmbiqAI/helia-rt#372
+        # Dynamic-batch SPACE_TO_BATCH_ND, BATCH_TO_SPACE_ND and convolution
+        # shapes add nine cases on every leg. see AmbiqAI/helia-rt#407
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 160
-            min-cases: 1344
+            min-cases: 1353
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 160
-            min-cases: 1344
+            min-cases: 1353
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and one case fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 159
-            min-cases: 1343
+            min-cases: 1352
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 160
-            min-cases: 1396
+            min-cases: 1405
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 159
-            min-cases: 1395
+            min-cases: 1404
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
