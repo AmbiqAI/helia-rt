@@ -90,9 +90,10 @@ TfLiteStatus CheckConstantOutputShape(TfLiteContext* context, TfLiteNode* node,
     TF_LITE_ENSURE(context, pad[2 * i] >= 0 && pad[2 * i + 1] >= 0);
     const int64_t padded = static_cast<int64_t>(input->dims->data[i + 1]) +
                            pad[2 * i] + pad[2 * i + 1];
-    TF_LITE_ENSURE_EQ(context, padded % block[i], 0);
-    TF_LITE_ENSURE_EQ(context, output->dims->data[i + 1], padded / block[i]);
+    TF_LITE_ENSURE(context, padded % block[i] == 0);
+    TF_LITE_ENSURE(context, padded / block[i] == output->dims->data[i + 1]);
     batch *= block[i];
+    TF_LITE_ENSURE(context, batch <= INT32_MAX);
   }
   TF_LITE_ENSURE_EQ(context, output->dims->data[rank - 1],
                     input->dims->data[rank - 1]);

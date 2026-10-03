@@ -85,8 +85,8 @@ TfLiteStatus CheckConstantOutputShape(TfLiteContext* context, TfLiteNode* node,
     TF_LITE_ENSURE(context, crop[2 * i] >= 0 && crop[2 * i + 1] >= 0);
     const int64_t uncropped =
         static_cast<int64_t>(input->dims->data[i + 1]) * block[i];
-    TF_LITE_ENSURE_EQ(context, output->dims->data[i + 1],
-                      uncropped - crop[2 * i] - crop[2 * i + 1]);
+    TF_LITE_ENSURE(context, uncropped - crop[2 * i] - crop[2 * i + 1] ==
+                                output->dims->data[i + 1]);
     block_product *= block[i];
   }
   TF_LITE_ENSURE_EQ(context, output->dims->data[rank - 1],

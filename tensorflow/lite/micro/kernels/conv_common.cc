@@ -157,9 +157,13 @@ TfLiteStatus ConvPrepare(TfLiteContext* context, TfLiteNode* node) {
 
   TF_LITE_ENSURE_EQ(context, input->type, output->type);
   // helia: see AmbiqAI/helia-rt#407.
-  TF_LITE_ENSURE_OK(
-      context, micro::MatchOutputBatchToInput(context, node, kConvOutputTensor,
-                                              input, output));
+  if (micro::MatchOutputBatchToInput(context, node, kConvOutputTensor, input,
+                                     output) != kTfLiteOk) {
+    micro_context->DeallocateTempTfLiteTensor(output);
+    micro_context->DeallocateTempTfLiteTensor(input);
+    micro_context->DeallocateTempTfLiteTensor(filter);
+    return kTfLiteError;
+  }
   TF_LITE_ENSURE_MSG(
       context,
       (input->type == kTfLiteFloat32 && filter->type == kTfLiteFloat32) ||

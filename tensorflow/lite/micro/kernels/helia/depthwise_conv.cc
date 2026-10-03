@@ -84,9 +84,16 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
 
   TF_LITE_ENSURE_EQ(context, input->type, output->type);
   // helia: see AmbiqAI/helia-rt#407.
-  TF_LITE_ENSURE_OK(context, micro::MatchOutputBatchToInput(
-                                 context, node, kDepthwiseConvOutputTensor,
-                                 input, output));
+  if (micro::MatchOutputBatchToInput(context, node, kDepthwiseConvOutputTensor,
+                                     input, output) != kTfLiteOk) {
+    micro_context->DeallocateTempTfLiteTensor(input);
+    micro_context->DeallocateTempTfLiteTensor(filter);
+    micro_context->DeallocateTempTfLiteTensor(output);
+    if (bias != nullptr) {
+      micro_context->DeallocateTempTfLiteTensor(bias);
+    }
+    return kTfLiteError;
+  }
   TF_LITE_ENSURE_MSG(context,
                      input->type == kTfLiteFloat32 ||
                          (kHeliaFloat16Enabled &&
@@ -173,8 +180,9 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
 
     const int batch_size = MatchingDim(input_shape, 0, output_shape, 0);
     const int output_depth = MatchingDim(output_shape, 3, filter_shape, 3);
-    // Batch > 1 (e.g. after SPACE_TO_BATCH_ND) takes heliaCORE's generic
-    // depthwise path, which needs no scratch buffer. see AmbiqAI/helia-rt#407
+    // Batch > 1 (e.g. after SPACE_TO_BATCH_ND) is supported: heliaCORE's
+    // depthwise kernels loop over batches, and the buffer-size query below
+    // covers the route it takes. see AmbiqAI/helia-rt#407
 
     cmsis_nn_dims input_dims;
     input_dims.n = batch_size;
