@@ -59,25 +59,32 @@ bool MayReadResizedTensor(const TFLMRegistration* registration) {
   }
 }
 
-bool ProducedBefore(const NodeAndRegistration* nodes, uint32_t node_index,
-                    int tensor_index) {
-  for (uint32_t j = 0; j < node_index; ++j) {
+// Returns the index of the only node that outputs `tensor_index`, or -1 if no
+// node or more than one does.
+int FindSoleProducer(const NodeAndRegistration* nodes, uint32_t nodes_size,
+                     int tensor_index) {
+  int producer = -1;
+  for (uint32_t j = 0; j < nodes_size; ++j) {
     const TfLiteIntArray* outputs = nodes[j].node.outputs;
     for (int k = 0; outputs != nullptr && k < outputs->size; ++k) {
       if (outputs->data[k] == tensor_index) {
-        return true;
+        if (producer != -1) {
+          return -1;
+        }
+        producer = static_cast<int>(j);
       }
     }
   }
-  return false;
+  return producer;
 }
 
 // Returns the first input of node `node_index` that was resized at Prepare
-// and that the node may not read, otherwise -1. Only an allowed kernel placed
-// after the op that resized the tensor may read it: a reader prepared before
-// that op saw the stored shape.
+// and that the node may not read, otherwise -1. Only an allowed kernel may
+// read it, placed after the single op that produces (and so resized) it: a
+// reader prepared before that op, or after another writer, saw the stored
+// shape.
 int FindUnsupportedResizedInput(const NodeAndRegistration* nodes,
-                                uint32_t node_index,
+                                uint32_t nodes_size, uint32_t node_index,
                                 const TfLiteEvalTensor* eval_tensors,
                                 const SubGraph* subgraph) {
   const TfLiteIntArray* inputs = nodes[node_index].node.inputs;
@@ -92,7 +99,11 @@ int FindUnsupportedResizedInput(const NodeAndRegistration* nodes,
                           *subgraph->tensors()->Get(tensor_index))) {
       continue;
     }
-    if (!may_read || !ProducedBefore(nodes, node_index, tensor_index)) {
+    if (!may_read) {
+      return tensor_index;
+    }
+    const int producer = FindSoleProducer(nodes, nodes_size, tensor_index);
+    if (producer < 0 || static_cast<uint32_t>(producer) >= node_index) {
       return tensor_index;
     }
   }
@@ -105,7 +116,7 @@ void ReportUnsupportedResizedInput(uint32_t node_index,
   MicroPrintf(
       "Op#%u (%s) of subgraph %u reads tensor #%d, which was resized at "
       "Prepare; only CONV_2D, DEPTHWISE_CONV_2D and BATCH_TO_SPACE_ND placed "
-      "after the op that resizes it accept a resized input.",
+      "after its only producer accept a resized input.",
       node_index, OpNameFromRegistration(registration),
       static_cast<unsigned>(subgraph_index), tensor_index);
 }
@@ -219,7 +230,8 @@ TfLiteStatus MicroInterpreterGraph::PrepareSubgraphs() {
       // cannot handle. see AmbiqAI/helia-rt#407
       const int resized_index = FindUnsupportedResizedInput(
           subgraph_allocations_[subgraph_idx].node_and_registrations,
-          current_operator_index_, subgraph_allocations_[subgraph_idx].tensors,
+          operators_size, current_operator_index_,
+          subgraph_allocations_[subgraph_idx].tensors,
           subgraphs_->Get(subgraph_idx));
       if (resized_index != -1) {
         ReportUnsupportedResizedInput(current_operator_index_, registration,
@@ -261,8 +273,8 @@ TfLiteStatus MicroInterpreterGraph::PrepareSubgraphs() {
     const uint32_t operators_size = NumSubgraphOperators(model_, subgraph_idx);
     for (uint32_t op_idx = 0; op_idx < operators_size; ++op_idx) {
       const int resized_index = FindUnsupportedResizedInput(
-          subgraph_allocations_[subgraph_idx].node_and_registrations, op_idx,
-          subgraph_allocations_[subgraph_idx].tensors,
+          subgraph_allocations_[subgraph_idx].node_and_registrations,
+          operators_size, op_idx, subgraph_allocations_[subgraph_idx].tensors,
           subgraphs_->Get(subgraph_idx));
       if (resized_index != -1) {
         ReportUnsupportedResizedInput(op_idx,
