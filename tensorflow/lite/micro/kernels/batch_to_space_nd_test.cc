@@ -120,11 +120,16 @@ TfLiteStatus TestBatchToSpaceNdQuantized(
 }
 
 // helia: constant block shape and crops, as converter output has them; the
-// output's stored shape must be the one they give. see AmbiqAI/helia-rt#407
+// output's stored shape must be the one they give. Prepare-only cases pass no
+// data. see AmbiqAI/helia-rt#407
+template <typename BlockT = int32_t>
 TfLiteStatus RunBatchToSpaceConstant(int* input_dims, const float* input,
-                                     const int32_t* block, const int32_t* crops,
-                                     int* output_dims, float* output) {
-  int block_dims[] = {1, input_dims[0] - 2};
+                                     const BlockT* block, const int32_t* crops,
+                                     int* output_dims, float* output,
+                                     bool constant_block = true,
+                                     bool constant_crops = true,
+                                     int block_size = -1) {
+  int block_dims[] = {1, block_size >= 0 ? block_size : input_dims[0] - 2};
   int crops_dims[] = {2, input_dims[0] - 2, 2};
   TfLiteTensor tensors[] = {
       CreateTensor(input, IntArrayFromInts(input_dims)),
@@ -132,8 +137,12 @@ TfLiteStatus RunBatchToSpaceConstant(int* input_dims, const float* input,
       CreateTensor(crops, IntArrayFromInts(crops_dims)),
       CreateTensor(output, IntArrayFromInts(output_dims)),
   };
-  tensors[1].allocation_type = kTfLiteMmapRo;
-  tensors[2].allocation_type = kTfLiteMmapRo;
+  if (constant_block) {
+    tensors[1].allocation_type = kTfLiteMmapRo;
+  }
+  if (constant_crops) {
+    tensors[2].allocation_type = kTfLiteMmapRo;
+  }
   int inputs_array_data[] = {3, 0, 1, 2};
   int outputs_array_data[] = {1, 3};
   const TFLMRegistration registration = Register_BATCH_TO_SPACE_ND();
@@ -141,12 +150,8 @@ TfLiteStatus RunBatchToSpaceConstant(int* input_dims, const float* input,
                              IntArrayFromInts(inputs_array_data),
                              IntArrayFromInts(outputs_array_data), nullptr);
   const TfLiteStatus status = runner.InitAndPrepare();
-  if (status != kTfLiteOk) {
-    EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
-    return status;
-  }
-  // Cases that only check Prepare pass no data.
-  if (input == nullptr) {
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
+  if (status != kTfLiteOk || input == nullptr) {
     return status;
   }
   return runner.Invoke();
@@ -230,12 +235,104 @@ TEST(BatchToSpaceNdTest, RejectsMismatchedSpatialOutputDim) {
                 input_dims, nullptr, block, crops, output_dims, nullptr));
 }
 
-// The block product exceeds INT32_MAX; checked without overflow.
-TEST(BatchToSpaceNdTest, RejectsBlockProductAboveInt32) {
+// A block product larger than the input batch cannot divide it.
+TEST(BatchToSpaceNdTest, RejectsBlockProductLargerThanInputBatch) {
   int input_dims[] = {4, 1, 1, 1, 1};
   const int32_t block[] = {65536, 65536};
   const int32_t crops[] = {65535, 0, 65535, 0};
   int output_dims[] = {4, 1, 1, 1, 1};
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunBatchToSpaceConstant(
+                input_dims, nullptr, block, crops, output_dims, nullptr));
+}
+
+TEST(BatchToSpaceNdTest, RejectsZeroBlock) {
+  int input_dims[] = {4, 2, 1, 3, 1};
+  const int32_t block[] = {1, 0};
+  const int32_t crops[] = {0, 0, 0, 0};
+  int output_dims[] = {4, 1, 1, 6, 1};
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunBatchToSpaceConstant(
+                input_dims, nullptr, block, crops, output_dims, nullptr));
+}
+
+TEST(BatchToSpaceNdTest, RejectsNegativeCrop) {
+  int input_dims[] = {4, 2, 1, 1, 1};
+  const int32_t block[] = {1, 2};
+  const int32_t crops[] = {0, 0, -1, 0};
+  int output_dims[] = {4, 1, 1, 3, 1};
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunBatchToSpaceConstant(
+                input_dims, nullptr, block, crops, output_dims, nullptr));
+}
+
+TEST(BatchToSpaceNdTest, RejectsCropLargerThanUncroppedSize) {
+  int input_dims[] = {4, 2, 1, 1, 1};
+  const int32_t block[] = {1, 2};
+  const int32_t crops[] = {0, 0, 2, 1};
+  int output_dims[] = {4, 1, 1, -1, 1};
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunBatchToSpaceConstant(
+                input_dims, nullptr, block, crops, output_dims, nullptr));
+}
+
+TEST(BatchToSpaceNdTest, RejectsNonPositiveInputBatch) {
+  int input_dims[] = {4, -4, 1, 3, 1};
+  const int32_t block[] = {1, 2};
+  const int32_t crops[] = {0, 0, 1, 1};
+  int output_dims[] = {4, -2, 1, 4, 1};
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunBatchToSpaceConstant(
+                input_dims, nullptr, block, crops, output_dims, nullptr));
+}
+
+TEST(BatchToSpaceNdTest, RejectsNegativeChannelDim) {
+  int input_dims[] = {4, 2, 1, 3, -1};
+  const int32_t block[] = {1, 2};
+  const int32_t crops[] = {0, 0, 1, 1};
+  int output_dims[] = {4, 1, 1, 4, -1};
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunBatchToSpaceConstant(
+                input_dims, nullptr, block, crops, output_dims, nullptr));
+}
+
+TEST(BatchToSpaceNdTest, RejectsChannelMismatch) {
+  int input_dims[] = {4, 2, 1, 3, 1};
+  const int32_t block[] = {1, 2};
+  const int32_t crops[] = {0, 0, 1, 1};
+  int output_dims[] = {4, 1, 1, 4, 2};
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::RunBatchToSpaceConstant(
+                input_dims, nullptr, block, crops, output_dims, nullptr));
+}
+
+// The batch depends only on the block shape.
+TEST(BatchToSpaceNdTest, RejectsPlaceholderBatchWithRuntimeCrops) {
+  int input_dims[] = {4, 4, 1, 3, 1};
+  const int32_t block[] = {1, 2};
+  const int32_t crops[] = {0, 0, 1, 1};
+  int output_dims[] = {4, 1, 1, 4, 1};
+  EXPECT_EQ(kTfLiteError, tflite::testing::RunBatchToSpaceConstant(
+                              input_dims, nullptr, block, crops, output_dims,
+                              nullptr, true, false));
+}
+
+// Not known before Eval: upstream behaviour.
+TEST(BatchToSpaceNdTest, AcceptsAnyStoredShapeWithRuntimeBlockShape) {
+  int input_dims[] = {4, 2, 1, 3, 1};
+  const int32_t block[] = {1, 2};
+  const int32_t crops[] = {0, 0, 1, 1};
+  int output_dims[] = {4, 2, 1, 5, 1};
+  EXPECT_EQ(kTfLiteOk, tflite::testing::RunBatchToSpaceConstant(
+                           input_dims, nullptr, block, crops, output_dims,
+                           nullptr, false, false));
+}
+
+TEST(BatchToSpaceNdTest, RejectsOutputRankMismatch) {
+  int input_dims[] = {3, 2, 3, 1};
+  const int32_t block[] = {2};
+  const int32_t crops[] = {1, 1};
+  int output_dims[] = {4, 1, 4, 1, 1};
   EXPECT_EQ(kTfLiteError,
             tflite::testing::RunBatchToSpaceConstant(
                 input_dims, nullptr, block, crops, output_dims, nullptr));
