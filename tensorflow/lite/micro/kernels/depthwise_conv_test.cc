@@ -637,24 +637,25 @@ TEST(DepthwiseConvTest, RejectsNonPlaceholderOutputBatchMismatch) {
 #endif  // !defined(CMSIS_NN) || defined(HELIA)
 
 #if defined(HELIA)
-// heliaCORE's generic depthwise kernels take the batch as uint16_t, so a
-// larger batch is rejected at Prepare. see AmbiqAI/helia-rt#407
-TEST(DepthwiseConvTest, RejectsBatchAboveHeliaCoreLimit) {
+// heliaCORE's generic int8 and int16 depthwise kernels take the batch as
+// uint16_t, so a larger batch is rejected at Prepare; float kernels are not
+// limited. see AmbiqAI/helia-rt#407
+template <typename T, typename WeightT, typename BiasT>
+TfLiteStatus PrepareDepthwiseWithBatch65536() {
   using tflite::testing::CreateTensor;
   using tflite::testing::IntArrayFromInts;
   int input_shape[] = {4, 65536, 1, 1, 1};
   int filter_shape[] = {4, 1, 1, 1, 1};
-  const float filter_data[1] = {};
+  const WeightT filter_data[1] = {};
   int bias_shape[] = {1, 1};
-  const float bias_data[1] = {};
-  int output_shape[] = {4, 1, 1, 1, 1};
+  const BiasT bias_data[1] = {};
+  int output_shape[] = {4, 65536, 1, 1, 1};
   TfLiteTensor tensors[] = {
-      CreateTensor(static_cast<const float*>(nullptr),
+      CreateTensor(static_cast<const T*>(nullptr),
                    IntArrayFromInts(input_shape)),
       CreateTensor(filter_data, IntArrayFromInts(filter_shape)),
       CreateTensor(bias_data, IntArrayFromInts(bias_shape)),
-      CreateTensor(static_cast<float*>(nullptr),
-                   IntArrayFromInts(output_shape)),
+      CreateTensor(static_cast<T*>(nullptr), IntArrayFromInts(output_shape)),
   };
   TfLiteDepthwiseConvParams conv_params;
   conv_params.padding = kTfLitePaddingValid;
@@ -671,9 +672,19 @@ TEST(DepthwiseConvTest, RejectsBatchAboveHeliaCoreLimit) {
                                      IntArrayFromInts(inputs_array_data),
                                      IntArrayFromInts(outputs_array_data),
                                      reinterpret_cast<void*>(&conv_params));
-  EXPECT_EQ(kTfLiteError,
-            runner.InitAndPrepare(reinterpret_cast<const char*>(&conv_params)));
+  const TfLiteStatus status =
+      runner.InitAndPrepare(reinterpret_cast<const char*>(&conv_params));
   EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
+  return status;
+}
+
+TEST(DepthwiseConvTest, RejectsInt8BatchAboveHeliaCoreLimit) {
+  EXPECT_EQ(kTfLiteError,
+            (PrepareDepthwiseWithBatch65536<int8_t, int8_t, int32_t>()));
+}
+
+TEST(DepthwiseConvTest, AcceptsFloatBatchAboveHeliaCoreLimit) {
+  EXPECT_EQ(kTfLiteOk, (PrepareDepthwiseWithBatch65536<float, float, float>()));
 }
 #endif  // defined(HELIA)
 

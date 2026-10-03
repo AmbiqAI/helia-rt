@@ -22,6 +22,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/arena_allocator/recording_single_arena_buffer_allocator.h"
 #include "tensorflow/lite/micro/compatibility.h"
 #include "tensorflow/lite/micro/micro_arena_constants.h"
+#include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/micro/micro_profiler_interface.h"
 #include "tensorflow/lite/micro/recording_micro_allocator.h"
 #include "tensorflow/lite/micro/test_helpers.h"
@@ -783,6 +784,41 @@ TEST(MicroInterpreterTest, TestDynamicTensorFails) {
     tflite::MicroInterpreter interpreter(model, op_resolver, allocator_buffer,
                                          kAllocatorBufferSize);
     EXPECT_EQ(interpreter.AllocateTensors(), kTfLiteError);
+  }
+}
+
+// A tensor resized at Prepare may only feed kernels that follow or check its
+// batch; RELU would size its output from the stored shape and write past it.
+// see AmbiqAI/helia-rt#407
+TEST(MicroInterpreterTest, ResizedTensorReadByOtherKernelFails) {
+  tflite::MicroMutableOpResolver<2> op_resolver;
+  EXPECT_EQ(kTfLiteOk, op_resolver.AddSpaceToBatchNd());
+  EXPECT_EQ(kTfLiteOk, op_resolver.AddRelu());
+  constexpr size_t kArenaSize = 4096;
+  alignas(16) static uint8_t arena[kArenaSize];
+  const tflite::Model* model =
+      tflite::testing::GetSpaceToBatchModel(tflite::BuiltinOperator_RELU);
+  tflite::MicroInterpreter interpreter(model, op_resolver, arena, kArenaSize);
+  EXPECT_EQ(kTfLiteError, interpreter.AllocateTensors());
+}
+
+TEST(MicroInterpreterTest, ResizedTensorReadByBatchToSpaceRoundTrips) {
+  tflite::MicroMutableOpResolver<2> op_resolver;
+  EXPECT_EQ(kTfLiteOk, op_resolver.AddSpaceToBatchNd());
+  EXPECT_EQ(kTfLiteOk, op_resolver.AddBatchToSpaceNd());
+  constexpr size_t kArenaSize = 4096;
+  alignas(16) static uint8_t arena[kArenaSize];
+  const tflite::Model* model = tflite::testing::GetSpaceToBatchModel(
+      tflite::BuiltinOperator_BATCH_TO_SPACE_ND);
+  tflite::MicroInterpreter interpreter(model, op_resolver, arena, kArenaSize);
+  ASSERT_EQ(kTfLiteOk, interpreter.AllocateTensors());
+  const float input[] = {1, 2, 3, 4};
+  for (int i = 0; i < 4; ++i) {
+    interpreter.input(0)->data.f[i] = input[i];
+  }
+  ASSERT_EQ(kTfLiteOk, interpreter.Invoke());
+  for (int i = 0; i < 4; ++i) {
+    EXPECT_EQ(input[i], interpreter.output(0)->data.f[i]);
   }
 }
 

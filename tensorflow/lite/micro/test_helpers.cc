@@ -1965,6 +1965,71 @@ const Model* GetNoOpModelWithTensorShape(
   return const_cast<Model*>(BuildNoOpModelWithTensorShape(shape));
 }
 
+// helia: see AmbiqAI/helia-rt#407.
+const Model* GetSpaceToBatchModel(BuiltinOperator consumer) {
+  using flatbuffers::Offset;
+  static ModelBuilderInstance<4096> builder_instance;
+  flatbuffers::FlatBufferBuilder& builder = builder_instance.GetBuilder();
+  builder.Clear();
+  const int32_t block[] = {1, 2};
+  const int32_t paddings[] = {0, 0, 0, 0};
+  const Offset<Buffer> buffers[] = {
+      CreateBuffer(builder),
+      CreateBuffer(builder,
+                   builder.CreateVector(reinterpret_cast<const uint8_t*>(block),
+                                        sizeof(block))),
+      CreateBuffer(builder, builder.CreateVector(
+                                reinterpret_cast<const uint8_t*>(paddings),
+                                sizeof(paddings))),
+  };
+  const int32_t io_shape[] = {1, 1, 4, 1};
+  const int32_t block_shape[] = {2};
+  const int32_t paddings_shape[] = {2, 2};
+  const int32_t s2b_shape[] = {1, 1, 2, 1};
+  const bool to_space = consumer == BuiltinOperator_BATCH_TO_SPACE_ND;
+  const Offset<Tensor> tensors[] = {
+      CreateTensor(builder, builder.CreateVector(io_shape, 4),
+                   TensorType_FLOAT32, 0, builder.CreateString("input")),
+      CreateTensor(builder, builder.CreateVector(block_shape, 1),
+                   TensorType_INT32, 1, builder.CreateString("block")),
+      CreateTensor(builder, builder.CreateVector(paddings_shape, 2),
+                   TensorType_INT32, 2, builder.CreateString("paddings")),
+      CreateTensor(builder, builder.CreateVector(s2b_shape, 4),
+                   TensorType_FLOAT32, 0, builder.CreateString("batched")),
+      CreateTensor(builder,
+                   builder.CreateVector(to_space ? io_shape : s2b_shape, 4),
+                   TensorType_FLOAT32, 0, builder.CreateString("output")),
+  };
+  const int32_t s2b_inputs[] = {0, 1, 2};
+  const int32_t s2b_outputs[] = {3};
+  const int32_t consumer_inputs[] = {3, 1, 2};
+  const int32_t consumer_outputs[] = {4};
+  const Offset<Operator> operators[] = {
+      CreateOperator(builder, 0, builder.CreateVector(s2b_inputs, 3),
+                     builder.CreateVector(s2b_outputs, 1)),
+      CreateOperator(builder, 1,
+                     builder.CreateVector(consumer_inputs, to_space ? 3 : 1),
+                     builder.CreateVector(consumer_outputs, 1)),
+  };
+  const int32_t graph_inputs[] = {0};
+  const int32_t graph_outputs[] = {4};
+  const Offset<SubGraph> subgraphs[] = {CreateSubGraph(
+      builder, builder.CreateVector(tensors, 5),
+      builder.CreateVector(graph_inputs, 1),
+      builder.CreateVector(graph_outputs, 1),
+      builder.CreateVector(operators, 2), builder.CreateString("main"))};
+  const Offset<OperatorCode> operator_codes[] = {
+      CreateOperatorCode(builder, 0, 0, 1, BuiltinOperator_SPACE_TO_BATCH_ND),
+      CreateOperatorCode(builder, 0, 0, 1, consumer),
+  };
+  const Offset<Model> model = CreateModel(
+      builder, 0, builder.CreateVector(operator_codes, 2),
+      builder.CreateVector(subgraphs, 1), builder.CreateString("s2b"),
+      builder.CreateVector(buffers, 3));
+  FinishModelBuffer(builder, model);
+  return GetModel(builder.GetBufferPointer());
+}
+
 const Tensor* Create1dFlatbufferTensor(int size, bool is_variable) {
   using flatbuffers::Offset;
   static ModelBuilderInstance<512> builder_instance;

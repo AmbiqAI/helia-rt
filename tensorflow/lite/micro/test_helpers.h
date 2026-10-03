@@ -196,6 +196,12 @@ const Model* GetSimpleModelWithNullInputsAndOutputs();
 const Model* GetNoOpModelWithTensorShape(
     const std::initializer_list<int32_t>& shape);
 
+// helia: see AmbiqAI/helia-rt#407.
+// Returns SPACE_TO_BATCH_ND with block [1, 2] on a [1, 1, 4, 1] input, its
+// output stored with the placeholder batch 1, read by `consumer` (RELU, or
+// BATCH_TO_SPACE_ND with the same block). Not cached.
+const Model* GetSpaceToBatchModel(BuiltinOperator consumer);
+
 // Builds a one-dimensional flatbuffer tensor of the given size.
 const Tensor* Create1dFlatbufferTensor(int size, bool is_variable = false);
 

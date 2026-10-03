@@ -563,6 +563,38 @@ TEST(ConvTest, PlaceholderOutputBatchFollowsInputBatchInt8) {
     EXPECT_EQ(static_cast<int8_t>(golden_data[i]), output_data[i]);
   }
 }
+// Following an input batch of 65536 would give the output 2^31 elements,
+// which the allocator cannot size. see AmbiqAI/helia-rt#407
+TEST(ConvTest, RejectsBatchedOutputTooLargeForAllocator) {
+  using tflite::testing::CreateTensor;
+  using tflite::testing::IntArrayFromInts;
+  int input_shape[] = {4, 65536, 1, 16384, 1};
+  int filter_shape[] = {4, 2, 1, 1, 1};
+  const float filter_data[] = {1, 1};
+  int bias_shape[] = {1, 2};
+  const float bias_data[] = {0, 0};
+  int output_shape[] = {4, 1, 1, 16384, 2};
+  TfLiteTensor tensors[] = {
+      CreateTensor(static_cast<const float*>(nullptr),
+                   IntArrayFromInts(input_shape)),
+      CreateTensor(filter_data, IntArrayFromInts(filter_shape)),
+      CreateTensor(bias_data, IntArrayFromInts(bias_shape)),
+      CreateTensor(static_cast<float*>(nullptr),
+                   IntArrayFromInts(output_shape)),
+  };
+  TfLiteConvParams conv_params = {
+      kTfLitePaddingValid, 1, 1, kTfLiteActNone, 1, 1, kTfLiteNoType};
+  int inputs_array_data[] = {3, 0, 1, 2};
+  int outputs_array_data[] = {1, 3};
+  const TFLMRegistration registration = tflite::Register_CONV_2D();
+  tflite::micro::KernelRunner runner(
+      registration, tensors, 4, IntArrayFromInts(inputs_array_data),
+      IntArrayFromInts(outputs_array_data), &conv_params);
+  EXPECT_EQ(kTfLiteError,
+            runner.InitAndPrepare(reinterpret_cast<const char*>(&conv_params)));
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
+  EXPECT_EQ(1, output_shape[1]);
+}
 #endif  // !defined(CMSIS_NN) || defined(HELIA)
 
 TEST(ConvTest, InputOutputDifferentTypeIsError) {

@@ -306,4 +306,35 @@ TEST(SpaceToBatchNdTest, RejectsNonPlaceholderBatchMismatch) {
             tflite::testing::RunSpaceToBatchConstant(output_dims, output, 9));
 }
 
+// The computed batch times the stored spatial dims exceeds INT32_MAX
+// elements, which the allocator cannot size. see AmbiqAI/helia-rt#407
+TEST(SpaceToBatchNdTest, RejectsOutputTooLargeForAllocator) {
+  using tflite::testing::CreateTensor;
+  using tflite::testing::IntArrayFromInts;
+  int input_dims[] = {4, 1, 1, 1, 1};
+  const float input_data[] = {1};
+  int block_shape_dims[] = {1, 2};
+  const int32_t block_shape_data[] = {65536, 1};
+  int paddings_dims[] = {2, 2, 2};
+  const int32_t paddings_data[] = {65535, 0, 65536, 0};
+  int output_dims[] = {4, 1, 1, 65537, 1};
+  TfLiteTensor tensors[] = {
+      CreateTensor(input_data, IntArrayFromInts(input_dims)),
+      CreateTensor(block_shape_data, IntArrayFromInts(block_shape_dims)),
+      CreateTensor(paddings_data, IntArrayFromInts(paddings_dims)),
+      CreateTensor(static_cast<float*>(nullptr), IntArrayFromInts(output_dims)),
+  };
+  tensors[1].allocation_type = kTfLiteMmapRo;
+  tensors[2].allocation_type = kTfLiteMmapRo;
+  int inputs_array_data[] = {3, 0, 1, 2};
+  int outputs_array_data[] = {1, 3};
+  const TFLMRegistration registration = tflite::Register_SPACE_TO_BATCH_ND();
+  tflite::micro::KernelRunner runner(
+      registration, tensors, 4, IntArrayFromInts(inputs_array_data),
+      IntArrayFromInts(outputs_array_data), nullptr);
+  EXPECT_EQ(kTfLiteError, runner.InitAndPrepare());
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
+  EXPECT_EQ(1, output_dims[1]);
+}
+
 TF_LITE_MICRO_TESTS_MAIN
