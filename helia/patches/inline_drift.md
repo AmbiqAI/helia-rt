@@ -635,11 +635,12 @@ AmbiqAI/helia-rt#407.
   resized at Prepare unless it is CONV_2D, DEPTHWISE_CONV_2D or
   BATCH_TO_SPACE_ND placed after the tensor's only producer; any other kernel,
   one prepared before the resize, or one reading a tensor another op also
-  writes, would size its output from the stored shape and write past it. It checks before each node's Prepare and again once every
-  node is prepared. `ResizedAtPrepare` (`memory_helpers`) decides what counts
-  as resized, for this check and the offline-plan check below: a different
-  element count than a stored shape with no negative dims, so a RESHAPE
-  resolving a stored -1 is not a resize.
+  writes, would size its output from the stored shape and write past it. It
+  checks before each node's Prepare and again once every node is prepared.
+  `ResizedAtPrepare` (`memory_helpers`) decides what counts as resized, for
+  this check and the offline-plan check below: a different element count than
+  a stored shape with no negative dims, so a RESHAPE resolving a stored -1 is
+  not a resize.
 - `kernels/BUILD`: `kernel_util` depends on `memory_helpers` and
   `micro_arena_constants`, which `BatchedTensorSizeFits` uses.
 - A batch rewrite also scales the tensor's `bytes`, and `MicroAllocator` sizes
@@ -670,7 +671,11 @@ AmbiqAI/helia-rt#407.
   stored -1.
 
 This correctness fix stays in the shared kernels: a helia-only override would
-leave reference, direct CMake, Bazel and source consumers wrong. The cmsis_nn
+leave reference, direct CMake, Bazel and source consumers wrong. The helia
+overrides in `kernels/helia/` are helia-owned rather than drift: they call the
+same helper, the int8 DEPTHWISE_CONV_2D path drops its batch==1 DCHECK, and
+DEPTHWISE_CONV_2D rejects an int8 or int16 batch above 65,535 because
+heliaCORE's generic kernels take the batch as `uint16_t`. The cmsis_nn
 backend's own convolution Prepare is upstream and unchanged.
 
 Drop condition: upstream TFLM checks SPACE_TO_BATCH_ND/BATCH_TO_SPACE_ND output
