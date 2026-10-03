@@ -51,6 +51,12 @@ TfLiteStatus BytesRequiredForTensor(const tflite::Tensor& flatbuffer_tensor,
 TfLiteStatus TfLiteEvalTensorByteLength(const TfLiteEvalTensor* eval_tensor,
                                         size_t* out_bytes);
 
+// helia: see AmbiqAI/helia-rt#407.
+// Whether an eval tensor's dims equal the shape stored in the flatbuffer. A
+// kernel may rewrite eval dims at Prepare (a dynamic batch).
+bool EvalDimsMatchStoredShape(const TfLiteEvalTensor& eval_tensor,
+                              const tflite::Tensor& stored);
+
 // Deduce output dimensions from input and allocate given size.
 // Useful for operators with two inputs where the largest input should equal the
 // output dimension.

@@ -140,6 +140,23 @@ TfLiteStatus TfLiteEvalTensorByteLength(const TfLiteEvalTensor* eval_tensor,
   return kTfLiteOk;
 }
 
+// helia: see AmbiqAI/helia-rt#407.
+bool EvalDimsMatchStoredShape(const TfLiteEvalTensor& eval_tensor,
+                              const tflite::Tensor& stored) {
+  const int rank = eval_tensor.dims == nullptr ? 0 : eval_tensor.dims->size;
+  const int stored_rank =
+      stored.shape() == nullptr ? 0 : static_cast<int>(stored.shape()->size());
+  if (rank != stored_rank) {
+    return false;
+  }
+  for (int d = 0; d < rank; ++d) {
+    if (eval_tensor.dims->data[d] != stored.shape()->Get(d)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 TfLiteStatus AllocateOutputDimensionsFromInput(TfLiteContext* context,
                                                const TfLiteTensor* input1,
                                                const TfLiteTensor* input2,

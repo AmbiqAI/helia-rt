@@ -44,6 +44,41 @@ const char* OpNameFromRegistration(const TFLMRegistration* registration) {
   }
 }
 
+// helia: see AmbiqAI/helia-rt#407.
+// A kernel may resize a tensor at Prepare (a dynamic batch). Only kernels that
+// follow or check that batch may read it; any other kernel would size its
+// output from the stored shape and write past it.
+bool MayReadResizedTensor(const TFLMRegistration* registration) {
+  switch (registration->builtin_code) {
+    case BuiltinOperator_CONV_2D:
+    case BuiltinOperator_DEPTHWISE_CONV_2D:
+    case BuiltinOperator_BATCH_TO_SPACE_ND:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// Returns the index of the first input resized at Prepare, otherwise -1.
+int FindResizedInput(const TfLiteIntArray* const tensor_indices,
+                     const TfLiteEvalTensor* const eval_tensors,
+                     const SubGraph* subgraph) {
+  if (tensor_indices == nullptr) {
+    return -1;
+  }
+  for (int i = 0; i < tensor_indices->size; i++) {
+    const int tensor_index = tensor_indices->data[i];
+    if (tensor_index < 0) {
+      continue;
+    }
+    if (!EvalDimsMatchStoredShape(eval_tensors[tensor_index],
+                                  *subgraph->tensors()->Get(tensor_index))) {
+      return tensor_index;
+    }
+  }
+  return -1;
+}
+
 // Check tensor shapes to determine if there are dynamic tensors present.
 // Returns the index of the first dynamic tensor found, otherwise returns -1.
 int CheckDynamicTensors(const TfLiteIntArray* const tensor_indices,
@@ -149,6 +184,21 @@ TfLiteStatus MicroInterpreterGraph::PrepareSubgraphs() {
           subgraph_allocations_[subgraph_idx]
               .node_and_registrations[current_operator_index_]
               .registration;
+      // helia: see AmbiqAI/helia-rt#407.
+      if (!MayReadResizedTensor(registration)) {
+        const int resized_index = FindResizedInput(
+            node->inputs, subgraph_allocations_[subgraph_idx].tensors,
+            subgraphs_->Get(subgraph_idx));
+        if (resized_index != -1) {
+          MicroPrintf(
+              "Op#%u (%s) of subgraph %u reads tensor #%d, which was resized "
+              "at Prepare; only CONV_2D, DEPTHWISE_CONV_2D and "
+              "BATCH_TO_SPACE_ND accept a resized input.",
+              current_operator_index_, OpNameFromRegistration(registration),
+              current_subgraph_index_, resized_index);
+          return kTfLiteError;
+        }
+      }
       if (registration->prepare != nullptr) {
         TfLiteStatus prepare_status = registration->prepare(context_, node);
         if (prepare_status != kTfLiteOk) {

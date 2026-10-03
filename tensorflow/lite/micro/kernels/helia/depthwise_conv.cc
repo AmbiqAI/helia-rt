@@ -96,9 +96,10 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     }
     return kTfLiteError;
   }
-  // heliaCORE's generic depthwise kernels take the batch as uint16_t.
-  // see AmbiqAI/helia-rt#407
-  if (input->dims->data[0] > UINT16_MAX) {
+  // heliaCORE's generic int8 and int16 depthwise kernels take the batch as
+  // uint16_t. see AmbiqAI/helia-rt#407
+  if ((input->type == kTfLiteInt8 || input->type == kTfLiteInt16) &&
+      input->dims->data[0] > UINT16_MAX) {
     MicroPrintf("DEPTHWISE_CONV_2D: batch %d exceeds heliaCORE's limit of %d.",
                 input->dims->data[0], static_cast<int>(UINT16_MAX));
     micro_context->DeallocateTempTfLiteTensor(input);

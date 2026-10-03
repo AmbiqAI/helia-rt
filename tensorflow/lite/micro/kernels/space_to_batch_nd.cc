@@ -59,6 +59,11 @@ TfLiteStatus SetComputedBatch(TfLiteContext* context, TfLiteNode* node,
                 output->dims->data[0], static_cast<int>(batch));
     return kTfLiteError;
   }
+  if (!tflite::micro::BatchedTensorSizeFits(output, batch)) {
+    MicroPrintf("SPACE_TO_BATCH_ND: output with batch %d is too large.",
+                static_cast<int>(batch));
+    return kTfLiteError;
+  }
   TfLiteEvalTensor* output_eval =
       tflite::micro::GetEvalOutput(context, node, kOutputTensor);
   TF_LITE_ENSURE_OK(context, tflite::micro::CreateWritableTensorDimsWithCopy(

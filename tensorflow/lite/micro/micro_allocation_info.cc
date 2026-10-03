@@ -31,24 +31,6 @@ namespace {
 constexpr char kOfflineMemAllocMetadata[] = "OfflineMemoryAllocation";
 constexpr int kUninitializedLifetime = -1;
 
-// helia: see AmbiqAI/helia-rt#407.
-bool EvalDimsMatchStoredShape(const TfLiteEvalTensor& eval_tensor,
-                              const tflite::Tensor* stored) {
-  const int rank = eval_tensor.dims == nullptr ? 0 : eval_tensor.dims->size;
-  const int stored_rank = stored->shape() == nullptr
-                              ? 0
-                              : static_cast<int>(stored->shape()->size());
-  if (rank != stored_rank) {
-    return false;
-  }
-  for (int d = 0; d < rank; ++d) {
-    if (eval_tensor.dims->data[d] != stored->shape()->Get(d)) {
-      return false;
-    }
-  }
-  return true;
-}
-
 }  // namespace
 
 // Mark the given Allocation info as first created at the specified allocation
@@ -231,7 +213,7 @@ TfLiteStatus AllocationInfoBuilder::InitializeAllocationInfo(
         // see AmbiqAI/helia-rt#407
         if (current->offline_offset != kOnlinePlannedBuffer &&
             !EvalDimsMatchStoredShape(eval_tensors[i],
-                                      subgraph->tensors()->Get(i))) {
+                                      *subgraph->tensors()->Get(i))) {
           MicroPrintf(
               "Tensor %d was resized at Prepare, but the model's offline "
               "memory plan was computed for its stored shape.",

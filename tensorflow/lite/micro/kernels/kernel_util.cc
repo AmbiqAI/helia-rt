@@ -162,12 +162,35 @@ TfLiteStatus MatchOutputBatchToInput(TfLiteContext* context, TfLiteNode* node,
                 output->dims->data[0], input_batch);
     return kTfLiteError;
   }
+  if (!BatchedTensorSizeFits(output, input_batch)) {
+    MicroPrintf("Output with batch %d is too large.", input_batch);
+    return kTfLiteError;
+  }
   TfLiteEvalTensor* output_eval = GetEvalOutput(context, node, output_index);
   TF_LITE_ENSURE_OK(
       context, CreateWritableTensorDimsWithCopy(context, output, output_eval));
   output->dims->data[0] = input_batch;
   output->bytes *= input_batch;
   return kTfLiteOk;
+}
+
+// helia: see AmbiqAI/helia-rt#407.
+bool BatchedTensorSizeFits(const TfLiteTensor* tensor, int64_t batch) {
+  if (batch < 0 || batch > INT32_MAX) {
+    return false;
+  }
+  int64_t elements = batch;
+  for (int i = 1; i < tensor->dims->size; ++i) {
+    elements *= tensor->dims->data[i];
+    if (elements > INT32_MAX) {
+      return false;
+    }
+  }
+  size_t type_size = 0;
+  if (TfLiteTypeSizeOf(tensor->type, &type_size) != kTfLiteOk) {
+    return false;
+  }
+  return elements * static_cast<int64_t>(type_size) <= INT32_MAX;
 }
 
 // Verify that both tensors have the same type and size, then return the size
