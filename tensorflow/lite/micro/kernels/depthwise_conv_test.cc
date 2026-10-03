@@ -552,6 +552,8 @@ TEST(DepthwiseConvTest, SimpleTestRelu) {
       bias_values, golden_relu, output_shape, &conv_params, output_data);
 }
 
+// The upstream cmsis_nn backend's own Prepare does not carry the batch.
+#if !defined(CMSIS_NN) || defined(HELIA)
 // A dynamic-batch export stores batch 1 for the output while the input
 // carries the batch SPACE_TO_BATCH_ND made. see AmbiqAI/helia-rt#407
 TEST(DepthwiseConvTest, PlaceholderOutputBatchFollowsInputBatch) {
@@ -632,6 +634,48 @@ TEST(DepthwiseConvTest, RejectsNonPlaceholderOutputBatchMismatch) {
             runner.InitAndPrepare(reinterpret_cast<const char*>(&conv_params)));
   EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
 }
+#endif  // !defined(CMSIS_NN) || defined(HELIA)
+
+#if defined(HELIA)
+// heliaCORE's generic depthwise kernels take the batch as uint16_t, so a
+// larger batch is rejected at Prepare. see AmbiqAI/helia-rt#407
+TEST(DepthwiseConvTest, RejectsBatchAboveHeliaCoreLimit) {
+  using tflite::testing::CreateTensor;
+  using tflite::testing::IntArrayFromInts;
+  int input_shape[] = {4, 65536, 1, 1, 1};
+  int filter_shape[] = {4, 1, 1, 1, 1};
+  const float filter_data[1] = {};
+  int bias_shape[] = {1, 1};
+  const float bias_data[1] = {};
+  int output_shape[] = {4, 1, 1, 1, 1};
+  TfLiteTensor tensors[] = {
+      CreateTensor(static_cast<const float*>(nullptr),
+                   IntArrayFromInts(input_shape)),
+      CreateTensor(filter_data, IntArrayFromInts(filter_shape)),
+      CreateTensor(bias_data, IntArrayFromInts(bias_shape)),
+      CreateTensor(static_cast<float*>(nullptr),
+                   IntArrayFromInts(output_shape)),
+  };
+  TfLiteDepthwiseConvParams conv_params;
+  conv_params.padding = kTfLitePaddingValid;
+  conv_params.activation = kTfLiteActNone;
+  conv_params.dilation_width_factor = 1;
+  conv_params.dilation_height_factor = 1;
+  conv_params.stride_height = 1;
+  conv_params.stride_width = 1;
+  conv_params.depth_multiplier = 1;
+  int inputs_array_data[] = {3, 0, 1, 2};
+  int outputs_array_data[] = {1, 3};
+  const TFLMRegistration registration = tflite::Register_DEPTHWISE_CONV_2D();
+  tflite::micro::KernelRunner runner(registration, tensors, 4,
+                                     IntArrayFromInts(inputs_array_data),
+                                     IntArrayFromInts(outputs_array_data),
+                                     reinterpret_cast<void*>(&conv_params));
+  EXPECT_EQ(kTfLiteError,
+            runner.InitAndPrepare(reinterpret_cast<const char*>(&conv_params)));
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
+}
+#endif  // defined(HELIA)
 
 TEST(DepthwiseConvTest, SimpleTestQuantizedPerChannelDepthMultiplier1) {
   const int input_elements = 12;

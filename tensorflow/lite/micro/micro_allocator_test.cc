@@ -866,6 +866,102 @@ TEST(MicroAllocatorTest, OfflinePlannerOfflineOnline) {
                    start);
 }
 
+// A kernel may rewrite a tensor's eval dims at Prepare (a dynamic batch);
+// the allocator must size TfLiteTensors from them. see AmbiqAI/helia-rt#407
+TEST(MicroAllocatorTest, TfLiteTensorBytesFollowRewrittenEvalDims) {
+  const tflite::Model* model = tflite::testing::GetSimpleMockModel();
+  constexpr size_t arena_size = 2048;
+  uint8_t arena[arena_size];
+  tflite::MicroAllocator* allocator =
+      tflite::MicroAllocator::Create(arena, arena_size);
+  EXPECT_NE(allocator, nullptr);
+  tflite::SubgraphAllocations* subgraph_allocations =
+      allocator->StartModelAllocation(model);
+  EXPECT_NE(nullptr, subgraph_allocations);
+
+  TfLiteTensor* before = allocator->AllocateTempTfLiteTensor(
+      model, subgraph_allocations, /*tensor_index=*/0, /*subgraph_index=*/0);
+  EXPECT_NE(before, nullptr);
+  const size_t stored_bytes = before->bytes;
+  allocator->DeallocateTempTfLiteTensor(before);
+  allocator->ResetTempAllocations();
+
+  TfLiteEvalTensor& eval = subgraph_allocations[0].tensors[0];
+  int resized_dims[5] = {eval.dims->size};
+  for (int i = 0; i < eval.dims->size; ++i) {
+    resized_dims[i + 1] = eval.dims->data[i];
+  }
+  resized_dims[1] *= 2;
+  eval.dims = tflite::testing::IntArrayFromInts(resized_dims);
+
+  TfLiteTensor* temp = allocator->AllocateTempTfLiteTensor(
+      model, subgraph_allocations, /*tensor_index=*/0, /*subgraph_index=*/0);
+  EXPECT_NE(temp, nullptr);
+  EXPECT_EQ(2 * stored_bytes, temp->bytes);
+  allocator->DeallocateTempTfLiteTensor(temp);
+  allocator->ResetTempAllocations();
+
+  TfLiteTensor* persistent = allocator->AllocatePersistentTfLiteTensor(
+      model, subgraph_allocations, /*tensor_index=*/0, /*subgraph_index=*/0);
+  EXPECT_NE(persistent, nullptr);
+  EXPECT_EQ(2 * stored_bytes, persistent->bytes);
+}
+
+// An offline plan was computed for the stored shapes, so a tensor resized at
+// Prepare must be rejected rather than outgrow its planned slot.
+// see AmbiqAI/helia-rt#407
+TfLiteStatus FinishOfflinePlanWithTensor1Dims(bool double_first_dim) {
+  constexpr int number_tensors = 4;
+  const int32_t metadata_buffer[tflite::testing::kOfflinePlannerHeaderSize +
+                                number_tensors] = {1,         0, number_tensors,
+                                                   /*t0=*/0,
+                                                   /*t1=*/48,
+                                                   /*t2=*/0,
+                                                   /*t3=*/48};
+  constexpr int number_connections = 3;
+  tflite::testing::NodeConnection node_list[number_connections] = {
+      {/*input=*/{tflite::testing::t0},
+       /*output=*/{tflite::testing::t1}},
+      {/*input=*/{tflite::testing::t1},
+       /*output=*/{tflite::testing::t2}},
+      {/*input=*/{tflite::testing::t2},
+       /*output=*/{tflite::testing::t3}}};
+  const tflite::Model* model = tflite::testing::GetModelWithOfflinePlanning(
+      number_tensors, metadata_buffer, node_list, number_connections);
+
+  tflite::ScratchBufferHandle* scratch_buffer_handles = nullptr;
+  constexpr size_t arena_size = 4096;
+  static uint8_t arena[arena_size];
+  tflite::MicroAllocator* allocator =
+      tflite::MicroAllocator::Create(arena, arena_size);
+  tflite::SubgraphAllocations* subgraph_allocations =
+      allocator->StartModelAllocation(model);
+  if (subgraph_allocations == nullptr) {
+    return kTfLiteError;
+  }
+  // What a kernel's Prepare does when it rewrites dims: a new array.
+  TfLiteEvalTensor& eval = subgraph_allocations[0].tensors[1];
+  static int rewritten_dims[5];
+  rewritten_dims[0] = eval.dims->size;
+  for (int i = 0; i < eval.dims->size; ++i) {
+    rewritten_dims[i + 1] = eval.dims->data[i];
+  }
+  if (double_first_dim) {
+    rewritten_dims[1] *= 2;
+  }
+  eval.dims = tflite::testing::IntArrayFromInts(rewritten_dims);
+  return allocator->FinishModelAllocation(model, subgraph_allocations,
+                                          &scratch_buffer_handles);
+}
+
+TEST(MicroAllocatorTest, OfflinePlannerRejectsTensorResizedAtPrepare) {
+  EXPECT_EQ(kTfLiteError, FinishOfflinePlanWithTensor1Dims(true));
+}
+
+TEST(MicroAllocatorTest, OfflinePlannerAcceptsRewrittenDimsWithSameShape) {
+  EXPECT_EQ(kTfLiteOk, FinishOfflinePlanWithTensor1Dims(false));
+}
+
 TEST(MicroAllocatorTest, TestAllocatePersistentTfLiteTensor) {
   const tflite::Model* model = tflite::GetModel(kTestConvModelData);
   constexpr size_t arena_size = 1024 * 12;

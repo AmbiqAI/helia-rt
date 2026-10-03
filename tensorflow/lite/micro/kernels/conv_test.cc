@@ -463,9 +463,12 @@ TEST(ConvTest, InputAndFilterSameWidthHeight) {
       output_data);
 }
 
+// The upstream cmsis_nn backend's own Prepare does not carry the batch.
+#if !defined(CMSIS_NN) || defined(HELIA)
 // A dynamic-batch export stores batch 1 for the output while the input
 // carries the batch SPACE_TO_BATCH_ND made. see AmbiqAI/helia-rt#407
-TfLiteStatus RunBatch2Conv1x1(int* output_shape, float* output_data) {
+TfLiteStatus RunBatch2Conv1x1(int* output_shape, float* output_data,
+                              size_t* output_bytes = nullptr) {
   using tflite::testing::CreateTensor;
   using tflite::testing::IntArrayFromInts;
   int input_shape[] = {4, 2, 1, 1, 1};
@@ -494,13 +497,19 @@ TfLiteStatus RunBatch2Conv1x1(int* output_shape, float* output_data) {
     EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
     return status;
   }
+  if (output_bytes != nullptr) {
+    *output_bytes = tensors[3].bytes;
+  }
   return runner.Invoke();
 }
 
 TEST(ConvTest, PlaceholderOutputBatchFollowsInputBatch) {
   int output_shape[] = {4, 1, 1, 1, 1};
   float output_data[] = {-100, -100};
-  ASSERT_EQ(kTfLiteOk, RunBatch2Conv1x1(output_shape, output_data));
+  size_t output_bytes = 0;
+  ASSERT_EQ(kTfLiteOk,
+            RunBatch2Conv1x1(output_shape, output_data, &output_bytes));
+  EXPECT_EQ(2 * sizeof(float), output_bytes);
   // The batch is written into a copy; the model's dims stay untouched.
   EXPECT_EQ(1, output_shape[1]);
   EXPECT_NEAR(7.0f, output_data[0], 1e-5f);
@@ -554,6 +563,7 @@ TEST(ConvTest, PlaceholderOutputBatchFollowsInputBatchInt8) {
     EXPECT_EQ(static_cast<int8_t>(golden_data[i]), output_data[i]);
   }
 }
+#endif  // !defined(CMSIS_NN) || defined(HELIA)
 
 TEST(ConvTest, InputOutputDifferentTypeIsError) {
   using tflite::testing::CreateQuantizedTensor;

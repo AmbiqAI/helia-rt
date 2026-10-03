@@ -135,7 +135,8 @@ TfLiteStatus TestSpaceToBatchNdQuantized(
 // A dynamic-batch export stores batch 1 for this output; the real batch is
 // the block product. see AmbiqAI/helia-rt#407
 TfLiteStatus RunSpaceToBatchConstant(int* output_dims_data, float* output_data,
-                                     int output_capacity) {
+                                     int output_capacity,
+                                     size_t* output_bytes = nullptr) {
   int input_dims_data[] = {4, 1, 1, 4, 1};
   const float input_data[] = {1, 2, 3, 4};
   int block_shape_dims_data[] = {1, 2};
@@ -163,6 +164,9 @@ TfLiteStatus RunSpaceToBatchConstant(int* output_dims_data, float* output_data,
   if (status != kTfLiteOk) {
     EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
     return status;
+  }
+  if (output_bytes != nullptr) {
+    *output_bytes = tensors[3].bytes;
   }
   return runner.Invoke();
 }
@@ -276,8 +280,10 @@ TEST(SpaceToBatchNdTest, PlaceholderBatchFollowsBlockShape) {
   // Input [1,1,4,1] padded to width 6 with block [1,2] is [2,1,3,1].
   int output_dims[] = {4, 1, 1, 3, 1};
   float output[6];
-  ASSERT_EQ(kTfLiteOk,
-            tflite::testing::RunSpaceToBatchConstant(output_dims, output, 6));
+  size_t output_bytes = 0;
+  ASSERT_EQ(kTfLiteOk, tflite::testing::RunSpaceToBatchConstant(
+                           output_dims, output, 6, &output_bytes));
+  EXPECT_EQ(6 * sizeof(float), output_bytes);
   // The batch is written into a copy; the model's dims stay untouched.
   EXPECT_EQ(1, output_dims[1]);
   const float golden[] = {0, 2, 4, 1, 3, 0};
