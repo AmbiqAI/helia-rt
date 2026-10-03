@@ -38,6 +38,97 @@ constexpr int kOutputTensor = 0;
 const int kInputOutputMinDimensionNum = 3;
 const int kInputOutputMaxDimensionNum = 4;
 
+// helia: see AmbiqAI/helia-rt#407.
+// Writes the computed batch into an output that stores the placeholder batch
+// 1 of a dynamic-batch export; any other batch mismatch is rejected.
+TfLiteStatus SetComputedBatch(TfLiteContext* context, TfLiteNode* node,
+                              TfLiteTensor* output, int64_t batch) {
+  TF_LITE_ENSURE(context, batch > 0 && batch <= INT32_MAX);
+  if (output->dims->data[0] == batch) {
+    return kTfLiteOk;
+  }
+  if (output->dims->data[0] != 1) {
+    MicroPrintf("Output batch %d does not match the computed batch %d.",
+                output->dims->data[0], static_cast<int>(batch));
+    return kTfLiteError;
+  }
+  TfLiteEvalTensor* output_eval =
+      tflite::micro::GetEvalOutput(context, node, kOutputTensor);
+  TF_LITE_ENSURE_OK(context, tflite::micro::CreateWritableTensorDimsWithCopy(
+                                 context, output, output_eval));
+  output->dims->data[0] = static_cast<int>(batch);
+  return kTfLiteOk;
+}
+
+// helia: see AmbiqAI/helia-rt#407.
+// With a constant block shape and crops, the output shape is fully known at
+// Prepare: check every non-batch dim and set the batch. An input batch that
+// the block product does not divide means an op between SPACE_TO_BATCH_ND
+// and here did not carry the batch forward, so the model is rejected.
+TfLiteStatus CheckConstantOutputShape(TfLiteContext* context, TfLiteNode* node,
+                                      const TfLiteTensor* input,
+                                      const TfLiteTensor* block_shape,
+                                      const TfLiteTensor* crops,
+                                      TfLiteTensor* output) {
+  const int rank = NumDimensions(input);
+  const int spatial_dims = rank - 2;
+  TF_LITE_ENSURE_EQ(context, NumDimensions(output), rank);
+  TF_LITE_ENSURE_TYPES_EQ(context, block_shape->type, kTfLiteInt32);
+  TF_LITE_ENSURE_TYPES_EQ(context, crops->type, kTfLiteInt32);
+  TF_LITE_ENSURE_EQ(context, NumElements(block_shape), spatial_dims);
+  TF_LITE_ENSURE_EQ(context, NumElements(crops), spatial_dims * 2);
+  const int32_t* block = GetTensorData<int32_t>(block_shape);
+  const int32_t* crop = GetTensorData<int32_t>(crops);
+  int64_t block_product = 1;
+  for (int i = 0; i < spatial_dims; ++i) {
+    TF_LITE_ENSURE(context, block[i] > 0);
+    TF_LITE_ENSURE(context, crop[2 * i] >= 0 && crop[2 * i + 1] >= 0);
+    const int64_t uncropped =
+        static_cast<int64_t>(input->dims->data[i + 1]) * block[i];
+    TF_LITE_ENSURE_EQ(context, output->dims->data[i + 1],
+                      uncropped - crop[2 * i] - crop[2 * i + 1]);
+    block_product *= block[i];
+  }
+  TF_LITE_ENSURE_EQ(context, output->dims->data[rank - 1],
+                    input->dims->data[rank - 1]);
+  if (input->dims->data[0] % block_product != 0) {
+    MicroPrintf(
+        "BATCH_TO_SPACE_ND: input batch %d is not a multiple of the block "
+        "product %d.",
+        input->dims->data[0], static_cast<int>(block_product));
+    return kTfLiteError;
+  }
+  return SetComputedBatch(context, node, output,
+                          input->dims->data[0] / block_product);
+}
+
+// helia: see AmbiqAI/helia-rt#407.
+// The shape is only checked when the block shape and crops are constant; it
+// cannot be known at Prepare otherwise.
+TfLiteStatus CheckOutputShape(TfLiteContext* context, TfLiteNode* node,
+                              const TfLiteTensor* input, TfLiteTensor* output) {
+  MicroContext* micro_context = GetMicroContext(context);
+  TfLiteTensor* block_shape =
+      micro_context->AllocateTempInputTensor(node, kBlockShapeTensor);
+  TfLiteTensor* crops =
+      micro_context->AllocateTempInputTensor(node, kCropsTensor);
+  TfLiteStatus status = kTfLiteError;
+  if (block_shape != nullptr && crops != nullptr) {
+    status = kTfLiteOk;
+    if (IsConstantTensor(block_shape) && IsConstantTensor(crops)) {
+      status = CheckConstantOutputShape(context, node, input, block_shape,
+                                        crops, output);
+    }
+  }
+  if (block_shape != nullptr) {
+    micro_context->DeallocateTempTfLiteTensor(block_shape);
+  }
+  if (crops != nullptr) {
+    micro_context->DeallocateTempTfLiteTensor(crops);
+  }
+  return status;
+}
+
 TfLiteStatus BatchToSpaceNDPrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, NumInputs(node), 3);
   TF_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
@@ -55,6 +146,13 @@ TfLiteStatus BatchToSpaceNDPrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE(context, NumDimensions(input) <= kInputOutputMaxDimensionNum);
   TF_LITE_ENSURE(context, NumDimensions(output) <= kInputOutputMaxDimensionNum);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
+
+  // helia: see AmbiqAI/helia-rt#407.
+  if (CheckOutputShape(context, node, input, output) != kTfLiteOk) {
+    micro_context->DeallocateTempTfLiteTensor(input);
+    micro_context->DeallocateTempTfLiteTensor(output);
+    return kTfLiteError;
+  }
 
   micro_context->DeallocateTempTfLiteTensor(input);
   micro_context->DeallocateTempTfLiteTensor(output);

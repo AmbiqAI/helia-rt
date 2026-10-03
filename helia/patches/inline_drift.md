@@ -601,3 +601,35 @@ leave reference/CMSIS-NN, direct CMake, Bazel and source consumers unfixed.
 
 Drop condition: upstream's PAD Prepare checks that the ranks match and that
 paddings are non-negative.
+
+## Dynamic-batch shapes: `kernels/space_to_batch_nd.cc`, `kernels/batch_to_space_nd.cc`, `kernels/depthwise_conv_common.cc`, `kernels/conv_common.cc`, `kernels/kernel_util.{h,cc}` and tests
+
+A model exported with a dynamic batch stores batch 1 for tensors whose real
+batch comes from the graph: the SPACE_TO_BATCH_ND output of a dilated
+convolution, and the DEPTHWISE_CONV_2D or CONV_2D output after it. TensorFlow
+Lite resizes these at runtime; TFLM computed into the stored shape, so S2B
+filled one batch, the convolution ran on batch 1 (its batch check is a DCHECK)
+and BATCH_TO_SPACE_ND wrote nothing, giving silent wrong outputs. See
+AmbiqAI/helia-rt#407.
+
+- SPACE_TO_BATCH_ND and BATCH_TO_SPACE_ND Prepare compute the output shape from
+  constant block shape and paddings/crops, reject any non-batch mismatch, and
+  write the computed batch into an output that stores the placeholder batch 1
+  (`CreateWritableTensorDimsWithCopy`, as depth_to_space and gather do).
+  BATCH_TO_SPACE_ND rejects an input batch the block product does not divide,
+  so an op between the pair that kept the stored batch is caught. Non-constant
+  block shape or paddings keep upstream's behaviour.
+- `micro::MatchOutputBatchToInput` makes a convolution's output batch follow its
+  input batch when the output stores batch 1, and rejects any other mismatch;
+  the reference DEPTHWISE_CONV_2D and CONV_2D Prepare call it, as do the helia
+  overrides.
+- The four kernel tests cover the placeholder batch, the rejections, and a
+  batch-2 depthwise and conv; `depthwise_conv_test.cc` gains an optional
+  validation length on its per-channel helper.
+
+This correctness fix stays in the shared kernels: a helia-only override would
+leave reference, direct CMake, Bazel and source consumers wrong. The cmsis_nn
+backend's own convolution Prepare is upstream and unchanged.
+
+Drop condition: upstream TFLM checks SPACE_TO_BATCH_ND/BATCH_TO_SPACE_ND output
+shapes at Prepare and propagates a dynamic batch through the convolution.

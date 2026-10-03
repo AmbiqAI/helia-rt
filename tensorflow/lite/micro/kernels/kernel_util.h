@@ -159,6 +159,17 @@ TfLiteStatus CreateWritableTensorDimsWithCopy(TfLiteContext* context,
                                               TfLiteTensor* tensor,
                                               TfLiteEvalTensor* eval_tensor);
 
+// helia: see AmbiqAI/helia-rt#407.
+// A model exported with a dynamic batch stores batch 1 for tensors whose real
+// batch is only known from the graph, e.g. the batch that SPACE_TO_BATCH_ND
+// creates. Makes the output batch follow the input batch when the output
+// stores the placeholder batch 1, and rejects any other batch mismatch. Only
+// use during Prepare, before anything is sized from the output dims.
+TfLiteStatus MatchOutputBatchToInput(TfLiteContext* context, TfLiteNode* node,
+                                     int output_index,
+                                     const TfLiteTensor* input,
+                                     TfLiteTensor* output);
+
 // Copy all op input tensors to op output tensors. Requires all op input tensor
 // shapes and types to be identical to op output tensor shapes and types.
 TfLiteStatus CopyOpInputsToOpOutputs(TfLiteContext* context, TfLiteNode* node);

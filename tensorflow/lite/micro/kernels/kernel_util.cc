@@ -146,6 +146,29 @@ TfLiteStatus CreateWritableTensorDimsWithCopy(TfLiteContext* context,
   return kTfLiteOk;
 }
 
+// helia: see AmbiqAI/helia-rt#407.
+TfLiteStatus MatchOutputBatchToInput(TfLiteContext* context, TfLiteNode* node,
+                                     int output_index,
+                                     const TfLiteTensor* input,
+                                     TfLiteTensor* output) {
+  TF_LITE_ENSURE(context, input != nullptr && output != nullptr);
+  TF_LITE_ENSURE(context, input->dims->size > 0 && output->dims->size > 0);
+  const int input_batch = input->dims->data[0];
+  if (output->dims->data[0] == input_batch) {
+    return kTfLiteOk;
+  }
+  if (output->dims->data[0] != 1) {
+    MicroPrintf("Output batch %d does not match input batch %d.",
+                output->dims->data[0], input_batch);
+    return kTfLiteError;
+  }
+  TfLiteEvalTensor* output_eval = GetEvalOutput(context, node, output_index);
+  TF_LITE_ENSURE_OK(
+      context, CreateWritableTensorDimsWithCopy(context, output, output_eval));
+  output->dims->data[0] = input_batch;
+  return kTfLiteOk;
+}
+
 // Verify that both tensors have the same type and size, then return the size
 // of both tensors in bytes if they are the same, or -1 if they are different.
 size_t ValidateAndGetTensorSizes(const TfLiteEvalTensor* tensor1,

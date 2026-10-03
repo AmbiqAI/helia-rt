@@ -83,6 +83,10 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE(context, output != nullptr);
 
   TF_LITE_ENSURE_EQ(context, input->type, output->type);
+  // helia: see AmbiqAI/helia-rt#407.
+  TF_LITE_ENSURE_OK(context, micro::MatchOutputBatchToInput(
+                                 context, node, kDepthwiseConvOutputTensor,
+                                 input, output));
   TF_LITE_ENSURE_MSG(context,
                      input->type == kTfLiteFloat32 ||
                          (kHeliaFloat16Enabled &&
@@ -169,7 +173,8 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
 
     const int batch_size = MatchingDim(input_shape, 0, output_shape, 0);
     const int output_depth = MatchingDim(output_shape, 3, filter_shape, 3);
-    TFLITE_DCHECK_EQ(batch_size, 1); /* Only batch = 1 is supported */
+    // Batch > 1 (e.g. after SPACE_TO_BATCH_ND) takes heliaCORE's generic
+    // depthwise path, which needs no scratch buffer. see AmbiqAI/helia-rt#407
 
     cmsis_nn_dims input_dims;
     input_dims.n = batch_size;

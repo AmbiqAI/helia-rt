@@ -155,6 +155,11 @@ TfLiteStatus DepthwiseConvPrepare(TfLiteContext* context, TfLiteNode* node) {
       micro_context->AllocateTempInputTensor(node, kDepthwiseConvWeightsTensor);
   TF_LITE_ENSURE(context, filter != nullptr);
 
+  // helia: see AmbiqAI/helia-rt#407.
+  TF_LITE_ENSURE_OK(
+      context, micro::MatchOutputBatchToInput(
+                   context, node, kDepthwiseConvOutputTensor, input, output));
+
   const int input_width = input->dims->data[2];
   const int input_height = input->dims->data[1];
   const int filter_width = filter->dims->data[2];

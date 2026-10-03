@@ -45,6 +45,87 @@ void* SpaceToBatchNDInit(TfLiteContext* context, const char* buffer,
   return context->AllocatePersistentBuffer(context, sizeof(SpaceToBatchParams));
 }
 
+// helia: see AmbiqAI/helia-rt#407.
+// Writes the computed batch into an output that stores the placeholder batch
+// 1 of a dynamic-batch export; any other batch mismatch is rejected.
+TfLiteStatus SetComputedBatch(TfLiteContext* context, TfLiteNode* node,
+                              TfLiteTensor* output, int64_t batch) {
+  TF_LITE_ENSURE(context, batch > 0 && batch <= INT32_MAX);
+  if (output->dims->data[0] == batch) {
+    return kTfLiteOk;
+  }
+  if (output->dims->data[0] != 1) {
+    MicroPrintf("Output batch %d does not match the computed batch %d.",
+                output->dims->data[0], static_cast<int>(batch));
+    return kTfLiteError;
+  }
+  TfLiteEvalTensor* output_eval =
+      tflite::micro::GetEvalOutput(context, node, kOutputTensor);
+  TF_LITE_ENSURE_OK(context, tflite::micro::CreateWritableTensorDimsWithCopy(
+                                 context, output, output_eval));
+  output->dims->data[0] = static_cast<int>(batch);
+  return kTfLiteOk;
+}
+
+// helia: see AmbiqAI/helia-rt#407.
+// With a constant block shape and paddings, the output shape is fully known
+// at Prepare: check every non-batch dim and set the batch.
+TfLiteStatus CheckConstantOutputShape(TfLiteContext* context, TfLiteNode* node,
+                                      const TfLiteTensor* input,
+                                      const TfLiteTensor* block_shape,
+                                      const TfLiteTensor* paddings,
+                                      TfLiteTensor* output) {
+  const int rank = NumDimensions(input);
+  const int spatial_dims = rank - 2;
+  TF_LITE_ENSURE_EQ(context, NumDimensions(output), rank);
+  TF_LITE_ENSURE_TYPES_EQ(context, block_shape->type, kTfLiteInt32);
+  TF_LITE_ENSURE_TYPES_EQ(context, paddings->type, kTfLiteInt32);
+  TF_LITE_ENSURE_EQ(context, NumElements(block_shape), spatial_dims);
+  TF_LITE_ENSURE_EQ(context, NumElements(paddings), spatial_dims * 2);
+  const int32_t* block = GetTensorData<int32_t>(block_shape);
+  const int32_t* pad = GetTensorData<int32_t>(paddings);
+  int64_t batch = input->dims->data[0];
+  for (int i = 0; i < spatial_dims; ++i) {
+    TF_LITE_ENSURE(context, block[i] > 0);
+    TF_LITE_ENSURE(context, pad[2 * i] >= 0 && pad[2 * i + 1] >= 0);
+    const int64_t padded = static_cast<int64_t>(input->dims->data[i + 1]) +
+                           pad[2 * i] + pad[2 * i + 1];
+    TF_LITE_ENSURE_EQ(context, padded % block[i], 0);
+    TF_LITE_ENSURE_EQ(context, output->dims->data[i + 1], padded / block[i]);
+    batch *= block[i];
+  }
+  TF_LITE_ENSURE_EQ(context, output->dims->data[rank - 1],
+                    input->dims->data[rank - 1]);
+  return SetComputedBatch(context, node, output, batch);
+}
+
+// helia: see AmbiqAI/helia-rt#407.
+// The shape is only checked when the block shape and paddings are constant; it
+// cannot be known at Prepare otherwise.
+TfLiteStatus CheckOutputShape(TfLiteContext* context, TfLiteNode* node,
+                              const TfLiteTensor* input, TfLiteTensor* output) {
+  MicroContext* micro_context = GetMicroContext(context);
+  TfLiteTensor* block_shape =
+      micro_context->AllocateTempInputTensor(node, kBlockShapeTensor);
+  TfLiteTensor* paddings =
+      micro_context->AllocateTempInputTensor(node, kCropsTensor);
+  TfLiteStatus status = kTfLiteError;
+  if (block_shape != nullptr && paddings != nullptr) {
+    status = kTfLiteOk;
+    if (IsConstantTensor(block_shape) && IsConstantTensor(paddings)) {
+      status = CheckConstantOutputShape(context, node, input, block_shape,
+                                        paddings, output);
+    }
+  }
+  if (block_shape != nullptr) {
+    micro_context->DeallocateTempTfLiteTensor(block_shape);
+  }
+  if (paddings != nullptr) {
+    micro_context->DeallocateTempTfLiteTensor(paddings);
+  }
+  return status;
+}
+
 TfLiteStatus SpaceToBatchNDPrepare(TfLiteContext* context, TfLiteNode* node) {
   MicroContext* micro_context = GetMicroContext(context);
 
@@ -62,6 +143,13 @@ TfLiteStatus SpaceToBatchNDPrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE(context, NumDimensions(input) <= kInputOutputMaxDimensionNum);
   TF_LITE_ENSURE(context, NumDimensions(output) <= kInputOutputMaxDimensionNum);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
+
+  // helia: see AmbiqAI/helia-rt#407.
+  if (CheckOutputShape(context, node, input, output) != kTfLiteOk) {
+    micro_context->DeallocateTempTfLiteTensor(input);
+    micro_context->DeallocateTempTfLiteTensor(output);
+    return kTfLiteError;
+  }
 
   // helia: see AmbiqAI/helia-rt#317.
   auto* params = static_cast<SpaceToBatchParams*>(node->user_data);
