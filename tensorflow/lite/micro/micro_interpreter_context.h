@@ -19,7 +19,7 @@ limitations under the License.
 #include <cstddef>
 #include <initializer_list>
 
-#include "tensorflow/lite/c/common.h"
+#include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/micro_allocator.h"
 #include "tensorflow/lite/micro/micro_context.h"
 #include "tensorflow/lite/micro/micro_interpreter_graph.h"
@@ -158,6 +158,11 @@ class MicroInterpreterContext : public MicroContext {
   // The alternate MicroProfilerInterface is currently used by the tensor
   // decompression subsystem.
   MicroProfilerInterface* GetAlternateProfiler() const override;
+
+  // Set the DECODE operator custom registrations.
+  // Can only be called during the kInit state.
+  TfLiteStatus SetCustomDecodeRegistrations(
+      const CustomDecodeRegistration* registrations, size_t count) override;
 
  private:
   MicroAllocator& allocator_;

@@ -18,7 +18,7 @@ limitations under the License.
 #include <algorithm>
 #include <cstdint>
 
-#include "tensorflow/lite/kernels/internal/compatibility.h"
+#include "tensorflow/lite/micro/kernels/internal/compatibility.h"
 #include "tensorflow/lite/micro/memory_helpers.h"
 #include "tensorflow/lite/micro/micro_arena_constants.h"
 #include "tensorflow/lite/micro/micro_utils.h"
@@ -245,6 +245,14 @@ TfLiteStatus MicroInterpreterContext::SetAlternateProfiler(
 
 MicroProfilerInterface* MicroInterpreterContext::GetAlternateProfiler() const {
   return alt_profiler_;
+}
+
+TfLiteStatus MicroInterpreterContext::SetCustomDecodeRegistrations(
+    const CustomDecodeRegistration* registrations, size_t count) {
+  if (state_ != InterpreterState::kInit) {
+    return kTfLiteError;
+  }
+  return MicroContext::SetCustomDecodeRegistrations(registrations, count);
 }
 
 }  // namespace tflite

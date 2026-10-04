@@ -264,6 +264,7 @@ endif
 
 
 CC_WARNINGS := \
+  -Werror \
   -Wsign-compare \
   -Wdouble-promotion \
   -Wunused-variable \
@@ -295,7 +296,6 @@ COMMON_FLAGS := \
   -ffunction-sections \
   -fdata-sections \
   -fmessage-length=0 \
-  -DTF_LITE_STATIC_MEMORY \
   -DTF_LITE_DISABLE_X86_NEON \
   $(CC_WARNINGS) \
   $(ADDITIONAL_DEFINES)
@@ -369,17 +369,6 @@ else ifeq ($(BUILD_TYPE), release_with_logs)
   # for profiling and benchmarking.
   CXXFLAGS += -DNDEBUG
   CCFLAGS  += -DNDEBUG
-else ifeq ($(BUILD_TYPE), no_tf_lite_static_memory)
-  # TODO(b/287320282): remove the no_tf_lite_static_memory build.
-  #
-  # This build should not be used to run any binaries/tests since
-  # TF_LITE_STATIC_MEMORY should be defined for all micro builds. However,
-  # having a build without TF_LITE_STATIC_MEMORY is useful to catch errors in
-  # code that is shared between TfLite Mobile and TfLite Micro. See this issue
-  # for more details:
-  # https://github.com/tensorflow/tensorflow/issues/43076
-  CXXFLAGS := $(filter-out -DTF_LITE_STATIC_MEMORY, $(CXXFLAGS))
-  CCFLAGS := $(filter-out -DTF_LITE_STATIC_MEMORY, $(CCFLAGS))
 endif
 
 ifeq ($(CC_VER11), true)

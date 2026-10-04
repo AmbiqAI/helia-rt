@@ -21,10 +21,10 @@ limitations under the License.
 #include <cstdint>
 #include <initializer_list>
 
-#include "tensorflow/lite/core/c/common.h"
-#include "tensorflow/lite/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/decode_state.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
+#include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_common.h"
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
@@ -66,7 +66,7 @@ struct AncillaryData {
 template <typename T>
 void CheckOutput(const TfLiteTensor& output, const void* const expected) {
   const T* const expected_data = reinterpret_cast<const T*>(expected);
-  const T* const output_data = tflite::GetTensorData<T>(&output);
+  const T* const output_data = tflite::micro::GetTensorData<T>(&output);
 
   constexpr float kTolerance = 1e-5;
   const size_t kOutputCount = tflite::NumElements(&output);
@@ -81,6 +81,8 @@ void ExecuteDecodeTest(
     const std::initializer_list<const void*>& expected,
     TfLiteStatus expected_status,
     const std::initializer_list<MicroContext::AlternateMemoryRegion>* amr =
+        nullptr,
+    const std::initializer_list<MicroContext::CustomDecodeRegistration>* cdr =
         nullptr) {
   int kInputArrayData[kNumInputs + 1] = {kNumInputs};
   for (size_t i = 0; i < kNumInputs; i++) {
@@ -100,6 +102,11 @@ void ExecuteDecodeTest(
   if (amr != nullptr) {
     runner.GetFakeMicroContext()->SetDecompressionMemory(amr->begin(),
                                                          amr->size());
+  }
+
+  if (cdr != nullptr) {
+    runner.GetFakeMicroContext()->SetCustomDecodeRegistrations(cdr->begin(),
+                                                               cdr->size());
   }
 
   TfLiteStatus status = runner.InitAndPrepare();
@@ -152,6 +159,8 @@ void TestDecode(
     const TFLMRegistration& registration,
     const std::initializer_list<MicroContext::AlternateMemoryRegion>* amr =
         nullptr,
+    const std::initializer_list<MicroContext::CustomDecodeRegistration>* cdr =
+        nullptr,
     const TfLiteStatus expected_status = kTfLiteOk) {
   TfLiteTensor tensors[kNumInputs + kNumOutputs] = {};
 
@@ -185,7 +194,7 @@ void TestDecode(
   }
 
   ExecuteDecodeTest<kNumInputs, kNumOutputs>(tensors, registration, expected,
-                                             expected_status, amr);
+                                             expected_status, amr, cdr);
 }
 
 }  // namespace testing

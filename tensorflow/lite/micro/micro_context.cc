@@ -19,8 +19,8 @@ limitations under the License.
 #include <cstdarg>
 #include <cstddef>
 
-#include "tensorflow/lite/kernels/internal/compatibility.h"
 #include "tensorflow/lite/micro/kernels/decompress.h"
+#include "tensorflow/lite/micro/kernels/internal/compatibility.h"
 #include "tensorflow/lite/micro/memory_helpers.h"
 #include "tensorflow/lite/micro/micro_common.h"
 #include "tensorflow/lite/micro/micro_log.h"
@@ -71,8 +71,8 @@ TfLiteTensor* MicroContext::AllocateTempIntermediateTensor(
   return AllocateTempTfLiteTensor(tensor_index);
 }
 
-void MicroContextReportOpError(struct TfLiteContext* context,
-                               const char* format, ...) {
+void MicroContextReportOpError(TfLiteContext* context, const char* format,
+                               ...) {
   va_list args;
   va_start(args, format);
   VMicroPrintf(format, args);
@@ -172,6 +172,16 @@ void MicroContext::ResetDecompressionMemoryAllocations() {
   }
   TFLITE_DCHECK(decompress_regions_allocations_ != nullptr);
   std::fill_n(decompress_regions_allocations_, decompress_regions_size_, 0);
+}
+
+TfLiteStatus MicroContext::SetCustomDecodeRegistrations(
+    const CustomDecodeRegistration* registrations, size_t count) {
+  if (custom_decode_registrations_ != nullptr) {
+    return kTfLiteError;
+  }
+  custom_decode_registrations_ = registrations;
+  custom_decode_registrations_size_ = count;
+  return kTfLiteOk;
 }
 
 }  // namespace tflite

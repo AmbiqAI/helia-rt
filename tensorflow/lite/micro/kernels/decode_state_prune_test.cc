@@ -17,7 +17,7 @@ limitations under the License.
 #include <cstdint>
 #include <initializer_list>
 
-#include "tensorflow/lite/core/c/common.h"
+#include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/decode_state.h"
 #include "tensorflow/lite/micro/kernels/decode_test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
@@ -573,7 +573,7 @@ TEST(DecodeStatePruneTest, DecodePruneQuantizedInvalidZeroPointInt16) {
   tflite::testing::TestDecode<kEncodes.size() + kAncillaries.size(),
                               kOutputs.size()>(
       kEncodes, kAncillaries, kOutputs, kExpected, tflite::Register_DECODE(),
-      nullptr, kTfLiteError);
+      nullptr, nullptr, kTfLiteError);
 }
 
 TF_LITE_MICRO_TESTS_MAIN

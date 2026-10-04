@@ -18,14 +18,14 @@ limitations under the License.
 
 #include <cstdint>
 
-#include "tensorflow/lite/c/common.h"
-#include "tensorflow/lite/core/c/c_api_types.h"
-#include "tensorflow/lite/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/c/c_api_types.h"
+#include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/compatibility.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_profiler_interface.h"
 
 namespace tflite {
+namespace micro {
 
 class DecodeState {
  public:
@@ -72,7 +72,8 @@ class DecodeState {
   static constexpr uint8_t kDcmTypeLUT = 0;
   static constexpr uint8_t kDcmTypeHuffman = 1;
   static constexpr uint8_t kDcmTypePrune = 2;
-  static constexpr uint8_t kDcmTypeCustom = 127;
+  static constexpr uint8_t kDcmTypeCustomFirst = 128;
+  static constexpr uint8_t kDcmTypeCustomLast = 255;
 
   static constexpr size_t kDcmSizeInBytes = 16;
 
@@ -89,6 +90,9 @@ class DecodeState {
   TF_LITE_REMOVE_VIRTUAL_DELETE
 };
 
+}  // namespace micro
+
+using micro::DecodeState;
 }  // namespace tflite
 
 #endif  // TENSORFLOW_LITE_MICRO_MICRO_KERNELS_DECODE_STATE_H_

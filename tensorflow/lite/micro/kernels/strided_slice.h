@@ -18,12 +18,12 @@ limitations under the License.
 
 #include <cstdint>
 
-#include "tensorflow/lite/c/builtin_op_data.h"
-#include "tensorflow/lite/c/common.h"
+#include "tensorflow/lite/micro/c/builtin_op_data.h"
+#include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/micro_common.h"
 
 namespace tflite {
-
+namespace micro {
 constexpr int kStridedSliceInputTensor = 0;
 constexpr int kStridedSliceBeginTensor = 1;
 constexpr int kStridedSliceEndTensor = 2;
@@ -35,6 +35,13 @@ void* StridedSliceInit(TfLiteContext* context, const char* buffer,
 
 TfLiteStatus StridedSlicePrepare(TfLiteContext* context, TfLiteNode* node);
 
+}  // namespace micro
+
+using micro::kStridedSliceBeginTensor;
+using micro::kStridedSliceEndTensor;
+using micro::kStridedSliceInputTensor;
+using micro::kStridedSliceOutputTensor;
+using micro::kStridedSliceStridesTensor;
 }  // namespace tflite
 
 #endif  // TENSORFLOW_LITE_MICRO_KERNELS_STRIDED_SLICE_H_

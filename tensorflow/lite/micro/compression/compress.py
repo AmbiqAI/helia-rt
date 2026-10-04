@@ -24,6 +24,7 @@ import warnings
 from typing import ByteString, Iterable, Type
 
 from tflite_micro.tensorflow.lite.micro.compression import compressor
+from tflite_micro.tensorflow.lite.micro.compression import constant_inputs
 from tflite_micro.tensorflow.lite.micro.compression import decode_insert
 from tflite_micro.tensorflow.lite.micro.compression import huffman
 from tflite_micro.tensorflow.lite.micro.compression import lut
@@ -34,9 +35,11 @@ from tflite_micro.tensorflow.lite.micro.tools import (
   tflite_flatbuffer_align_wrapper,
 )
 
-USAGE = f"""\
-Usage: compress.py --input <in.tflite> --spec <spec.yaml> [--output <out.tflite>]
+# argparse prints "usage: " ahead of this line.
+USAGE = """\
+compress.py --input <in.tflite> --spec <spec.yaml> [--output <out.tflite>]"""
 
+_DESCRIPTION = f"""\
 Produce a compressed model from the input model by compressing tensors
 according to the instructions in the spec file. The spec file lists the tensors
 to compress, the compression methods to use on each tensor, and any parameters
@@ -62,8 +65,7 @@ Supported compression methods:
   pruning: Pruning (sparsity) compression for sparse tensors. (Not yet
            implemented.)
 
-Compressed models use DECODE operators to decompress tensors at runtime.
-"""
+Compressed models use DECODE operators to decompress tensors at runtime."""
 
 # Plugin dispatch table: maps CompressionMethod subclasses to compressor instances
 _COMPRESSORS: dict[Type[spec.CompressionMethod], compressor.Compressor] = {
@@ -145,7 +147,16 @@ def compress(model_in: ByteString, specs: Iterable[spec.Tensor]) -> bytearray:
 
   for tensor_spec in specs:
     try:
-      tensor = model.subgraphs[tensor_spec.subgraph].tensors[tensor_spec.tensor]
+      subgraph = model.subgraphs[tensor_spec.subgraph]
+      tensor = subgraph.tensors[tensor_spec.tensor]
+
+      uses = constant_inputs.find_uses(subgraph, tensor)
+      if uses:
+        raise compressor.CompressionError(
+          f"tensor {tensor.name!r} (subgraph {tensor_spec.subgraph}, "
+          f"tensor {tensor_spec.tensor}) must stay constant; "
+          + "; ".join(use.describe() for use in uses)
+        )
 
       # Currently only one compression method per tensor
       if len(tensor_spec.compression) != 1:
@@ -190,13 +201,17 @@ def compress(model_in: ByteString, specs: Iterable[spec.Tensor]) -> bytearray:
   return _apply_flatbuffer_alignment(unaligned_model)
 
 
-def _fail_w_usage() -> int:
-  sys.stderr.write(USAGE)
+def _fail_w_usage(parser: argparse.ArgumentParser) -> int:
+  sys.stderr.write(parser.format_help())
   return 1
 
 
 def main(argv):
-  parser = argparse.ArgumentParser(usage=USAGE)
+  parser = argparse.ArgumentParser(
+    usage=USAGE,
+    description=_DESCRIPTION,
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+  )
   parser.add_argument(
     "--input", default=None, help="uncompressed .tflite flatbuffer"
   )
@@ -209,18 +224,18 @@ def main(argv):
   args, extra = parser.parse_known_args(argv[1:])
   if extra:
     # no positional arguments accepted
-    return _fail_w_usage()
+    return _fail_w_usage(parser)
 
   in_path = args.input
   if in_path is None:
-    return _fail_w_usage()
+    return _fail_w_usage(parser)
   else:
     with open(in_path, "rb") as in_file:
       in_model = in_file.read()
 
   spec_path = args.spec
   if spec_path is None:
-    return _fail_w_usage()
+    return _fail_w_usage(parser)
   else:
     with open(spec_path, "r") as spec_file:
       specs = spec.parse_yaml(spec_file.read())
