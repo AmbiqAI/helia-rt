@@ -19,7 +19,6 @@ Set cache options before `add_subdirectory(helia-rt)`. The [root CMake file](htt
 | `HELIA_RT_GLOBAL_KERNEL_OPTIMIZE` | `SPEED` | Global HELIA profile: `SPEED` or `SIZE`. |
 | `HELIA_RT_CONV_OPT` | Empty, inherit global | Convolution family override: `SPEED` or `SIZE`. |
 | `HELIA_RT_FC_OPT` | Empty, inherit global | Fully connected override: `SPEED` or `SIZE`. |
-| `HELIA_RT_STATIC_MEMORY` | `ON` | Export `TF_LITE_STATIC_MEMORY`. |
 | `HELIA_RT_USE_COMPRESSION` | `OFF` | Export `USE_TFLM_COMPRESSION`; enabling the flag alone does not convert a model to a supported compressed representation. |
 | `HELIA_RT_DISABLE_X86_NEON` | `OFF` | Export `TF_LITE_DISABLE_X86_NEON` for applicable host builds. |
 | `HELIA_RT_CORE_OPT` | `-Os` | Compiler optimization option applied to common runtime sources. |
@@ -49,7 +48,7 @@ The [NSX wrapper](https://github.com/AmbiqAI/helia-rt/blob/main/nsx/CMakeLists.t
 | `HELIA_RT_NSCMSISNN_TARGET` | `nsx::cmsis_nn` when unset | HELIA dependency target. |
 | `HELIA_RT_CMSISNN_TARGET` | Required for CMSIS-NN backend | An upstream-compatible CMSIS-NN target, not the HELIA kernel target. |
 
-The wrapper forces static memory on, disables the root default logging source and supplies platform logging glue. It selects the root backend and maps the build flavor. Root profile and recording settings remain useful source-build controls.
+The wrapper disables the root default logging source and supplies platform logging glue. It selects the root backend and maps the build flavor. Root profile and recording settings remain useful source-build controls.
 
 `NSX_BOARD_FLAGS_TARGET` and `NSX_SOC_FAMILY` are required board-provided integration inputs. `HELIA_RT_FLOAT32_ENABLED`, `HELIA_RT_FLOAT16_ENABLED` and `HELIA_RT_TARGET_HAS_MVE_FP` report resolved capabilities; they are not feature requests.
 

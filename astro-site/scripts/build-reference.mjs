@@ -29,7 +29,7 @@ fs.writeFileSync(doxyfile, [
   'GENERATE_XML = YES', 'XML_PROGRAMLISTING = NO', 'GENERATE_HTML = NO', 'GENERATE_LATEX = NO',
   'EXTRACT_ALL = YES', 'EXTRACT_PRIVATE = NO', 'EXTRACT_STATIC = NO',
   'ENABLE_PREPROCESSING = YES', 'MACRO_EXPANSION = YES', 'EXPAND_ONLY_PREDEF = YES',
-  'PREDEFINED = TF_LITE_REMOVE_VIRTUAL_DELETE= FLATBUFFERS_FINAL_CLASS=final TF_LITE_STATIC_MEMORY=1', 'QUIET = YES', 'WARN_IF_UNDOCUMENTED = NO',
+  'PREDEFINED = TF_LITE_REMOVE_VIRTUAL_DELETE= FLATBUFFERS_FINAL_CLASS=final', 'QUIET = YES', 'WARN_IF_UNDOCUMENTED = NO',
 ].join('\n'));
 run('doxygen', [doxyfile]);
 const { extractModel, readDoxygenXml } = await import(path.join(packageRoot, 'scripts/lib/doxyref-extract.mjs'));

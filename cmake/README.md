@@ -35,13 +35,13 @@ Tracked in [issue #147](https://github.com/AmbiqAI/helia-rt/issues/147).
 
 ## Hard constraint: hands off `tensorflow/`
 
-heliaRT periodically re-syncs from `tensorflow/tflite-micro` via [`ci/sync_from_upstream_tf.sh`](../ci/sync_from_upstream_tf.sh). To keep that sync clean:
+heliaRT periodically re-syncs from `tensorflow/tflite-micro` (the synced revision is in [`helia/UPSTREAM`](../helia/UPSTREAM)). To keep that sync clean:
 
 - The SSoT files live **only** under `cmake/`, top-level `CMakeLists.txt`, and `tools/cmsis_pack/` — never under `tensorflow/`, `signal/`, or `python/tflite_micro/`.
 - Per-source compile options (e.g. `-O2`) are applied via `set_source_files_properties(... TARGET_DIRECTORY ...)` on the *target side*. Source files are never edited.
 - Kernel selection is path-based (`${KERNEL_ROOT}/<backend>/<base>` vs `${KERNEL_ROOT}/<base>`); no patches.
 
-After `ci/sync_from_upstream_tf.sh` runs on a clean checkout, **no SSoT files should be modified**.
+An upstream sync edits the SSoT files only where upstream adds, moves or removes a source.
 
 ## Customer-facing CMake options
 
@@ -58,7 +58,6 @@ When consuming via the top-level `CMakeLists.txt` (or NSX/Zephyr source-mode she
 | `HELIA_RT_CORE_OPT` | `-Os` | Optimization flag for runtime core (`micro_allocator.cc`, etc.) |
 | `HELIA_RT_KERNEL_OPT` | `-O2` | Optimization flag for kernel `.cc` files |
 | `HELIA_RT_THIRD_PARTY_OPT` | `-O2` | Reserved — applied when `third_party_static/` ships compile units |
-| `HELIA_RT_STATIC_MEMORY` | `ON` | Defines `TF_LITE_STATIC_MEMORY` (heap-free TFLM runtime) |
 | `HELIA_RT_USE_COMPRESSION` | `OFF` | Defines `USE_TFLM_COMPRESSION` |
 | `HELIA_RT_DISABLE_X86_NEON` | `OFF` | Defines `TF_LITE_DISABLE_X86_NEON` (host builds only) |
 | `HELIA_RT_CXX_STANDARD` | `17` | C++ standard (14 or 17) |

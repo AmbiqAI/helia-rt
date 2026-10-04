@@ -46,6 +46,8 @@ In your project's component selection, use the Ambiq `Machine Learning` / `TFLM 
 | `CMSIS-NN` | Upstream Arm CMSIS-NN kernel dependency for your target. |
 | `HELIA` | The Ambiq heliaCORE (`ns-cmsis-nn`) source component. The generated PDSC requires version 7.39.2 or newer. |
 
+Compile the runtime's C++ sources with `-fno-exceptions`: its arena objects hide `operator delete`, so its placement `new` does not compile with exceptions enabled. The example below sets it for the whole solution.
+
 Keep runtime and kernel feature settings consistent. A HELIA component selection does not establish support for every operator, tensor type or model shape. Review [Model compatibility](/helia-rt/guide/model-compatibility/) before enabling float kernels.
 
 ## Build the example consumer
