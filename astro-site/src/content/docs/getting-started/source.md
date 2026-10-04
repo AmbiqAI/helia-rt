@@ -13,7 +13,7 @@ Install Git, Python 3 and the build tools for your chosen path. CMake source int
 ```bash
 git clone https://github.com/AmbiqAI/helia-rt.git
 cd helia-rt
-git checkout helia-rt-v1.21.4
+git checkout helia-rt-v2.0.0
 ```
 <!-- x-release-please-end -->
 
