@@ -153,15 +153,15 @@
   },
   {
     "name": "TfLiteTensor",
-    "header": "tensorflow/lite/core/c/common.h",
-    "role": "Tensor data, dimensions, quantization and allocation metadata for static-memory builds.",
+    "header": "tensorflow/lite/micro/c/common.h",
+    "role": "Tensor data, dimensions, quantization and allocation metadata.",
     "group": "Tensor and status types",
     "symbol": "TfLiteTensor",
     "route": "reference/api/tflitetensor"
   },
   {
     "name": "TfLiteEvalTensor",
-    "header": "tensorflow/lite/core/c/common.h",
+    "header": "tensorflow/lite/micro/c/common.h",
     "role": "Evaluation-time tensor data, dimensions and type.",
     "group": "Tensor and status types",
     "symbol": "TfLiteEvalTensor",
@@ -169,7 +169,7 @@
   },
   {
     "name": "TfLiteStatus",
-    "header": "tensorflow/lite/core/c/c_api_types.h",
+    "header": "tensorflow/lite/micro/c/c_api_types.h",
     "role": "Status values returned by runtime operations.",
     "group": "Tensor and status types",
     "symbol": "TfLiteStatus",
@@ -177,7 +177,7 @@
   },
   {
     "name": "TfLiteType",
-    "header": "tensorflow/compiler/mlir/lite/core/c/tflite_types.h",
+    "header": "tensorflow/lite/micro/c/c_api_types.h",
     "role": "Tensor element type identifiers.",
     "group": "Tensor and status types",
     "symbol": "TfLiteType",

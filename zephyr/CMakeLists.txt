@@ -39,6 +39,9 @@ endif()
 include(${HELIA_RT_DIR}/cmake/helia_rt_sources.cmake)
 
 zephyr_library_named(helia_rt)
+# The runtime's arena objects hide operator delete, so its placement new
+# compiles only without exceptions, whatever CONFIG_CPP_EXCEPTIONS says.
+zephyr_library_compile_options($<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>)
 
 # --- Includes from SSoT ---
 zephyr_include_directories(${HELIA_RT_INCLUDE_DIRS})

@@ -264,6 +264,7 @@ endif
 
 
 CC_WARNINGS := \
+  -Werror \
   -Wsign-compare \
   -Wdouble-promotion \
   -Wunused-variable \
@@ -295,7 +296,6 @@ COMMON_FLAGS := \
   -ffunction-sections \
   -fdata-sections \
   -fmessage-length=0 \
-  -DTF_LITE_STATIC_MEMORY \
   -DTF_LITE_DISABLE_X86_NEON \
   $(CC_WARNINGS) \
   $(ADDITIONAL_DEFINES)
@@ -369,17 +369,6 @@ else ifeq ($(BUILD_TYPE), release_with_logs)
   # for profiling and benchmarking.
   CXXFLAGS += -DNDEBUG
   CCFLAGS  += -DNDEBUG
-else ifeq ($(BUILD_TYPE), no_tf_lite_static_memory)
-  # TODO(b/287320282): remove the no_tf_lite_static_memory build.
-  #
-  # This build should not be used to run any binaries/tests since
-  # TF_LITE_STATIC_MEMORY should be defined for all micro builds. However,
-  # having a build without TF_LITE_STATIC_MEMORY is useful to catch errors in
-  # code that is shared between TfLite Mobile and TfLite Micro. See this issue
-  # for more details:
-  # https://github.com/tensorflow/tensorflow/issues/43076
-  CXXFLAGS := $(filter-out -DTF_LITE_STATIC_MEMORY, $(CXXFLAGS))
-  CCFLAGS := $(filter-out -DTF_LITE_STATIC_MEMORY, $(CCFLAGS))
 endif
 
 ifeq ($(CC_VER11), true)
@@ -734,12 +723,11 @@ ifeq ($(TOOLCHAIN), armclang)
   #   -Ofast -ffp-mode=full -Werror=...               -> silent   (exit 0)
   #
   # This deliberately replaces the previous `-Wno-error=nan-infinity-disabled`
-  # suppressions. Those were inert (no `-Werror` is set anywhere in this build)
-  # AND pointed the wrong way: they existed to hide the one signal that would
-  # have caught #228. Note the scope is a single `-Werror=<diag>`; global
-  # `-Werror` is NOT enabled here. ATfE keeps its own suppression in
-  # targets/atfe.inc -- it has no `-ffast-math` in its opt levels, so the
-  # diagnostic means something different there.
+  # suppressions, which pointed the wrong way: they existed to hide the one
+  # signal that would have caught #228. CC_WARNINGS also carries a global
+  # `-Werror`; this keeps the assertion if that is ever relaxed. ATfE keeps
+  # its own suppression in targets/atfe.inc -- it has no `-ffast-math` in its
+  # opt levels, so the diagnostic means something different there.
   CCFLAGS  += -Werror=nan-infinity-disabled
   CXXFLAGS += -Werror=nan-infinity-disabled
   FROMELF := $(TARGET_TOOLCHAIN_ROOT)$(TARGET_TOOLCHAIN_PREFIX)fromelf

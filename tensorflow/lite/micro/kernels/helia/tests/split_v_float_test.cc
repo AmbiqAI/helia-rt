@@ -17,7 +17,7 @@ limitations under the License.
 #include <cstring>
 #include <initializer_list>
 
-#include "tensorflow/lite/c/builtin_op_data.h"
+#include "tensorflow/lite/micro/c/builtin_op_data.h"
 #include "tensorflow/lite/micro/kernels/helia/tests/split_v_float_goldens.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
 #include "tensorflow/lite/micro/kernels/micro_ops.h"

@@ -50,33 +50,6 @@ unconditionally on Cortex-M55 (unlikely).
 `-DCMSIS_NN` (see "Shared kernel headers" section above), so the existing
 `#if !defined(CMSIS_NN)` guard already covers the helia case.
 
-## `tensorflow/lite/micro/kernels/kernel_runner.h`
-
-Stores the kernel registration **by value** (`const TFLMRegistration
-registration_;`) instead of upstream's reference member
-(`const TFLMRegistration& registration_;`). Three added comment lines
-explain why; the constructor signature is unchanged
-(`const TFLMRegistration&`), so every caller and the `.cc` are untouched.
-A by-value member needs `TFLMRegistration` to be a complete type, which the
-header previously got only transitively (`mock_micro_graph.h` ->
-`micro_graph.h` -> `micro_common.h`), so the entry also adds a direct
-`#include "tensorflow/lite/micro/micro_common.h"`. That include is part of
-the same drift and goes away with it.
-
-Rationale: a temporary bound to a *reference member* through a constructor
-is not lifetime-extended, so `KernelRunner runner(Register_X(), ...)`
-leaves the runner pointing at a dead stack slot. Under ATfE clang 22 for
-cortex-m55 the compiler reuses that slot before `InitAndPrepare()`, which
-corrupts `registration.init` and faults (see AmbiqAI/helia-rt#239).
-`TFLMRegistration` is a 7-field POD of function pointers and ints, so the
-copy is cheap and the class of bug cannot recur.
-
-Cannot be moved to `kernels/helia/`: `KernelRunner` is upstream shared test
-infrastructure used by every kernel test.
-
-Drop condition: upstream tflite-micro adopts a by-value member (or otherwise
-lifetime-extends the registration) in `kernel_runner.h`.
-
 ## `tensorflow/lite/micro/kernels/dequantize.h`, `tensorflow/lite/micro/kernels/dequantize.cc`, `tensorflow/lite/micro/kernels/dequantize_common.cc`, `tensorflow/lite/micro/kernels/dequantize_test.cc`, `tensorflow/lite/micro/kernels/xtensa/dequantize.cc`
 
 Widens DEQUANTIZE to accept a `kTfLiteFloat16` input with a float32 output,
@@ -87,7 +60,7 @@ AmbiqAI/helia-rt#255). Five inline changes:
   scale/zero-point read stays unconditional; an f16 tensor carries `{0, 0}`
   params, which the widening path never uses.
 - `dequantize.h`: adds the shared `Float16BitsToFloat32()` bit-expansion
-  helper.
+  helper in `tflite::micro`.
 - `dequantize.cc`: adds the `kTfLiteFloat16` case to the reference Eval.
 - `xtensa/dequantize.cc`: adds the same case to the xtensa Eval, using the
   same portable helper (there is no HiFi f16 widening primitive to call).
@@ -361,11 +334,6 @@ own log. The `^FAULT:` check drops together with the fault handlers, i.e.
 when the CMSIS startup for this target stops defining the fault vectors as
 `while(1);`.
 
-## `.github/workflows/check_tflite_files.yml`
-
-Resolved: identical to upstream. The workflow has no caller in helia-rt and is
-no longer a CI-image pin point.
-
 ## `.github/workflows/issue_on_error.yml`
 
 Two helia-specific changes:
@@ -381,16 +349,6 @@ at a sibling workflow before this could be moved.
 
 Drop condition: helia switches all callers to a sibling
 `helia_issue_on_error.yml`.
-
-## `.github/workflows/sync.yml`
-
-Disables the upstream-sync schedule (commented-out cron) and changes the
-schedule-guard repo string from `tensorflow/tflite-micro` to
-`AmbiqAI/helia-rt`, and keeps helia's own Python and action steps (no
-Bazel setup). The workflow stays usable via `workflow_dispatch`.
-
-Drop condition: helia replaces this with a sibling `helia_sync.yml`
-(deferred — see Phase 4 plan).
 
 ## `.github/workflows/ci.yml`
 
@@ -415,7 +373,7 @@ jobs to a sibling `helia_*.yml`.
 
 ## Action references in upstream-derived workflows
 
-`log_binary_size_pr.yml`, `sync.yml` and `issue_on_error.yml` reference
+`log_binary_size_pr.yml` and `issue_on_error.yml` reference
 actions by version tag; upstream pins them by commit SHA. Upstream's
 read-only default `permissions` blocks are taken. `.github/dependabot.yml`
 adds an `ignore` list for actions used only by upstream-vendored workflows
@@ -483,15 +441,16 @@ requires matching INT8 input/output quantization. Regression tests cover padded
 This common correctness fix stays in the shared kernel: a helia-only override
 or build_helia.sh patch would leave reference/CMSIS-NN, direct CMake, Bazel and
 source consumers unfixed. The shared reference header is unchanged.
-ci/sync_from_upstream_tf.sh preserves micro/, but a TFLM sync must reconcile
-these two files. Drop this drift when the selected upstream TFLM pin includes
-equivalent initialization, quantization checks and regression coverage.
+A TFLM sync must reconcile these two files. Drop this drift when the
+selected upstream TFLM pin includes equivalent initialization,
+quantization checks and regression coverage.
 
 ## `tensorflow/lite/micro/kernels/ethos_u/ethosu.cc`
 
 Compiles the Ethos-U kernel only under `HELIA_RT_ENABLE_ETHOSU`, which
 `ETHOS_U` sets unless `HELIA_RT_DISABLE_ETHOSU` is defined; otherwise
-`Register_ETHOSU()` is a stub returning `nullptr`. The kernel declares the
+`Register_ETHOSU()` is a stub returning `nullptr`, inside upstream's
+`tflite::micro` namespace. The kernel declares the
 driver entry points it calls instead of including `ethosu_driver.h`. The
 source-list builds (CMake, Zephyr, NSX) compile this file without the
 Ethos-U driver. See AmbiqAI/helia-rt#172 and #213.
@@ -602,7 +561,7 @@ leave reference/CMSIS-NN, direct CMake, Bazel and source consumers unfixed.
 Drop condition: upstream's PAD Prepare checks that the ranks match and that
 paddings are non-negative.
 
-## `tensorflow/lite/micro/kernels/space_to_batch_nd.cc`, `kernels/batch_to_space_nd.cc` and tests
+## `tensorflow/lite/micro/kernels/space_to_batch_nd.cc`, `kernels/batch_to_space_nd.cc`, `micro/test_helpers.cc`, `micro/test_helpers.h` and tests
 
 A model exported with a dynamic batch stores batch 1 for the
 SPACE_TO_BATCH_ND output of a dilated convolution, and for the convolution

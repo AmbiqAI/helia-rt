@@ -96,7 +96,7 @@ CONFIG_HELIA_RT_PREBUILT_BUILD_RELEASE_WITH_LOGS=y
 
 The module selects the archive from the board CPU, toolchain and flavor. It accepts Cortex-M4 with FPU or Cortex-M55; the archive must match the target's floating-point ABI and features. Alternative flavor settings are `CONFIG_HELIA_RT_PREBUILT_BUILD_DEBUG` and `CONFIG_HELIA_RT_PREBUILT_BUILD_RELEASE`.
 
-Do not add a separate heliaCORE module for the prebuilt archive. Its kernel objects are already included. Source-only backend and SPEED/SIZE options do not configure a prebuilt library. The module supplies `TF_LITE_STATIC_MEMORY` and applies `-fshort-enums`. Confirm that the selected archive was produced with matching enum-width and floating-point ABI settings; a successful link alone does not establish matching tensor layouts.
+Do not add a separate heliaCORE module for the prebuilt archive. Its kernel objects are already included. Source-only backend and SPEED/SIZE options do not configure a prebuilt library. The module applies `-fshort-enums`. Confirm that the selected archive was produced with matching enum-width and floating-point ABI settings; a successful link alone does not establish matching tensor layouts.
 
 ### GCC prebuilt enum ABI
 

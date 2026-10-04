@@ -19,8 +19,8 @@ limitations under the License.
 #include <cstdint>
 
 #include "flatbuffers/flatbuffers.h"  // from @flatbuffers
-#include "tensorflow/lite/c/c_api_types.h"
-#include "tensorflow/lite/c/common.h"
+#include "tensorflow/lite/micro/c/c_api_types.h"
+#include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/flatbuffer_utils.h"
 #include "tensorflow/lite/micro/memory_helpers.h"
 #include "tensorflow/lite/micro/micro_allocator.h"
@@ -30,7 +30,6 @@ limitations under the License.
 #include "tensorflow/lite/micro/micro_profiler_interface.h"
 #include "tensorflow/lite/micro/tflite_bridge/flatbuffer_conversions_bridge.h"
 #include "tensorflow/lite/schema/schema_generated.h"
-#include "tensorflow/lite/schema/schema_utils.h"
 
 namespace tflite {
 namespace {
@@ -129,7 +128,7 @@ TfLiteStatus MicroInterpreter::PrepareNodeAndRegistrationDataFromFlatbuffer() {
                                           .registration));
       if (status != kTfLiteOk) {
         MicroPrintf("Failed to get registration from op code %s\n ",
-                    EnumNameBuiltinOperator(GetBuiltinCode(opcode)));
+                    EnumNameBuiltinOperator(micro::GetBuiltinCode(opcode)));
         return status;
       }
       const auto* registration = graph_.GetAllocations()[subgraph_idx]
@@ -347,6 +346,11 @@ TfLiteStatus MicroInterpreter::SetAlternateProfiler(
 TfLiteStatus MicroInterpreter::SetDecompressionMemory(
     const MicroContext::AlternateMemoryRegion* regions, size_t count) {
   return micro_context_.SetDecompressionMemory(regions, count);
+}
+
+TfLiteStatus MicroInterpreter::SetCustomDecodeRegistrations(
+    const MicroContext::CustomDecodeRegistration* registrations, size_t count) {
+  return micro_context_.SetCustomDecodeRegistrations(registrations, count);
 }
 
 }  // namespace tflite

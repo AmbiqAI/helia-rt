@@ -35,7 +35,6 @@ UPSTREAM_ONLY=(
   ".github/workflows/log_binary_size_pr.yml"
   ".github/workflows/run_ci.yml"
   ".github/workflows/stale_handler.yml"
-  ".github/workflows/sync.yml"
 )
 
 echo "Disabling upstream-only workflows in ${REPO}..."

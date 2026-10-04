@@ -57,7 +57,6 @@ set(HELIA_RT_BUILD_TYPE "release_with_logs" CACHE STRING
 set_property(CACHE HELIA_RT_BUILD_TYPE PROPERTY STRINGS
     debug release_with_logs release)
 
-option(HELIA_RT_STATIC_MEMORY      "Define TF_LITE_STATIC_MEMORY"        ON)
 option(HELIA_RT_USE_COMPRESSION    "Define USE_TFLM_COMPRESSION"         OFF)
 option(HELIA_RT_DISABLE_X86_NEON   "Define TF_LITE_DISABLE_X86_NEON"     OFF)
 
@@ -218,17 +217,13 @@ function(_helia_rt_add_backend_target backend)
         CXX_EXTENSIONS        NO
         POSITION_INDEPENDENT_CODE OFF)
 
-        # TODO: Remove this once upstream TFLM fixes the placement-new sites in
-        # micro_allocator.cc / recording_micro_allocator.cc to avoid class-scope
-        # operator delete lookup when TF_LITE_STATIC_MEMORY is enabled.
+        # The runtime's arena objects hide operator delete, so its placement new
+        # compiles only without exceptions.
         target_compile_options(${_target} PRIVATE
             $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>)
 
     # Compile definitions: backend + build-type + feature toggles + extras.
     set(_defs ${_backend_defs} ${_buildtype_defs} ${HELIA_RT_EXTRA_DEFINES})
-    if(HELIA_RT_STATIC_MEMORY)
-        list(APPEND _defs TF_LITE_STATIC_MEMORY)
-    endif()
     if(HELIA_RT_USE_COMPRESSION)
         list(APPEND _defs USE_TFLM_COMPRESSION)
     endif()

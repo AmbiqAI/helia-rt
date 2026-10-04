@@ -39,7 +39,6 @@ set_target_properties(helia_rt_prebuilt PROPERTIES
   IMPORTED_LOCATION "${HELIA_RT_ARCHIVE}"
   INTERFACE_INCLUDE_DIRECTORIES
     "${HELIA_RT_BUNDLE};${HELIA_RT_BUNDLE}/third_party/flatbuffers/include;${HELIA_RT_BUNDLE}/third_party/gemmlowp;${HELIA_RT_BUNDLE}/third_party/ruy;${HELIA_RT_BUNDLE}/third_party/kissfft;${HELIA_RT_BUNDLE}/third_party/ns_cmsis_nn/Include"
-  INTERFACE_COMPILE_DEFINITIONS "TF_LITE_STATIC_MEMORY"
 )
 target_link_libraries(my_firmware PRIVATE helia_rt_prebuilt)
 ```
@@ -49,7 +48,7 @@ Replace `my_firmware` with your existing application target. Its toolchain file 
 For Zephyr consumers, see the [GCC prebuilt enum ABI caution](/helia-rt/getting-started/zephyr/#gcc-prebuilt-enum-abi). The bundled Zephyr template applies an enum-width flag that the GCC archive build does not explicitly request; do not copy that flag into a custom CMake integration without checking the archive ABI.
 
 :::caution[Keep the tensor layout consistent]
-`TF_LITE_STATIC_MEMORY` affects public tensor structures. Compile application code including LiteRT headers with the same definition as the archive. Use the headers delivered with that archive, rather than headers from another runtime checkout.
+Public tensor structures must match between the archive and the application. Use the headers delivered with that archive, rather than headers from another runtime checkout.
 :::
 
 ## Build and check inference

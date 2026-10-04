@@ -301,17 +301,13 @@ def stage_pack_files(
                 repo_root, sd, suffixes=(".h", ".hpp", ".inc")
             ):
                 headers.add(rel.as_posix())
-        # tensorflow/lite/{c,core,kernels,schema} carry headers used by the
-        # public TFLM API surface that aren't always in the same dir as a
-        # source file. Pull their full header trees so #include "tensorflow/
-        # lite/..." resolves cleanly for consumers.
+        # tensorflow/lite/{micro,schema} carry headers used by the public
+        # TFLM API surface that aren't always in the same dir as a source
+        # file. Pull their full header trees so #include "tensorflow/lite/..."
+        # resolves cleanly for consumers.
         for tl_subtree in (
-            "tensorflow/lite/c",
-            "tensorflow/lite/core",
-            "tensorflow/lite/kernels",
             "tensorflow/lite/micro",
             "tensorflow/lite/schema",
-            "tensorflow/compiler/mlir/lite",
         ):
             for rel in _iter_repo_files(
                 repo_root, tl_subtree, suffixes=(".h", ".hpp", ".inc")

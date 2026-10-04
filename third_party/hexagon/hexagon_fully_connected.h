@@ -15,12 +15,13 @@ limitations under the License.
 #ifndef TENSORFLOW_LITE_MICRO_KERNELS_HEXAGON_HEXAGON_FULLY_CONNECTED_H_
 #define TENSORFLOW_LITE_MICRO_KERNELS_HEXAGON_HEXAGON_FULLY_CONNECTED_H_
 
-#include "tensorflow/lite/c/builtin_op_data.h"
-#include "tensorflow/lite/c/common.h"
-#include "tensorflow/lite/kernels/internal/types.h"
+#include "tensorflow/lite/micro/c/builtin_op_data.h"
+#include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/fully_connected.h"
+#include "tensorflow/lite/micro/kernels/internal/types.h"
 
 namespace tflite {
+namespace micro {
 
 struct HexagonOpDataFullyConnected {
   struct OpDataFullyConnected reference_op_data;
@@ -34,6 +35,7 @@ TfLiteStatus HexagonFullyConnectedPrepare(TfLiteContext* context,
 TfLiteStatus HexagonFullyConnectedEvalInt8(TfLiteContext* context,
                                            TfLiteNode* node);
 
+}  // namespace micro
 }  // namespace tflite
 
 #endif  // TENSORFLOW_LITE_MICRO_KERNELS_HEXAGON_HEXAGON_FULLY_CONNECTED_H_

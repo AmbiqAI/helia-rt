@@ -7,6 +7,12 @@ solution:
   compiler: GCC
   language-CPP: c++17
 
+  # The runtime's arena objects hide operator delete, so its placement new
+  # compiles only without exceptions.
+  misc:
+    - CPP:
+        - -fno-exceptions
+
   packs:
     # Pinned so a new upstream release cannot change what this example checks.
     - pack: ARM::CMSIS@6.3.0

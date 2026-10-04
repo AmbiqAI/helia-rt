@@ -12,8 +12,8 @@
 #   * cmake/dump_manifest.cmake       — JSON export for the CMSIS-Pack builder
 #
 # Hard constraint (see issue #147): every path referenced from here lives
-# inside the heliaRT repo. We never patch upstream files under tensorflow/,
-# so ci/sync_from_upstream_tf.sh stays a no-op for these lists.
+# inside the heliaRT repo. We never patch upstream files under tensorflow/;
+# an upstream sync updates these lists by hand.
 #
 # Adding a new kernel:
 #   1. Drop the .cc into tensorflow/lite/micro/kernels/ (and any backend
@@ -89,17 +89,8 @@ set(HELIA_RT_RUNTIME_COMMON_SOURCES
     signal/src/kiss_fft_wrappers/kiss_fft_int16.cc
     signal/src/kiss_fft_wrappers/kiss_fft_int32.cc
 
-    # tensorflow/compiler/mlir
-    tensorflow/compiler/mlir/lite/core/api/error_reporter.cc
-    tensorflow/compiler/mlir/lite/schema/schema_utils.cc
-
-    # tensorflow/lite (core)
-    tensorflow/lite/array.cc
-    tensorflow/lite/core/c/common.cc
-    tensorflow/lite/core/api/flatbuffer_conversions.cc
-    tensorflow/lite/core/api/tensor_utils.cc
-
     # tensorflow/lite/micro (runtime)
+    tensorflow/lite/micro/c/common.cc
     tensorflow/lite/micro/debug_log.cc
     tensorflow/lite/micro/hexdump.cc
     tensorflow/lite/micro/memory_helpers.cc
@@ -125,20 +116,18 @@ set(HELIA_RT_RUNTIME_COMMON_SOURCES
 
     # tflite_bridge
     tensorflow/lite/micro/tflite_bridge/flatbuffer_conversions_bridge.cc
-    tensorflow/lite/micro/tflite_bridge/micro_error_reporter.cc
 
     # memory planners
     tensorflow/lite/micro/memory_planner/linear_memory_planner.cc
     tensorflow/lite/micro/memory_planner/greedy_memory_planner.cc
 
-    # tensorflow/lite/kernels/internal
-    tensorflow/lite/kernels/internal/common.cc
-    tensorflow/lite/kernels/internal/quantization_util.cc
-    tensorflow/lite/kernels/internal/portable_tensor_utils.cc
-    tensorflow/lite/kernels/internal/tensor_ctypes.cc
-    tensorflow/lite/kernels/internal/tensor_utils.cc
-    tensorflow/lite/kernels/internal/reference/portable_tensor_utils.cc
-    tensorflow/lite/kernels/kernel_util.cc
+    # kernel internals
+    tensorflow/lite/micro/kernels/internal/common.cc
+    tensorflow/lite/micro/kernels/internal/quantization_util.cc
+    tensorflow/lite/micro/kernels/internal/portable_tensor_utils.cc
+    tensorflow/lite/micro/kernels/internal/tensor_ctypes.cc
+    tensorflow/lite/micro/kernels/internal/tensor_utils.cc
+    tensorflow/lite/micro/kernels/internal/reference/portable_tensor_utils.cc
 )
 
 # Arena recording / introspection. Only needed for RecordingMicroInterpreter /
@@ -278,6 +267,7 @@ set(HELIA_RT_KERNEL_BASENAMES
     svdf.cc
     svdf_common.cc
     tanh.cc
+    tflite_kernel_util.cc
     transpose.cc
     transpose_common.cc
     transpose_conv.cc

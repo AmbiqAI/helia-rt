@@ -25,12 +25,12 @@ limitations under the License.
 #include <cstring>
 
 #include "Include/arm_nnfunctions.h"
-#include "tensorflow/lite/c/builtin_op_data.h"
-#include "tensorflow/lite/c/common.h"
-#include "tensorflow/lite/kernels/internal/quantization_util.h"
-#include "tensorflow/lite/kernels/internal/reference/integer_ops/depthwise_conv.h"
-#include "tensorflow/lite/kernels/internal/types.h"
+#include "tensorflow/lite/micro/c/builtin_op_data.h"
+#include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/depthwise_conv.h"
+#include "tensorflow/lite/micro/kernels/internal/quantization_util.h"
+#include "tensorflow/lite/micro/kernels/internal/reference/integer_ops/depthwise_conv.h"
+#include "tensorflow/lite/micro/kernels/internal/types.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
@@ -298,7 +298,7 @@ void ExpectMatchesReference(const Shape& s, Route route) {
   const int32_t f_shape[] = {1, s.k_h, s.k_w, out_c};
   const int32_t b_shape[] = {out_c};
   const int32_t o_shape[] = {1, out_h, out_w, out_c};
-  reference_integer_ops::DepthwiseConvPerChannel(
+  tflite::micro::reference_integer_ops::DepthwiseConvPerChannel(
       op_params, multipliers, shifts, RuntimeShape(4, in_shape), input,
       RuntimeShape(4, f_shape), filter, RuntimeShape(1, b_shape), bias,
       RuntimeShape(4, o_shape), expected);

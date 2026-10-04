@@ -21,6 +21,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/kernels/logistic.h"
 
 namespace tflite {
+namespace micro {
 
 // Upstream tflite-micro removed the int8 lookup-table field from
 // `OpDataLogistic` in PR #308 in favour of a closed-form integer
@@ -37,6 +38,7 @@ struct OpDataLogisticHelia : OpDataLogistic {
   int8_t table[256];
 };
 
+}  // namespace micro
 }  // namespace tflite
 
 #endif  // TENSORFLOW_LITE_MICRO_KERNELS_HELIA_LOGISTIC_HELIA_H_

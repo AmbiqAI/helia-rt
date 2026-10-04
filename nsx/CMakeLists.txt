@@ -137,7 +137,6 @@ elseif(NSX_HELIA_RT_BACKEND STREQUAL "reference")
     set(HELIA_RT_ENABLE_CMSIS_NN OFF CACHE BOOL "" FORCE)
 endif()
 
-set(HELIA_RT_STATIC_MEMORY      ON  CACHE BOOL "" FORCE)
 # Embedded targets: skip the host-only NEON guard.
 set(HELIA_RT_DISABLE_X86_NEON   OFF CACHE BOOL "" FORCE)
 # We provide our own Cortex-M debug_log.cc below; suppress the default stub
@@ -474,9 +473,6 @@ target_include_directories(nsx_helia_rt_glue PRIVATE
     "${HELIA_RT_TFLM_ROOT}"
     "${HELIA_RT_TFLM_ROOT}/third_party_static/flatbuffers/include"
     "${HELIA_RT_TFLM_ROOT}/third_party_static/gemmlowp"
-)
-target_compile_definitions(nsx_helia_rt_glue PRIVATE
-    TF_LITE_STATIC_MEMORY
 )
 
 # --- Public-facing INTERFACE target ---

@@ -31,12 +31,12 @@ limitations under the License.
 #include <cmath>
 #include <limits>
 
-#include "tensorflow/lite/c/builtin_op_data.h"
-#include "tensorflow/lite/c/common.h"
-#include "tensorflow/lite/kernels/internal/reference/add.h"
-#include "tensorflow/lite/kernels/internal/reference/mul.h"
-#include "tensorflow/lite/kernels/internal/reference/sub.h"
-#include "tensorflow/lite/kernels/internal/types.h"
+#include "tensorflow/lite/micro/c/builtin_op_data.h"
+#include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/kernels/internal/reference/add.h"
+#include "tensorflow/lite/micro/kernels/internal/reference/mul.h"
+#include "tensorflow/lite/micro/kernels/internal/reference/sub.h"
+#include "tensorflow/lite/micro/kernels/internal/types.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
 #include "tensorflow/lite/micro/kernels/micro_ops.h"
 #include "tensorflow/lite/micro/micro_log.h"
@@ -187,16 +187,16 @@ void ReferenceBinary(BinaryOp op, const int* dims1, const float* input1,
 
   switch (op) {
     case BinaryOp::kAdd:
-      reference_ops::BroadcastAdd4DSlow(params, shape1, input1, shape2, input2,
-                                        shape_out, output);
+      tflite::micro::reference_ops::BroadcastAdd4DSlow(
+          params, shape1, input1, shape2, input2, shape_out, output);
       break;
     case BinaryOp::kSub:
-      reference_ops::BroadcastSubSlow(params, shape1, input1, shape2, input2,
-                                      shape_out, output);
+      tflite::micro::reference_ops::BroadcastSubSlow(
+          params, shape1, input1, shape2, input2, shape_out, output);
       break;
     default:
-      reference_ops::BroadcastMul4DSlow(params, shape1, input1, shape2, input2,
-                                        shape_out, output);
+      tflite::micro::reference_ops::BroadcastMul4DSlow(
+          params, shape1, input1, shape2, input2, shape_out, output);
       break;
   }
 }
