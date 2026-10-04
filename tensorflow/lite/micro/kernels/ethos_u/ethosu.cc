@@ -14,7 +14,7 @@ limitations under the License.
 ==============================================================================*/
 
 #include "flatbuffers/flexbuffers.h"
-#include "tensorflow/lite/c/common.h"
+#include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_context.h"
 #include "tensorflow/lite/micro/micro_log.h"
@@ -59,6 +59,7 @@ int ethosu_invoke_v3(struct ethosu_driver* drv,
 #endif
 
 namespace tflite {
+namespace micro {
 namespace {
 
 constexpr uint8_t CO_TYPE_ETHOSU = 1;
@@ -221,4 +222,5 @@ const char* GetString_ETHOSU() { return ""; }
 
 #endif
 
+}  // namespace micro
 }  // namespace tflite
