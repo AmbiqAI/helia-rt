@@ -16,7 +16,7 @@ Add these projects to the `manifest.projects` list in your workspace's west mani
   path: modules/helia-rt
 - name: ns-cmsis-nn
   url: https://github.com/AmbiqAI/ns-cmsis-nn
-  revision: v7.39.2
+  revision: v7.39.3
   path: modules/ns-cmsis-nn
 ```
 
