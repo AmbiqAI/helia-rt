@@ -16,8 +16,8 @@ limitations under the License.
 #include <cstdint>
 
 #include "Include/arm_nnfunctions.h"
-#include "tensorflow/lite/c/builtin_op_data.h"
-#include "tensorflow/lite/c/common.h"
+#include "tensorflow/lite/micro/c/builtin_op_data.h"
+#include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/fully_connected.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
 #include "tensorflow/lite/micro/kernels/micro_ops.h"
@@ -926,10 +926,12 @@ void ExpectPad(CoreEntry entry) {
 }  // namespace
 
 namespace tflite {
+namespace micro {
 // helia typed registrations without an upstream header declaration.
 TFLMRegistration Register_SUB_INT8();
 TFLMRegistration Register_SUB_INT16();
 TFLMRegistration Register_MUL_INT16();
+}  // namespace micro
 }  // namespace tflite
 
 TEST(HeliaStatusContextTest, LstmInt8Golden) {
@@ -1050,7 +1052,7 @@ TEST(HeliaStatusContextTest, SubInt8Status) {
   TfLiteSubParams params = {kTfLiteActNone, false};
   ExpectElementwise<int8_t>(tflite::Register_SUB(), &params, kSubS8,
                             kSubExpected);
-  ExpectElementwise<int8_t>(tflite::Register_SUB_INT8(), &params, kSubS8,
+  ExpectElementwise<int8_t>(tflite::micro::Register_SUB_INT8(), &params, kSubS8,
                             kSubExpected);
 }
 
@@ -1058,8 +1060,8 @@ TEST(HeliaStatusContextTest, SubInt16Status) {
   TfLiteSubParams params = {kTfLiteActNone, false};
   ExpectElementwise<int16_t>(tflite::Register_SUB(), &params, kSubS16,
                              kSubExpected);
-  ExpectElementwise<int16_t>(tflite::Register_SUB_INT16(), &params, kSubS16,
-                             kSubExpected);
+  ExpectElementwise<int16_t>(tflite::micro::Register_SUB_INT16(), &params,
+                             kSubS16, kSubExpected);
 }
 
 TEST(HeliaStatusContextTest, MulInt8Status) {
@@ -1074,8 +1076,8 @@ TEST(HeliaStatusContextTest, MulInt16Status) {
   TfLiteMulParams params = {kTfLiteActNone};
   ExpectElementwise<int16_t>(tflite::Register_MUL(), &params, kMulS16,
                              kMulExpected);
-  ExpectElementwise<int16_t>(tflite::Register_MUL_INT16(), &params, kMulS16,
-                             kMulExpected);
+  ExpectElementwise<int16_t>(tflite::micro::Register_MUL_INT16(), &params,
+                             kMulS16, kMulExpected);
 }
 
 TEST(HeliaStatusContextTest, MaximumInt8Status) {

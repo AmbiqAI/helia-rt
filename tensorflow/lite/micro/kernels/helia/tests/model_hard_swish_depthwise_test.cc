@@ -31,7 +31,7 @@ limitations under the License.
 #include <cstdint>
 #include <cstring>
 
-#include "tensorflow/lite/c/common.h"
+#include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/helia/tests/model_hard_swish_depthwise_data.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/micro/micro_log.h"

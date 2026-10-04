@@ -268,19 +268,3 @@ jobs:
           tensorflow/lite/micro/tools/ci_build/test_makefile.sh
           cd ../
           helia-rt/tensorflow/lite/micro/tools/ci_build/test_x86_out_of_tree.sh helia-rt/
-
-  x86_no_tflite_static_memory:
-    runs-on: ubuntu-latest-md
-    name: Makefile x86 No TFLite Static Memory (presubmit)
-    needs: ci-image
-    container:
-      image: ${{ needs.ci-image.outputs.image }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.trigger-sha }}
-      - name: Test
-        run: |
-          tensorflow/lite/micro/tools/ci_build/test_makefile.sh
-          cd ../
-          helia-rt/tensorflow/lite/micro/tools/ci_build/test_x86_no_tflite_static_memory.sh helia-rt/

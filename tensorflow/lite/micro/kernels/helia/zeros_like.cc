@@ -15,13 +15,13 @@ limitations under the License.
 
 #include "arm_nnsupportfunctions.h"
 
-#include "tensorflow/lite/c/common.h"
-#include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
-#include "tensorflow/lite/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_log.h"
 
 namespace tflite {
+namespace micro {
 namespace {
 
 constexpr int kInputTensor = 0;
@@ -88,4 +88,5 @@ TFLMRegistration Register_ZEROS_LIKE() {
   return tflite::micro::RegisterOp(nullptr, ZerosLikePrepare, ZerosLikeEval);
 }
 
+}  // namespace micro
 }  // namespace tflite

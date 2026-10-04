@@ -17,9 +17,10 @@ limitations under the License.
 
 #include <cstdint>
 
-#include "tensorflow/lite/kernels/internal/types.h"
+#include "tensorflow/lite/micro/kernels/internal/types.h"
 
 namespace tflite {
+namespace micro {
 
 // Which leg of the heliaCore NHWC broadcast walk a TFLite shape pair lands on.
 // The walk dispatches identical shapes to the flat elementwise kernel, a
@@ -99,6 +100,7 @@ inline bool HeliaBroadcastNeedsWalk(HeliaBroadcastClass broadcast_class) {
          broadcast_class != HeliaBroadcastClass::kSameShape;
 }
 
+}  // namespace micro
 }  // namespace tflite
 
 #endif  // TENSORFLOW_LITE_MICRO_KERNELS_HELIA_HELIA_BROADCAST_H_

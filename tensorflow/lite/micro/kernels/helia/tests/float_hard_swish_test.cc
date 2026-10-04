@@ -24,14 +24,14 @@ limitations under the License.
 // The element count is deliberately not a multiple of four so that an MVE
 // build exercises both the vector body and the predicated tail.
 
-#include "tensorflow/lite/kernels/internal/reference/hard_swish.h"
-
 #include <algorithm>
 #include <cmath>
 
-#include "tensorflow/lite/c/builtin_op_data.h"
-#include "tensorflow/lite/c/common.h"
-#include "tensorflow/lite/kernels/internal/types.h"
+#include "tensorflow/lite/micro/c/builtin_op_data.h"
+#include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/kernels/internal/reference/hard_swish.h"
+
+#include "tensorflow/lite/micro/kernels/internal/types.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
 #include "tensorflow/lite/micro/kernels/micro_ops.h"
 #include "tensorflow/lite/micro/micro_log.h"
@@ -115,8 +115,8 @@ TEST(HeliaFloatHardSwishTest, Float32MatchesReference) {
 
   const int32_t shape_data[] = {1, tflite::testing::kCount};
   const tflite::RuntimeShape shape(2, shape_data);
-  tflite::reference_ops::HardSwish<float>(shape, tflite::testing::kInput, shape,
-                                          expected);
+  tflite::micro::reference_ops::HardSwish<float>(shape, tflite::testing::kInput,
+                                                 shape, expected);
 
   tflite::testing::RunHardSwish(tflite::testing::kInput, output,
                                 kTfLiteFloat32);

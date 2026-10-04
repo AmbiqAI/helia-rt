@@ -723,12 +723,11 @@ ifeq ($(TOOLCHAIN), armclang)
   #   -Ofast -ffp-mode=full -Werror=...               -> silent   (exit 0)
   #
   # This deliberately replaces the previous `-Wno-error=nan-infinity-disabled`
-  # suppressions. Those were inert (no `-Werror` is set anywhere in this build)
-  # AND pointed the wrong way: they existed to hide the one signal that would
-  # have caught #228. Note the scope is a single `-Werror=<diag>`; global
-  # `-Werror` is NOT enabled here. ATfE keeps its own suppression in
-  # targets/atfe.inc -- it has no `-ffast-math` in its opt levels, so the
-  # diagnostic means something different there.
+  # suppressions, which pointed the wrong way: they existed to hide the one
+  # signal that would have caught #228. CC_WARNINGS also carries a global
+  # `-Werror`; this keeps the assertion if that is ever relaxed. ATfE keeps
+  # its own suppression in targets/atfe.inc -- it has no `-ffast-math` in its
+  # opt levels, so the diagnostic means something different there.
   CCFLAGS  += -Werror=nan-infinity-disabled
   CXXFLAGS += -Werror=nan-infinity-disabled
   FROMELF := $(TARGET_TOOLCHAIN_ROOT)$(TARGET_TOOLCHAIN_PREFIX)fromelf

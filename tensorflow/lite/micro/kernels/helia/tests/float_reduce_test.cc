@@ -21,12 +21,12 @@ limitations under the License.
 // combination at rank up to 4 and leaves everything else on the reference. The
 // rank-5 cases below therefore run the reference path in the same binary.
 
-#include "tensorflow/lite/kernels/internal/reference/reduce.h"
-
 #include <cmath>
 
-#include "tensorflow/lite/c/builtin_op_data.h"
-#include "tensorflow/lite/c/common.h"
+#include "tensorflow/lite/micro/c/builtin_op_data.h"
+#include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/kernels/internal/reference/reduce.h"
+
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
 #include "tensorflow/lite/micro/kernels/micro_ops.h"
 #include "tensorflow/lite/micro/micro_log.h"
@@ -118,10 +118,9 @@ void ReferenceMean(const float* input, const int* input_shape,
                    bool keep_dims) {
   int axis_int[4];
   NarrowAxis(axis, num_axis, axis_int);
-  EXPECT_TRUE(reference_ops::Mean(input, input_shape, input_num_dims, output,
-                                  output_shape, output_num_dims, axis_int,
-                                  num_axis, keep_dims, temp_index,
-                                  resolved_axis, output));
+  EXPECT_TRUE(tflite::micro::reference_ops::Mean(
+      input, input_shape, input_num_dims, output, output_shape, output_num_dims,
+      axis_int, num_axis, keep_dims, temp_index, resolved_axis, output));
 }
 
 void ReferenceSum(const float* input, const int* input_shape,
@@ -130,11 +129,12 @@ void ReferenceSum(const float* input, const int* input_shape,
                   bool keep_dims) {
   int axis_int[4];
   NarrowAxis(axis, num_axis, axis_int);
-  EXPECT_TRUE(reference_ops::ReduceGeneric<float>(
+  EXPECT_TRUE(tflite::micro::reference_ops::ReduceGeneric<float>(
       input, input_shape, input_num_dims, output, output_shape, output_num_dims,
       axis_int, num_axis, keep_dims, temp_index, resolved_axis,
-      /*init_value=*/0.f,
-      [](const float current, const float in) -> float { return in + current; }));
+      /*init_value=*/0.f, [](const float current, const float in) -> float {
+        return in + current;
+      }));
 }
 
 void ExpectNear(const float* expected, const float* actual, int count,

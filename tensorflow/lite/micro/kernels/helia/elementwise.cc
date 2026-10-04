@@ -17,17 +17,17 @@ limitations under the License.
 #include <cmath>
 
 #include "Include/arm_nnfunctions.h"
-#include "tensorflow/lite/c/common.h"
-#include "tensorflow/lite/kernels/internal/common.h"
-#include "tensorflow/lite/kernels/internal/quantization_util.h"
-#include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
-#include "tensorflow/lite/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
+#include "tensorflow/lite/micro/kernels/internal/common.h"
+#include "tensorflow/lite/micro/kernels/internal/quantization_util.h"
+#include "tensorflow/lite/micro/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 
 namespace tflite {
+namespace micro {
 namespace {
 
 constexpr int kAbsNameId = 0;
@@ -613,4 +613,5 @@ TFLMRegistration Register_LOGICAL_NOT() {
       nullptr, GenericPrepare<IsLogicalSupportedType>, LogicalNotEval);
 }
 
+}  // namespace micro
 }  // namespace tflite

@@ -21,14 +21,14 @@ limitations under the License.
 #include <limits>
 
 #include "Include/arm_nnfunctions.h"
-#include "tensorflow/lite/kernels/internal/quantization_util.h"
-#include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/fully_connected.h"
+#include "tensorflow/lite/micro/kernels/internal/quantization_util.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/lstm_eval.h"
 #include "tensorflow/lite/micro/kernels/lstm_shared.h"
 #include "tensorflow/lite/micro/kernels/micro_tensor_utils.h"
 namespace tflite {
+namespace micro {
 
 namespace {
 
@@ -877,4 +877,5 @@ TFLMRegistration Register_UNIDIRECTIONAL_SEQUENCE_LSTM_INT16() {
                                    UnidirectionalSequenceLstmEvalInt16);
 }
 
+}  // namespace micro
 }  // namespace tflite

@@ -16,10 +16,11 @@ limitations under the License.
 #include <cstring>
 
 #include "Include/arm_nnfunctions.h"
-#include "tensorflow/lite/c/builtin_op_data.h"
+#include "tensorflow/lite/micro/c/builtin_op_data.h"
 #include "tensorflow/lite/micro/kernels/helia/helia_data_movement.h"
 
 namespace tflite {
+namespace micro {
 namespace {
 
 constexpr int kInputTensor = 0;
@@ -209,4 +210,5 @@ TFLMRegistration Register_SPLIT_V() {
   return micro::RegisterOp(InitHeliaDataMovement, SplitVPrepare, SplitVEval);
 }
 
+}  // namespace micro
 }  // namespace tflite

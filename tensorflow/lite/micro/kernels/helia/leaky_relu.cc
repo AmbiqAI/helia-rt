@@ -13,21 +13,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#include "tensorflow/lite/kernels/internal/reference/leaky_relu.h"
+#include "tensorflow/lite/micro/kernels/internal/reference/leaky_relu.h"
 
 #include "Include/arm_nnsupportfunctions.h"
 #include "Include/arm_nnfunctions.h"
 
-#include "tensorflow/lite/c/common.h"
-#include "tensorflow/lite/kernels/internal/quantization_util.h"
-#include "tensorflow/lite/kernels/internal/reference/process_broadcast_shapes.h"
-#include "tensorflow/lite/kernels/internal/types.h"
-#include "tensorflow/lite/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/kernels/internal/quantization_util.h"
+#include "tensorflow/lite/micro/kernels/internal/reference/process_broadcast_shapes.h"
+#include "tensorflow/lite/micro/kernels/internal/types.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/leaky_relu.h"
 #include "tensorflow/lite/micro/micro_log.h"
 
 namespace tflite {
+namespace micro {
 
 static inline arm_cmsis_nn_status leaky_relu_s8(
   const LeakyReluOpData& data,
@@ -142,4 +142,5 @@ TFLMRegistration Register_LEAKY_RELU() {
   return tflite::micro::RegisterOp(LeakyReluInit, LeakyReluPrepare, LeakyReluEval);
 }
 
+}  // namespace micro
 }  // namespace tflite

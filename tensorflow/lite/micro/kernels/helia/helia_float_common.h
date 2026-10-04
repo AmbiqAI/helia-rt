@@ -18,6 +18,7 @@ limitations under the License.
 #include "Include/arm_nnfunctions.h"
 
 namespace tflite {
+namespace micro {
 
 // Compile-time mirrors of the ARM_NN_ENABLE_F32/F16 feature macros so kernel
 // Prepare() type checks can accept float types only when the corresponding
@@ -53,6 +54,7 @@ inline float16_t HeliaFloat16ActivationBound(float bound) {
 }
 #endif
 
+}  // namespace micro
 }  // namespace tflite
 
 #endif  // TENSORFLOW_LITE_MICRO_KERNELS_HELIA_HELIA_FLOAT_COMMON_H_

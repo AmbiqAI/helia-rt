@@ -18,11 +18,11 @@ limitations under the License.
 #include <cstdint>
 #include <limits>
 
-#include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 
 namespace tflite {
+namespace micro {
 
 struct HeliaDataMovementData {
   int axis;
@@ -102,6 +102,7 @@ inline TfLiteStatus HeliaDataMovementPointers(TfLiteContext* context,
       &data->pointer_scratch);
 }
 
+}  // namespace micro
 }  // namespace tflite
 
 #endif  // TENSORFLOW_LITE_MICRO_KERNELS_HELIA_HELIA_DATA_MOVEMENT_H_
