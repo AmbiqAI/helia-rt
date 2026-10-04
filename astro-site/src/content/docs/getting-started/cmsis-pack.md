@@ -14,11 +14,11 @@ python3 tools/cmsis_pack/build_pack.py --output dist --keep-stage
 ```
 
 <!-- x-release-please-start-version -->
-For runtime v1.21.3, this produces:
+For runtime v1.21.4, this produces:
 
 ```text
-dist/Ambiq.helia-rt.1.21.3.pack
-dist/Ambiq.helia-rt.1.21.3.stage/
+dist/Ambiq.helia-rt.1.21.4.pack
+dist/Ambiq.helia-rt.1.21.4.stage/
 ```
 
 The generator derives the version from the runtime source manifest. Use the filename printed by your checkout rather than assuming the example version. It includes the selected runtime sources, public headers, license and PDSC description.
@@ -28,9 +28,9 @@ The generator derives the version from the runtime source manifest. Use the file
 Install CMSIS-Toolbox for `packchk` and `cpackget`, then validate the generated pack:
 
 ```bash
-python3 tools/cmsis_pack/check_pdsc.py dist/Ambiq.helia-rt.1.21.3.pack
-packchk --disable-validation dist/Ambiq.helia-rt.1.21.3.stage/Ambiq.helia-rt.pdsc
-cpackget add --agree-embedded-license dist/Ambiq.helia-rt.1.21.3.pack
+python3 tools/cmsis_pack/check_pdsc.py dist/Ambiq.helia-rt.1.21.4.pack
+packchk --disable-validation dist/Ambiq.helia-rt.1.21.4.stage/Ambiq.helia-rt.pdsc
+cpackget add --agree-embedded-license dist/Ambiq.helia-rt.1.21.4.pack
 ```
 <!-- x-release-please-end -->
 

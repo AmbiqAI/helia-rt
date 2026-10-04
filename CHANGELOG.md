@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.21.4](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.21.3...helia-rt-v1.21.4) (2026-10-03)
+
+
+### Bug Fixes
+
+* reject dynamic-batch SPACE_TO_BATCH_ND and BATCH_TO_SPACE_ND shapes at load ([#412](https://github.com/AmbiqAI/helia-rt/issues/412)) ([2801ba4](https://github.com/AmbiqAI/helia-rt/commit/2801ba4aea7c53f383fc7ad4a010841e0f0cb7fe)), closes [#407](https://github.com/AmbiqAI/helia-rt/issues/407)
+
 ## [1.21.3](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.21.2...helia-rt-v1.21.3) (2026-10-02)
 
 
