@@ -16,6 +16,9 @@ on:
       tflm-bot-token:
         required: false
 
+# Every job declares its own permissions.
+permissions: {}
+
 jobs:
   check_tflite_files:
     runs-on: ubuntu-latest

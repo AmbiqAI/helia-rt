@@ -40,6 +40,10 @@ on:
       token:
         required: true
 
+# The issue-writing token arrives as secrets.token; the job token only checks out.
+permissions:
+  contents: read
+
 jobs:
   error-trap:
     runs-on: ubuntu-latest
