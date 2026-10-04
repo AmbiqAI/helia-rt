@@ -5,6 +5,9 @@ on:
 
   workflow_dispatch: {}
 
+# Every job declares its own permissions.
+permissions: {}
+
 jobs:
   stale:
     runs-on: ubuntu-latest
