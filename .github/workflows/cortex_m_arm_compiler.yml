@@ -24,6 +24,9 @@ on:
       token:
         required: false
 
+permissions:
+  contents: read
+
 jobs:
   cortex_m_generic:
     runs-on: ubuntu-latest

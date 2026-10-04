@@ -20,6 +20,10 @@ env:
   AWS_IAM_PROFILE: Proj-s3-orta-vht-role
   AWS_SECURITY_GROUP_ID: sg-03afe5ec007b4bcb0
   AWS_SUBNET_ID: subnet-025b7baebd743a68b
+
+# Every job declares its own permissions.
+permissions: {}
+
 jobs:
   cortex_m_generic:
     runs-on: ubuntu-latest

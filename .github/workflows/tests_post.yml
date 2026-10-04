@@ -25,6 +25,7 @@ on:
 
 # No workflow-level default: each job declares exactly what it needs below,
 # so nothing silently inherits the repository's `write` default.
+permissions: {}
 
 jobs:
 

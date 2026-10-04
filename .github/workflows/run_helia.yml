@@ -4,6 +4,9 @@ on:
 
   workflow_dispatch: {}
 
+permissions:
+  contents: read
+
 jobs:
   call-helia-build:
     if: ${{ github.repository == 'AmbiqAI/helia-rt' }}
