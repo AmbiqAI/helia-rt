@@ -1,6 +1,6 @@
 #ifndef TENSORFLOW_LITE_MICRO_HELIA_RT_VERSION_H_
 #define TENSORFLOW_LITE_MICRO_HELIA_RT_VERSION_H_
 
-#define HELIA_RT_VERSION "v1.21.4"  // x-release-please-version
+#define HELIA_RT_VERSION "v2.0.0"  // x-release-please-version
 
 #endif  // TENSORFLOW_LITE_MICRO_HELIA_RT_VERSION_H_

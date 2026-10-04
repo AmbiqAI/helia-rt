@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.21.4...helia-rt-v2.0.0) (2026-10-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* the tensorflow/lite/c, tensorflow/lite/core, tensorflow/lite/kernels and tensorflow/compiler headers are removed. Include tensorflow/lite/micro/c/{common,builtin_op_data,c_api_types}.h and tensorflow/lite/micro/kernels/... instead; reference_ops and reference_integer_ops are in tflite::micro. TF_LITE_STATIC_MEMORY and the HELIA_RT_STATIC_MEMORY CMake option are gone, and source builds of the runtime need -fno-exceptions.
+
+### Features
+
+* sync with upstream tflite-micro 3f787dcf ([#414](https://github.com/AmbiqAI/helia-rt/issues/414)) ([c9ba707](https://github.com/AmbiqAI/helia-rt/commit/c9ba7072110c734ab7180193fd58b6575c7cc5e3)), closes [#345](https://github.com/AmbiqAI/helia-rt/issues/345)
+
 ## [1.21.4](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.21.3...helia-rt-v1.21.4) (2026-10-03)
 
 
