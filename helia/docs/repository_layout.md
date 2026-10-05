@@ -105,9 +105,9 @@ scripts unless the behavior change is *also* useful upstream.
 
 ### 5. GitHub workflows (`.github/workflows/`)
 
-helia-specific workflows are named `helia_*.yml` or `run_helia.yml` /
-`zephyr_tflm_rt_assets.yml`. Upstream workflows (`ci.yml`, `cortex_m.yml`,
-`docs.yml`, `release-please.yml`, etc.) should remain pristine wherever
+helia-specific workflows are named `helia_*.yml` or `run_helia.yml`.
+Upstream workflows (`ci.yml`, `cortex_m.yml`, `docs.yml`,
+`release-please.yml`, etc.) should remain pristine wherever
 possible — when they need helia behavior, prefer adding a sibling
 `helia_*` workflow rather than patching the upstream one.
 
@@ -132,11 +132,11 @@ helia-specific files:
 | `tensorflow/lite/micro/tools/ci_build/{ns_local_build,package_helia_bundle,resolve_release_meta,release_asset_helpers,check_helia_kernel_runner_temporaries,check_helia_ci_image_pins,check_helia_ci_image_pins_test,check_helia_cmsis_nn_status_checks,check_helia_cmsis_nn_status_checks_test,check_helia_workflow_secrets,check_helia_workflow_secrets_test}.sh` | helia CI helpers. The `*_helia.sh` naming is preferred for new scripts. |
 | `tensorflow/lite/micro/tools/github/arm_virtual_hardware/cortex_m_*_avh.yml` | Arm Virtual Hardware test configs consumed by `.github/workflows/cortex_m_virtual_hardware.yml`. |
 | `tensorflow/lite/micro/integration_tests/nnaed/` | helia integration tests vendored from the nnaed test generator. New helia-only integration tests go here, not under `integration_tests/seanet/` (upstream). |
-| `tensorflow/lite/micro/tools/ci_build/templates/zephyr_prebuilt/` | Zephyr module template assets used by `zephyr_static_export.sh` and `zephyr_tflm_rt_assets.yml`. |
+| `tensorflow/lite/micro/tools/ci_build/templates/zephyr_prebuilt/` | Zephyr module template assets used by `zephyr_static_export.sh`. |
 | `.devcontainer/` | helia-rt VS Code dev container definition. Upstream has none. |
 | `.github/stale.yml` | Probot-stale config (separate from `stale_handler.yml` which is upstream-owned). |
 | `nsx/` | heliaRT NSX module manifest (`nsx-module.yaml`, `CMakeLists.txt`) consumed by neuralSPOT and bumped by `release-please-config.json`. |
-| `zephyr/` | Top-level Zephyr module (`CMakeLists.txt`, `Kconfig`, `module.yml`) so the heliaRT repo can be west-imported as a Zephyr module. Distinct from `tensorflow/lite/micro/tools/ci_build/templates/zephyr_prebuilt/`, which is the prebuilt-asset template used by `zephyr_tflm_rt_assets.yml`. |
+| `zephyr/` | Top-level Zephyr module (`CMakeLists.txt`, `Kconfig`, `module.yml`) so the heliaRT repo can be west-imported as a Zephyr module. Distinct from `tensorflow/lite/micro/tools/ci_build/templates/zephyr_prebuilt/`, which is the prebuilt-asset template. |
 | `zephyr_static_export.sh` | Top-level helper that drives the static Zephyr export flow. |
 | `pyproject.toml`, `uv.lock` | Python lint tooling managed with uv. Runtime Python utilities retain their own dependency manifests. |
 | `astro-site/` | Astro/Starlight documentation source, locked site dependencies and reference generation consumed by `.github/workflows/docs.yml`. |
