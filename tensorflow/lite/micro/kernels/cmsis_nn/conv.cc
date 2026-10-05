@@ -19,8 +19,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/c/builtin_op_data.h"
 #include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/internal/common.h"
+#include "tensorflow/lite/micro/kernels/internal/portable_tensor_utils.h"
 #include "tensorflow/lite/micro/kernels/internal/quantization_util.h"
 #include "tensorflow/lite/micro/kernels/internal/reference/conv.h"
+#include "tensorflow/lite/micro/kernels/internal/reference/integer_ops/conv.h"
 #include "tensorflow/lite/micro/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/padding.h"
@@ -92,7 +94,8 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, input->dims->data[3] % filter->dims->data[3], 0);
   // Output channels should be an even multiple of the number of groups
   const int groups = input->dims->data[3] / filter->dims->data[3];
-  TFLITE_DCHECK_EQ(output->dims->data[3] % groups, 0);
+  TF_LITE_ENSURE(context, groups > 0);
+  TF_LITE_ENSURE_EQ(context, output->dims->data[3] % groups, 0);
   // Bias size equal to output channels
   if (bias != nullptr) {
     TF_LITE_ENSURE_EQ(context, bias->dims->size, 4);
@@ -134,6 +137,13 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
       filter_dims.h, output_dims.w, output_dims.h, input->type,
       &data->reference_op_data));
 
+  // Grouped int4 runs the reference kernel on an unpacked filter.
+  if (filter->type == kTfLiteInt4 && groups > 1) {
+    TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
+        context, NumElements(filter),
+        &data->reference_op_data.filter_buffer_index));
+  }
+
   // CMSIS_NN allows INT64 or nullptr bias data pointer
   if (input->type == kTfLiteInt8 ||
       (input->type == kTfLiteInt16 &&
@@ -157,8 +167,11 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     } else if (input->type == kTfLiteInt16) {
       TF_LITE_ENSURE_EQ(context, input->params.zero_point, 0);
       TF_LITE_ENSURE_EQ(context, output->params.zero_point, 0);
-      buf_size = arm_convolve_wrapper_s16_get_buffer_size(
-          &conv_params, &input_dims, &filter_dims, &output_dims);
+      // Grouped int16 runs the reference kernel, which needs no scratch.
+      if (groups == 1) {
+        buf_size = arm_convolve_wrapper_s16_get_buffer_size(
+            &conv_params, &input_dims, &filter_dims, &output_dims);
+      }
     }
 
     if (buf_size > 0) {
@@ -249,6 +262,35 @@ TfLiteStatus EvalQuantizedPerChannel(TfLiteContext* context, TfLiteNode* node,
                                      const TfLiteEvalTensor* filter,
                                      const TfLiteEvalTensor* bias,
                                      TfLiteEvalTensor* output) {
+  // CMSIS-NN's arm_convolve_s16 and arm_convolve_s4 ignore filter_dims->c, so
+  // a grouped filter would be read past its end, with the full input depth as
+  // its stride. see AmbiqAI/helia-rt#421
+  if constexpr (type == kTfLiteInt16 || type == kTfLiteInt4) {
+    if (input->dims->data[3] != filter->dims->data[3]) {
+      const int8_t* filter_data = tflite::micro::GetTensorData<int8_t>(filter);
+      if constexpr (type == kTfLiteInt4) {
+        int8_t* unpacked = static_cast<int8_t*>(context->GetScratchBuffer(
+            context, data.reference_op_data.filter_buffer_index));
+        tflite::micro::tensor_utils::UnpackDenseInt4IntoInt8(
+            filter_data, tflite::micro::GetTensorShape(filter).FlatSize(),
+            unpacked);
+        filter_data = unpacked;
+      }
+      reference_integer_ops::ConvPerChannel(
+          ConvParamsQuantized(params, data.reference_op_data),
+          data.reference_op_data.per_channel_output_multiplier,
+          data.reference_op_data.per_channel_output_shift,
+          tflite::micro::GetTensorShape(input),
+          tflite::micro::GetTensorData<ActType>(input),
+          tflite::micro::GetTensorShape(filter), filter_data,
+          tflite::micro::GetTensorShape(bias),
+          tflite::micro::GetOptionalTensorData<BiasType>(bias),
+          tflite::micro::GetTensorShape(output),
+          tflite::micro::GetTensorData<ActType>(output));
+      return kTfLiteOk;
+    }
+  }
+
   cmsis_nn_conv_params conv_params;
   conv_params.dilation.h = params.dilation_height_factor;
   conv_params.dilation.w = params.dilation_width_factor;

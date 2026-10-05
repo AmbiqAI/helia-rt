@@ -287,30 +287,32 @@ jobs:
         # Upstream tflite-micro 3f787dcf adds four cases on every gcc leg and
         # three on atfe, which filters flatbuffer_utils_test.
         # see AmbiqAI/helia-rt#345
+        # Grouped conv cases and grouped-shape Prepare rejections add fourteen
+        # cases on every leg. see AmbiqAI/helia-rt#421
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 160
-            min-cases: 1384
+            min-cases: 1398
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 160
-            min-cases: 1384
+            min-cases: 1398
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 159
-            min-cases: 1382
+            min-cases: 1396
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 160
-            min-cases: 1436
+            min-cases: 1450
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 159
-            min-cases: 1434
+            min-cases: 1448
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
