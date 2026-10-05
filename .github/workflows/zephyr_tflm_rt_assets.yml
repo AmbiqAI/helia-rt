@@ -17,6 +17,11 @@ permissions:
 
 jobs:
   helia-assets:
+    # helia_release.yml declares contents: write at its top level, and a called
+    # workflow cannot exceed its caller's token, so the call must grant it even
+    # with upload_to_release false.
+    permissions:
+      contents: write
     uses: ./.github/workflows/helia_release.yml
     with:
       ref: ${{ inputs.ref }}
