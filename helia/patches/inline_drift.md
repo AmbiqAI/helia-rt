@@ -473,7 +473,11 @@ Drop condition: upstream's macros become NaN-aware.
 `transpose_conv` and `unidirectional_sequence_lstm` `_test.cc` add
 `#if ARM_NN_ENABLE_F16` float16 cases, keep the kernel registration alive
 for the test's lifetime, and (LSTM) add stateful streaming coverage. These
-run against the helia kernels on the M55 legs.
+run against the helia kernels on the M55 legs. `conv_test.cc` also adds
+grouped int16, int8 and int4-weight cases against a float grouped-conv
+golden, which run on every backend, and grouped-shape Prepare-rejection
+cases, which run on the `CMSIS_NN` (cmsis_nn and helia) backends (see
+AmbiqAI/helia-rt#421).
 
 Drop condition: none; re-merge on each sync.
 
@@ -501,6 +505,24 @@ Writes the link map to `$(GENDIR)` instead of `gen/`, so parallel builds with
 different `BASE_GENDIR` values do not share one map.
 
 Drop condition: upstream writes target maps under `GENDIR`.
+
+## `tensorflow/lite/micro/kernels/cmsis_nn/conv.cc`
+
+Grouped convolutions (input depth a multiple of, but not equal to, the
+filter depth) with int16 activations or int4 weights run
+`reference_integer_ops::ConvPerChannel`; int4 is unpacked into a scratch
+buffer that Prepare requests only for that case, and int16 requests no
+CMSIS-NN scratch then. CMSIS-NN's `arm_convolve_s16` and `arm_convolve_s4`
+ignore `filter_dims->c`, so before this a grouped filter was read past its
+end, with the full input depth as its stride, and the outputs were wrong.
+Prepare also rejects an input depth of zero and output channels that are not
+a multiple of the groups (previously a debug-only check). int8, float32 and
+`groups == 1` routing is unchanged. `kernels/helia/conv.cc` applies the same
+rules to int4; heliaCORE's s16 convolutions handle groups.
+See AmbiqAI/helia-rt#421.
+
+Drop condition: upstream CMSIS-NN supports groups in its s16 and s4
+convolutions, or upstream TFLM routes grouped convs to the reference kernel.
 
 ## `tensorflow/lite/micro/kernels/cmsis_nn/maximum_minimum.cc`
 

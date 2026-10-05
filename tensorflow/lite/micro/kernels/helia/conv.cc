@@ -20,8 +20,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/internal/common.h"
+#include "tensorflow/lite/micro/kernels/internal/portable_tensor_utils.h"
 #include "tensorflow/lite/micro/kernels/internal/quantization_util.h"
 #include "tensorflow/lite/micro/kernels/internal/reference/conv.h"
+#include "tensorflow/lite/micro/kernels/internal/reference/integer_ops/conv.h"
 #include "tensorflow/lite/micro/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/padding.h"
@@ -101,7 +103,8 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, input->dims->data[3] % filter->dims->data[3], 0);
   // Output channels should be an even multiple of the number of groups
   const int groups = input->dims->data[3] / filter->dims->data[3];
-  TFLITE_DCHECK_EQ(output->dims->data[3] % groups, 0);
+  TF_LITE_ENSURE(context, groups > 0);
+  TF_LITE_ENSURE_EQ(context, output->dims->data[3] % groups, 0);
 
   // heliaCore's float convolution kernels do not implement grouped
   // convolution: they stride the filter by the full input channel count, so
@@ -155,6 +158,13 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
       filter_dims.h, output_dims.w, output_dims.h,
       input->type == kTfLiteFloat16 ? kTfLiteFloat32 : input->type,
       &data->reference_op_data));
+
+  // Grouped int4 runs the reference kernel on an unpacked filter.
+  if (filter->type == kTfLiteInt4 && groups > 1) {
+    TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
+        context, NumElements(filter),
+        &data->reference_op_data.filter_buffer_index));
+  }
 
   // CMSIS_NN allows INT64, INT32 or nullptr bias data pointer
   if (input->type == kTfLiteInt8 ||
@@ -213,7 +223,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
       if (filter->type == kTfLiteInt8) {
         arena_buf_size = arm_convolve_wrapper_s8_get_buffer_size(
             &conv_params, &input_dims, &filter_dims, &output_dims);
-      } else {
+      } else if (groups == 1) {
         arena_buf_size = arm_convolve_wrapper_s4_get_buffer_size(
             &conv_params, &input_dims, &filter_dims, &output_dims);
       }
@@ -357,6 +367,31 @@ TfLiteStatus EvalQuantizedPerChannel(TfLiteContext* context, TfLiteNode* node,
                                      const TfLiteEvalTensor* filter,
                                      const TfLiteEvalTensor* bias,
                                      TfLiteEvalTensor* output) {
+  // heliaCore's arm_convolve_s4 ignores filter_dims->c, so a grouped int4
+  // filter would be read past its end, with the full input depth as its
+  // stride. see AmbiqAI/helia-rt#421
+  if constexpr (type == kTfLiteInt4) {
+    if (input->dims->data[3] != filter->dims->data[3]) {
+      int8_t* unpacked = static_cast<int8_t*>(context->GetScratchBuffer(
+          context, data.reference_op_data.filter_buffer_index));
+      tflite::micro::tensor_utils::UnpackDenseInt4IntoInt8(
+          tflite::micro::GetTensorData<int8_t>(filter),
+          tflite::micro::GetTensorShape(filter).FlatSize(), unpacked);
+      reference_integer_ops::ConvPerChannel(
+          ConvParamsQuantized(params, data.reference_op_data),
+          data.reference_op_data.per_channel_output_multiplier,
+          data.reference_op_data.per_channel_output_shift,
+          tflite::micro::GetTensorShape(input),
+          tflite::micro::GetTensorData<int8_t>(input),
+          tflite::micro::GetTensorShape(filter), unpacked,
+          tflite::micro::GetTensorShape(bias),
+          tflite::micro::GetOptionalTensorData<int32_t>(bias),
+          tflite::micro::GetTensorShape(output),
+          tflite::micro::GetTensorData<int8_t>(output));
+      return kTfLiteOk;
+    }
+  }
+
   cmsis_nn_conv_params conv_params;
   conv_params.dilation.h = params.dilation_height_factor;
   conv_params.dilation.w = params.dilation_width_factor;

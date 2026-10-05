@@ -15,6 +15,8 @@ limitations under the License.
 
 #include "tensorflow/lite/micro/kernels/conv_test.h"
 
+#include <algorithm>
+#include <cstdint>
 #include <type_traits>
 
 #include "tensorflow/lite/micro/c/builtin_op_data.h"
@@ -432,6 +434,304 @@ TEST(ConvTest, GroupedFloatShouldMatchGolden) {
                                  output_shape, golden, &conv_params,
                                  tflite::Register_CONV_2D(), output_data);
 }
+
+namespace tflite {
+namespace testing {
+namespace {
+
+// Grouped quantized convolution against a float grouped-conv golden. Inputs are
+// small integers at scale 1, filters are in {-1, 0, 1} with a nonzero per
+// output channel, and biases are integers, so every quantized value and the
+// golden are exact; a kernel that ignores groups reads the filter with the
+// wrong stride and past its end. see AmbiqAI/helia-rt#421
+struct GroupedConvCase {
+  int input_h, input_w, input_ch;
+  int filter_h, filter_w, filter_ch;
+  int output_ch;
+  int stride_h, stride_w;
+  TfLitePadding padding;
+  TfLiteFusedActivation activation;
+};
+
+constexpr int kGroupedMaxInput = 1024;
+constexpr int kGroupedMaxFilter = 128;
+constexpr int kGroupedMaxOutput = 256;
+constexpr int kGroupedMaxChannels = 8;
+
+template <typename ActT, typename BiasT>
+void TestGroupedConvQuantized(const GroupedConvCase& c,
+                              TfLiteType weight_type = kTfLiteNoType) {
+  const int groups = c.input_ch / c.filter_ch;
+  const int output_ch_per_group = c.output_ch / groups;
+  const bool same = c.padding == kTfLitePaddingSame;
+  const int output_h = same
+                           ? (c.input_h + c.stride_h - 1) / c.stride_h
+                           : (c.input_h - c.filter_h + c.stride_h) / c.stride_h;
+  const int output_w = same
+                           ? (c.input_w + c.stride_w - 1) / c.stride_w
+                           : (c.input_w - c.filter_w + c.stride_w) / c.stride_w;
+  const int pad_h =
+      same ? std::max(
+                 0, ((output_h - 1) * c.stride_h + c.filter_h - c.input_h) / 2)
+           : 0;
+  const int pad_w =
+      same ? std::max(
+                 0, ((output_w - 1) * c.stride_w + c.filter_w - c.input_w) / 2)
+           : 0;
+  const int input_count = c.input_h * c.input_w * c.input_ch;
+  const int filter_count = c.output_ch * c.filter_h * c.filter_w * c.filter_ch;
+  const int output_count = output_h * output_w * c.output_ch;
+  ASSERT_LE(input_count, kGroupedMaxInput);
+  ASSERT_LE(filter_count, kGroupedMaxFilter);
+  ASSERT_LE(output_count, kGroupedMaxOutput);
+  ASSERT_LE(c.output_ch, kGroupedMaxChannels);
+
+  float input[kGroupedMaxInput];
+  for (int i = 0; i < input_count; ++i) {
+    input[i] = static_cast<float>((i * 37 + 5) % 17 - 8);
+  }
+  float filter[kGroupedMaxFilter];
+  for (int i = 0; i < filter_count; ++i) {
+    filter[i] = static_cast<float>((i * 13 + 3) % 3 - 1);
+  }
+  const int per_channel = c.filter_h * c.filter_w * c.filter_ch;
+  for (int oc = 0; oc < c.output_ch; ++oc) {
+    filter[oc * per_channel] = 1.0f;
+  }
+  float bias[kGroupedMaxChannels];
+  for (int oc = 0; oc < c.output_ch; ++oc) {
+    bias[oc] = static_cast<float>(oc % 5 - 2);
+  }
+
+  float golden[kGroupedMaxOutput];
+  for (int oy = 0; oy < output_h; ++oy) {
+    for (int ox = 0; ox < output_w; ++ox) {
+      for (int oc = 0; oc < c.output_ch; ++oc) {
+        const int group = oc / output_ch_per_group;
+        float acc = bias[oc];
+        for (int ky = 0; ky < c.filter_h; ++ky) {
+          const int iy = oy * c.stride_h - pad_h + ky;
+          if (iy < 0 || iy >= c.input_h) continue;
+          for (int kx = 0; kx < c.filter_w; ++kx) {
+            const int ix = ox * c.stride_w - pad_w + kx;
+            if (ix < 0 || ix >= c.input_w) continue;
+            for (int ic = 0; ic < c.filter_ch; ++ic) {
+              acc += input[(iy * c.input_w + ix) * c.input_ch +
+                           group * c.filter_ch + ic] *
+                     filter[((oc * c.filter_h + ky) * c.filter_w + kx) *
+                                c.filter_ch +
+                            ic];
+            }
+          }
+        }
+        if (c.activation == kTfLiteActRelu) acc = std::max(acc, 0.0f);
+        golden[(oy * output_w + ox) * c.output_ch + oc] = acc;
+      }
+    }
+  }
+
+  int input_shape[] = {4, 1, c.input_h, c.input_w, c.input_ch};
+  int filter_shape[] = {4, c.output_ch, c.filter_h, c.filter_w, c.filter_ch};
+  int bias_shape[] = {1, c.output_ch};
+  int output_shape[] = {4, 1, output_h, output_w, c.output_ch};
+  TfLiteConvParams conv_params = {
+      c.padding, c.stride_w, c.stride_h, c.activation, 1, 1, kTfLiteNoType};
+
+  ActT input_quantized[kGroupedMaxInput];
+  int8_t filter_quantized[kGroupedMaxFilter];
+  BiasT bias_quantized[kGroupedMaxChannels];
+  ActT golden_quantized[kGroupedMaxOutput];
+  ActT output[kGroupedMaxOutput];
+  float bias_scales[kGroupedMaxChannels + 1];
+  int bias_zero_points[kGroupedMaxChannels + 1];
+  float filter_scales[kGroupedMaxChannels + 1];
+  int filter_zero_points[kGroupedMaxChannels + 1];
+  TfLiteAffineQuantization filter_quant;
+  TfLiteAffineQuantization bias_quant;
+
+  TfLiteIntArray* input_dims = IntArrayFromInts(input_shape);
+  TfLiteIntArray* filter_dims = IntArrayFromInts(filter_shape);
+  TfLiteIntArray* bias_dims = IntArrayFromInts(bias_shape);
+  TfLiteIntArray* output_dims = IntArrayFromInts(output_shape);
+  const float input_scale = 1.0f;
+  const float output_scale = 1.0f;
+  TfLiteTensor input_tensor =
+      CreateQuantizedTensor(input, input_quantized, input_dims, input_scale, 0);
+  TfLiteTensor filter_tensor = CreateSymmetricPerChannelQuantizedTensor(
+      filter, filter_quantized, filter_dims, filter_scales, filter_zero_points,
+      &filter_quant, 0, false, weight_type);
+  TfLiteTensor bias_tensor = CreatePerChannelQuantizedBiasTensor(
+      bias, bias_quantized, bias_dims, input_scale, &filter_scales[1],
+      bias_scales, bias_zero_points, &bias_quant, 0);
+  TfLiteTensor output_tensor =
+      CreateQuantizedTensor(output, output_dims, output_scale, 0);
+  float input_scales[] = {1, input_scale};
+  int input_zero_points[] = {1, 0};
+  TfLiteAffineQuantization input_quant = {FloatArrayFromFloats(input_scales),
+                                          IntArrayFromInts(input_zero_points),
+                                          0};
+  input_tensor.quantization = {kTfLiteAffineQuantization, &input_quant};
+  float output_scales[] = {1, output_scale};
+  int output_zero_points[] = {1, 0};
+  TfLiteAffineQuantization output_quant = {FloatArrayFromFloats(output_scales),
+                                           IntArrayFromInts(output_zero_points),
+                                           0};
+  output_tensor.quantization = {kTfLiteAffineQuantization, &output_quant};
+
+  TfLiteTensor tensors[] = {input_tensor, filter_tensor, bias_tensor,
+                            output_tensor};
+  Quantize(golden, golden_quantized, output_count, output_scale, 0);
+  ValidateConvGoldens(tensors, 4, golden_quantized, output_count, &conv_params,
+                      Register_CONV_2D(), output, 0.0f);
+}
+
+#if defined(CMSIS_NN)
+// The optimized backends reject a grouped shape that the reference fallback
+// cannot index: an input depth of zero or output channels that are not a
+// multiple of the groups. see AmbiqAI/helia-rt#421
+void TestGroupedConvShapeFailsPrepare(int input_depth, int output_ch,
+                                      bool int16) {
+  const TfLiteType weight_type = int16 ? kTfLiteNoType : kTfLiteInt4;
+  int input_shape[] = {4, 1, 2, 2, input_depth};
+  int filter_shape[] = {4, output_ch, 1, 1, 2};
+  int bias_shape[] = {1, output_ch};
+  int output_shape[] = {4, 1, 2, 2, output_ch};
+  float input[16] = {};
+  float filter[8] = {1, 1, 1, 1, 1, 1, 1, 1};
+  float bias[4] = {};
+  int16_t input_q16[16];
+  int8_t input_q8[16];
+  int8_t filter_quantized[8];
+  int64_t bias_q64[4];
+  int32_t bias_q32[4];
+  int16_t output_q16[64];
+  int8_t output_q8[64];
+  float filter_scales[5];
+  int filter_zero_points[5];
+  float bias_scales[5];
+  int bias_zero_points[5];
+  TfLiteAffineQuantization filter_quant;
+  TfLiteAffineQuantization bias_quant;
+  TfLiteTensor input_tensor =
+      int16 ? CreateQuantizedTensor(input, input_q16,
+                                    IntArrayFromInts(input_shape), 1.0f, 0)
+            : CreateQuantizedTensor(input, input_q8,
+                                    IntArrayFromInts(input_shape), 1.0f, 0);
+  TfLiteTensor filter_tensor = CreateSymmetricPerChannelQuantizedTensor(
+      filter, filter_quantized, IntArrayFromInts(filter_shape), filter_scales,
+      filter_zero_points, &filter_quant, 0, false, weight_type);
+  TfLiteTensor bias_tensor =
+      int16 ? CreatePerChannelQuantizedBiasTensor(
+                  bias, bias_q64, IntArrayFromInts(bias_shape), 1.0f,
+                  &filter_scales[1], bias_scales, bias_zero_points,
+                  &bias_quant, 0)
+            : CreatePerChannelQuantizedBiasTensor(
+                  bias, bias_q32, IntArrayFromInts(bias_shape), 1.0f,
+                  &filter_scales[1], bias_scales, bias_zero_points,
+                  &bias_quant, 0);
+  TfLiteTensor output_tensor =
+      int16 ? CreateQuantizedTensor(output_q16, IntArrayFromInts(output_shape),
+                                    1.0f, 0)
+            : CreateQuantizedTensor(output_q8, IntArrayFromInts(output_shape),
+                                    1.0f, 0);
+  float scales[] = {1, 1.0f};
+  int zero_points[] = {1, 0};
+  TfLiteAffineQuantization io_quant = {FloatArrayFromFloats(scales),
+                                       IntArrayFromInts(zero_points), 0};
+  input_tensor.quantization = {kTfLiteAffineQuantization, &io_quant};
+  output_tensor.quantization = {kTfLiteAffineQuantization, &io_quant};
+  TfLiteTensor tensors[] = {input_tensor, filter_tensor, bias_tensor,
+                            output_tensor};
+  TfLiteConvParams conv_params = {kTfLitePaddingValid, 1, 1, kTfLiteActNone,
+                                  1, 1, kTfLiteNoType};
+  ValidateConvFailsDuringPrepare(tensors, 4, &conv_params, Register_CONV_2D(),
+                                 int16 ? static_cast<void*>(output_q16)
+                                       : static_cast<void*>(output_q8));
+}
+#endif  // defined(CMSIS_NN)
+
+// The public #421 reproducer's shape: 8 groups of one input channel, 2x3
+// kernel, stride (1, 2), VALID, ReLU.
+constexpr GroupedConvCase kGroupedReproCase = {
+    2, 64, 8, 2, 3, 1, 8, 1, 2, kTfLitePaddingValid, kTfLiteActRelu};
+// Two groups of two input channels, 3x3 SAME.
+constexpr GroupedConvCase kGroupedSameCase = {
+    5, 5, 4, 3, 3, 2, 4, 1, 1, kTfLitePaddingSame, kTfLiteActNone};
+// One input channel per group and as many outputs as inputs, 3x3 SAME.
+constexpr GroupedConvCase kGroupedChannelMultiplierOneCase = {
+    6, 6, 4, 3, 3, 1, 4, 1, 1, kTfLitePaddingSame, kTfLiteActNone};
+
+}  // namespace
+}  // namespace testing
+}  // namespace tflite
+
+TEST(ConvTest, Grouped16x8ReproShouldMatchGolden) {
+  tflite::testing::TestGroupedConvQuantized<int16_t, std::int64_t>(
+      tflite::testing::kGroupedReproCase);
+}
+
+TEST(ConvTest, Grouped16x8SamePaddingShouldMatchGolden) {
+  tflite::testing::TestGroupedConvQuantized<int16_t, std::int64_t>(
+      tflite::testing::kGroupedSameCase);
+}
+
+TEST(ConvTest, Grouped16x8ChannelMultiplierOneShouldMatchGolden) {
+  tflite::testing::TestGroupedConvQuantized<int16_t, std::int64_t>(
+      tflite::testing::kGroupedChannelMultiplierOneCase);
+}
+
+TEST(ConvTest, Grouped16x8Bias32ShouldMatchGolden) {
+  tflite::testing::TestGroupedConvQuantized<int16_t, std::int32_t>(
+      tflite::testing::kGroupedSameCase);
+}
+
+TEST(ConvTest, GroupedInt8ReproShouldMatchGolden) {
+  tflite::testing::TestGroupedConvQuantized<int8_t, std::int32_t>(
+      tflite::testing::kGroupedReproCase);
+}
+
+TEST(ConvTest, GroupedInt8SamePaddingShouldMatchGolden) {
+  tflite::testing::TestGroupedConvQuantized<int8_t, std::int32_t>(
+      tflite::testing::kGroupedSameCase);
+}
+
+TEST(ConvTest, GroupedInt8ChannelMultiplierOneShouldMatchGolden) {
+  tflite::testing::TestGroupedConvQuantized<int8_t, std::int32_t>(
+      tflite::testing::kGroupedChannelMultiplierOneCase);
+}
+
+TEST(ConvTest, GroupedInt4ReproShouldMatchGolden) {
+  tflite::testing::TestGroupedConvQuantized<int8_t, std::int32_t>(
+      tflite::testing::kGroupedReproCase, kTfLiteInt4);
+}
+
+TEST(ConvTest, GroupedInt4SamePaddingShouldMatchGolden) {
+  tflite::testing::TestGroupedConvQuantized<int8_t, std::int32_t>(
+      tflite::testing::kGroupedSameCase, kTfLiteInt4);
+}
+
+TEST(ConvTest, GroupedInt4ChannelMultiplierOneShouldMatchGolden) {
+  tflite::testing::TestGroupedConvQuantized<int8_t, std::int32_t>(
+      tflite::testing::kGroupedChannelMultiplierOneCase, kTfLiteInt4);
+}
+
+#if defined(CMSIS_NN)
+TEST(ConvTest, Grouped16x8ZeroDepthInputFailsPrepare) {
+  tflite::testing::TestGroupedConvShapeFailsPrepare(0, 2, true);
+}
+
+TEST(ConvTest, Grouped16x8OutputNotMultipleOfGroupsFailsPrepare) {
+  tflite::testing::TestGroupedConvShapeFailsPrepare(4, 3, true);
+}
+
+TEST(ConvTest, GroupedInt4ZeroDepthInputFailsPrepare) {
+  tflite::testing::TestGroupedConvShapeFailsPrepare(0, 2, false);
+}
+
+TEST(ConvTest, GroupedInt4OutputNotMultipleOfGroupsFailsPrepare) {
+  tflite::testing::TestGroupedConvShapeFailsPrepare(4, 3, false);
+}
+#endif  // defined(CMSIS_NN)
 
 TEST(ConvTest, AsymmetricPaddingFloatShouldMatchGolden) {
   float output_data[tflite::testing::kAsymInputElements];
