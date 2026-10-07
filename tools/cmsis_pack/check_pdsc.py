@@ -8,15 +8,16 @@ contract consumers depend on:
     (Cclass, Cgroup, Csub, Cvariant, Cversion)
   - HELIA variant is gated by a <condition> on ns-cmsis-nn/heliaCORE
   - the <require> inside that condition targets the exact identity
-    ns-cmsis-nn ships and pins Cversion to the agreed minimum
-  - the advertised minimum satisfies the compiled HELIA source floor
+    ns-cmsis-nn ships
+  - the advertised minimum satisfies the matching compiled HELIA source floor
 
 Run modes:
 
-  # Use an existing pdsc file (the workflow's preferred path).
+  # A staged pdsc uses its sibling source tree, or an explicit source root.
     python3 tools/cmsis_pack/check_pdsc.py path/to/Ambiq.helia-rt.pdsc
+    python3 tools/cmsis_pack/check_pdsc.py file.pdsc --repo-root path/to/helia-rt
 
-  # Or: read the pdsc out of a built .pack archive.
+  # A .pack uses its own packaged guard, never the tool checkout's sources.
     python3 tools/cmsis_pack/check_pdsc.py path/to/Ambiq.helia-rt.<version>.pack
 
 Exit code is 0 on success, 1 on contract violation (with a diff-style
@@ -32,36 +33,44 @@ import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 
-# Single source of truth for the contract — keep imports lazy so the
-# script remains usable from a checkout that has not configured anything.
+# Shared package identity and guard parser; no source tree is read on import.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build_pack import (  # noqa: E402
     BACKENDS,
     CCLASS,
     CGROUP,
     CSUB,
+    CORE_VERSION_GUARD,
     NS_CMSIS_NN_CCLASS,
     NS_CMSIS_NN_CGROUP,
     NS_CMSIS_NN_CSUB,
     NS_CMSIS_NN_CVARIANT,
-    NS_CMSIS_NN_MIN_VERSION,
     NS_CMSIS_NN_VENDOR,
     PACK_NAME,
     PACK_VENDOR,
     core_source_min_version,
+    parse_core_source_min_version,
 )
 
 
-def _load_pdsc(path: Path) -> ET.Element:
+def _load_pdsc(path: Path, repo_root: Path | None = None) -> tuple[ET.Element, str]:
     if path.suffix == ".pack":
+        if repo_root is not None:
+            raise ValueError(
+                "--repo-root applies to plain PDSC files; .pack owns its sources"
+            )
         with zipfile.ZipFile(path) as zf:
             pdsc_name = next(
                 (n for n in zf.namelist() if n.endswith(".pdsc")), None
             )
             if not pdsc_name:
                 raise SystemExit(f"no .pdsc inside {path}")
-            return ET.fromstring(zf.read(pdsc_name))
-    return ET.parse(path).getroot()
+            source_floor = parse_core_source_min_version(
+                zf.read(CORE_VERSION_GUARD).decode("utf-8")
+            )
+            return ET.fromstring(zf.read(pdsc_name)), source_floor
+    source_floor = core_source_min_version(repo_root or path.parent)
+    return ET.parse(path).getroot(), source_floor
 
 
 def _check(failures: list[str], cond: bool, msg: str) -> None:
@@ -69,7 +78,8 @@ def _check(failures: list[str], cond: bool, msg: str) -> None:
         failures.append(msg)
 
 
-def check_contract(pdsc: ET.Element) -> list[str]:
+def check_contract(pdsc: ET.Element, *, source_floor: str) -> list[str]:
+    """Check metadata against the floor parsed from its matching source guard."""
     failures: list[str] = []
 
     _check(failures, pdsc.tag == "package", f"root tag = {pdsc.tag!r}, want 'package'")
@@ -131,7 +141,6 @@ def check_contract(pdsc: ET.Element) -> list[str]:
                         ("Cgroup", NS_CMSIS_NN_CGROUP),
                         ("Csub", NS_CMSIS_NN_CSUB),
                         ("Cvariant", NS_CMSIS_NN_CVARIANT),
-                        ("Cversion", NS_CMSIS_NN_MIN_VERSION),
                     ):
                         got = req.get(attr)
                         _check(
@@ -140,7 +149,6 @@ def check_contract(pdsc: ET.Element) -> list[str]:
                             f"heliaCORE <require>: {attr}={got!r}, want {want!r}",
                         )
                     advertised = req.get("Cversion", "")
-                    source_floor = core_source_min_version()
                     _check(
                         failures,
                         bool(re.fullmatch(r"\d+\.\d+\.\d+", advertised))
@@ -156,6 +164,11 @@ def check_contract(pdsc: ET.Element) -> list[str]:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Matching source root for a plain PDSC (default: its directory); .pack uses its own sources",
+    )
+    ap.add_argument(
         "path",
         type=Path,
         help="Path to a .pdsc file or a .pack archive containing one.",
@@ -166,15 +179,26 @@ def main() -> int:
         print(f"error: {args.path} not found", file=sys.stderr)
         return 1
 
-    pdsc = _load_pdsc(args.path)
-    failures = check_contract(pdsc)
+    try:
+        pdsc, source_floor = _load_pdsc(args.path, args.repo_root)
+    except (OSError, ValueError, KeyError, zipfile.BadZipFile) as exc:
+        print(f"error: cannot establish matching source floor: {exc}", file=sys.stderr)
+        return 1
+    failures = check_contract(pdsc, source_floor=source_floor)
     if failures:
         print("CMSIS-Pack contract check FAILED:", file=sys.stderr)
         for f in failures:
             print(f"  - {f}", file=sys.stderr)
         return 1
 
-    print(f"OK: {args.path.name} matches heliaRT pack contract")
+    context = (
+        "packaged sources" if args.path.suffix == ".pack"
+        else str(args.repo_root or args.path.parent)
+    )
+    print(
+        f"OK: {args.path.name} matches heliaRT pack contract; "
+        f"source floor {source_floor} from {context}"
+    )
     return 0
 
 

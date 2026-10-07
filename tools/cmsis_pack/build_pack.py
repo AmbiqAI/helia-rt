@@ -97,22 +97,28 @@ NS_CMSIS_NN_CSUB = "heliaCORE"
 NS_CMSIS_NN_CVARIANT = "Source"
 
 
-def core_source_min_version() -> str:
-    """Read the minimum from the HELIA source's compiled version guard."""
-    guard = Path(__file__).resolve().parents[2] / "cmake/helia_rt_core_version.cc"
+CORE_VERSION_GUARD = "cmake/helia_rt_core_version.cc"
+
+
+def parse_core_source_min_version(guard_text: str) -> str:
+    """Parse the minimum in a HELIA source's compiled numeric guard."""
     versions = re.findall(
         r"^\s*#if[^\n]*NS_CMSIS_NN_VERSION\s*<\s*(\d+)\s*$",
-        guard.read_text(encoding="utf-8"),
+        guard_text,
         re.M,
     )
     if len(versions) != 1:
-        raise ValueError(f"expected one HELIA version floor in {guard}")
+        raise ValueError("expected one compiled numeric HELIA version floor")
     major, remainder = divmod(int(versions[0]), 1000000)
     minor, patch = divmod(remainder, 1000)
     return f"{major}.{minor}.{patch}"
 
 
-NS_CMSIS_NN_MIN_VERSION = core_source_min_version()
+def core_source_min_version(repo_root: Path) -> str:
+    """Read the compiled HELIA floor from the selected source root."""
+    return parse_core_source_min_version(
+        (repo_root / CORE_VERSION_GUARD).read_text(encoding="utf-8")
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -362,12 +368,13 @@ def _ind(elem: ET.Element, level: int = 0) -> None:
 def build_pdsc(
     *,
     version: str,
+    core_min_version: str,
     manifests: dict[str, BackendManifest],
     sources: set[str],
     headers: set[str],
     include_dirs: set[str],
 ) -> ET.ElementTree:
-    """Build the in-memory ``<package>`` XML tree for the pack."""
+    """Build package XML using the floor read from the selected source root."""
     pkg = ET.Element("package", schemaVersion="1.7.36")
 
     ET.SubElement(pkg, "vendor").text = PACK_VENDOR
@@ -410,7 +417,7 @@ def build_pdsc(
         Cgroup=NS_CMSIS_NN_CGROUP,
         Csub=NS_CMSIS_NN_CSUB,
         Cvariant=NS_CMSIS_NN_CVARIANT,
-        Cversion=NS_CMSIS_NN_MIN_VERSION,
+        Cversion=core_min_version,
     )
 
     # ----- components --------------------------------------------------
@@ -527,6 +534,7 @@ def build_pack(
         write_define_stubs(stage, manifests)
         tree = build_pdsc(
             version=resolved_version,
+            core_min_version=core_source_min_version(repo_root),
             manifests=manifests,
             sources=sources,
             headers=headers,
