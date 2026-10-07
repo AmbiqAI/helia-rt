@@ -32,7 +32,7 @@ interpreter.Invoke();`;
 ---
 
 <div class="rt-opening">
-  <Hero variant="contrast" palette="product" size="compact" eyebrow="heliaRT" eyebrowIcon={`${import.meta.env.BASE_URL}/helia-rt-favicon.svg`}>
+  <Hero eyebrowStyle="brand" variant="contrast" palette="product" size="compact" eyebrow="heliaRT" eyebrowIcon={`${import.meta.env.BASE_URL}/helia-rt-favicon.svg`}>
     <Fragment>Proven LiteRT workflows.<br />Turbocharged on Ambiq silicon.</Fragment>
     <Fragment slot="summary">heliaRT is Ambiq's optimized LiteRT runtime: the same <code>.tflite</code> models and MicroInterpreter API, backed by heliaCORE kernels tuned for Ambiq silicon.</Fragment>
     <Button slot="actions" href={`${import.meta.env.BASE_URL}/getting-started/`}>Get started</Button>
@@ -83,7 +83,6 @@ interpreter.Invoke();`;
 
   .rt-opening { margin-block-end: var(--helia-space-6); }
   .rt-panel { min-width: 0; padding: 0; box-shadow: none; }
-  .rt-opening :global(.helia-hero__eyebrow) { font-size: 14px; font-weight: 400; letter-spacing: .03em; }
   .rt-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
   .rt-metrics > * { padding: 10px 12px; border: 1px solid var(--helia-surface-border); border-radius: var(--helia-radius-md); text-decoration: none; }
   .rt-metrics a:hover { border-color: var(--helia-product-accent); }
