@@ -241,6 +241,7 @@ jobs:
           packs=(dist/Ambiq.helia-rt.*.pack)
           PACK="${packs[0]}"
           test -f "${PACK}"
+          python3 tools/cmsis_pack/check_pdsc_test.py
           python3 tools/cmsis_pack/check_pdsc.py "${PACK}"
       - name: Install consumer toolchains (Arm GNU, ATfE)
         run: |

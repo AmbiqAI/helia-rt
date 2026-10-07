@@ -77,7 +77,7 @@ set(HELIA_RT_NSCMSISNN_TARGET "ns-cmsis-nn" CACHE STRING "Kernel dependency")
 add_subdirectory(third_party/helia-rt)
 ```
 
-Link `rt_app` to `helia_rt::helia` instead of `helia_rt::reference`. Supply the CMSIS Core headers and target compiler flags required by your heliaCORE checkout. Enable float features before adding that dependency when the model needs them. For the adapters in this runtime release, use heliaCORE v7.35.0 or newer.
+Link `rt_app` to `helia_rt::helia` instead of `helia_rt::reference`. Supply the CMSIS Core headers and target compiler flags required by your heliaCORE checkout. Enable float features before adding that dependency when the model needs them. For the current HELIA adapters, use heliaCORE v7.41.0 or newer.
 
 CMake links heliaCORE transitively into the final application; it does not physically merge two static libraries. For the upstream Arm backend, use `HELIA_RT_ENABLE_CMSIS_NN=ON`, provide its target through `HELIA_RT_CMSISNN_TARGET`, and link `helia_rt::cmsis_nn` instead. Do not substitute heliaCORE for upstream CMSIS-NN.
 

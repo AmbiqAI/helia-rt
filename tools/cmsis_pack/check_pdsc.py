@@ -9,6 +9,7 @@ contract consumers depend on:
   - HELIA variant is gated by a <condition> on ns-cmsis-nn/heliaCORE
   - the <require> inside that condition targets the exact identity
     ns-cmsis-nn ships and pins Cversion to the agreed minimum
+  - the advertised minimum satisfies the compiled HELIA source floor
 
 Run modes:
 
@@ -25,6 +26,7 @@ report on stderr).
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 import xml.etree.ElementTree as ET
 import zipfile
@@ -46,6 +48,7 @@ from build_pack import (  # noqa: E402
     NS_CMSIS_NN_VENDOR,
     PACK_NAME,
     PACK_VENDOR,
+    core_source_min_version,
 )
 
 
@@ -136,6 +139,16 @@ def check_contract(pdsc: ET.Element) -> list[str]:
                             got == want,
                             f"heliaCORE <require>: {attr}={got!r}, want {want!r}",
                         )
+                    advertised = req.get("Cversion", "")
+                    source_floor = core_source_min_version()
+                    _check(
+                        failures,
+                        bool(re.fullmatch(r"\d+\.\d+\.\d+", advertised))
+                        and tuple(map(int, advertised.split(".")))
+                        >= tuple(map(int, source_floor.split("."))),
+                        f"heliaCORE advertised floor {advertised!r} is below "
+                        f"compiled HELIA source floor {source_floor}",
+                    )
 
     return failures
 
