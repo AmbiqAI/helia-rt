@@ -72,6 +72,9 @@ struct LinkState {
   int32_t compute_context_sizes[static_cast<int>(ComputeRoute::kCount)] = {};
   bool compute_context_buffers[static_cast<int>(ComputeRoute::kCount)] = {};
   int weight_query_calls = 0;
+  // heliaCORE's weight-sum precompute may query the size itself; only the
+  // kernel's own queries are counted.
+  bool in_precompute = false;
   int precompute_calls[static_cast<int>(PrecomputeRoute::kCount)] = {};
   int32_t weight_context_sizes[static_cast<int>(PrecomputeRoute::kCount)] = {};
   bool weight_context_buffers[static_cast<int>(PrecomputeRoute::kCount)] = {};
@@ -187,9 +190,12 @@ int32_t __wrap_arm_depthwise_conv_wrapper_s16_get_buffer_size(
 int32_t __real_arm_convolve_s8_get_weights_sum_size(const cmsis_nn_dims*);
 int32_t __wrap_arm_convolve_s8_get_weights_sum_size(
     const cmsis_nn_dims* output_dims) {
-  ++g_link_state.weight_query_calls;
   const int32_t actual =
       __real_arm_convolve_s8_get_weights_sum_size(output_dims);
+  if (g_link_state.in_precompute) {
+    return actual;
+  }
+  ++g_link_state.weight_query_calls;
   int32_t result = actual;
   if (g_link_state.override_weight_query) {
     result = g_link_state.weight_query_result < 0 || actual == 0
@@ -213,8 +219,10 @@ arm_cmsis_nn_status __wrap_arm_convolve_weight_sum(
   if (g_link_state.precompute_error == PrecomputeRoute::kConv) {
     return ARM_CMSIS_NN_ARG_ERROR;
   }
+  g_link_state.in_precompute = true;
   const arm_cmsis_nn_status status = __real_arm_convolve_weight_sum(
       sums, filter, input_dims, filter_dims, output_dims, input_offset, bias);
+  g_link_state.in_precompute = false;
   if (status == ARM_CMSIS_NN_NO_IMPL_ERROR) {
     if (sums != nullptr) {
       sums[0] = input_offset * filter[0] + (bias == nullptr ? 0 : bias[0]);
@@ -237,9 +245,11 @@ arm_cmsis_nn_status __wrap_arm_depthwise_convolve_weight_sum(
   if (g_link_state.precompute_error == PrecomputeRoute::kDepthwise) {
     return ARM_CMSIS_NN_ARG_ERROR;
   }
+  g_link_state.in_precompute = true;
   const arm_cmsis_nn_status status = __real_arm_depthwise_convolve_weight_sum(
       sums, scratch, filter, params, input_dims, filter_dims, output_dims,
       input_offset, bias);
+  g_link_state.in_precompute = false;
   if (status == ARM_CMSIS_NN_NO_IMPL_ERROR) {
     if (sums != nullptr) {
       sums[0] = input_offset * filter[0] + (bias == nullptr ? 0 : bias[0]);

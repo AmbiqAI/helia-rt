@@ -15,6 +15,16 @@ MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/prepare_contract_test.cc \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/fp16_pad_rank_test.cc
 
+$(eval $(call microlite_test,kernel_quantize_s16_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/quantize_s16_test.cc))
+
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
+$(kernel_quantize_s16_test_BINARY): CXXFLAGS += \
+  -DHELIA_QUANTIZE_S16_LINK_WRAP=1
+$(kernel_quantize_s16_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_requantize_s16_s16
+endif
+
 # Every float golden relies on the near and float-equal checks failing on a
 # NaN. see AmbiqAI/helia-rt#335
 MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \

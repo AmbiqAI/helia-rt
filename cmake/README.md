@@ -51,7 +51,7 @@ When consuming via the top-level `CMakeLists.txt` (or NSX/Zephyr source-mode she
 |---|---|---|
 | `HELIA_RT_BUILD_TYPE` | `release_with_logs` | `debug` / `release_with_logs` (defines `NDEBUG`) / `release` (also `TF_LITE_STRIP_ERROR_STRINGS`) |
 | `HELIA_RT_ENABLE_CMSIS_NN` | `OFF` | Materialize `helia_rt::cmsis_nn`. Requires consumer-provided `cmsis-nn` target. |
-| `HELIA_RT_ENABLE_HELIA` | `OFF` | Materialize `helia_rt::helia`. Requires consumer-provided `ns-cmsis-nn` target. |
+| `HELIA_RT_ENABLE_HELIA` | `OFF` | Materialize `helia_rt::helia`. Requires a consumer-provided `ns-cmsis-nn` v7.41.0 or newer target. |
 | `HELIA_RT_GLOBAL_KERNEL_OPTIMIZE` | `SPEED` | HELIA backend kernel profile: `SPEED` or `SIZE`. |
 | `HELIA_RT_CONV_OPT` | (empty) | Optional HELIA conv-family override: `SPEED` or `SIZE`; empty inherits `HELIA_RT_GLOBAL_KERNEL_OPTIMIZE`. |
 | `HELIA_RT_FC_OPT` | (empty) | Optional HELIA fully-connected override: `SPEED` or `SIZE`; empty inherits `HELIA_RT_GLOBAL_KERNEL_OPTIMIZE`. |
@@ -72,8 +72,11 @@ add_subdirectory(third_party/helia-rt)
 target_link_libraries(my_app PRIVATE helia_rt::reference)
 ```
 
-For the HELIA backend, select the source-build kernel profile before adding
-the repo:
+For the HELIA backend, provide a released ns-cmsis-nn v7.41.0 or newer
+target before adding the repo. Its exported FP32/FP16 definitions must match
+the library. The build checks the canonical header version; the application
+remains responsible for supplying the matching library. Select the
+source-build kernel profile before adding the repo:
 
 ```cmake
 set(HELIA_RT_ENABLE_HELIA ON CACHE BOOL "" FORCE)

@@ -359,6 +359,10 @@ function(helia_rt_select_kernel_sources OUT_VAR)
         endif()
     endforeach()
 
+    if(_ARG_BACKEND STREQUAL "helia")
+        list(APPEND _out "${HELIA_RT_ROOT}/cmake/helia_rt_core_version.cc")
+    endif()
+
     set(${OUT_VAR} ${_out} PARENT_SCOPE)
 endfunction()
 

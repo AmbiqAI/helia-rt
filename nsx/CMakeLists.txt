@@ -26,7 +26,7 @@
 #   nsx_soc_hal                  SoC HAL (transitive deps for debug_log glue)
 #
 # Backend-specific upstream targets:
-#   helia:    nsx::cmsis_nn (or alias) — ns-cmsis-nn kernels, with Ambiq's
+#   helia:    nsx::cmsis_nn (or alias) — ns-cmsis-nn >= 7.41.0, with Ambiq's
 #             additive weight-sum / fast-path symbols actively referenced.
 #             fp32/fp16 are opt-in: set ARM_NN_ENABLE_F32/F16 before
 #             add_subdirectory(<ns-cmsis-nn>/nsx ...), which is where
