@@ -60,15 +60,20 @@ def _load_pdsc(path: Path, repo_root: Path | None = None) -> tuple[ET.Element, s
                 "--repo-root applies to plain PDSC files; .pack owns its sources"
             )
         with zipfile.ZipFile(path) as zf:
-            pdsc_name = next(
-                (n for n in zf.namelist() if n.endswith(".pdsc")), None
-            )
-            if not pdsc_name:
-                raise SystemExit(f"no .pdsc inside {path}")
+            descriptors = [e for e in zf.infolist() if e.filename.endswith(".pdsc")]
+            guards = [e for e in zf.infolist() if e.filename == CORE_VERSION_GUARD]
+            if len(descriptors) != 1:
+                raise ValueError(
+                    f"expected exactly one PDSC entry, found {len(descriptors)}"
+                )
+            if len(guards) != 1:
+                raise ValueError(
+                    f"expected exactly one canonical guard entry, found {len(guards)}"
+                )
             source_floor = parse_core_source_min_version(
-                zf.read(CORE_VERSION_GUARD).decode("utf-8")
+                zf.read(guards[0]).decode("utf-8")
             )
-            return ET.fromstring(zf.read(pdsc_name)), source_floor
+            return ET.fromstring(zf.read(descriptors[0])), source_floor
     source_floor = core_source_min_version(repo_root or path.parent)
     return ET.parse(path).getroot(), source_floor
 

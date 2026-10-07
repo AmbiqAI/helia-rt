@@ -6,6 +6,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+import warnings
 import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
@@ -164,6 +165,55 @@ class DependencyFloorTest(unittest.TestCase):
     self.assertEqual(
       1, self.check_cli(pack, "--repo-root", self.roots["7.41.0"])
     )
+
+  def test_multiple_pdsc_entries_rejected_in_every_order(self):
+    stale = ("stale.pdsc", "7.42.0")
+    canonical = ("Ambiq.helia-rt.pdsc", "7.41.0")
+    entries = ((stale, canonical), (canonical, stale), (stale, stale))
+    for index, descriptors in enumerate(entries):
+      with self.subTest(descriptors=descriptors):
+        pack = self.scratch / f"multiple-descriptors-{index}.pack"
+        with warnings.catch_warnings(), zipfile.ZipFile(pack, "w") as archive:
+          warnings.filterwarnings(
+            "ignore", message="Duplicate name:.*", category=UserWarning
+          )
+          for name, floor in descriptors:
+            archive.writestr(name, ET.tostring(self.make_pdsc(floor)))
+          archive.write(
+            self.roots["7.42.0"] / build_pack.CORE_VERSION_GUARD,
+            build_pack.CORE_VERSION_GUARD,
+          )
+        with self.assertRaisesRegex(ValueError, "exactly one PDSC entry"):
+          check_pdsc._load_pdsc(pack)
+        self.assertEqual(1, self.check_cli(pack))
+
+  def test_missing_or_duplicate_canonical_guard_rejected(self):
+    cases = (
+      (),
+      ("7.41.0", "7.42.0"),
+      ("7.42.0", "7.41.0"),
+      ("7.42.0", "7.42.0"),
+    )
+    for index, floors in enumerate(cases):
+      with self.subTest(guards=floors):
+        pack = self.scratch / f"ambiguous-guard-{index}.pack"
+        with warnings.catch_warnings(), zipfile.ZipFile(pack, "w") as archive:
+          warnings.filterwarnings(
+            "ignore", message="Duplicate name:.*", category=UserWarning
+          )
+          archive.writestr(
+            "Ambiq.helia-rt.pdsc", ET.tostring(self.make_pdsc("7.42.0"))
+          )
+          for floor in floors:
+            archive.write(
+              self.roots[floor] / build_pack.CORE_VERSION_GUARD,
+              build_pack.CORE_VERSION_GUARD,
+            )
+        with self.assertRaisesRegex(
+          ValueError, "exactly one canonical guard entry"
+        ):
+          check_pdsc._load_pdsc(pack)
+        self.assertEqual(1, self.check_cli(pack))
 
   def test_generator_cli_preserves_repo_root_selection(self):
     result = self.roots["7.42.0"] / build_pack.CORE_VERSION_GUARD
