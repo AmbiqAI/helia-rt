@@ -3,7 +3,7 @@
 project:
   # The HELIA variant's floor; CI installs the release that helia-rt pins.
   packs:
-    - pack: Ambiq::NS-CMSIS-NN@>=7.39.2
+    - pack: Ambiq::NS-CMSIS-NN@>=7.41.0
 
   groups:
     - group: App

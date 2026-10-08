@@ -11,7 +11,7 @@ support:
 
 summary: >-
   Ambiq-optimized TensorFlow Lite for Microcontrollers (TFLM) runtime.
-  Built from source against the nsx-cmsis-nn (ns-cmsis-nn) kernel module.
+  Built from source against the nsx-cmsis-nn (ns-cmsis-nn >= 7.41.0) kernel module.
 
 capabilities:
   - inference

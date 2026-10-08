@@ -79,12 +79,8 @@ CGROUP = "TFLM Runtime"
 CSUB = "helia-rt"
 
 # Identity of the cross-pack dependency (Ambiq ns-cmsis-nn / heliaCORE).
-# Pinned to the ns-cmsis-nn release that aligned its CMake / Zephyr / NSX /
-# CMSIS-Pack surfaces with heliaRT. Bump the lower bound when a source adapter
-# requires a newer API or a newer release introduces a breaking contract
-# change; widen to a range (e.g. "7.25.0:8.0.0") once the next-major
-# compatibility window is known. The CI guard at tools/cmsis_pack/check_pdsc.py
-# asserts this value.
+# The compiled HELIA source guard owns the lower bound. The pack checker
+# rejects advertised metadata that admits older source dependencies.
 #
 # 7.25.0 introduced a Cvariant split ("Source" vs "Prebuilt") on the
 # heliaCORE component. heliaRT itself ships as source via CMSIS-Pack, so
@@ -92,15 +88,37 @@ CSUB = "helia-rt"
 # consistent. Consumers who need the prebuilt heliaCORE for binary-size
 # reasons can override at integration time.
 #
-# 7.39.2 is the floor because the HELIA sources include heliaCORE headers as
-# "Include/<name>.h", which resolves only once the ns-cmsis-nn pack exports its
-# root as an include path. see AmbiqAI/ns-cmsis-nn#657
+# 7.39.2 first exported the include root needed by "Include/<name>.h".
+# see AmbiqAI/ns-cmsis-nn#657
 NS_CMSIS_NN_VENDOR = "Ambiq"
 NS_CMSIS_NN_CCLASS = "Machine Learning"
 NS_CMSIS_NN_CGROUP = "NN Lib"
 NS_CMSIS_NN_CSUB = "heliaCORE"
 NS_CMSIS_NN_CVARIANT = "Source"
-NS_CMSIS_NN_MIN_VERSION = "7.39.2"
+
+
+CORE_VERSION_GUARD = "cmake/helia_rt_core_version.cc"
+
+
+def parse_core_source_min_version(guard_text: str) -> str:
+    """Parse the minimum in a HELIA source's compiled numeric guard."""
+    versions = re.findall(
+        r"^\s*#if[^\n]*NS_CMSIS_NN_VERSION\s*<\s*(\d+)\s*$",
+        guard_text,
+        re.M,
+    )
+    if len(versions) != 1:
+        raise ValueError("expected one compiled numeric HELIA version floor")
+    major, remainder = divmod(int(versions[0]), 1000000)
+    minor, patch = divmod(remainder, 1000)
+    return f"{major}.{minor}.{patch}"
+
+
+def core_source_min_version(repo_root: Path) -> str:
+    """Read the compiled HELIA floor from the selected source root."""
+    return parse_core_source_min_version(
+        (repo_root / CORE_VERSION_GUARD).read_text(encoding="utf-8")
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -350,12 +368,13 @@ def _ind(elem: ET.Element, level: int = 0) -> None:
 def build_pdsc(
     *,
     version: str,
+    core_min_version: str,
     manifests: dict[str, BackendManifest],
     sources: set[str],
     headers: set[str],
     include_dirs: set[str],
 ) -> ET.ElementTree:
-    """Build the in-memory ``<package>`` XML tree for the pack."""
+    """Build package XML using the floor read from the selected source root."""
     pkg = ET.Element("package", schemaVersion="1.7.36")
 
     ET.SubElement(pkg, "vendor").text = PACK_VENDOR
@@ -398,7 +417,7 @@ def build_pdsc(
         Cgroup=NS_CMSIS_NN_CGROUP,
         Csub=NS_CMSIS_NN_CSUB,
         Cvariant=NS_CMSIS_NN_CVARIANT,
-        Cversion=NS_CMSIS_NN_MIN_VERSION,
+        Cversion=core_min_version,
     )
 
     # ----- components --------------------------------------------------
@@ -515,6 +534,7 @@ def build_pack(
         write_define_stubs(stage, manifests)
         tree = build_pdsc(
             version=resolved_version,
+            core_min_version=core_source_min_version(repo_root),
             manifests=manifests,
             sources=sources,
             headers=headers,

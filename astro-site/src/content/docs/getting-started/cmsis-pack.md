@@ -44,7 +44,7 @@ In your project's component selection, use the Ambiq `Machine Learning` / `TFLM 
 |---|---|
 | `Reference` | Portable runtime kernels without an external NN library. |
 | `CMSIS-NN` | Upstream Arm CMSIS-NN kernel dependency for your target. |
-| `HELIA` | The Ambiq heliaCORE (`ns-cmsis-nn`) source component. The generated PDSC requires version 7.39.2 or newer. |
+| `HELIA` | The Ambiq heliaCORE (`ns-cmsis-nn`) source component. The generated PDSC requires version 7.41.0 or newer. |
 
 Compile the runtime's C++ sources with `-fno-exceptions`: its arena objects hide `operator delete`, so its placement `new` does not compile with exceptions enabled. The example below sets it for the whole solution.
 
@@ -52,7 +52,7 @@ Keep runtime and kernel feature settings consistent. A HELIA component selection
 
 ## Build the example consumer
 
-[`tools/cmsis_pack/examples/hello_world`](https://github.com/AmbiqAI/helia-rt/tree/main/tools/cmsis_pack/examples/hello_world) is a minimal CMSIS-Toolbox solution. It targets the generic `ARM::ARMCM55` device and builds one project per variant: `hello_world` selects `Reference`, and `hello_world_helia` selects `HELIA` with heliaCORE built from the `Ambiq::NS-CMSIS-NN` source pack. Each links a `MicroInterpreter` against the installed packs. Add the heliaRT pack with `cpackget`, plus the ns-cmsis-nn pack (`Ambiq.NS-CMSIS-NN.<version>.pack` from the [ns-cmsis-nn release](https://github.com/AmbiqAI/ns-cmsis-nn/releases) that heliaRT pins, 7.39.2 or newer). Then point CMSIS-Toolbox 2.13.0 at each compiler's `bin` directory with a variable named after its version, for example `GCC_TOOLCHAIN_14_3_1` for Arm GNU 14.3.rel1 and `CLANG_TOOLCHAIN_22_1_0` for ATfE 22.1.0. Then build:
+[`tools/cmsis_pack/examples/hello_world`](https://github.com/AmbiqAI/helia-rt/tree/main/tools/cmsis_pack/examples/hello_world) is a minimal CMSIS-Toolbox solution. It targets the generic `ARM::ARMCM55` device and builds one project per variant: `hello_world` selects `Reference`, and `hello_world_helia` selects `HELIA` with heliaCORE built from the `Ambiq::NS-CMSIS-NN` source pack. Each links a `MicroInterpreter` against the installed packs. Add the heliaRT pack with `cpackget`, plus the ns-cmsis-nn pack (`Ambiq.NS-CMSIS-NN.<version>.pack` from the [ns-cmsis-nn release](https://github.com/AmbiqAI/ns-cmsis-nn/releases) that heliaRT pins, 7.41.0 or newer). Then point CMSIS-Toolbox 2.13.0 at each compiler's `bin` directory with a variable named after its version, for example `GCC_TOOLCHAIN_14_3_1` for Arm GNU 14.3.rel1 and `CLANG_TOOLCHAIN_22_1_0` for ATfE 22.1.0. Then build:
 
 ```bash
 cd tools/cmsis_pack/examples/hello_world
@@ -62,7 +62,7 @@ cbuild hello_world.csolution.yml --toolchain CLANG --update-rte --packs
 
 `--packs` installs the pinned public `ARM::CMSIS` and `ARM::Cortex_DFP` packs from the public pack index on first use. The example links `--specs=nosys.specs` on GCC and `-lsemihost` on ATfE to satisfy the C library's I/O and exit hooks; a board application supplies its own retarget layer instead. The packaging workflow builds this example on both compilers. It proves the `Reference` and `HELIA` variants compile and link together with their dependencies. It does not build the `CMSIS-NN` variant or run a model.
 
-If a `HELIA` build fails with `Include/arm_nnfunctions.h: No such file or directory`, the installed ns-cmsis-nn pack is older than 7.39.2, the first release that exports its root as an include path. CMSIS-Toolbox reports the unmet PDSC requirement only as a warning. Install ns-cmsis-nn 7.39.2 or newer.
+If a `HELIA` build fails with `Include/arm_nnfunctions.h: No such file or directory`, the installed ns-cmsis-nn pack is older than 7.39.2, the first release that exports its root as an include path. CMSIS-Toolbox reports the unmet PDSC requirement only as a warning. Install ns-cmsis-nn 7.41.0 or newer to satisfy the current HELIA source requirement.
 
 Your consumer project still provides the device/board support, compiler settings, startup code, memory layout and application sources. Add the model and inference sequence from [First inference](/helia-rt/getting-started/first-inference/), build with your CMSIS toolchain, then verify known inputs and outputs on the board.
 
