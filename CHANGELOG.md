@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.1](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v2.0.0...helia-rt-v2.0.1) (2026-10-08)
+
+
+### Bug Fixes
+
+* adopt ns-cmsis-nn 7.41.0 and cover s16 quantization ([75b0be9](https://github.com/AmbiqAI/helia-rt/commit/75b0be9c8c33605f7a513e9f92380aa26687db86)), closes [#426](https://github.com/AmbiqAI/helia-rt/issues/426) [#427](https://github.com/AmbiqAI/helia-rt/issues/427)
+* run grouped int16 and int4-weight CONV_2D on the reference kernel ([#424](https://github.com/AmbiqAI/helia-rt/issues/424)) ([e1f4901](https://github.com/AmbiqAI/helia-rt/commit/e1f490191f23c83e45a799c2461b25af4149971f)), closes [#421](https://github.com/AmbiqAI/helia-rt/issues/421)
+
 ## [2.0.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.21.4...helia-rt-v2.0.0) (2026-10-04)
 
 
