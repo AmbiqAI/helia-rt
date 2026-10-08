@@ -15,7 +15,7 @@ Start in a directory where you want to keep the example. Pin the runtime and mod
 mkdir hello-rt
 cd hello-rt
 git clone https://github.com/AmbiqAI/helia-rt.git
-git -C helia-rt checkout helia-rt-v2.0.0 # x-release-please-version
+git -C helia-rt checkout helia-rt-v2.0.1 # x-release-please-version
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install numpy==2.4.4 Pillow==12.2.0
@@ -31,7 +31,7 @@ The 3,164-byte fixture's SHA-256 is:
 ee939863195ca37ce063b18e14fb82aa0d98db6596ba41095757f6b560da1070
 ```
 
-This is the existing [upstream-derived hello-world fixture](https://github.com/AmbiqAI/helia-rt/tree/helia-rt-v2.0.0/tensorflow/lite/micro/examples/hello_world), not a newly trained model. Its example sources retain the TensorFlow Authors' Apache-2.0 notices. Preserve the repository's [license and third-party notices](/helia-rt/guide/maintenance/attribution/) when redistributing. The runtime license permits development and validation on a host; production deployment has separate CPU restrictions. <!-- x-release-please-version -->
+This is the existing [upstream-derived hello-world fixture](https://github.com/AmbiqAI/helia-rt/tree/helia-rt-v2.0.1/tensorflow/lite/micro/examples/hello_world), not a newly trained model. Its example sources retain the TensorFlow Authors' Apache-2.0 notices. Preserve the repository's [license and third-party notices](/helia-rt/guide/maintenance/attribution/) when redistributing. The runtime license permits development and validation on a host; production deployment has separate CPU restrictions. <!-- x-release-please-version -->
 
 ## Embed the model bytes
 
@@ -43,7 +43,7 @@ python ../helia-rt/tensorflow/lite/micro/tools/generate_cc_arrays.py genfiles mo
 
 It creates `genfiles/model_model_data.cc` and `.h`, declaring `g_model_model_data` and its byte count. The array has 16-byte alignment. NumPy and Pillow are imports of this generator even for a `.tflite` input.
 
-This step converts **file bytes into a C++ array**. It does not convert a trained model into LiteRT operators or quantize it. The supplied fixture is already exported. When starting from your own trained model, export a `.tflite` file using its framework's converter, then check [model compatibility](/helia-rt/guide/model-compatibility/) before embedding it. The repository's [hello-world training and quantization guide](https://github.com/AmbiqAI/helia-rt/blob/helia-rt-v2.0.0/tensorflow/lite/micro/examples/hello_world/README.md#train-your-own-model) describes that separate workflow; a retrained model is not this pinned fixture. <!-- x-release-please-version -->
+This step converts **file bytes into a C++ array**. It does not convert a trained model into LiteRT operators or quantize it. The supplied fixture is already exported. When starting from your own trained model, export a `.tflite` file using its framework's converter, then check [model compatibility](/helia-rt/guide/model-compatibility/) before embedding it. The repository's [hello-world training and quantization guide](https://github.com/AmbiqAI/helia-rt/blob/helia-rt-v2.0.1/tensorflow/lite/micro/examples/hello_world/README.md#train-your-own-model) describes that separate workflow; a retrained model is not this pinned fixture. <!-- x-release-please-version -->
 
 ## Create the application
 
@@ -144,7 +144,7 @@ The program prints each input, prediction, mathematical reference and absolute e
 PASS: 4 sine predictions within 0.05
 ```
 
-The model approximates sine, so predictions need not equal the mathematical reference. The absolute tolerance `0.05` comes from the fixture's [upstream example check](https://github.com/AmbiqAI/helia-rt/blob/helia-rt-v2.0.0/tensorflow/lite/micro/examples/hello_world/hello_world_test.cc). It is a four-input smoke check, not accuracy evidence for the whole input range or a tolerance for your own model. Non-finite predictions are rejected explicitly; these checks remain active in a release build. <!-- x-release-please-version -->
+The model approximates sine, so predictions need not equal the mathematical reference. The absolute tolerance `0.05` comes from the fixture's [upstream example check](https://github.com/AmbiqAI/helia-rt/blob/helia-rt-v2.0.1/tensorflow/lite/micro/examples/hello_world/hello_world_test.cc). It is a four-input smoke check, not accuracy evidence for the whole input range or a tolerance for your own model. Non-finite predictions are rejected explicitly; these checks remain active in a release build. <!-- x-release-please-version -->
 
 If it fails, check the fixture hash, generated array, backend, tensor types and reported error. Do not widen the tolerance to get a pass. A successful build alone does not establish successful inference.
 
