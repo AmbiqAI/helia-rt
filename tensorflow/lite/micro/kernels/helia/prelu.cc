@@ -72,16 +72,20 @@ TfLiteStatus HeliaPreluPrepare(TfLiteContext* context, TfLiteNode* node) {
   TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
   TF_LITE_ENSURE(context, output != nullptr);
 
+  // Eval writes through the input's type.
+  TF_LITE_ENSURE_TYPES_EQ(context, output->type, input->type);
+
   data->helia_shapes =
       HeliaPreluShapes(GetTensorShape(input), GetTensorShape(alpha),
                        GetTensorShape(output));
 
-  // float16 has no reference kernel.
+  // float16 has no reference kernel. An empty output is a no-op at Eval.
   if (input->type == kTfLiteFloat16) {
     TF_LITE_ENSURE_MSG(context, kHeliaFloat16Enabled,
                        "Float16 PRELU requires the fp16 API.");
     TF_LITE_ENSURE_TYPES_EQ(context, alpha->type, kTfLiteFloat16);
-    TF_LITE_ENSURE_MSG(context, data->helia_shapes,
+    TF_LITE_ENSURE_MSG(context,
+                       data->helia_shapes || NumElements(output) == 0,
                        "Float16 PRELU does not support these shapes.");
   }
 
@@ -123,6 +127,9 @@ TfLiteStatus PreluEval(TfLiteContext* context, TfLiteNode* node) {
   switch (input->type) {
 #if ARM_NN_ENABLE_F16
     case kTfLiteFloat16: {
+      if (tflite::micro::GetTensorShape(output).FlatSize() == 0) {
+        return kTfLiteOk;
+      }
       const HeliaPreluDims dims(input, alpha, output);
       const arm_cmsis_nn_status status = arm_prelu_f16(
           &dims.input, tflite::micro::GetTensorData<float16_t>(input),

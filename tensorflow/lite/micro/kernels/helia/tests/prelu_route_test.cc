@@ -218,6 +218,24 @@ TfLiteStatus Run(const Shape& si, const T* in, const Shape& sa, const U* alpha,
   return runner.Invoke();
 }
 
+// Prepare status for a float input and alpha with an int8 output.
+template <typename T>
+TfLiteStatus PrepareWithInt8Output(const T* in, const T* alpha,
+                                   int8_t* out, int count) {
+  int dims[] = {1, count};
+  TfLiteTensor tensors[3] = {
+      CreateTensor(in, IntArrayFromInts(dims), false, FloatTensorType<T>()),
+      CreateTensor(alpha, IntArrayFromInts(dims), false, FloatTensorType<T>()),
+      CreateQuantizedTensor(out, IntArrayFromInts(dims), 1.0f, 0),
+  };
+  int inputs[] = {2, 0, 1};
+  int outputs[] = {1, 2};
+  const TFLMRegistration registration = Register_PRELU();
+  micro::KernelRunner runner(registration, tensors, 3, IntArrayFromInts(inputs),
+                             IntArrayFromInts(outputs), nullptr);
+  return runner.InitAndPrepare();
+}
+
 // T input and output, U alpha: int8/int8 or int16/int8, as TFLM types them.
 template <typename T, typename U>
 void ExpectQuantizedMatches(const Shape& si, const Shape& sa, Leaf leaf,
@@ -353,6 +371,16 @@ TEST(HeliaPreluRouteTest, Float32AlphaWideningOutputIsReference) {
 // The reference's x >= 0 ? x : x * alpha bit for bit: NaN input gives NaN, a
 // NaN alpha reaches only negative inputs, -0 and +0 pass through with their
 // sign, -Inf * 0 is NaN, and positive subnormals pass through.
+// Eval writes the output through the input's type, so a narrower output
+// fails Prepare.
+TEST(HeliaPreluRouteTest, Float32Int8OutputRejectedAtPrepare) {
+  const float in[8] = {};
+  const float alpha[8] = {};
+  int8_t out[8] = {};
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::PrepareWithInt8Output(in, alpha, out, 8));
+}
+
 TEST(HeliaPreluRouteTest, Float32EdgeValues) {
   const float inf = std::numeric_limits<float>::infinity();
   const float nan = std::numeric_limits<float>::quiet_NaN();
@@ -427,6 +455,25 @@ TEST(HeliaPreluRouteTest, Float16PerChannelAlpha) {
   EXPECT_EQ(0, mismatches);
 }
 
+TEST(HeliaPreluRouteTest, Float16Int8OutputRejectedAtPrepare) {
+  const float16_t in[8] = {};
+  const float16_t alpha[8] = {};
+  int8_t out[8] = {};
+  EXPECT_EQ(kTfLiteError,
+            tflite::testing::PrepareWithInt8Output(in, alpha, out, 8));
+}
+
+// An empty tensor is a no-op, as in float16 DIV and SQUARED_DIFFERENCE.
+TEST(HeliaPreluRouteTest, Float16EmptyTensorIsNoOp) {
+  float16_t in[1] = {};
+  float16_t alpha[6] = {};
+  float16_t out[1] = {};
+  EXPECT_EQ(kTfLiteOk,
+            tflite::testing::Run(Shape{2, {0, 6}}, in, Shape{1, {6}}, alpha,
+                                 Shape{2, {0, 6}}, out, 0, 0, 0, 0, 0, 0));
+  tflite::testing::ExpectCalls(Leaf::kF16, 0);
+}
+
 TEST(HeliaPreluRouteTest, Float16AlphaWideningOutputRejectedAtPrepare) {
   float16_t in[30] = {};
   float16_t alpha[18] = {};
@@ -438,8 +485,8 @@ TEST(HeliaPreluRouteTest, Float16AlphaWideningOutputRejectedAtPrepare) {
                                  0));
 }
 
-// NaN input gives NaN, signed zeros pass through, -Inf * 0 is NaN, and unlike
-// the MVE float32 leg a negative subnormal gives x * alpha.
+// NaN input gives NaN, signed zeros pass through, -Inf * 0 is NaN, and a
+// negative subnormal gives x * alpha.
 TEST(HeliaPreluRouteTest, Float16EdgeValues) {
   const float inf = std::numeric_limits<float>::infinity();
   const float nan = std::numeric_limits<float>::quiet_NaN();

@@ -26,6 +26,14 @@ limitations under the License.
 namespace tflite {
 namespace micro {
 namespace {
+
+// TODO(AmbiqAI/ns-cmsis-nn#877): arm_elementwise_squared_difference_f32 flushes subnormal results on Helium; MVEF builds keep the reference.
+#if ARM_NN_ENABLE_F32 && \
+    !(defined(ARM_MATH_MVEF) && !defined(ARM_MATH_AUTOVECTORIZE))
+#define HELIA_SQDIFF_F32 1
+#else
+#define HELIA_SQDIFF_F32 0
+#endif
 constexpr int kInputTensor1 = 0;
 constexpr int kInputTensor2 = 1;
 constexpr int kOutputTensor = 0;
@@ -332,7 +340,7 @@ TfLiteStatus SquaredDifferenceEval(TfLiteContext* context, TfLiteNode* node) {
       tflite::micro::GetEvalOutput(context, node, kOutputTensor);
 
   if (output->type == kTfLiteFloat32) {
-#if ARM_NN_ENABLE_F32
+#if HELIA_SQDIFF_F32
     // The reference covers what heliaCORE declines, an empty tensor included.
     if (data->broadcast_class == HeliaBroadcastClass::kSameShape &&
         arm_elementwise_squared_difference_f32(

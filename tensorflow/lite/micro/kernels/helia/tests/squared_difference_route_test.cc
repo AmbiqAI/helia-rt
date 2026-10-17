@@ -135,7 +135,9 @@ namespace {
 
 enum class Route { kFlat, kWalk, kReference };
 
-#if ARM_NN_ENABLE_F32
+// MVE float builds keep float32 on the reference; see squared_difference.cc.
+#if ARM_NN_ENABLE_F32 && \
+    !(defined(ARM_MATH_MVEF) && !defined(ARM_MATH_AUTOVECTORIZE))
 constexpr Route kHeliaFloat32Route = Route::kFlat;
 #else
 constexpr Route kHeliaFloat32Route = Route::kReference;
@@ -427,6 +429,47 @@ TEST(HeliaSquaredDifferenceRouteTest, Float32EdgeValues) {
   // denorm_min^2 underflows to +0 with or without subnormal flushing.
   EXPECT_EQ(tflite::testing::Bits(0.0f), tflite::testing::Bits(out[6]));
   EXPECT_EQ(tflite::testing::Bits(4.0f), tflite::testing::Bits(out[7]));
+}
+
+// Normal operands whose squared difference is subnormal keep gradual
+// underflow. The expected bits come from double arithmetic, which no float32
+// flush mode reaches.
+// CHARACTERIZATION on clang builds with MVE float: clang may auto-vectorize
+// the reference kernel's loop with MVE, which flushes subnormal results, so
+// each element there is the IEEE result or +0; the observed bits print.
+TEST(HeliaSquaredDifferenceRouteTest, Float32SubnormalResultsMatchReference) {
+  float in1[] = {1e-20f, 1e-20f, 1e-19f, 3e-20f, -2e-20f, 1e-22f, 1e-23f, 3.0f};
+  float in2[] = {0.0f, -1e-20f, 0.0f, 1e-20f, 0.0f, 0.0f, 0.0f, 1.0f};
+  float out[8] = {};
+  const Shape shape{1, {8}};
+  tflite::testing::Run(shape, in1, shape, in2, shape, out, 0, 0, 0, 0, 0, 0,
+                       kTfLiteOk);
+  tflite::testing::ExpectRoute(Leaf::kFlatF32, Leaf::kCount,
+                               tflite::testing::kHeliaFloat32Route);
+#if defined(__clang__) && defined(__ARM_FEATURE_MVE) && \
+    ((__ARM_FEATURE_MVE) & 2)
+  constexpr bool kFlushAllowed = true;
+#else
+  constexpr bool kFlushAllowed = false;
+#endif
+  int mismatches = 0;
+  for (int i = 0; i < 8; ++i) {
+    const double d = static_cast<double>(in1[i] - in2[i]);
+    const float expected = static_cast<float>(d * d);
+    const bool flushed = kFlushAllowed &&
+                         std::fpclassify(expected) == FP_SUBNORMAL &&
+                         tflite::testing::Bits(out[i]) == 0u;
+    if (flushed) {
+      MicroPrintf("SQUARED_DIFFERENCE f32 subnormal %d: flushed to +0", i);
+    } else if (tflite::testing::Bits(out[i]) !=
+               tflite::testing::Bits(expected)) {
+      MicroPrintf("SQUARED_DIFFERENCE f32 subnormal %d: 0x%08x, expected 0x%08x",
+                  i, static_cast<unsigned>(tflite::testing::Bits(out[i])),
+                  static_cast<unsigned>(tflite::testing::Bits(expected)));
+      ++mismatches;
+    }
+  }
+  EXPECT_EQ(0, mismatches);
 }
 
 #if ARM_NN_ENABLE_F16
