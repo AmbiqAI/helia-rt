@@ -20,6 +20,8 @@ limitations under the License.
 // gate and arm_convolve_wrapper_s8 otherwise or when the entry declines. GCC
 // and ATfE links wrap both, assert which ran, and inject entry statuses.
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 
@@ -111,7 +113,25 @@ constexpr bool kMve = false;
 
 struct Shape {
   int batch, in_h, in_w, in_c, out_c, stride;
+  float output_scale = 0.3f;
+  TfLiteFusedActivation activation = kTfLiteActNone;
 };
+
+// The int8 output range TFLite derives from a fused activation.
+void ActivationRange(TfLiteFusedActivation activation, float scale,
+                     int zero_point, int32_t* lo, int32_t* hi) {
+  const auto quantize = [&](float f) {
+    return zero_point + static_cast<int32_t>(std::round(f / scale));
+  };
+  *lo = -128;
+  *hi = 127;
+  if (activation == kTfLiteActRelu || activation == kTfLiteActRelu6) {
+    *lo = std::max(*lo, quantize(0.0f));
+  }
+  if (activation == kTfLiteActRelu6) {
+    *hi = std::min(*hi, quantize(6.0f));
+  }
+}
 
 enum class Route { kShortK, kWrapper };
 
@@ -176,7 +196,7 @@ TfLiteStatus RunAgainstReference(const Shape& s) {
 
   const float input_scale = 0.05f;
   const int input_zero_point = 3;
-  const float output_scale = 0.3f;
+  const float output_scale = s.output_scale;
   const int output_zero_point = -5;
   float filter_scales[kMaxChannels + 1] = {static_cast<float>(s.out_c)};
   int filter_zero_points[kMaxChannels + 1] = {s.out_c};
@@ -225,7 +245,7 @@ TfLiteStatus RunAgainstReference(const Shape& s) {
   params.stride_height = s.stride;
   params.dilation_width_factor = 1;
   params.dilation_height_factor = 1;
-  params.activation = kTfLiteActNone;
+  params.activation = s.activation;
 
   int inputs[] = {3, 0, 1, 2};
   int outputs[] = {1, 3};
@@ -249,8 +269,9 @@ TfLiteStatus RunAgainstReference(const Shape& s) {
   op_params.input_offset = -input_zero_point;
   op_params.weights_offset = 0;
   op_params.output_offset = output_zero_point;
-  op_params.quantized_activation_min = -128;
-  op_params.quantized_activation_max = 127;
+  ActivationRange(s.activation, output_scale, output_zero_point,
+                  &op_params.quantized_activation_min,
+                  &op_params.quantized_activation_max);
   const int32_t in_shape[] = {s.batch, s.in_h, s.in_w, s.in_c};
   const int32_t f_shape[] = {s.out_c, 1, 1, s.in_c};
   const int32_t b_shape[] = {s.out_c};
@@ -302,6 +323,17 @@ TEST(HeliaConv1x1ShortKRouteTest, DepthOneInGate) {
 
 TEST(HeliaConv1x1ShortKRouteTest, BatchTwoDepthThreeInGate) {
   ExpectMatchesReference(Shape{2, 4, 5, 3, 16, 1}, Route::kShortK);
+}
+
+// An output scale below the input x filter scales gives effective multipliers
+// from 0.5 to 2.5, so channels requantize with shift 0 and with shift > 0.
+TEST(HeliaConv1x1ShortKRouteTest, NonNegativeShiftInGate) {
+  ExpectMatchesReference(Shape{1, 5, 7, 16, 24, 1, 2e-4f}, Route::kShortK);
+}
+
+TEST(HeliaConv1x1ShortKRouteTest, FusedRelu6InGate) {
+  ExpectMatchesReference(Shape{1, 5, 7, 16, 24, 1, 0.05f, kTfLiteActRelu6},
+                         Route::kShortK);
 }
 
 TEST(HeliaConv1x1ShortKRouteTest, DepthSeventeenIsWrapper) {
