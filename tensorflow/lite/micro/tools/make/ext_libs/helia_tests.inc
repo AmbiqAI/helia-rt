@@ -171,6 +171,7 @@ $(kernel_depthwise_s8_3x3_route_test_BINARY): CXXFLAGS += \
 $(kernel_depthwise_s8_3x3_route_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_depthwise_conv_s8_opt_3x3 \
   -Wl,--wrap=arm_depthwise_conv_s8_opt_3x3_c64_s1 \
+  -Wl,--wrap=arm_depthwise_conv_s8_opt_3x3_get_buffer_size \
   -Wl,--wrap=arm_depthwise_conv_wrapper_s8
 endif
 

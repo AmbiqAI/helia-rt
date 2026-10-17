@@ -71,14 +71,15 @@ namespace {
 
 enum class Bias { kInt64, kInt16, kNone };
 
-// A nonzero input_zero_point must fail Prepare: 16x8 requires symmetric
-// activations.
+// A nonzero input or output zero point must fail Prepare: 16x8 requires
+// symmetric activations.
 struct Shape {
   int in_h, in_w, in_c, out_c, kernel, stride;
   TfLitePadding padding;
   Bias bias;
   int batch = 1;
   int input_zero_point = 0;
+  int output_zero_point = 0;
 };
 
 constexpr int kMaxInput = 2 * 6 * 7 * 16;
@@ -186,7 +187,7 @@ void ExpectMatchesReference(const Shape& s) {
           ? CreateTensor(bias16, IntArrayFromInts(bias_dims))
           : CreateTensor(bias64, IntArrayFromInts(bias_dims)),
       CreateQuantizedTensor(output, IntArrayFromInts(output_dims), output_scale,
-                            0),
+                            s.output_zero_point),
   };
   tensors[1].quantization = {kTfLiteAffineQuantization, &filter_quant};
   tensors[3].quantization = {kTfLiteAffineQuantization, &bias_quant};
@@ -208,7 +209,7 @@ void ExpectMatchesReference(const Shape& s) {
       IntArrayFromInts(outputs), &params);
   const TfLiteStatus prepare =
       runner.InitAndPrepare(reinterpret_cast<const char*>(&params));
-  if (s.input_zero_point != 0) {
+  if (s.input_zero_point != 0 || s.output_zero_point != 0) {
     EXPECT_EQ(kTfLiteError, prepare);
     return;
   }
@@ -302,6 +303,11 @@ TEST(HeliaTransposeConvS16Test, BatchTwoSameStrideTwo) {
 TEST(HeliaTransposeConvS16Test, NonzeroZeroPointFailsPrepare) {
   ExpectMatchesReference(
       Shape{4, 5, 3, 5, 3, 2, kTfLitePaddingSame, Bias::kInt64, 1, 3});
+}
+
+TEST(HeliaTransposeConvS16Test, NonzeroOutputZeroPointFailsPrepare) {
+  ExpectMatchesReference(
+      Shape{4, 5, 3, 5, 3, 2, kTfLitePaddingSame, Bias::kInt64, 1, 0, 3});
 }
 
 TF_LITE_MICRO_TESTS_MAIN

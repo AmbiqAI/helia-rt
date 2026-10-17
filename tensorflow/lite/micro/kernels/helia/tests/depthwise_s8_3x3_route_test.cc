@@ -42,6 +42,8 @@ namespace {
 enum class Leaf { kOpt3x3, kC64S1, kWrapper, kCount };
 
 int g_leaf_calls[static_cast<int>(Leaf::kCount)] = {};
+// Prepare queries the entries' scratch size only for layers in their gate.
+int g_opt_3x3_size_queries = 0;
 
 // When set, the wrapped entries return this status without running.
 bool g_inject = false;
@@ -94,6 +96,14 @@ arm_cmsis_nn_status __wrap_arm_depthwise_conv_wrapper_s8(HELIA_DW_S8_ARGS) {
   return __real_arm_depthwise_conv_wrapper_s8(HELIA_DW_S8_FORWARD);
 }
 
+int32_t __real_arm_depthwise_conv_s8_opt_3x3_get_buffer_size(
+    const cmsis_nn_dims* input_dims);
+int32_t __wrap_arm_depthwise_conv_s8_opt_3x3_get_buffer_size(
+    const cmsis_nn_dims* input_dims) {
+  ++g_opt_3x3_size_queries;
+  return __real_arm_depthwise_conv_s8_opt_3x3_get_buffer_size(input_dims);
+}
+
 #undef HELIA_DW_S8_FORWARD
 #undef HELIA_DW_S8_ARGS
 
@@ -135,6 +145,7 @@ void ExpectRoute(Route route, Leaf entry) {
   EXPECT_EQ(tried && entry == Leaf::kOpt3x3 ? 1 : 0, LeafCalls(Leaf::kOpt3x3));
   EXPECT_EQ(tried && entry == Leaf::kC64S1 ? 1 : 0, LeafCalls(Leaf::kC64S1));
   EXPECT_EQ(finished ? 0 : 1, LeafCalls(Leaf::kWrapper));
+  EXPECT_EQ(tried ? 1 : 0, g_opt_3x3_size_queries);
 #else
   (void)kMve;
   (void)route;
@@ -277,6 +288,7 @@ TfLiteStatus RunAgainstReference(const Shape& s) {
   const TFLMRegistration registration = Register_DEPTHWISE_CONV_2D();
   micro::KernelRunner runner(registration, tensors, 4, IntArrayFromInts(inputs),
                              IntArrayFromInts(outputs), &params);
+  g_opt_3x3_size_queries = 0;
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
   memset(output, 0x55, sizeof(output));
   memset(g_leaf_calls, 0, sizeof(g_leaf_calls));
@@ -393,6 +405,13 @@ TEST(HeliaDepthwiseS8Opt3x3RouteTest, SmallOutputAreaIsWrapper) {
 }
 
 // More than one 64-channel pass: 96 channels, and 130 with a channel tail.
+// Input W 2 is below the gate's 3, so Prepare must not request the entries'
+// scratch: an 8x2 output keeps every other condition in the gate.
+TEST(HeliaDepthwiseS8Opt3x3RouteTest, InputWidthTwoIsWrapper) {
+  ExpectMatchesReference(Shape{8, 2, 16, 1, 1, kTfLitePaddingSame},
+                         Route::kWrapper, Leaf::kCount);
+}
+
 TEST(HeliaDepthwiseS8Opt3x3RouteTest, Depth96InGate) {
   ExpectMatchesReference(Shape{6, 7, 96, 1, 1, kTfLitePaddingSame},
                          Route::kOpt3x3, Leaf::kOpt3x3);

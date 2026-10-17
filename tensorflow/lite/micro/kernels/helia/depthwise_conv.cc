@@ -58,13 +58,14 @@ struct OpData {
 #endif
 
 #if HELIA_DW_S8_OPT_3X3
-// The arm_depthwise_conv_s8_opt_3x3 gate as its header states it, so only
-// layers the entries take request their larger scratch.
+// The arm_depthwise_conv_s8_opt_3x3 gate from its header, so only layers the
+// entries take request their larger scratch.
 bool InDwS8Opt3x3Gate(const cmsis_nn_dw_conv_params& p,
                       const cmsis_nn_dims& in, int filter_h, int filter_w,
                       const cmsis_nn_dims& out) {
   constexpr int32_t kMaxDim = 4096;
-  if (filter_h != 3 || filter_w != 3 || p.ch_mult != 1 || p.dilation.h != 1 ||
+  if (filter_h != 3 || filter_w != 3 || p.ch_mult != 1 || in.c != out.c ||
+      p.dilation.h != 1 ||
       p.dilation.w != 1 || in.n != 1 || in.c < 16 || in.c > 2048 ||
       (p.stride.h != 1 && p.stride.h != 2) ||
       (p.stride.w != 1 && p.stride.w != 2) || p.padding.h < 0 ||
