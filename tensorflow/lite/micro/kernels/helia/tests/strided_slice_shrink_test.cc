@@ -299,10 +299,9 @@ TEST(HeliaStridedSliceShrinkTest, FourDShrinkLeadingAxisWithMasks) {
 // elements on an axis, so a hostile model can declare an output that does not
 // hold the slice. Such an axis cannot be allocated here; instead Prepare sees
 // the true [2, 4] output and Invoke a [1, `elements`] one. Every type must
-// fail the op without reaching heliaCORE or writing past the tensor; `leaf`
-// is kCount for the types that run the reference.
+// fail the op without reaching heliaCORE or writing past the tensor.
 template <typename T>
-void ExpectWrongOutputSizeFails(TfLiteType type, Leaf leaf, int elements) {
+void ExpectWrongOutputSizeFails(TfLiteType type, int elements) {
   using tflite::testing::CreateTensor;
   using tflite::testing::IntArrayFromInts;
   T input[24];
@@ -345,7 +344,6 @@ void ExpectWrongOutputSizeFails(TfLiteType type, Leaf leaf, int elements) {
     EXPECT_EQ(0, g_leaf_calls[i]);
   }
 #endif
-  (void)leaf;
   const int kept = elements < 8 ? elements : 8;
   for (size_t i = kept * sizeof(T); i < sizeof(output); ++i) {
     EXPECT_EQ(0x5A, reinterpret_cast<const uint8_t*>(output)[i]);
@@ -353,17 +351,17 @@ void ExpectWrongOutputSizeFails(TfLiteType type, Leaf leaf, int elements) {
 }
 
 TEST(HeliaStridedSliceShrinkTest, OutputShorterThanSliceFailsInvoke) {
-  ExpectWrongOutputSizeFails<int8_t>(kTfLiteInt8, Leaf::kS8, 7);
-  ExpectWrongOutputSizeFails<int16_t>(kTfLiteInt16, Leaf::kS16, 7);
-  ExpectWrongOutputSizeFails<float>(kTfLiteFloat32, Leaf::kCount, 7);
-  ExpectWrongOutputSizeFails<int32_t>(kTfLiteInt32, Leaf::kCount, 7);
-  ExpectWrongOutputSizeFails<bool>(kTfLiteBool, Leaf::kCount, 7);
+  ExpectWrongOutputSizeFails<int8_t>(kTfLiteInt8, 7);
+  ExpectWrongOutputSizeFails<int16_t>(kTfLiteInt16, 7);
+  ExpectWrongOutputSizeFails<float>(kTfLiteFloat32, 7);
+  ExpectWrongOutputSizeFails<int32_t>(kTfLiteInt32, 7);
+  ExpectWrongOutputSizeFails<bool>(kTfLiteBool, 7);
 }
 
 // The check is for equality, so a larger output fails too.
 TEST(HeliaStridedSliceShrinkTest, OutputLargerThanSliceFailsInvoke) {
-  ExpectWrongOutputSizeFails<int8_t>(kTfLiteInt8, Leaf::kS8, 9);
-  ExpectWrongOutputSizeFails<float>(kTfLiteFloat32, Leaf::kCount, 9);
+  ExpectWrongOutputSizeFails<int8_t>(kTfLiteInt8, 9);
+  ExpectWrongOutputSizeFails<float>(kTfLiteFloat32, 9);
 }
 
 // A [65536, 65536] slice takes 2^32 elements, past what the saturating counts
@@ -392,6 +390,80 @@ TEST(HeliaStridedSliceShrinkTest, SlicePastInt32MaxFailsInvoke) {
   }
   tensors[0].dims = IntArrayFromInts(huge_dims);
   tensors[4].dims = IntArrayFromInts(huge_dims);
+  TfLiteStridedSliceParams params = {};
+  int inputs[] = {4, 0, 1, 2, 3};
+  int outputs[] = {1, 4};
+  const TFLMRegistration registration = tflite::Register_STRIDED_SLICE();
+  tflite::micro::KernelRunner runner(registration, tensors, 5,
+                                     IntArrayFromInts(inputs),
+                                     IntArrayFromInts(outputs), &params);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  memset(g_leaf_calls, 0, sizeof(g_leaf_calls));
+  EXPECT_EQ(kTfLiteError, runner.Invoke());
+#if HELIA_STRIDED_SLICE_SHRINK_LINK_WRAP
+  EXPECT_EQ(0, g_leaf_calls[static_cast<int>(Leaf::kS8)]);
+#endif
+}
+
+// Prepare does not check the type, so an unsupported one must fail in Eval
+// even when the slice is empty.
+TEST(HeliaStridedSliceShrinkTest, UnsupportedTypeEmptySliceFailsInvoke) {
+  using tflite::testing::CreateTensor;
+  using tflite::testing::IntArrayFromInts;
+  static uint8_t input[6] = {};
+  static uint8_t output[1] = {};
+  const int32_t begin[] = {1, 0};
+  const int32_t end[] = {1, 3};
+  const int32_t strides[] = {1, 1};
+  int input_dims[] = {2, 2, 3};
+  int index_dims[] = {1, 2};
+  int output_dims[] = {2, 0, 3};
+  TfLiteTensor tensors[5] = {
+      CreateTensor(input, IntArrayFromInts(input_dims)),
+      CreateTensor(begin, IntArrayFromInts(index_dims)),
+      CreateTensor(end, IntArrayFromInts(index_dims)),
+      CreateTensor(strides, IntArrayFromInts(index_dims)),
+      CreateTensor(output, IntArrayFromInts(output_dims)),
+  };
+  for (int i = 1; i <= 3; ++i) {
+    tensors[i].allocation_type = kTfLiteMmapRo;
+  }
+  TfLiteStridedSliceParams params = {};
+  int inputs[] = {4, 0, 1, 2, 3};
+  int outputs[] = {1, 4};
+  const TFLMRegistration registration = tflite::Register_STRIDED_SLICE();
+  tflite::micro::KernelRunner runner(registration, tensors, 5,
+                                     IntArrayFromInts(inputs),
+                                     IntArrayFromInts(outputs), &params);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteError, runner.Invoke());
+}
+
+// An axis above 2^30 elements could overflow heliaCORE's begin + stride *
+// count, so it fails before any copy. The dims are set after the tensors are
+// made, so nothing is allocated or read for them.
+TEST(HeliaStridedSliceShrinkTest, AxisAbove2To30FailsInvoke) {
+  using tflite::testing::CreateTensor;
+  using tflite::testing::IntArrayFromInts;
+  static int8_t input[4] = {};
+  static int8_t output[2] = {};
+  const int32_t begin[] = {0};
+  const int32_t end[] = {2147483647};
+  const int32_t strides[] = {1073741825};
+  int small_dims[] = {1, 2};
+  int index_dims[] = {1, 1};
+  static int huge_input_dims[] = {1, 2147483647};
+  TfLiteTensor tensors[5] = {
+      CreateTensor(input, IntArrayFromInts(small_dims)),
+      CreateTensor(begin, IntArrayFromInts(index_dims)),
+      CreateTensor(end, IntArrayFromInts(index_dims)),
+      CreateTensor(strides, IntArrayFromInts(index_dims)),
+      CreateTensor(output, IntArrayFromInts(small_dims)),
+  };
+  for (int i = 1; i <= 3; ++i) {
+    tensors[i].allocation_type = kTfLiteMmapRo;
+  }
+  tensors[0].dims = IntArrayFromInts(huge_input_dims);
   TfLiteStridedSliceParams params = {};
   int inputs[] = {4, 0, 1, 2, 3};
   int outputs[] = {1, 4};
