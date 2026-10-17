@@ -1,5 +1,70 @@
 # Changelog
 
+## [2.1.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v2.0.0...helia-rt-v2.1.0) (2026-10-17)
+
+
+### Features
+
+* **helia:** route ABS, NEG, SQRT and RSQRT to ns-cmsis-nn ([812178e](https://github.com/AmbiqAI/helia-rt/commit/812178ea66e929e003c7b991c65a31dd79756de8)), closes [#433](https://github.com/AmbiqAI/helia-rt/issues/433)
+* **helia:** route ABS, NEG, SQRT and RSQRT to ns-cmsis-nn (stack 1/4) ([56e15e1](https://github.com/AmbiqAI/helia-rt/commit/56e15e1ce51f29d2ac7e19a92b9c095ec2922446))
+* **helia:** route RESIZE_NEAREST_NEIGHBOR to ns-cmsis-nn ([d1f4508](https://github.com/AmbiqAI/helia-rt/commit/d1f45082f902086b85fb9f9689030c736c0e38e8)), closes [#433](https://github.com/AmbiqAI/helia-rt/issues/433)
+* **helia:** route RESIZE_NEAREST_NEIGHBOR to ns-cmsis-nn (stack 4/4) ([5095d4d](https://github.com/AmbiqAI/helia-rt/commit/5095d4d0ba6ace8b106c80605dce23339b5bed80))
+* **helia:** route slicing, arg and min/max reductions to heliaCORE ([b19391a](https://github.com/AmbiqAI/helia-rt/commit/b19391a5b69818a174159a6ddba9c6ce08dd3b29)), closes [#433](https://github.com/AmbiqAI/helia-rt/issues/433)
+* **helia:** route slicing, arg and min/max reductions to ns-cmsis-nn (stack 2/4) ([357d117](https://github.com/AmbiqAI/helia-rt/commit/357d117e7e2c46b988bac657ee925a1b70fedfac))
+* **helia:** route SQUARED_DIFFERENCE, DIV and PRELU to ns-cmsis-nn ([9e4a29c](https://github.com/AmbiqAI/helia-rt/commit/9e4a29c8ab5cc6095bdf513c4f182bc947dcadd9)), closes [#433](https://github.com/AmbiqAI/helia-rt/issues/433)
+* **helia:** route SQUARED_DIFFERENCE, DIV and PRELU to ns-cmsis-nn (stack 3/4) ([7f8bf5f](https://github.com/AmbiqAI/helia-rt/commit/7f8bf5ff78afc40205673d62c08ed9e4439b6017))
+* **helia:** route three conv layers to direct ns-cmsis-nn entries ([2c49cff](https://github.com/AmbiqAI/helia-rt/commit/2c49cff3598f6e94e36cf4e6d5bbdc444768b9cc)), closes [#433](https://github.com/AmbiqAI/helia-rt/issues/433)
+* **helia:** run float REDUCE_MAX/MIN and float16 DEQUANTIZE on ns-cmsis-nn 7.46 ([c9b568b](https://github.com/AmbiqAI/helia-rt/commit/c9b568ba5cc07b030d4315b6f2372899af4cf107)), closes [#433](https://github.com/AmbiqAI/helia-rt/issues/433)
+
+
+### Bug Fixes
+
+* adopt ns-cmsis-nn 7.41.0 and cover s16 quantization ([75b0be9](https://github.com/AmbiqAI/helia-rt/commit/75b0be9c8c33605f7a513e9f92380aa26687db86)), closes [#426](https://github.com/AmbiqAI/helia-rt/issues/426) [#427](https://github.com/AmbiqAI/helia-rt/issues/427)
+* **helia:** apply the fused activation in quantized TRANSPOSE_CONV ([b180ff6](https://github.com/AmbiqAI/helia-rt/commit/b180ff60f7ea271b616bdaf5d9e3c931c63fcd69)), closes [#442](https://github.com/AmbiqAI/helia-rt/issues/442)
+* **helia:** apply TRANSPOSE_CONV fused activation and validate shapes in Prepare ([1e94c06](https://github.com/AmbiqAI/helia-rt/commit/1e94c068493a89a2aa0776891277a6473e3e78de))
+* **helia:** bound STRIDED_SLICE axes and reject bad types first ([7d21260](https://github.com/AmbiqAI/helia-rt/commit/7d212602b40bbf94e471154e41d4b1983711c20c)), closes [#435](https://github.com/AmbiqAI/helia-rt/issues/435)
+* **helia:** bound STRIDED_SLICE axes and reject bad types first ([0744544](https://github.com/AmbiqAI/helia-rt/commit/0744544c6a66783a820f176822a5305b2502254a)), closes [#435](https://github.com/AmbiqAI/helia-rt/issues/435)
+* **helia:** bound the TRANSPOSE_CONV bias rank and release Prepare temporaries on every return ([426bdc2](https://github.com/AmbiqAI/helia-rt/commit/426bdc2ed564150654cacdf3877ce24549c2a86e)), closes [#443](https://github.com/AmbiqAI/helia-rt/issues/443)
+* **helia:** check every reduction's output size before dispatch ([b5b0c8c](https://github.com/AmbiqAI/helia-rt/commit/b5b0c8c2e5e76374838a4b4b0aa7b27e5b0c9f50)), closes [#433](https://github.com/AmbiqAI/helia-rt/issues/433)
+* **helia:** check float16 ABS and NEG shapes and zero the ABS multiplier ([382228b](https://github.com/AmbiqAI/helia-rt/commit/382228b9da639742539761073479c2700bb871d1)), closes [#433](https://github.com/AmbiqAI/helia-rt/issues/433)
+* **helia:** check REDUCE_MAX/MIN output size before heliaCORE ([341f785](https://github.com/AmbiqAI/helia-rt/commit/341f7851982c786825f603f6dbbb525ae5db0f1e)), closes [#433](https://github.com/AmbiqAI/helia-rt/issues/433)
+* **helia:** check the output count on every elementwise heliaCORE route ([feecc0e](https://github.com/AmbiqAI/helia-rt/commit/feecc0ea03cfede99a63b84b386812969162ef52)), closes [#433](https://github.com/AmbiqAI/helia-rt/issues/433)
+* **helia:** check the STRIDED_SLICE output size for every type ([28aaef1](https://github.com/AmbiqAI/helia-rt/commit/28aaef188dfaff9304231b3f4b3639e86dbdd6d6)), closes [#435](https://github.com/AmbiqAI/helia-rt/issues/435)
+* **helia:** check the STRIDED_SLICE output size for every type ([267b12a](https://github.com/AmbiqAI/helia-rt/commit/267b12a153c3110bc458d7ff8d154f7379397c3d)), closes [#435](https://github.com/AmbiqAI/helia-rt/issues/435)
+* **helia:** compare the TRANSPOSE_CONV bias count in 64 bits ([1d902ba](https://github.com/AmbiqAI/helia-rt/commit/1d902baefd0f37c7673a1cb7495b871ef6821f2b)), closes [#443](https://github.com/AmbiqAI/helia-rt/issues/443)
+* **helia:** count STRIDED_SLICE elements per axis in 64 bits ([551ee23](https://github.com/AmbiqAI/helia-rt/commit/551ee2311d131edeb234059852695c4077948b29)), closes [#435](https://github.com/AmbiqAI/helia-rt/issues/435)
+* **helia:** count STRIDED_SLICE elements per axis in 64 bits ([d2af52b](https://github.com/AmbiqAI/helia-rt/commit/d2af52b7e5a8486fe579c4bd6df8b283b9d58ca6)), closes [#435](https://github.com/AmbiqAI/helia-rt/issues/435)
+* **helia:** count the TRANSPOSE_CONV bias without wrapping and require positive extents ([c769575](https://github.com/AmbiqAI/helia-rt/commit/c769575cae0d6acd5221bf76ac4c1285311ed085)), closes [#443](https://github.com/AmbiqAI/helia-rt/issues/443)
+* **helia:** fail a STRIDED_SLICE past INT32_MAX elements ([ee7a684](https://github.com/AmbiqAI/helia-rt/commit/ee7a684e078c82c0dfac249501c9b22071ef1f94)), closes [#435](https://github.com/AmbiqAI/helia-rt/issues/435)
+* **helia:** fail a STRIDED_SLICE past INT32_MAX elements ([1e7e2ba](https://github.com/AmbiqAI/helia-rt/commit/1e7e2ba4072df4176164c23f510ed97f3fe31abc)), closes [#435](https://github.com/AmbiqAI/helia-rt/issues/435)
+* **helia:** fail DIV and SQUARED_DIFFERENCE on a failing float32 heliaCORE entry ([61c5d50](https://github.com/AmbiqAI/helia-rt/commit/61c5d50b920b354d1eddade95daddfbd67362c78))
+* **helia:** gate depthwise 3x3 on equal channels and test both zero points ([5242287](https://github.com/AmbiqAI/helia-rt/commit/52422873391fb2b0407736e4faa97ca73932c32c)), closes [#433](https://github.com/AmbiqAI/helia-rt/issues/433)
+* **helia:** give single-element STRIDED_SLICE axes stride 1 ([8a6d1c4](https://github.com/AmbiqAI/helia-rt/commit/8a6d1c4079d444c1049934e3d03bb4798ec37ca5)), closes [#435](https://github.com/AmbiqAI/helia-rt/issues/435)
+* **helia:** give single-element STRIDED_SLICE axes stride 1 ([b1ed5c0](https://github.com/AmbiqAI/helia-rt/commit/b1ed5c012b33915e0897b82933f8094330c68a39)), closes [#435](https://github.com/AmbiqAI/helia-rt/issues/435)
+* **helia:** hold any axis list on the reference MEAN and SUM routes ([b526884](https://github.com/AmbiqAI/helia-rt/commit/b52688487239779535987e7c0f853a8b84259166)), closes [#433](https://github.com/AmbiqAI/helia-rt/issues/433)
+* **helia:** keep MVE float32 SQUARED_DIFFERENCE on the reference ([424b0d3](https://github.com/AmbiqAI/helia-rt/commit/424b0d3b68d7904ea2c387ad13268f396d6ae8ae)), closes [#433](https://github.com/AmbiqAI/helia-rt/issues/433)
+* **helia:** keep rank-6 and scalar reductions on the reference ([b569890](https://github.com/AmbiqAI/helia-rt/commit/b569890ae864805d2d8c258e6a2d29a16fd0129b))
+* **helia:** keep shrunk STRIDED_SLICE axes in place on heliaCORE ([951b5bb](https://github.com/AmbiqAI/helia-rt/commit/951b5bb5bc7e7282d21884827693a5e637babde3))
+* **helia:** keep shrunk STRIDED_SLICE axes in place on heliaCORE ([9118f41](https://github.com/AmbiqAI/helia-rt/commit/9118f413e3e0fdc191a18afc3d2aaa1298b59a0e)), closes [#435](https://github.com/AmbiqAI/helia-rt/issues/435)
+* **helia:** keep shrunk STRIDED_SLICE axes in place on heliaCORE ([38ddd8d](https://github.com/AmbiqAI/helia-rt/commit/38ddd8d1f440861eb9310d8c84c6f0bc11358604)), closes [#435](https://github.com/AmbiqAI/helia-rt/issues/435)
+* **helia:** reject a STRIDED_SLICE output smaller than the slice ([87288d2](https://github.com/AmbiqAI/helia-rt/commit/87288d20349255bac88b8b9c1c10c4223a837ca7)), closes [#435](https://github.com/AmbiqAI/helia-rt/issues/435)
+* **helia:** reject a STRIDED_SLICE output smaller than the slice ([8cc68a7](https://github.com/AmbiqAI/helia-rt/commit/8cc68a7580b5d3f291ec99defcb9ee5d081f5157)), closes [#435](https://github.com/AmbiqAI/helia-rt/issues/435)
+* **helia:** reject an empty RESIZE_NEAREST_NEIGHBOR input extent for a nonempty output ([6e83ed2](https://github.com/AmbiqAI/helia-rt/commit/6e83ed28c8f497b8e6d8153cb4e55921dde2db47))
+* **helia:** reject mismatched RESIZE_NEAREST_NEIGHBOR types and output shapes in Prepare ([052421c](https://github.com/AmbiqAI/helia-rt/commit/052421c7d73cf8fc14c70073b9c4fb3b510eb993))
+* **helia:** release RESIZE_NEAREST_NEIGHBOR temporaries on every Prepare exit ([25ea603](https://github.com/AmbiqAI/helia-rt/commit/25ea6039835700963f956b125e3d0702a30e0471)), closes [#433](https://github.com/AmbiqAI/helia-rt/issues/433)
+* **helia:** request the depthwise 3x3 scratch only for layers it takes ([1f980f2](https://github.com/AmbiqAI/helia-rt/commit/1f980f2fc398eb193bb082894cc757c6a8c2299b)), closes [#433](https://github.com/AmbiqAI/helia-rt/issues/433)
+* **helia:** require a float TRANSPOSE_CONV bias of the input type ([1de77e7](https://github.com/AmbiqAI/helia-rt/commit/1de77e7149e2d6f60b7c593b4f08528f653eca01)), closes [#443](https://github.com/AmbiqAI/helia-rt/issues/443)
+* **helia:** require a float32 PRELU alpha for float32 input ([fb51a21](https://github.com/AmbiqAI/helia-rt/commit/fb51a21f0c0815a7d916ea982c5f022fd4f31016))
+* **helia:** require matching MEAN input and output types ([51f5b15](https://github.com/AmbiqAI/helia-rt/commit/51f5b15aa5ce18a0cd2c20a8e8ea67befd09691e))
+* **helia:** require matching RESIZE_NEAREST_NEIGHBOR types ([eb3b172](https://github.com/AmbiqAI/helia-rt/commit/eb3b17224a6b2851f0eb7b98bd4febd0663b0b79)), closes [#433](https://github.com/AmbiqAI/helia-rt/issues/433)
+* **helia:** require matching STRIDED_SLICE types and nonnegative axes ([36a788f](https://github.com/AmbiqAI/helia-rt/commit/36a788f62d465d64bf4b4c492fbaace383cbd328)), closes [#435](https://github.com/AmbiqAI/helia-rt/issues/435)
+* **helia:** require matching STRIDED_SLICE types and nonnegative axes ([efd23d4](https://github.com/AmbiqAI/helia-rt/commit/efd23d460386a064eb725aea4988f129fe1200c5)), closes [#435](https://github.com/AmbiqAI/helia-rt/issues/435)
+* **helia:** require the PRELU output to be the broadcast of input and alpha ([aea1d44](https://github.com/AmbiqAI/helia-rt/commit/aea1d44efc80769a06e0ec08b59b698db38f1d4e))
+* **helia:** require zero int16 TRANSPOSE_CONV zero points ([cbc73fa](https://github.com/AmbiqAI/helia-rt/commit/cbc73fa857429254e5f5cdb6dabea187e73041a5)), closes [#433](https://github.com/AmbiqAI/helia-rt/issues/433)
+* **helia:** run no kernel on an empty reduction input and bound its extents ([a853011](https://github.com/AmbiqAI/helia-rt/commit/a853011665bbf348f3d4a21f69310a26b82334aa))
+* **helia:** validate TRANSPOSE_CONV shapes and bias in Prepare ([c36d01f](https://github.com/AmbiqAI/helia-rt/commit/c36d01f69955277018de63c719dfb26b555d0d21)), closes [#443](https://github.com/AmbiqAI/helia-rt/issues/443)
+* run grouped int16 and int4-weight CONV_2D on the reference kernel ([#424](https://github.com/AmbiqAI/helia-rt/issues/424)) ([e1f4901](https://github.com/AmbiqAI/helia-rt/commit/e1f490191f23c83e45a799c2461b25af4149971f)), closes [#421](https://github.com/AmbiqAI/helia-rt/issues/421)
+
 ## [2.0.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v1.21.4...helia-rt-v2.0.0) (2026-10-04)
 
 
