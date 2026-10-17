@@ -76,6 +76,28 @@ bool HeliaPreluShapes(const RuntimeShape& input_shape,
   return true;
 }
 
+// The reference kernels index input and alpha at each output position,
+// broadcast over at most four dimensions.
+bool IsPreluBroadcastShape(const TfLiteIntArray* input,
+                           const TfLiteIntArray* alpha,
+                           const TfLiteIntArray* output) {
+  if (input->size > 4 || alpha->size > 4 ||
+      output->size != (input->size > alpha->size ? input->size : alpha->size)) {
+    return false;
+  }
+  for (int i = 1; i <= output->size; ++i) {
+    const int in = i <= input->size ? input->data[input->size - i] : 1;
+    const int al = i <= alpha->size ? alpha->data[alpha->size - i] : 1;
+    if (in != al && in != 1 && al != 1) {
+      return false;
+    }
+    if (output->data[output->size - i] != (in == 1 ? al : in)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 TfLiteStatus HeliaPreluPrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_OK(context, PreluPrepare(context, node));
   OpDataPrelu* data = static_cast<OpDataPrelu*>(node->user_data);
@@ -97,6 +119,10 @@ TfLiteStatus HeliaPreluPrepare(TfLiteContext* context, TfLiteNode* node) {
   if (input->type == kTfLiteFloat32) {
     TF_LITE_ENSURE_TYPES_EQ(context, alpha->type, kTfLiteFloat32);
   }
+  TF_LITE_ENSURE_MSG(
+      context, IsPreluBroadcastShape(input->dims, alpha->dims, output->dims),
+      "PRELU output must be the broadcast shape of input and "
+      "alpha, rank <= 4.");
 
   data->helia_shapes =
       HeliaPreluShapes(GetTensorShape(input), GetTensorShape(alpha),

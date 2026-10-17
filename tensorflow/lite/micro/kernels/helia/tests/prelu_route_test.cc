@@ -246,6 +246,26 @@ void ExpectPrepareRejected(T* in, U* alpha, V* out, int count) {
   EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
 }
 
+// Prepare must reject a float32 PRELU with these dims, and release its
+// temporaries. Each dims array is TfLiteIntArray-shaped: size first.
+void ExpectShapesRejected(int* in_dims, int* alpha_dims, int* out_dims) {
+  static float in[kMaxElements];
+  static float alpha[kMaxElements];
+  static float out[kMaxElements];
+  TfLiteTensor tensors[3] = {
+      PreluTensor(in, IntArrayFromInts(in_dims)),
+      PreluTensor(alpha, IntArrayFromInts(alpha_dims)),
+      PreluTensor(out, IntArrayFromInts(out_dims)),
+  };
+  int inputs[] = {2, 0, 1};
+  int outputs[] = {1, 2};
+  const TFLMRegistration registration = Register_PRELU();
+  micro::KernelRunner runner(registration, tensors, 3, IntArrayFromInts(inputs),
+                             IntArrayFromInts(outputs), nullptr);
+  EXPECT_EQ(kTfLiteError, runner.InitAndPrepare());
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
+}
+
 // T input and output, U alpha: int8/int8 or int16/int8, as TFLM types them.
 template <typename T, typename U>
 void ExpectQuantizedMatches(const Shape& si, const Shape& sa, Leaf leaf,
@@ -393,6 +413,21 @@ TEST(HeliaPreluRouteTest, Float32Int8AlphaRejectedAtPrepare) {
   int8_t alpha[8] = {};
   float out[8] = {};
   tflite::testing::ExpectPrepareRejected(in, alpha, out, 8);
+}
+
+// The reference walks the output shape, so an output larger than the
+// broadcast of input and alpha would read past both.
+TEST(HeliaPreluRouteTest, OutputNotBroadcastShapeRejectedAtPrepare) {
+  int in_dims[] = {2, 1, 2};
+  int alpha_dims[] = {1, 1};
+  int wider_out[] = {2, 1, 4};
+  tflite::testing::ExpectShapesRejected(in_dims, alpha_dims, wider_out);
+  int higher_rank_out[] = {3, 2, 1, 2};
+  tflite::testing::ExpectShapesRejected(in_dims, alpha_dims, higher_rank_out);
+  int rank5[] = {5, 1, 1, 1, 1, 2};
+  tflite::testing::ExpectShapesRejected(rank5, alpha_dims, rank5);
+  int mismatched_alpha[] = {1, 3};
+  tflite::testing::ExpectShapesRejected(in_dims, mismatched_alpha, in_dims);
 }
 
 // The reference's x >= 0 ? x : x * alpha bit for bit: NaN input gives NaN, a

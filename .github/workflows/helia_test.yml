@@ -329,30 +329,32 @@ jobs:
         # every leg. see AmbiqAI/helia-rt#433
         # SQUARED_DIFFERENCE subnormal and PRELU output-type cases add four cases on
         # the cortex-m55 legs and two on the others. see AmbiqAI/helia-rt#433
+        # PRELU alpha-type and output-shape rejections add two cases on every leg.
+        # see AmbiqAI/helia-rt#433
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 173
-            min-cases: 1544
+            min-cases: 1545
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 173
-            min-cases: 1544
+            min-cases: 1545
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 172
-            min-cases: 1542
+            min-cases: 1543
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 173
-            min-cases: 1608
+            min-cases: 1609
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 172
-            min-cases: 1606
+            min-cases: 1607
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
