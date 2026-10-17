@@ -14,10 +14,11 @@ limitations under the License.
 ==============================================================================*/
 
 // int8 and int16 STRIDED_SLICE through the helia kernel, compared bit for bit
-// with the reference. A shrunk inner axis must keep its place in the heliaCORE
-// dims, and an empty slice must not reach heliaCORE. GCC and ATfE links wrap
-// the entries and assert each invoke ran its own once, or none when empty.
-// see AmbiqAI/helia-rt#435
+// with the reference: shrunk axes in any position, empty slices, negative
+// strides through masks and extreme strides. The reference overflows on an
+// extreme stride from a nonzero begin, so those cases name the one input
+// element they take. GCC and ATfE links wrap the entries and assert each
+// invoke ran its own once, or none when empty. see AmbiqAI/helia-rt#435
 
 #include <cstdint>
 #include <cstring>
@@ -156,8 +157,11 @@ void FillInput(T* input, int count) {
 
 // Runs one slice for element type T stored as TfLiteType `type` and checks it
 // against the reference. `leaf` is the entry the invoke must reach.
+// With `only` >= 0 the slice must take exactly input element `only`, which is
+// checked without the reference.
 template <typename T>
-void ExpectMatchesReference(const Slice& s, TfLiteType type, Leaf leaf) {
+void ExpectMatchesReference(const Slice& s, TfLiteType type, Leaf leaf,
+                            int only = -1) {
   static T input[kMaxElements];
   static T output[kMaxElements];
   static T expected[kMaxElements];
@@ -216,15 +220,19 @@ void ExpectMatchesReference(const Slice& s, TfLiteType type, Leaf leaf) {
     output_shape[i] = output_dims_data[1 + i];
   }
   memset(expected, 0x5A, sizeof(expected));
-  micro::reference_ops::StridedSlice(
-      ReferenceParams(s), RuntimeShape(s.rank, s.shape), input,
-      RuntimeShape(output_dims_data[0], output_shape), expected);
+  if (only >= 0) {
+    expected[0] = input[only];
+  } else {
+    micro::reference_ops::StridedSlice(
+        ReferenceParams(s), RuntimeShape(s.rank, s.shape), input,
+        RuntimeShape(output_dims_data[0], output_shape), expected);
+  }
   EXPECT_EQ(0, memcmp(expected, output, sizeof(output)));
 }
 
-void ExpectAllTypesMatch(const Slice& s) {
-  ExpectMatchesReference<int8_t>(s, kTfLiteInt8, Leaf::kS8);
-  ExpectMatchesReference<int16_t>(s, kTfLiteInt16, Leaf::kS16);
+void ExpectAllTypesMatch(const Slice& s, int only = -1) {
+  ExpectMatchesReference<int8_t>(s, kTfLiteInt8, Leaf::kS8, only);
+  ExpectMatchesReference<int16_t>(s, kTfLiteInt16, Leaf::kS16, only);
 }
 
 }  // namespace
@@ -261,6 +269,17 @@ TEST(HeliaStridedSliceShrinkTest, StrideInt32MaxTakesOneElement) {
 TEST(HeliaStridedSliceShrinkTest, StrideInt32MinTakesOneElement) {
   ExpectAllTypesMatch(Slice{
       1, {4}, {3}, {0}, {std::numeric_limits<int32_t>::min()}, 0, 0, 0});
+}
+
+// begin + stride passes INT32_MAX: the single element is input[1], then
+// input[2].
+TEST(HeliaStridedSliceShrinkTest, StrideInt32MaxFromNonzeroBegin) {
+  ExpectAllTypesMatch(
+      Slice{1, {4}, {1}, {4}, {std::numeric_limits<int32_t>::max()}, 0, 0, 0},
+      /*only=*/1);
+  ExpectAllTypesMatch(Slice{1, {4}, {2}, {4},
+                            {std::numeric_limits<int32_t>::max() - 1}, 0, 0, 0},
+                      /*only=*/2);
 }
 
 // Negative strides through begin/end masks: the reversed input, every other

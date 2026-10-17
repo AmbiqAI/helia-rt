@@ -303,6 +303,8 @@ jobs:
         # leg. see AmbiqAI/helia-rt#435
         # Float16 ABS and NEG shape-mismatch rejections add two cases on every
         # leg. see AmbiqAI/helia-rt#433
+        # Nonzero-begin extreme-stride STRIDED_SLICE cases add two cases on every
+        # leg. see AmbiqAI/helia-rt#435
         # Depthwise 3x3, 1x1 short-K and int16 TRANSPOSE_CONV review cases add nine
         # cases on every leg. see AmbiqAI/helia-rt#433
         # Elementwise shrunk-output cases add two cases on every leg.

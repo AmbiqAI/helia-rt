@@ -188,9 +188,12 @@ void FillInput<uint16_t>(uint16_t* input, int count) {
 #endif
 
 // Runs one slice for element type T stored as TfLiteType `type` and checks it
-// against the reference. `leaf` is the entry the invoke must reach.
+// against the reference. `leaf` is the entry the invoke must reach. With
+// `only` >= 0 the slice must take exactly input element `only`, checked
+// without the reference.
 template <typename T>
-void ExpectMatchesReference(const Slice& s, TfLiteType type, Leaf leaf) {
+void ExpectMatchesReference(const Slice& s, TfLiteType type, Leaf leaf,
+                            int only = -1) {
   static T input[kMaxElements];
   static T output[kMaxElements];
   static T expected[kMaxElements];
@@ -249,19 +252,23 @@ void ExpectMatchesReference(const Slice& s, TfLiteType type, Leaf leaf) {
     output_shape[i] = output_dims_data[1 + i];
   }
   memset(expected, 0x5A, sizeof(expected));
-  micro::reference_ops::StridedSlice(
-      ReferenceParams(s), RuntimeShape(s.rank, s.shape), input,
-      RuntimeShape(output_dims_data[0], output_shape), expected);
+  if (only >= 0) {
+    expected[0] = input[only];
+  } else {
+    micro::reference_ops::StridedSlice(
+        ReferenceParams(s), RuntimeShape(s.rank, s.shape), input,
+        RuntimeShape(output_dims_data[0], output_shape), expected);
+  }
   EXPECT_EQ(0, memcmp(expected, output, sizeof(output)));
 }
 
-void ExpectAllTypesMatch(const Slice& s) {
-  ExpectMatchesReference<float>(s, kTfLiteFloat32, Leaf::kF32);
-  ExpectMatchesReference<int8_t>(s, kTfLiteInt8, Leaf::kS8);
-  ExpectMatchesReference<int16_t>(s, kTfLiteInt16, Leaf::kS16);
-  ExpectMatchesReference<int32_t>(s, kTfLiteInt32, Leaf::kS32);
+void ExpectAllTypesMatch(const Slice& s, int only = -1) {
+  ExpectMatchesReference<float>(s, kTfLiteFloat32, Leaf::kF32, only);
+  ExpectMatchesReference<int8_t>(s, kTfLiteInt8, Leaf::kS8, only);
+  ExpectMatchesReference<int16_t>(s, kTfLiteInt16, Leaf::kS16, only);
+  ExpectMatchesReference<int32_t>(s, kTfLiteInt32, Leaf::kS32, only);
 #if ARM_NN_ENABLE_F16
-  ExpectMatchesReference<uint16_t>(s, kTfLiteFloat16, Leaf::kF16);
+  ExpectMatchesReference<uint16_t>(s, kTfLiteFloat16, Leaf::kF16, only);
 #endif
 }
 
@@ -315,6 +322,14 @@ TEST(HeliaStridedSliceRouteTest, ExtremeStridesTakeOneElement) {
                             {std::numeric_limits<int32_t>::max(),
                              std::numeric_limits<int32_t>::min()},
                             0, 0, 0});
+}
+
+// begin + stride passes INT32_MAX: the single element is input[1]. The
+// reference overflows here, so the case names the element it expects.
+TEST(HeliaStridedSliceRouteTest, ExtremeStrideFromNonzeroBegin) {
+  ExpectAllTypesMatch(
+      Slice{1, {4}, {1}, {4}, {std::numeric_limits<int32_t>::max()}, 0, 0, 0},
+      /*only=*/1);
 }
 
 // begin == end on one axis: nothing to copy, and no heliaCORE call.
