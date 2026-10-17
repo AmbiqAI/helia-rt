@@ -363,7 +363,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "Float optimized paths support rank <= 4 and axis sets; higher-rank FP32 uses Reference, FP16 is rejected. See reduce_common.cc."
+    "notes": "Float optimized paths support rank <= 4 and axis sets; higher-rank FP32 uses Reference, FP16 is rejected. On every route and dtype, an output whose element count differs from the input's elements on the kept axes, or an axis outside the input rank, fails at Invoke. See reduce_common.cc."
   },
   {
     "name": "MINIMUM",
@@ -485,7 +485,7 @@
       "bool"
     ],
     "path": "Reference",
-    "notes": "Boolean reduction using Reference in reduce_common.cc."
+    "notes": "Boolean reduction using Reference in reduce_common.cc. On every route and dtype, an output whose element count differs from the input's elements on the kept axes, or an axis outside the input rank, fails at Invoke."
   },
   {
     "name": "REDUCE_MAX",
@@ -498,7 +498,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "int8/int16 run CORE at rank <= 4 with equal input/output quantization. FP32 uses Reference to keep TFLite's non-finite results (NaN skipped, -FLT_MAX for an all -Inf or empty window). FP16 runs CORE at rank <= 4 and is rejected otherwise or without ARM_NN_ENABLE_F16; unlike FP32 it propagates NaN (canonical 0x7e00) and gives -Inf for an all -Inf or empty window. An output tensor whose size differs from the reduction fails the op. Implementation is in reduce_common.cc."
+    "notes": "int8/int16 run CORE at rank <= 4 with equal input/output quantization. FP32 uses Reference to keep TFLite's non-finite results (NaN skipped, -FLT_MAX for an all -Inf or empty window). FP16 runs CORE at rank <= 4 and is rejected otherwise or without ARM_NN_ENABLE_F16; unlike FP32 it propagates NaN (canonical 0x7e00) and gives -Inf for an all -Inf or empty window, and with an empty axis list it copies each element, NaN payload included. On every route and dtype, FP32 Reference and rank 5 included, an output whose element count differs from the input's elements on the kept axes, or an axis outside the input rank, fails at Invoke. Implementation is in reduce_common.cc."
   },
   {
     "name": "REDUCE_MIN",
@@ -511,7 +511,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "int8/int16 run CORE at rank <= 4 with equal input/output quantization. FP32 uses Reference to keep TFLite's non-finite results (NaN skipped, +FLT_MAX for an all +Inf or empty window). FP16 runs CORE at rank <= 4 and is rejected otherwise or without ARM_NN_ENABLE_F16; unlike FP32 it propagates NaN (canonical 0x7e00) and gives +Inf for an all +Inf or empty window. An output tensor whose size differs from the reduction fails the op. Implementation is in reduce_common.cc."
+    "notes": "int8/int16 run CORE at rank <= 4 with equal input/output quantization. FP32 uses Reference to keep TFLite's non-finite results (NaN skipped, +FLT_MAX for an all +Inf or empty window). FP16 runs CORE at rank <= 4 and is rejected otherwise or without ARM_NN_ENABLE_F16; unlike FP32 it propagates NaN (canonical 0x7e00) and gives +Inf for an all +Inf or empty window, and with an empty axis list it copies each element, NaN payload included. On every route and dtype, FP32 Reference and rank 5 included, an output whose element count differs from the input's elements on the kept axes, or an axis outside the input rank, fails at Invoke. Implementation is in reduce_common.cc."
   },
   {
     "name": "RELU",
@@ -671,7 +671,7 @@
       "bool"
     ],
     "path": "Mixed",
-    "notes": "int8, int16 and int32 run CORE; FP32 runs CORE with ARM_NN_ENABLE_F32 and Reference without it; FP16 runs CORE with ARM_NN_ENABLE_F16 and fails preparation without it; bool uses Reference. Rank is limited to 4; an empty slice writes nothing, and an output tensor smaller than the slice fails the op."
+    "notes": "int8, int16 and int32 run CORE; FP32 runs CORE with ARM_NN_ENABLE_F32 and Reference without it; FP16 runs CORE with ARM_NN_ENABLE_F16 and fails preparation without it; bool uses Reference. Rank is limited to 4; an empty slice writes nothing. For every type, an output whose element count differs from the slice's, or a slice past INT32_MAX elements, fails at Invoke."
   },
   {
     "name": "SUB",
@@ -698,7 +698,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "SUM is LiteRT REDUCE_SUM. Float optimized paths support rank <= 4 and axis sets; higher-rank FP32 uses Reference, FP16 is rejected. See reduce_common.cc."
+    "notes": "SUM is LiteRT REDUCE_SUM. Float optimized paths support rank <= 4 and axis sets; higher-rank FP32 uses Reference, FP16 is rejected. On every route and dtype, an output whose element count differs from the input's elements on the kept axes, or an axis outside the input rank, fails at Invoke. See reduce_common.cc."
   },
   {
     "name": "SVDF",

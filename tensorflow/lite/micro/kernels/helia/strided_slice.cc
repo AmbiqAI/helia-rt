@@ -79,7 +79,8 @@ bool ArmPopulateCommonParams(const tflite::StridedSliceParams& op_params,
     *begin[axis] = start;
     // heliaCORE forms begin + stride * count in int32_t. An axis that takes one
     // element never steps, so give it stride 1; a longer one has |stride| <
-    // dim, which keeps that sum under 2 * dim: in range for axes below 2^30.
+    // dim, which keeps that sum under 2 * dim. Nothing enforces a bound on dim;
+    // heliaCORE's int32_t index math assumes tensors below 2^31 elements.
     *stride[axis] = count == 1u ? 1 : step;
   }
   return true;
@@ -149,6 +150,22 @@ TfLiteStatus StridedSliceEval(TfLiteContext* context, TfLiteNode* node) {
       tflite::micro::GetEvalInput(context, node, kStridedSliceInputTensor);
   TfLiteEvalTensor* output =
       tflite::micro::GetEvalOutput(context, node, kStridedSliceOutputTensor);
+
+  switch (output->type) {
+    case kTfLiteFloat32:
+#if ARM_NN_ENABLE_F16
+    case kTfLiteFloat16:
+#endif
+    case kTfLiteInt8:
+    case kTfLiteInt16:
+    case kTfLiteInt32:
+    case kTfLiteBool:
+      break;
+    default:
+      MicroPrintf("Type %s (%d) not supported.", TfLiteTypeGetName(input->type),
+                  input->type);
+      return kTfLiteError;
+  }
 
   // Prepare checks only the output shape, which it derives with a float ceil
   // that rounds above 2^24 elements on an axis, so check for every type that

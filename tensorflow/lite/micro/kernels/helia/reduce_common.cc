@@ -322,16 +322,54 @@ struct MinMaxReducerCompare {
   MinMaxEvalType type_;
 };
 
-// heliaCORE writes the reduced shape it derives from the input and axes, and
-// Prepare never compares that with the output tensor.
-TfLiteStatus EnsureReducedOutputFits(const cmsis_nn_dims& out_d,
-                                     const TfLiteEvalTensor* output) {
-  const int64_t elements = static_cast<int64_t>(out_d.n) * out_d.h * out_d.w *
-                           out_d.c;
-  if (elements != static_cast<int64_t>(ElementCount(*output->dims))) {
-    MicroPrintf(
-        "REDUCE_MAX/REDUCE_MIN: the reduction does not fit the output "
-        "tensor.");
+// Element count of `dims`, or -1 for a negative dim or a count past
+// INT32_MAX: such a count is not compared, since saturated counts could match.
+template <typename D>
+int64_t CheckedElementCount(const D* dims, int count, const bool* skip) {
+  int64_t elements = 1;
+  for (int i = 0; i < count; ++i) {
+    if (dims[i] < 0) {
+      return -1;
+    }
+    if (skip != nullptr && skip[i]) {
+      continue;
+    }
+    elements *= static_cast<int64_t>(dims[i]);
+    if (elements > INT32_MAX) {
+      return -1;
+    }
+  }
+  return elements;
+}
+
+// Both heliaCORE and the reference reducers write the reduction by the input
+// shape, and Prepare never compares that with the output tensor, so every
+// route checks here that the output holds exactly the input's elements on the
+// axes the reduction keeps. An axis outside the input rank fails, as the
+// reference's axis resolution does; a reduced axis of extent 0 still yields
+// the start value.
+TfLiteStatus EnsureReducedOutputSize(const TfLiteEvalTensor* input,
+                                     const TfLiteEvalTensor* axis,
+                                     const TfLiteEvalTensor* output,
+                                     const char* op) {
+  const int rank = input->dims->size;
+  const int num_axis = static_cast<int>(ElementCount(*axis->dims));
+  const int32_t* axis_data = tflite::micro::GetTensorData<int32_t>(axis);
+  bool reduced[kMaxNumberOfAxis] = {};
+  bool valid = rank <= kMaxNumberOfAxis;
+  for (int i = 0; valid && i < num_axis; ++i) {
+    const int32_t a = axis_data[i] < 0 ? axis_data[i] + rank : axis_data[i];
+    valid = a >= 0 && a < rank;
+    if (valid) {
+      reduced[a] = true;
+    }
+  }
+  const int64_t expected =
+      valid ? CheckedElementCount(input->dims->data, rank, reduced) : -1;
+  const int64_t actual =
+      CheckedElementCount(output->dims->data, output->dims->size, nullptr);
+  if (expected < 0 || expected != actual) {
+    MicroPrintf("%s: the output size does not match the reduction.", op);
     return kTfLiteError;
   }
   return kTfLiteOk;
@@ -357,6 +395,8 @@ TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
 
   // Interpret an axis tensor with null dimensions as a scalar
   int num_axis = static_cast<int>(ElementCount(*axis->dims));
+  TF_LITE_ENSURE_OK(context, EnsureReducedOutputSize(input, axis, output,
+                                                     evalType == kEvalMax ? "REDUCE_MAX" : "REDUCE_MIN"));
   int* temp_buffer = static_cast<int*>(
       context->GetScratchBuffer(context, op_data->scratch_input_iter_idx));
   int* resolved_axis = static_cast<int*>(
@@ -388,7 +428,6 @@ TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
       cmsis_nn_dims in_d, ax_d, out_d;
       PopulateCmsisShapeAndAxis(input, axis_data, num_axis, &in_d, &ax_d,
                                 &out_d);
-      TF_LITE_ENSURE_OK(context, EnsureReducedOutputFits(out_d, output));
       const float16_t* input_data =
           tflite::micro::GetTensorData<float16_t>(input);
       float16_t* output_data = tflite::micro::GetTensorData<float16_t>(output);
@@ -410,7 +449,6 @@ TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
         cmsis_nn_dims in_d, ax_d, out_d;
         PopulateCmsisShapeAndAxis(input, axis_data, num_axis, &in_d, &ax_d,
                                   &out_d);
-        TF_LITE_ENSURE_OK(context, EnsureReducedOutputFits(out_d, output));
         const int8_t* input_data = tflite::micro::GetTensorData<int8_t>(input);
         int8_t* output_data = tflite::micro::GetTensorData<int8_t>(output);
         const arm_cmsis_nn_status status =
@@ -442,7 +480,6 @@ TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
         cmsis_nn_dims in_d, ax_d, out_d;
         PopulateCmsisShapeAndAxis(input, axis_data, num_axis, &in_d, &ax_d,
                                   &out_d);
-        TF_LITE_ENSURE_OK(context, EnsureReducedOutputFits(out_d, output));
         const int16_t* input_data =
             tflite::micro::GetTensorData<int16_t>(input);
         int16_t* output_data = tflite::micro::GetTensorData<int16_t>(output);
@@ -566,6 +603,8 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
       reinterpret_cast<TfLiteReducerParams*>(node->builtin_data);
 
   int num_axis = static_cast<int>(ElementCount(*axis->dims));
+  TF_LITE_ENSURE_OK(context, EnsureReducedOutputSize(input, axis, output,
+                                                     "MEAN"));
   int temp_index[kMaxNumberOfAxis];
   int resolved_axis[kMaxNumberOfReducedAxis];
 
@@ -728,6 +767,8 @@ TfLiteStatus EvalSumHelper(TfLiteContext* context, TfLiteNode* node,
 
   // Interpret an axis tensor with null dimensions as a scalar.
   int num_axis = static_cast<int>(ElementCount(*axis->dims));
+  TF_LITE_ENSURE_OK(context, EnsureReducedOutputSize(input, axis, output,
+                                                     "SUM"));
   int temp_index[kMaxNumberOfAxis];
   int resolved_axis[kMaxNumberOfReducedAxis];
 
@@ -902,6 +943,8 @@ TfLiteStatus EvalAllHelper(TfLiteContext* context, TfLiteNode* node,
       static_cast<TfLiteReducerParams*>(node->builtin_data);
 
   int num_axis = static_cast<int>(ElementCount(*axis->dims));
+  TF_LITE_ENSURE_OK(context, EnsureReducedOutputSize(input, axis, output,
+                                                     "REDUCE_ALL"));
   int* input_iter = static_cast<int*>(
       context->GetScratchBuffer(context, op_data->scratch_input_iter_idx));
   int* resolved_axis = static_cast<int*>(

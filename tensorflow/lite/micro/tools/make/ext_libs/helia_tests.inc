@@ -447,3 +447,9 @@ $(kernel_dequantize_f16_test_BINARY): CXXFLAGS += \
 $(kernel_dequantize_f16_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_dequantize_f16_bits_f32
 endif
+
+# MEAN, SUM, REDUCE_MIN/MAX and REDUCE_ALL fail at Invoke, on heliaCORE and
+# reference routes and at rank 5, when the output does not hold exactly the
+# reduced elements. see AmbiqAI/helia-rt#433
+$(eval $(call microlite_test,kernel_reduce_output_size_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/reduce_output_size_test.cc))

@@ -447,4 +447,38 @@ TEST(HeliaStridedSliceRouteTest, OutputLargerThanSliceFailsInvoke) {
   ExpectWrongOutputSizeFailsForEveryType(9);
 }
 
+// An unsupported type fails even when the slice is empty and would write
+// nothing.
+TEST(HeliaStridedSliceRouteTest, UnsupportedTypeEmptySliceFailsInvoke) {
+  using tflite::testing::CreateTensor;
+  using tflite::testing::IntArrayFromInts;
+  uint8_t input[16] = {};
+  uint8_t output[4] = {};
+  const int32_t begin[] = {2, 0};
+  const int32_t end[] = {2, 4};
+  const int32_t strides[] = {1, 1};
+  int input_dims[] = {2, 4, 4};
+  int index_dims[] = {1, 2};
+  int output_dims[] = {2, 0, 4};
+  TfLiteTensor tensors[5] = {
+      CreateTensor(input, IntArrayFromInts(input_dims), false, kTfLiteUInt8),
+      CreateTensor(begin, IntArrayFromInts(index_dims)),
+      CreateTensor(end, IntArrayFromInts(index_dims)),
+      CreateTensor(strides, IntArrayFromInts(index_dims)),
+      CreateTensor(output, IntArrayFromInts(output_dims), false, kTfLiteUInt8),
+  };
+  for (int i = 1; i <= 3; ++i) {
+    tensors[i].allocation_type = kTfLiteMmapRo;
+  }
+  TfLiteStridedSliceParams params = {};
+  int inputs[] = {4, 0, 1, 2, 3};
+  int outputs[] = {1, 4};
+  const TFLMRegistration registration = tflite::Register_STRIDED_SLICE();
+  tflite::micro::KernelRunner runner(registration, tensors, 5,
+                                     IntArrayFromInts(inputs),
+                                     IntArrayFromInts(outputs), &params);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteError, runner.Invoke());
+}
+
 TF_LITE_MICRO_TESTS_MAIN

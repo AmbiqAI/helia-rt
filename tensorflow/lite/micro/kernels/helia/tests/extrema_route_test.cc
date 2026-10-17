@@ -500,19 +500,21 @@ TEST(HeliaExtremaRouteTest, ReduceFloat16) {
 #endif
 }
 
-// Prepare never compares the output tensor with the reduced shape, so a model
-// can declare a [2, 3] -> axis 1 reduction's output as one element. The kernel
-// must fail the op without reaching heliaCORE or writing past the tensor.
+// Prepare never compares the output tensor with the reduced shape. A model can
+// declare a [2, 3] -> axis `axis` reduction's output as `output_dims`; Prepare
+// must accept it and Invoke must fail without reaching heliaCORE or writing
+// past the tensor. See also reduce_output_size_test.cc.
 template <typename T>
-TfLiteStatus RunShortReduceOutput(TfLiteType type, T* output, int capacity) {
+void ExpectReduceMaxPreparesThenFailsInvoke(TfLiteType type, int32_t axis_value,
+                                           int* output_dims, int capacity) {
   using tflite::testing::CreateQuantizedTensor;
   using tflite::testing::CreateTensor;
   using tflite::testing::IntArrayFromInts;
   const T input[6] = {1, 2, 3, 4, 5, 6};
-  const int32_t axis[1] = {1};
+  T output[8];
+  const int32_t axis[1] = {axis_value};
   int input_dims[] = {2, 2, 3};
   int axis_dims[] = {1, 1};
-  int output_dims[] = {1, 1};
   TfLiteTensor tensors[3];
   if constexpr (std::is_same_v<T, uint16_t>) {
     tensors[0] =
@@ -534,28 +536,36 @@ TfLiteStatus RunShortReduceOutput(TfLiteType type, T* output, int capacity) {
   tflite::micro::KernelRunner runner(registration, tensors, 3,
                                      IntArrayFromInts(inputs),
                                      IntArrayFromInts(outputs), &params);
-  TF_LITE_ENSURE_STATUS(runner.InitAndPrepare());
-  memset(output, 0x5A, sizeof(T) * capacity);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  memset(output, 0x5A, sizeof(output));
   memset(g_leaf_calls, 0, sizeof(g_leaf_calls));
-  return runner.Invoke();
-}
-
-template <typename T>
-void ExpectShortReduceOutputFails(TfLiteType type) {
-  T output[4];
-  EXPECT_EQ(kTfLiteError, RunShortReduceOutput<T>(type, output, 4));
+  EXPECT_EQ(kTfLiteError, runner.Invoke());
   EXPECT_EQ(0, CoreCalls());
-  for (size_t i = sizeof(T); i < sizeof(output); ++i) {
+  for (size_t i = 0; i < sizeof(T) * capacity; ++i) {
     EXPECT_EQ(0x5A, reinterpret_cast<const uint8_t*>(output)[i]);
   }
 }
 
-TEST(HeliaExtremaRouteTest, ReduceOutputShorterThanReductionFailsInvoke) {
-  ExpectShortReduceOutputFails<int8_t>(kTfLiteInt8);
-  ExpectShortReduceOutputFails<int16_t>(kTfLiteInt16);
+TEST(HeliaExtremaRouteTest, ReduceMaxShortOutputPreparesThenFailsInvoke) {
+  int output_dims[] = {1, 1};
+  ExpectReduceMaxPreparesThenFailsInvoke<int8_t>(kTfLiteInt8, 1, output_dims,
+                                                 8);
+  ExpectReduceMaxPreparesThenFailsInvoke<int16_t>(kTfLiteInt16, 1, output_dims,
+                                                  8);
 #if ARM_NN_ENABLE_F16
-  ExpectShortReduceOutputFails<uint16_t>(kTfLiteFloat16);
+  ExpectReduceMaxPreparesThenFailsInvoke<uint16_t>(kTfLiteFloat16, 1,
+                                                   output_dims, 8);
 #endif
+}
+
+// An axis outside the input rank fails, as on the reference and float16
+// routes, rather than being skipped and copying the input.
+TEST(HeliaExtremaRouteTest, ReduceMaxIntAxisOutOfRangeFailsInvoke) {
+  int output_dims[] = {2, 2, 3};
+  ExpectReduceMaxPreparesThenFailsInvoke<int8_t>(kTfLiteInt8, 7, output_dims,
+                                                 8);
+  ExpectReduceMaxPreparesThenFailsInvoke<int16_t>(kTfLiteInt16, 7, output_dims,
+                                                  8);
 }
 
 TF_LITE_MICRO_TESTS_MAIN
