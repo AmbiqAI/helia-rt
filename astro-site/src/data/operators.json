@@ -679,7 +679,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "int8/int16 run CORE for identical shapes and rank <= 4 broadcasts. FP32 runs CORE for identical shapes and uses Reference for broadcasts; on MVE float builds (cortex-m55) FP32 uses Reference throughout, because the CORE Helium path flushes subnormal results (AmbiqAI/ns-cmsis-nn#877). FP16 runs CORE for identical shapes and rejects broadcasts. int32 uses Reference. FP16 requires ARM_NN_ENABLE_F16; without it preparation fails."
+    "notes": "int8/int16 run CORE for identical shapes and rank <= 4 broadcasts. FP32 runs CORE for identical shapes and uses Reference for broadcasts; on MVE float builds (cortex-m55) FP32 uses Reference throughout, because the CORE Helium path flushes subnormal results (AmbiqAI/ns-cmsis-nn#877). The Reference keeps subnormal results on GCC builds; clang builds (ATfE, armclang) may vectorize its loop with Helium, which flushes them as well. FP16 runs CORE for identical shapes and rejects broadcasts. int32 uses Reference. FP16 requires ARM_NN_ENABLE_F16; without it preparation fails."
   },
   {
     "name": "SQUEEZE",
