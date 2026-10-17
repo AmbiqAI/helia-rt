@@ -73,7 +73,9 @@ extern "C" {
 
 HELIA_RESIZE_NN_WRAP(arm_resize_nearest_neighbor_s8, Entry::kS8, int8_t)
 HELIA_RESIZE_NN_WRAP(arm_resize_nearest_neighbor_s16, Entry::kS16, int16_t)
+#if ARM_NN_ENABLE_F32
 HELIA_RESIZE_NN_WRAP(arm_resize_nearest_neighbor_f32, Entry::kF32, float)
+#endif
 #if ARM_NN_ENABLE_F16
 HELIA_RESIZE_NN_WRAP(arm_resize_nearest_neighbor_f16, Entry::kF16, float16_t)
 #endif
@@ -225,8 +227,10 @@ void Sweep(TfLiteType type, Entry entry) {
 // declared 2x3 instead, the same element count but not [N, size[0], size[1],
 // C].
 template <typename Storage>
+// `eval_output_type`, when set, replaces the output type after Prepare.
 TfLiteStatus RunSmallLayer(TfLiteType type, bool match_output,
-                           bool* entry_called) {
+                           bool* entry_called,
+                           TfLiteType eval_output_type = kTfLiteNoType) {
   Storage input[2 * 3 * 2] = {};
   Storage output[6 * 2] = {};
   int input_dims[] = {4, 1, 2, 3, 2};
@@ -252,6 +256,9 @@ TfLiteStatus RunSmallLayer(TfLiteType type, bool match_output,
                              IntArrayFromInts(outputs), &params);
   memset(g_entry_calls, 0, sizeof(g_entry_calls));
   TfLiteStatus status = runner.InitAndPrepare();
+  if (eval_output_type != kTfLiteNoType) {
+    tensors[2].type = eval_output_type;
+  }
   if (status == kTfLiteOk) {
     status = runner.Invoke();
   }
@@ -280,6 +287,15 @@ TEST(HeliaResizeNearestNeighborRouteTest, Int16MatchesReference) {
 
 TEST(HeliaResizeNearestNeighborRouteTest, Float32SpecialValuesExactBits) {
   Sweep<int32_t>(kTfLiteFloat32, Entry::kF32);
+}
+
+// An int8 input written to an int16 output would run the s16 entry over half
+// the bytes it reads, so mismatched types fail without an entry call.
+TEST(HeliaResizeNearestNeighborRouteTest, TypeMismatchFailsInvoke) {
+  bool entry_called = true;
+  EXPECT_EQ(kTfLiteError, RunSmallLayer<int8_t>(kTfLiteInt8, true,
+                                                &entry_called, kTfLiteInt16));
+  EXPECT_FALSE(entry_called);
 }
 
 TEST(HeliaResizeNearestNeighborRouteTest, MismatchedOutputShapeKeepsReference) {

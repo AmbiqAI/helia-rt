@@ -157,6 +157,8 @@ TfLiteStatus EvalHelia(TfLiteContext* context, const OpData& data,
                        const TfLiteResizeNearestNeighborParams& params,
                        const TfLiteEvalTensor* input,
                        const TfLiteEvalTensor* size, TfLiteEvalTensor* output) {
+  // The entry reads input elements of the output's type.
+  TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
   const cmsis_nn_context ctx = {
       context->GetScratchBuffer(context, data.scratch_index),
       data.scratch_size};
@@ -208,7 +210,9 @@ TfLiteStatus EvalHelia(TfLiteContext* context, const OpData& data,
       break;
 #endif
     default:
-      break;
+      MicroPrintf("RESIZE_NEAREST_NEIGHBOR: type %s is not supported.",
+                  TfLiteTypeGetName(output->type));
+      return kTfLiteError;
   }
   if (status != ARM_CMSIS_NN_SUCCESS) {
     MicroPrintf("RESIZE_NEAREST_NEIGHBOR: %s failed (%d).", entry,

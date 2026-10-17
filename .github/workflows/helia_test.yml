@@ -325,6 +325,8 @@ jobs:
         # leg. see AmbiqAI/helia-rt#435
         # The STRIDED_SLICE type-mismatch case adds one case on every leg.
         # see AmbiqAI/helia-rt#435
+        # The RESIZE_NEAREST_NEIGHBOR type-mismatch case adds one case on every
+        # leg. see AmbiqAI/helia-rt#433
         # Rank-6 and scalar-input reduction cases add two cases on every leg.
         # see AmbiqAI/helia-rt#433
         # Reference-route axis-list and empty huge-extent cases add three cases on
@@ -335,26 +337,26 @@ jobs:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 174
-            min-cases: 1548
+            min-cases: 1549
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 174
-            min-cases: 1548
+            min-cases: 1549
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 173
-            min-cases: 1546
+            min-cases: 1547
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 174
-            min-cases: 1613
+            min-cases: 1614
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 173
-            min-cases: 1611
+            min-cases: 1612
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
