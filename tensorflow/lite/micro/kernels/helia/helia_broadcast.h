@@ -17,6 +17,7 @@ limitations under the License.
 
 #include <cstdint>
 
+#include "Include/arm_nn_types.h"
 #include "tensorflow/lite/micro/kernels/internal/types.h"
 
 namespace tflite {
@@ -98,6 +99,12 @@ inline HeliaBroadcastClass HeliaClassifyBroadcast(
 inline bool HeliaBroadcastNeedsWalk(HeliaBroadcastClass broadcast_class) {
   return broadcast_class != HeliaBroadcastClass::kUnsupported &&
          broadcast_class != HeliaBroadcastClass::kSameShape;
+}
+
+// NHWC dims of a shape of rank at most 4, left-padded with ones.
+inline cmsis_nn_dims HeliaNhwcDims(const RuntimeShape& unextended_shape) {
+  const RuntimeShape shape = RuntimeShape::ExtendedShape(4, unextended_shape);
+  return {shape.Dims(0), shape.Dims(1), shape.Dims(2), shape.Dims(3)};
 }
 
 }  // namespace micro
