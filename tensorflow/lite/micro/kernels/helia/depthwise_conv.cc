@@ -16,6 +16,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/kernels/depthwise_conv.h"
 
 #include <algorithm>
+#include <cstdint>
 
 #include "Include/arm_nnfunctions.h"
 #include "tensorflow/lite/micro/c/builtin_op_data.h"
@@ -54,6 +55,32 @@ struct OpData {
 #define HELIA_DW_S8_OPT_3X3 1
 #else
 #define HELIA_DW_S8_OPT_3X3 0
+#endif
+
+#if HELIA_DW_S8_OPT_3X3
+// The arm_depthwise_conv_s8_opt_3x3 gate as its header states it, so only
+// layers the entries take request their larger scratch.
+bool InDwS8Opt3x3Gate(const cmsis_nn_dw_conv_params& p,
+                      const cmsis_nn_dims& in, int filter_h, int filter_w,
+                      const cmsis_nn_dims& out) {
+  constexpr int32_t kMaxDim = 4096;
+  if (filter_h != 3 || filter_w != 3 || p.ch_mult != 1 || p.dilation.h != 1 ||
+      p.dilation.w != 1 || in.n != 1 || in.c < 16 || in.c > 2048 ||
+      (p.stride.h != 1 && p.stride.h != 2) ||
+      (p.stride.w != 1 && p.stride.w != 2) || p.padding.h < 0 ||
+      p.padding.h > 1 || p.padding.w < 0 || p.padding.w > 1) {
+    return false;
+  }
+  if (in.h < 1 || in.h > kMaxDim || in.w < 3 || in.w > kMaxDim || out.h < 3 ||
+      out.h > kMaxDim || out.w < 1 || out.w > kMaxDim || out.w * out.h < 16) {
+    return false;
+  }
+  if (int64_t{in.h} * in.w * in.c > INT32_MAX ||
+      int64_t{out.h} * out.w * in.c > INT32_MAX) {
+    return false;
+  }
+  return (out.w - 1) * p.stride.w - p.padding.w + 1 < in.w;
+}
 #endif
 
 // Always inline for optimal code size.
@@ -227,16 +254,10 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
       buf_size = arm_depthwise_conv_wrapper_s8_get_buffer_size(
           &dw_conv_params, &input_dims, &filter_dims, &output_dims);
 #if HELIA_DW_S8_OPT_3X3
-      // The parts of the entries' gate that select the layer; the kernel
-      // checks the rest and declines without writing output. One ctx serves
-      // both routes, so it holds the larger of the two sizes.
-      if (buf_size >= 0 && weight_sum_length > 0 && filter_height == 3 &&
-          filter_width == 3 && dw_conv_params.ch_mult == 1 &&
-          dw_conv_params.dilation.h == 1 && dw_conv_params.dilation.w == 1 &&
-          input_dims.c >= 16 && input_dims.c <= 2048 &&
-          (dw_conv_params.stride.h == 1 || dw_conv_params.stride.h == 2) &&
-          (dw_conv_params.stride.w == 1 || dw_conv_params.stride.w == 2) &&
-          dw_conv_params.padding.h <= 1 && dw_conv_params.padding.w <= 1) {
+      // One ctx serves both routes, so it holds the larger of the two sizes.
+      if (buf_size >= 0 && weight_sum_length > 0 &&
+          InDwS8Opt3x3Gate(dw_conv_params, input_dims, filter_height,
+                           filter_width, output_dims)) {
         const int32_t opt_3x3_size =
             arm_depthwise_conv_s8_opt_3x3_get_buffer_size(&input_dims);
         if (opt_3x3_size >= 0) {

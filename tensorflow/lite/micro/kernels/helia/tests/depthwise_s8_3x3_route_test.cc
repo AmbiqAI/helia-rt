@@ -21,6 +21,8 @@ limitations under the License.
 // entry declines. GCC and ATfE links wrap all three, assert which ran, and
 // inject entry statuses.
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 
@@ -108,13 +110,17 @@ constexpr bool kMve = true;
 constexpr bool kMve = false;
 #endif
 
+// stride is the vertical stride, and the horizontal one unless stride_w is set.
 struct Shape {
   int in_h, in_w, channels, stride, dilation;
   TfLitePadding padding;
+  int stride_w = 0;
+  TfLiteFusedActivation activation = kTfLiteActNone;
 };
 
-// kDeclined: in the kernel's pre-gate, but the entry declines and the wrapper
-// runs the layer.
+int StrideW(const Shape& s) { return s.stride_w > 0 ? s.stride_w : s.stride; }
+
+// kDeclined: the entry is called, declines, and the wrapper runs the layer.
 enum class Route { kOpt3x3, kC64S1, kWrapper, kDeclined };
 
 #if HELIA_DW_3X3_LINK_WRAP
@@ -137,10 +143,10 @@ void ExpectRoute(Route route, Leaf entry) {
 }
 
 constexpr int kKernel = 3;
-constexpr int kMaxInput = 9 * 11 * 64;
-constexpr int kMaxFilter = kKernel * kKernel * 64;
-constexpr int kMaxChannels = 64;
-constexpr int kMaxOutput = 9 * 11 * 64;
+constexpr int kMaxInput = 9 * 11 * 130;
+constexpr int kMaxFilter = kKernel * kKernel * 130;
+constexpr int kMaxChannels = 130;
+constexpr int kMaxOutput = 9 * 11 * 130;
 
 uint32_t g_seed = 2743;
 int NextInt(int lo, int hi) {
@@ -163,6 +169,22 @@ int PadSize(TfLitePadding padding, int in, int out, int stride, int dilation) {
   return total > 0 ? total / 2 : 0;
 }
 
+// The int8 output range TFLite derives from a fused activation.
+void ActivationRange(TfLiteFusedActivation activation, float scale,
+                     int zero_point, int32_t* lo, int32_t* hi) {
+  const auto quantize = [&](float f) {
+    return zero_point + static_cast<int32_t>(std::round(f / scale));
+  };
+  *lo = -128;
+  *hi = 127;
+  if (activation == kTfLiteActRelu || activation == kTfLiteActRelu6) {
+    *lo = std::max(*lo, quantize(0.0f));
+  }
+  if (activation == kTfLiteActRelu6) {
+    *hi = std::min(*hi, quantize(6.0f));
+  }
+}
+
 // Runs the layer and returns the invoke status. On kTfLiteOk the output is
 // compared with the reference and the bytes past it are checked untouched.
 TfLiteStatus RunAgainstReference(const Shape& s) {
@@ -173,7 +195,7 @@ TfLiteStatus RunAgainstReference(const Shape& s) {
   static int8_t expected[kMaxOutput];
 
   const int out_h = OutSize(s.padding, s.in_h, s.stride, s.dilation);
-  const int out_w = OutSize(s.padding, s.in_w, s.stride, s.dilation);
+  const int out_w = OutSize(s.padding, s.in_w, StrideW(s), s.dilation);
   const int input_count = s.in_h * s.in_w * s.channels;
   const int filter_count = kKernel * kKernel * s.channels;
   const int output_count = out_h * out_w * s.channels;
@@ -243,12 +265,12 @@ TfLiteStatus RunAgainstReference(const Shape& s) {
 
   TfLiteDepthwiseConvParams params = {};
   params.padding = s.padding;
-  params.stride_width = s.stride;
+  params.stride_width = StrideW(s);
   params.stride_height = s.stride;
   params.dilation_width_factor = s.dilation;
   params.dilation_height_factor = s.dilation;
   params.depth_multiplier = 1;
-  params.activation = kTfLiteActNone;
+  params.activation = s.activation;
 
   int inputs[] = {3, 0, 1, 2};
   int outputs[] = {1, 3};
@@ -268,10 +290,10 @@ TfLiteStatus RunAgainstReference(const Shape& s) {
                                ? PaddingType::kSame
                                : PaddingType::kValid;
   op_params.padding_values.width =
-      PadSize(s.padding, s.in_w, out_w, s.stride, s.dilation);
+      PadSize(s.padding, s.in_w, out_w, StrideW(s), s.dilation);
   op_params.padding_values.height =
       PadSize(s.padding, s.in_h, out_h, s.stride, s.dilation);
-  op_params.stride_width = s.stride;
+  op_params.stride_width = StrideW(s);
   op_params.stride_height = s.stride;
   op_params.dilation_width_factor = s.dilation;
   op_params.dilation_height_factor = s.dilation;
@@ -279,8 +301,9 @@ TfLiteStatus RunAgainstReference(const Shape& s) {
   op_params.input_offset = -input_zero_point;
   op_params.weights_offset = 0;
   op_params.output_offset = output_zero_point;
-  op_params.quantized_activation_min = -128;
-  op_params.quantized_activation_max = 127;
+  ActivationRange(s.activation, output_scale, output_zero_point,
+                  &op_params.quantized_activation_min,
+                  &op_params.quantized_activation_max);
   const int32_t in_shape[] = {1, s.in_h, s.in_w, s.channels};
   const int32_t f_shape[] = {1, kKernel, kKernel, s.channels};
   const int32_t b_shape[] = {s.channels};
@@ -357,10 +380,39 @@ TEST(HeliaDepthwiseS8Opt3x3RouteTest, DilationTwoIsWrapper) {
                          Route::kWrapper, Leaf::kCount);
 }
 
-// Two output rows: in the kernel's pre-gate, below the entry's three.
-TEST(HeliaDepthwiseS8Opt3x3RouteTest, TwoOutputRowsDeclines) {
+// Two output rows, below the entry's three.
+TEST(HeliaDepthwiseS8Opt3x3RouteTest, TwoOutputRowsIsWrapper) {
   ExpectMatchesReference(Shape{2, 11, 16, 1, 1, kTfLitePaddingSame},
-                         Route::kDeclined, Leaf::kOpt3x3);
+                         Route::kWrapper, Leaf::kCount);
+}
+
+// 3 x 5 = 15 output pixels, below the entry's 16.
+TEST(HeliaDepthwiseS8Opt3x3RouteTest, SmallOutputAreaIsWrapper) {
+  ExpectMatchesReference(Shape{3, 5, 16, 1, 1, kTfLitePaddingSame},
+                         Route::kWrapper, Leaf::kCount);
+}
+
+// More than one 64-channel pass: 96 channels, and 130 with a channel tail.
+TEST(HeliaDepthwiseS8Opt3x3RouteTest, Depth96InGate) {
+  ExpectMatchesReference(Shape{6, 7, 96, 1, 1, kTfLitePaddingSame},
+                         Route::kOpt3x3, Leaf::kOpt3x3);
+}
+
+TEST(HeliaDepthwiseS8Opt3x3RouteTest, Depth130InGate) {
+  ExpectMatchesReference(Shape{7, 9, 130, 1, 1, kTfLitePaddingSame},
+                         Route::kOpt3x3, Leaf::kOpt3x3);
+}
+
+// 64 channels at vertical stride 1 and horizontal stride 2 still take c64_s1.
+TEST(HeliaDepthwiseS8Opt3x3RouteTest, Depth64HorizontalStrideTwoTakesC64S1) {
+  ExpectMatchesReference(Shape{6, 9, 64, 1, 1, kTfLitePaddingSame, 2},
+                         Route::kC64S1, Leaf::kC64S1);
+}
+
+TEST(HeliaDepthwiseS8Opt3x3RouteTest, FusedRelu6InGate) {
+  ExpectMatchesReference(
+      Shape{8, 9, 16, 1, 1, kTfLitePaddingSame, 0, kTfLiteActRelu6},
+      Route::kOpt3x3, Leaf::kOpt3x3);
 }
 
 TEST(HeliaDepthwiseS8Opt3x3RouteTest, DeclinedEntryFallsBackToWrapper) {
