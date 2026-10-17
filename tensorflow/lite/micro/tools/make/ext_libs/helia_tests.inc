@@ -180,7 +180,8 @@ endif
 $(eval $(call microlite_test,kernel_transpose_conv_s8_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/transpose_conv_s8_test.cc))
 
-# Float TRANSPOSE_CONV Prepare rejects a bias of another type.
+# Float TRANSPOSE_CONV Prepare rejects a bias of another type, a rank above six
+# or an element count other than the output channels.
 # see AmbiqAI/helia-rt#443
 $(eval $(call microlite_test,kernel_transpose_conv_float_bias_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/transpose_conv_float_bias_test.cc))

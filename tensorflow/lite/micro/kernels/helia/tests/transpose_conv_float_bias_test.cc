@@ -14,8 +14,9 @@ limitations under the License.
 ==============================================================================*/
 
 // Float TRANSPOSE_CONV Prepare must reject a bias whose type differs from the
-// input's: the float kernels read output-channel many elements of the input
-// type from it. see AmbiqAI/helia-rt#443
+// input's, whose rank exceeds six, or whose element count is not the output
+// channel count: the float kernels read output-channel many elements of the
+// input type from it. see AmbiqAI/helia-rt#443
 
 #include <cstdint>
 
