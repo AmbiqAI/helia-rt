@@ -78,7 +78,8 @@ bool ArmPopulateCommonParams(const tflite::StridedSliceParams& op_params,
     *begin[axis] = start;
     // heliaCORE forms begin + stride * count in int32_t. An axis that takes one
     // element never steps, so give it stride 1; a longer one has |stride| <
-    // dim, which keeps that sum under 2 * dim: in range for axes below 2^30.
+    // dim, which keeps that sum under 2 * dim. Nothing enforces a bound on dim;
+    // heliaCORE's int32_t index math assumes tensors below 2^31 elements.
     *stride[axis] = count == 1u ? 1 : step;
   }
   return true;
