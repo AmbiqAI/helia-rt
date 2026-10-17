@@ -26,7 +26,6 @@ limitations under the License.
 #include "tensorflow/lite/micro/kernels/op_macros.h"
 #include "tensorflow/lite/micro/kernels/strided_slice.h"
 #include "tensorflow/lite/micro/micro_log.h"
-#include "tensorflow/lite/micro/micro_utils.h"
 
 namespace tflite {
 namespace micro {
@@ -79,8 +78,8 @@ bool ArmPopulateCommonParams(const tflite::StridedSliceParams& op_params,
     *begin[axis] = start;
     // heliaCORE forms begin + stride * count in int32_t. An axis that takes one
     // element never steps, so give it stride 1; a longer one has |stride| <
-    // dim, which keeps that sum under 2 * dim. Nothing enforces a bound on dim;
-    // heliaCORE's int32_t index math assumes tensors below 2^31 elements.
+    // dim, which keeps that sum under 2 * dim, in range because Eval rejects
+    // axes above 2^30.
     *stride[axis] = count == 1u ? 1 : step;
   }
   return true;
@@ -165,6 +164,22 @@ TfLiteStatus StridedSliceEval(TfLiteContext* context, TfLiteNode* node) {
       MicroPrintf("Type %s (%d) not supported.", TfLiteTypeGetName(input->type),
                   input->type);
       return kTfLiteError;
+  }
+
+  // heliaCORE's offsets and the reference's indices are int32_t: each axis
+  // must stay at most 2^30 so begin + stride * count fits, and the input
+  // below 2^31 elements so element offsets fit.
+  constexpr int32_t kMaxAxis = int32_t{1} << 30;
+  for (int i = 0; i < input->dims->size; ++i) {
+    if (input->dims->data[i] > kMaxAxis) {
+      MicroPrintf("STRIDED_SLICE: input axis %d exceeds 2^30 elements.", i);
+      return kTfLiteError;
+    }
+  }
+  if (SaturatingProduct(input->dims->data, input->dims->size) >
+      static_cast<uint64_t>(INT32_MAX)) {
+    MicroPrintf("STRIDED_SLICE: the input exceeds INT32_MAX elements.");
+    return kTfLiteError;
   }
 
   // Prepare checks only the output shape, which it derives with a float ceil
