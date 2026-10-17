@@ -63,17 +63,22 @@ bool ArmPopulateCommonParams(const tflite::StridedSliceParams& op_params,
     const int32_t stop =
         StridedSliceEndForAxis(params_copy, input_shape, axis, start);
     const int32_t step = params_copy.strides[axis];
-    // In 64 bits: a stride near INT32_MAX, or INT32_MIN, overflows 32.
-    const int64_t span =
-        step > 0 ? int64_t{stop} - start : int64_t{start} - stop;
+    // start and stop lie in [-1, dim], so the span fits int32_t; the stride
+    // magnitude of INT32_MIN needs uint32_t.
+    const int32_t span = step > 0 ? stop - start : start - stop;
     if (span <= 0) {
       return false;
     }
-    const int64_t magnitude = step > 0 ? int64_t{step} : -int64_t{step};
+    const uint32_t magnitude = step > 0 ? static_cast<uint32_t>(step)
+                                        : 0u - static_cast<uint32_t>(step);
+    const uint32_t count = (static_cast<uint32_t>(span) - 1u) / magnitude + 1u;
     *in[axis] = input_shape.Dims(axis);
-    *out[axis] = static_cast<int32_t>((span - 1) / magnitude + 1);
+    *out[axis] = static_cast<int32_t>(count);
     *begin[axis] = start;
-    *stride[axis] = step;
+    // heliaCORE forms begin + stride * count in int32_t. An axis that takes one
+    // element never steps, so give it stride 1; a longer one has |stride| <
+    // dim and cannot overflow.
+    *stride[axis] = count == 1u ? 1 : step;
   }
   return true;
 }
