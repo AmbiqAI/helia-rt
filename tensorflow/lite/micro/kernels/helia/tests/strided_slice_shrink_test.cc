@@ -366,4 +366,45 @@ TEST(HeliaStridedSliceShrinkTest, OutputLargerThanSliceFailsInvoke) {
   ExpectWrongOutputSizeFails<float>(kTfLiteFloat32, Leaf::kCount, 9);
 }
 
+// A [65536, 65536] slice takes 2^32 elements, past what the saturating counts
+// can tell apart, so it fails even with a matching output. The dims are set
+// after the tensors are made, so nothing is allocated or read for them.
+TEST(HeliaStridedSliceShrinkTest, SlicePastInt32MaxFailsInvoke) {
+  using tflite::testing::CreateTensor;
+  using tflite::testing::IntArrayFromInts;
+  static int8_t input[4] = {};
+  static int8_t output[4] = {};
+  const int32_t begin[] = {0, 0};
+  const int32_t end[] = {65536, 65536};
+  const int32_t strides[] = {1, 1};
+  int small_dims[] = {2, 2, 2};
+  int index_dims[] = {1, 2};
+  static int huge_dims[] = {2, 65536, 65536};
+  TfLiteTensor tensors[5] = {
+      CreateTensor(input, IntArrayFromInts(small_dims)),
+      CreateTensor(begin, IntArrayFromInts(index_dims)),
+      CreateTensor(end, IntArrayFromInts(index_dims)),
+      CreateTensor(strides, IntArrayFromInts(index_dims)),
+      CreateTensor(output, IntArrayFromInts(small_dims)),
+  };
+  for (int i = 1; i <= 3; ++i) {
+    tensors[i].allocation_type = kTfLiteMmapRo;
+  }
+  tensors[0].dims = IntArrayFromInts(huge_dims);
+  tensors[4].dims = IntArrayFromInts(huge_dims);
+  TfLiteStridedSliceParams params = {};
+  int inputs[] = {4, 0, 1, 2, 3};
+  int outputs[] = {1, 4};
+  const TFLMRegistration registration = tflite::Register_STRIDED_SLICE();
+  tflite::micro::KernelRunner runner(registration, tensors, 5,
+                                     IntArrayFromInts(inputs),
+                                     IntArrayFromInts(outputs), &params);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  memset(g_leaf_calls, 0, sizeof(g_leaf_calls));
+  EXPECT_EQ(kTfLiteError, runner.Invoke());
+#if HELIA_STRIDED_SLICE_SHRINK_LINK_WRAP
+  EXPECT_EQ(0, g_leaf_calls[static_cast<int>(Leaf::kS8)]);
+#endif
+}
+
 TF_LITE_MICRO_TESTS_MAIN

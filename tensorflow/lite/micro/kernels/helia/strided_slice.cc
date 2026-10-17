@@ -151,8 +151,12 @@ TfLiteStatus StridedSliceEval(TfLiteContext* context, TfLiteNode* node) {
   }
   const int32_t counts[4] = {output_dims.n, output_dims.h, output_dims.w,
                              output_dims.c};
-  if (SaturatingProduct(counts, 4) !=
-      SaturatingProduct(output->dims->data, output->dims->size)) {
+  // Two counts that both saturate are not known to be equal, so a slice past
+  // INT32_MAX elements fails too.
+  const uint64_t slice_elements = SaturatingProduct(counts, 4);
+  if (slice_elements > static_cast<uint64_t>(INT32_MAX) ||
+      slice_elements !=
+          SaturatingProduct(output->dims->data, output->dims->size)) {
     MicroPrintf("STRIDED_SLICE: the output size does not match the slice.");
     return kTfLiteError;
   }
