@@ -336,14 +336,35 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
                                    &(data->scratch_buffer_output_index)));
     data->scratch_buffer_output_size = reverse_buf_size;
   }
-  // Quantized 16x8 kernels use an int64 scratch buffer.
   if (input->type == kTfLiteInt16) {
-    TFLITE_DCHECK(context->RequestScratchBufferInArena != nullptr);
-    TF_LITE_ENSURE_OK(
-        context,
-        context->RequestScratchBufferInArena(
-            context, GetTensorShape(output).FlatSize() * sizeof(std::int64_t),
-            &(data->scratch_buffer_index)));
+    RuntimeShape input_shape = GetTensorShape(input);
+    RuntimeShape output_shape = GetTensorShape(output);
+    RuntimeShape filter_shape = GetTensorShape(filter);
+    const int batch_size = MatchingDim(input_shape, 0, output_shape, 0);
+    const int output_depth = MatchingDim(filter_shape, 0, output_shape, 3);
+    const int input_depth = MatchingDim(input_shape, 3, filter_shape, 3);
+
+    cmsis_nn_transpose_conv_params conv_params = {};
+    conv_params.stride.w = params->stride_width;
+    conv_params.stride.h = params->stride_height;
+    conv_params.dilation.w = 1;
+    conv_params.dilation.h = 1;
+    const cmsis_nn_dims input_dims = {batch_size, input_shape.Dims(1),
+                                      input_shape.Dims(2), input_depth};
+    const cmsis_nn_dims filter_dims = {output_depth, filter_shape.Dims(1),
+                                       filter_shape.Dims(2), input_depth};
+    const cmsis_nn_dims output_dims = {batch_size, output_shape.Dims(1),
+                                       output_shape.Dims(2), output_depth};
+    const int32_t buf_size = arm_transpose_conv_s16_get_buffer_size(
+        &conv_params, &input_dims, &filter_dims, &output_dims);
+    TF_LITE_ENSURE_MSG(context, buf_size >= 0,
+                       "TRANSPOSE_CONV: invalid int16 scratch buffer size.");
+    if (buf_size > 0) {
+      TF_LITE_ENSURE_OK(context,
+                        context->RequestScratchBufferInArena(
+                            context, buf_size, &(data->scratch_buffer_index)));
+      data->scratch_buffer_size = buf_size;
+    }
   }
 
   // All per-channel quantized tensors need valid zero point and scale arrays.
@@ -521,6 +542,75 @@ TfLiteStatus EvalQuantizedPerChannel(TfLiteContext* context, TfLiteNode* node,
   return kTfLiteOk;
 }
 
+TfLiteStatus EvalQuantizedPerChannel16x8(TfLiteContext* context,
+                                         const TfLiteConvParams& params,
+                                         const OpData& data,
+                                         const TfLiteEvalTensor* input,
+                                         const TfLiteEvalTensor* filter,
+                                         const TfLiteEvalTensor* bias,
+                                         TfLiteEvalTensor* output) {
+  // Input and output zero points are 0 for 16x8, so the offsets are unused.
+  cmsis_nn_transpose_conv_params conv_params = {};
+  conv_params.stride.h = params.stride_height;
+  conv_params.stride.w = params.stride_width;
+  conv_params.padding.h = data.params.padding_values.height;
+  conv_params.padding.w = data.params.padding_values.width;
+  conv_params.dilation.h = 1;
+  conv_params.dilation.w = 1;
+  conv_params.activation.min = data.params.quantized_activation_min;
+  conv_params.activation.max = data.params.quantized_activation_max;
+
+  cmsis_nn_per_channel_quant_params quant_params;
+  quant_params.multiplier =
+      const_cast<int32_t*>(data.per_channel_output_multiplier);
+  quant_params.shift = const_cast<int32_t*>(data.per_channel_output_shift);
+
+  const RuntimeShape input_shape = tflite::micro::GetTensorShape(input);
+  const RuntimeShape filter_shape = tflite::micro::GetTensorShape(filter);
+  const RuntimeShape output_shape = tflite::micro::GetTensorShape(output);
+  const int batch_size = MatchingDim(input_shape, 0, output_shape, 0);
+  const int input_depth = MatchingDim(input_shape, 3, filter_shape, 3);
+  const int output_depth = MatchingDim(filter_shape, 0, output_shape, 3);
+  const cmsis_nn_dims input_dims = {batch_size, input_shape.Dims(1),
+                                    input_shape.Dims(2), input_depth};
+  const cmsis_nn_dims filter_dims = {output_depth, filter_shape.Dims(1),
+                                     filter_shape.Dims(2), input_depth};
+  const cmsis_nn_dims bias_dims = {1, 1, 1, output_depth};
+  const cmsis_nn_dims output_dims = {batch_size, output_shape.Dims(1),
+                                     output_shape.Dims(2), output_depth};
+
+  cmsis_nn_context ctx = {nullptr, data.scratch_buffer_size};
+  if (data.scratch_buffer_index >= 0) {
+    ctx.buf = context->GetScratchBuffer(context, data.scratch_buffer_index);
+  }
+  const cmsis_nn_context output_ctx = {nullptr, 0};
+
+  const std::int64_t* bias_data =
+      tflite::micro::GetOptionalTensorData<std::int64_t>(bias);
+  // TODO(b/192090531): Remove this once all 8x16 transpose conv models use
+  // 64-bit biases.
+  if (bias != nullptr && bias->type == kTfLiteInt16) {
+    std::int64_t* bias_converted_buffer = static_cast<int64_t*>(
+        context->GetScratchBuffer(context, data.bias_converted_buffer_index));
+    for (int i = 0; i < tflite::micro::GetTensorShape(bias).FlatSize(); i++) {
+      bias_converted_buffer[i] = bias->data.i16[i];
+    }
+    bias_data = bias_converted_buffer;
+  }
+
+  const arm_cmsis_nn_status status = arm_transpose_conv_s16(
+      &ctx, &output_ctx, &conv_params, &quant_params, &input_dims,
+      tflite::micro::GetTensorData<int16_t>(input), &filter_dims,
+      tflite::micro::GetTensorData<int8_t>(filter), &bias_dims, bias_data,
+      &output_dims, tflite::micro::GetTensorData<int16_t>(output));
+  if (status != ARM_CMSIS_NN_SUCCESS) {
+    MicroPrintf("TRANSPOSE_CONV: arm_transpose_conv_s16 failed (%d).",
+                static_cast<int>(status));
+    return kTfLiteError;
+  }
+  return kTfLiteOk;
+}
+
 template <typename T>
 TfLiteStatus EvalFloat(TfLiteContext* context, TfLiteNode* node,
                        const TfLiteEvalTensor* input,
@@ -657,42 +747,8 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
       break;
     }
     case kTfLiteInt16: {
-      std::int64_t* scratch_buffer = static_cast<int64_t*>(
-          context->GetScratchBuffer(context, data.scratch_buffer_index));
-      // TODO(b/192090531): Remove this once all 8x16 transpose conv models use
-      // 64-bit biases.
-      if (bias != nullptr && bias->type == kTfLiteInt16) {
-        std::int64_t* bias_converted_buffer =
-            static_cast<int64_t*>(context->GetScratchBuffer(
-                context, data.bias_converted_buffer_index));
-        for (int i = 0; i < tflite::micro::GetTensorShape(bias).FlatSize();
-             i++) {
-          bias_converted_buffer[i] = bias->data.i16[i];
-        }
-        reference_integer_ops::TransposeConv(
-            data.params, data.per_channel_output_multiplier,
-            data.per_channel_output_shift, tflite::micro::GetTensorShape(input),
-            tflite::micro::GetTensorData<int16_t>(input),
-            tflite::micro::GetTensorShape(filter),
-            tflite::micro::GetTensorData<int8_t>(filter),
-            tflite::micro::GetTensorShape(bias), bias_converted_buffer,
-            tflite::micro::GetTensorShape(output),
-            tflite::micro::GetTensorData<int16_t>(output),
-            tflite::micro::GetTensorShape(nullptr), nullptr, scratch_buffer);
-      } else {
-        reference_integer_ops::TransposeConv(
-            data.params, data.per_channel_output_multiplier,
-            data.per_channel_output_shift, tflite::micro::GetTensorShape(input),
-            tflite::micro::GetTensorData<int16_t>(input),
-            tflite::micro::GetTensorShape(filter),
-            tflite::micro::GetTensorData<int8_t>(filter),
-            tflite::micro::GetTensorShape(bias),
-            tflite::micro::GetOptionalTensorData<std::int64_t>(bias),
-            tflite::micro::GetTensorShape(output),
-            tflite::micro::GetTensorData<int16_t>(output),
-            tflite::micro::GetTensorShape(nullptr), nullptr, scratch_buffer);
-      }
-      break;
+      return EvalQuantizedPerChannel16x8(context, params, data, input, filter,
+                                         bias, output);
     }
     default:
       MicroPrintf("Type %s (%d) not supported.", TfLiteTypeGetName(input->type),

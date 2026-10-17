@@ -15,6 +15,8 @@ limitations under the License.
 
 #include "tensorflow/lite/micro/kernels/depthwise_conv.h"
 
+#include <algorithm>
+
 #include "Include/arm_nnfunctions.h"
 #include "tensorflow/lite/micro/c/builtin_op_data.h"
 #include "tensorflow/lite/micro/c/common.h"
@@ -42,7 +44,17 @@ struct OpData {
   int32_t activation_buffer_size;
   int32_t weight_sum_buffer_size;
   int32_t* weight_sum_buf;
+  // Try the s8 3x3 direct entries before the wrapper. Set only on MVEI builds.
+  bool use_s8_opt_3x3;
 };
+
+// The s8 3x3 direct entries return ARM_CMSIS_NN_NO_IMPL_ERROR without writing
+// output on any other build, so they are not compiled in there.
+#if defined(ARM_MATH_MVEI) && !defined(ARM_MATH_AUTOVECTORIZE)
+#define HELIA_DW_S8_OPT_3X3 1
+#else
+#define HELIA_DW_S8_OPT_3X3 0
+#endif
 
 // Always inline for optimal code size.
 void PopulateDwConvParams(
@@ -158,6 +170,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   data->activation_buffer_size = 0;
   data->weight_sum_buffer_size = 0;
   data->weight_sum_buf = nullptr;
+  data->use_s8_opt_3x3 = false;
 
   if (input->type == kTfLiteInt8) {
     RuntimeShape input_shape = GetTensorShape(input);
@@ -213,6 +226,25 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
       data->weight_sum_buffer_size = weight_sum_length;
       buf_size = arm_depthwise_conv_wrapper_s8_get_buffer_size(
           &dw_conv_params, &input_dims, &filter_dims, &output_dims);
+#if HELIA_DW_S8_OPT_3X3
+      // The parts of the entries' gate that select the layer; the kernel
+      // checks the rest and declines without writing output. One ctx serves
+      // both routes, so it holds the larger of the two sizes.
+      if (buf_size >= 0 && weight_sum_length > 0 && filter_height == 3 &&
+          filter_width == 3 && dw_conv_params.ch_mult == 1 &&
+          dw_conv_params.dilation.h == 1 && dw_conv_params.dilation.w == 1 &&
+          input_dims.c >= 16 && input_dims.c <= 2048 &&
+          (dw_conv_params.stride.h == 1 || dw_conv_params.stride.h == 2) &&
+          (dw_conv_params.stride.w == 1 || dw_conv_params.stride.w == 2) &&
+          dw_conv_params.padding.h <= 1 && dw_conv_params.padding.w <= 1) {
+        const int32_t opt_3x3_size =
+            arm_depthwise_conv_s8_opt_3x3_get_buffer_size(&input_dims);
+        if (opt_3x3_size >= 0) {
+          data->use_s8_opt_3x3 = true;
+          buf_size = std::max(buf_size, opt_3x3_size);
+        }
+      }
+#endif
     } else if (filter->type == kTfLiteInt4) {
       buf_size = arm_depthwise_conv_wrapper_s4_get_buffer_size(
           &dw_conv_params, &input_dims, &filter_dims, &output_dims);
@@ -472,6 +504,37 @@ TfLiteStatus EvalQuantizedPerChannel(TfLiteContext* context, TfLiteNode* node,
       }
     }
   }
+#if HELIA_DW_S8_OPT_3X3
+  if (data.use_s8_opt_3x3) {
+    const bool c64_s1 = input_dims.c == 64 && dw_conv_params.stride.h == 1;
+    const arm_cmsis_nn_status opt_status =
+        c64_s1
+            ? arm_depthwise_conv_s8_opt_3x3_c64_s1(
+                  &ctx, &weight_sum_ctx, &dw_conv_params, &quant_params,
+                  &input_dims, tflite::micro::GetTensorData<int8_t>(input),
+                  &filter_dims, tflite::micro::GetTensorData<int8_t>(filter),
+                  &bias_dims,
+                  tflite::micro::GetOptionalTensorData<int32_t>(bias),
+                  &output_dims, tflite::micro::GetTensorData<int8_t>(output))
+            : arm_depthwise_conv_s8_opt_3x3(
+                  &ctx, &weight_sum_ctx, &dw_conv_params, &quant_params,
+                  &input_dims, tflite::micro::GetTensorData<int8_t>(input),
+                  &filter_dims, tflite::micro::GetTensorData<int8_t>(filter),
+                  &bias_dims,
+                  tflite::micro::GetOptionalTensorData<int32_t>(bias),
+                  &output_dims, tflite::micro::GetTensorData<int8_t>(output));
+    if (opt_status == ARM_CMSIS_NN_SUCCESS) {
+      return kTfLiteOk;
+    }
+    if (opt_status != ARM_CMSIS_NN_NO_IMPL_ERROR) {
+      MicroPrintf("DEPTHWISE_CONV_2D: %s failed (%d).",
+                  c64_s1 ? "arm_depthwise_conv_s8_opt_3x3_c64_s1"
+                         : "arm_depthwise_conv_s8_opt_3x3",
+                  static_cast<int>(opt_status));
+      return kTfLiteError;
+    }
+  }
+#endif
   const arm_cmsis_nn_status status = arm_depthwise_conv_wrapper_s8(
       &ctx, &weight_sum_ctx, &dw_conv_params, &quant_params, &input_dims,
       tflite::micro::GetTensorData<int8_t>(input), &filter_dims,

@@ -144,6 +144,48 @@ $(kernel_conv_3x3_c16_route_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_convolve_s8
 endif
 
+# int8 1x1 CONV_2D inside and just outside the arm_convolve_1x1_s8_short_k gate,
+# against the reference kernel. GCC and ATfE links wrap the entry and the
+# wrapper to prove each route and inject entry statuses.
+$(eval $(call microlite_test,kernel_conv_1x1_short_k_route_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/conv_1x1_short_k_route_test.cc))
+
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
+$(kernel_conv_1x1_short_k_route_test_BINARY): CXXFLAGS += \
+  -DHELIA_CONV_SHORT_K_LINK_WRAP=1
+$(kernel_conv_1x1_short_k_route_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_convolve_1x1_s8_short_k \
+  -Wl,--wrap=arm_convolve_wrapper_s8
+endif
+
+# int8 3x3 DEPTHWISE_CONV_2D inside and just outside the
+# arm_depthwise_conv_s8_opt_3x3 gates, against the reference kernel. GCC and
+# ATfE links wrap both entries and the wrapper to prove each route and inject
+# entry statuses.
+$(eval $(call microlite_test,kernel_depthwise_s8_3x3_route_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/depthwise_s8_3x3_route_test.cc))
+
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
+$(kernel_depthwise_s8_3x3_route_test_BINARY): CXXFLAGS += \
+  -DHELIA_DW_3X3_LINK_WRAP=1
+$(kernel_depthwise_s8_3x3_route_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_depthwise_conv_s8_opt_3x3 \
+  -Wl,--wrap=arm_depthwise_conv_s8_opt_3x3_c64_s1 \
+  -Wl,--wrap=arm_depthwise_conv_wrapper_s8
+endif
+
+# 16x8 TRANSPOSE_CONV against the reference kernel over strides, paddings and
+# bias types. GCC and ATfE links wrap arm_transpose_conv_s16 to prove the route.
+$(eval $(call microlite_test,kernel_transpose_conv_s16_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/transpose_conv_s16_test.cc))
+
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
+$(kernel_transpose_conv_s16_test_BINARY): CXXFLAGS += \
+  -DHELIA_TRANSPOSE_CONV_S16_LINK_WRAP=1
+$(kernel_transpose_conv_s16_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_transpose_conv_s16
+endif
+
 # TRANSPOSE_CONV optional bias, and the int8 scratch-context contract on GCC and
 # ATfE links. see AmbiqAI/helia-rt#238
 $(eval $(call microlite_test,kernel_transpose_conv_optional_bias_test,\
