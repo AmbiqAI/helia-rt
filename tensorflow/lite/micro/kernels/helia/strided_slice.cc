@@ -135,6 +135,8 @@ TfLiteStatus StridedSliceEval(TfLiteContext* context, TfLiteNode* node) {
   TfLiteEvalTensor* output =
       tflite::micro::GetEvalOutput(context, node, kStridedSliceOutputTensor);
 
+  // The copy reads input elements of the output's type.
+  TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
   switch (output->type) {
     case kTfLiteFloat32:
     case kTfLiteInt8:
@@ -143,8 +145,8 @@ TfLiteStatus StridedSliceEval(TfLiteContext* context, TfLiteNode* node) {
     case kTfLiteBool:
       break;
     default:
-      MicroPrintf("Type %s (%d) not supported.", TfLiteTypeGetName(input->type),
-                  input->type);
+      MicroPrintf("Type %s (%d) not supported.",
+                  TfLiteTypeGetName(output->type), output->type);
       return kTfLiteError;
   }
 
@@ -153,8 +155,8 @@ TfLiteStatus StridedSliceEval(TfLiteContext* context, TfLiteNode* node) {
   // below 2^31 elements so element offsets fit.
   constexpr int32_t kMaxAxis = int32_t{1} << 30;
   for (int i = 0; i < input->dims->size; ++i) {
-    if (input->dims->data[i] > kMaxAxis) {
-      MicroPrintf("STRIDED_SLICE: input axis %d exceeds 2^30 elements.", i);
+    if (input->dims->data[i] < 0 || input->dims->data[i] > kMaxAxis) {
+      MicroPrintf("STRIDED_SLICE: input axis %d is negative or above 2^30.", i);
       return kTfLiteError;
     }
   }
@@ -180,12 +182,10 @@ TfLiteStatus StridedSliceEval(TfLiteContext* context, TfLiteNode* node) {
   }
   const int32_t counts[4] = {output_dims.n, output_dims.h, output_dims.w,
                              output_dims.c};
-  // Two counts that both saturate are not known to be equal, so a slice past
-  // INT32_MAX elements fails too.
-  const uint64_t slice_elements = SaturatingProduct(counts, 4);
-  if (slice_elements > static_cast<uint64_t>(INT32_MAX) ||
-      slice_elements !=
-          SaturatingProduct(output->dims->data, output->dims->size)) {
+  // The input bound keeps the slice below 2^31 elements, so neither count
+  // saturates and they compare exactly.
+  if (SaturatingProduct(counts, 4) !=
+      SaturatingProduct(output->dims->data, output->dims->size)) {
     MicroPrintf("STRIDED_SLICE: the output size does not match the slice.");
     return kTfLiteError;
   }
