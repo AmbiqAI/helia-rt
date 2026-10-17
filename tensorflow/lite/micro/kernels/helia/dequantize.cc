@@ -91,9 +91,8 @@ TfLiteStatus DequantizeEval(TfLiteContext* context, TfLiteNode* node) {
     // kHeliaFloat16Enabled; see AmbiqAI/helia-rt#255.
     case kTfLiteFloat16: {
 #if defined(ARM_NN_DEQUANTIZE_F16_MVE)
-      // The MVE vector conversion returns the default NaN for every NaN, and
-      // compilers vectorize a float16_t cast loop into it, so widen in integer
-      // arithmetic: a NaN keeps its sign and payload.
+      // TODO(AmbiqAI/ns-cmsis-nn#871): MVE widening drops NaN payloads.
+      // A float16_t cast loop compiles to that same conversion, so widen bits.
       float* output_data = tflite::micro::GetTensorData<float>(output);
       const int flat_size = ElementCount(*input->dims);
       const TfLiteFloat16* input_data =

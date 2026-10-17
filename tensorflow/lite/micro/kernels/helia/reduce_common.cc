@@ -350,8 +350,7 @@ TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
   const bool is_max = evalType == kEvalMax;
   switch (input->type) {
     case kTfLiteFloat32: {
-      // arm_reduce_max/min_f32 propagate NaN and start from -/+Inf where
-      // TFLite skips NaN and starts from -/+FLT_MAX, so float32 stays here.
+      // TODO(AmbiqAI/ns-cmsis-nn#870): f32 entries miss TFLite NaN/Inf rules.
       MinMaxReducerCompare<float> reducer(evalType);
       TF_LITE_ENSURE(
           context,
