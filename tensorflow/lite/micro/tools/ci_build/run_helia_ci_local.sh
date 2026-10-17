@@ -15,8 +15,8 @@
 #
 # Options:
 #   --src <dir>        Checkout to test (default: the one holding this script).
-#   --legs <regex>     Run only units whose "<arch>-<toolchain>-<opt>" name
-#                      matches (e.g. 'cortex-m55', 'atfe-SPEED').
+#   --legs <text>      Run only units whose "<arch>-<toolchain>-<opt>" name
+#                      contains <text> (e.g. 'cortex-m4+fp', 'atfe-SPEED').
 #   --opt <SPEED|SIZE|BOTH>
 #                      Kernel optimization profiles (default: BOTH).
 #   --parallel <n>     Units run at once (default: 2).
@@ -103,8 +103,8 @@ def items(key):
         sys.exit("helia_test.yml: matrix %s not found" % key)
     return [s.strip().strip('"') for s in v.group(1).split(",")]
 excludes = set(re.findall(
-    r'-\s*arch:\s*"([^"]+)"\s*\n\s*toolchain:\s*"([^"]+)"',
-    head.split("exclude:", 1)[1] if "exclude:" in head else ""))
+    r'-\s*arch:\s*[\'"]?([^\'"\n]+?)[\'"]?\s*\n\s*toolchain:\s*[\'"]?([^\'"\n]+?)[\'"]?\s*$',
+    head.split("exclude:", 1)[1] if "exclude:" in head else "", re.M))
 floors = {}
 for entry in re.split(r"\n\s*-\s*(?=arch:)", "\n" + include)[1:]:
     get = lambda k: (re.search(r'%s:\s*"?([^"\n]+)"?' % k, entry) or [None, "-"])[1]
@@ -125,11 +125,19 @@ UNITS=()
 while read -r arch tc min_bins min_cases; do
   for opt in "${OPTS[@]}"; do
     name="${arch}-${tc}-${opt}"
-    if [[ -z "${LEGS_RE}" || "${name}" =~ ${LEGS_RE} ]]; then
+    if [[ -z "${LEGS_RE}" || "${name}" == *"${LEGS_RE}"* ]]; then
       UNITS+=("${name} ${arch} ${tc} ${opt} ${min_bins} ${min_cases}")
     fi
   done
 done < <(read_matrix)
+
+# A workflow edit the parser does not follow would drop every floor and let a
+# run pass with none enforced, so finding no floor at all is an error.
+if [[ ${USE_FLOORS} -eq 1 ]] && ! printf '%s\n' "${UNITS[@]}" |
+    awk '$5 != "-" && $6 != "-" {found = 1} END {exit !found}'; then
+  echo "No executed-case floors parsed from ${WORKFLOW}; pass --no-floors to run anyway." >&2
+  exit 2
+fi
 
 if [[ ${#UNITS[@]} -eq 0 ]]; then
   echo "No matrix unit matches --legs '${LEGS_RE}'." >&2
@@ -239,6 +247,7 @@ run_unit() {
     fi
   fi
   local start=${SECONDS}
+  [[ ${NATIVE} -eq 1 ]] || env_opts+=" --name helia-local-ci-${RUN_ID}-${name//+/p}"
   if UNIT_ENV="${env_opts}" in_unit "${CACHE_DIR}/trees/${name}" \
       tensorflow/lite/micro/tools/ci_build/test_helia.sh \
       -a "${arch}" -t "${tc}" -O "${opt}" > "${LOG_DIR}/${name}.log" 2>&1; then
@@ -249,6 +258,18 @@ run_unit() {
 }
 
 echo "==> ${#UNITS[@]} units, ${PARALLEL} at a time, ${UNIT_CPUS} CPUs each"
+
+# Stop every unit, and the containers they started, if the run is interrupted.
+stop_units() {
+  trap - INT TERM
+  jobs -p | xargs -r kill 2>/dev/null || true
+  if [[ ${NATIVE} -eq 0 ]]; then
+    docker ps -q --filter "name=helia-local-ci-${RUN_ID}-" | xargs -r docker kill >/dev/null 2>&1 || true
+  fi
+  echo "==> interrupted; units stopped. logs: ${LOG_DIR}" >&2
+  exit 130
+}
+trap stop_units INT TERM
 results="${LOG_DIR}/results.txt"
 : > "${results}"
 running=0
@@ -285,4 +306,12 @@ for unit in "${UNITS[@]}"; do
   fi
 done
 echo "==> logs: ${LOG_DIR}"
+partial=()
+[[ -n "${LEGS_RE}" ]] && partial+=("--legs ${LEGS_RE}")
+[[ "${OPT_CHOICE}" != BOTH ]] && partial+=("--opt ${OPT_CHOICE}")
+[[ ${USE_FLOORS} -eq 0 ]] && partial+=("--no-floors")
+[[ ${RUN_CHECKS} -eq 0 ]] && partial+=("--skip-checks")
+if [[ ${#partial[@]} -gt 0 ]]; then
+  echo "==> NOTE: partial run (${partial[*]}): this is not the full helia_test.yml gate."
+fi
 exit ${status}
