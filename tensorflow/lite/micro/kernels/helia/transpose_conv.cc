@@ -51,8 +51,8 @@ struct OpData {
   // Scratch buffers are required for quantized implementations.
   int scratch_buffer_index;
   int scratch_buffer_output_index;
-  // Byte counts Prepare requested for the two int8 buffers; the contexts
-  // passed to heliaCORE must carry them.
+  // Byte counts Prepare requested for the scratch buffers; the contexts passed
+  // to heliaCORE must carry them.
   int32_t scratch_buffer_size;
   int32_t scratch_buffer_output_size;
 
@@ -337,6 +337,8 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     data->scratch_buffer_output_size = reverse_buf_size;
   }
   if (input->type == kTfLiteInt16) {
+    TF_LITE_ENSURE_EQ(context, input->params.zero_point, 0);
+    TF_LITE_ENSURE_EQ(context, output->params.zero_point, 0);
     RuntimeShape input_shape = GetTensorShape(input);
     RuntimeShape output_shape = GetTensorShape(output);
     RuntimeShape filter_shape = GetTensorShape(filter);
@@ -549,7 +551,7 @@ TfLiteStatus EvalQuantizedPerChannel16x8(TfLiteContext* context,
                                          const TfLiteEvalTensor* filter,
                                          const TfLiteEvalTensor* bias,
                                          TfLiteEvalTensor* output) {
-  // Input and output zero points are 0 for 16x8, so the offsets are unused.
+  // Prepare requires zero input and output zero points for 16x8.
   cmsis_nn_transpose_conv_params conv_params = {};
   conv_params.stride.h = params.stride_height;
   conv_params.stride.w = params.stride_width;

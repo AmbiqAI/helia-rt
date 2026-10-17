@@ -71,16 +71,20 @@ namespace {
 
 enum class Bias { kInt64, kInt16, kNone };
 
+// A nonzero input_zero_point must fail Prepare: 16x8 requires symmetric
+// activations.
 struct Shape {
   int in_h, in_w, in_c, out_c, kernel, stride;
   TfLitePadding padding;
   Bias bias;
+  int batch = 1;
+  int input_zero_point = 0;
 };
 
-constexpr int kMaxInput = 6 * 7 * 16;
+constexpr int kMaxInput = 2 * 6 * 7 * 16;
 constexpr int kMaxFilter = 8 * 5 * 5 * 16;
 constexpr int kMaxChannels = 8;
-constexpr int kMaxOutput = 16 * 18 * 8;
+constexpr int kMaxOutput = 2 * 16 * 18 * 8;
 
 uint32_t g_seed = 1066;
 int NextInt(int lo, int hi) {
@@ -114,9 +118,9 @@ void ExpectMatchesReference(const Shape& s) {
 
   const int out_h = OutSize(s.padding, s.in_h, s.kernel, s.stride);
   const int out_w = OutSize(s.padding, s.in_w, s.kernel, s.stride);
-  const int input_count = s.in_h * s.in_w * s.in_c;
+  const int input_count = s.batch * s.in_h * s.in_w * s.in_c;
   const int filter_count = s.out_c * s.kernel * s.kernel * s.in_c;
-  const int output_count = out_h * out_w * s.out_c;
+  const int output_count = s.batch * out_h * out_w * s.out_c;
   EXPECT_LE(input_count, kMaxInput);
   EXPECT_LE(filter_count, kMaxFilter);
   EXPECT_LE(output_count, kMaxOutput);
@@ -164,10 +168,10 @@ void ExpectMatchesReference(const Shape& s) {
 
   int output_shape_dims[] = {1, 0};
   int32_t* output_shape = nullptr;
-  int input_dims[] = {4, 1, s.in_h, s.in_w, s.in_c};
+  int input_dims[] = {4, s.batch, s.in_h, s.in_w, s.in_c};
   int filter_dims[] = {4, s.out_c, s.kernel, s.kernel, s.in_c};
   int bias_dims[] = {1, s.out_c};
-  int output_dims[] = {4, 1, out_h, out_w, s.out_c};
+  int output_dims[] = {4, s.batch, out_h, out_w, s.out_c};
   TfLiteAffineQuantization filter_quant = {FloatArrayFromFloats(filter_scales),
                                            IntArrayFromInts(filter_zero_points),
                                            0};
@@ -177,7 +181,7 @@ void ExpectMatchesReference(const Shape& s) {
       CreateTensor(output_shape, IntArrayFromInts(output_shape_dims)),
       CreateTensor(filter, IntArrayFromInts(filter_dims)),
       CreateQuantizedTensor(input, IntArrayFromInts(input_dims), input_scale,
-                            0),
+                            s.input_zero_point),
       s.bias == Bias::kInt16
           ? CreateTensor(bias16, IntArrayFromInts(bias_dims))
           : CreateTensor(bias64, IntArrayFromInts(bias_dims)),
@@ -202,8 +206,13 @@ void ExpectMatchesReference(const Shape& s) {
       registration, tensors, 5,
       IntArrayFromInts(has_bias ? inputs_with_bias : inputs_without_bias),
       IntArrayFromInts(outputs), &params);
-  EXPECT_EQ(kTfLiteOk,
-            runner.InitAndPrepare(reinterpret_cast<const char*>(&params)));
+  const TfLiteStatus prepare =
+      runner.InitAndPrepare(reinterpret_cast<const char*>(&params));
+  if (s.input_zero_point != 0) {
+    EXPECT_EQ(kTfLiteError, prepare);
+    return;
+  }
+  EXPECT_EQ(kTfLiteOk, prepare);
   memset(output, 0x55, sizeof(output));
   g_s16_calls = 0;
   EXPECT_EQ(kTfLiteOk, runner.Invoke());
@@ -223,10 +232,10 @@ void ExpectMatchesReference(const Shape& s) {
   op_params.stride_height = s.stride;
   op_params.quantized_activation_min = -32768;
   op_params.quantized_activation_max = 32767;
-  const int32_t in_shape[] = {1, s.in_h, s.in_w, s.in_c};
+  const int32_t in_shape[] = {s.batch, s.in_h, s.in_w, s.in_c};
   const int32_t f_shape[] = {s.out_c, s.kernel, s.kernel, s.in_c};
   const int32_t b_shape[] = {s.out_c};
-  const int32_t o_shape[] = {1, out_h, out_w, s.out_c};
+  const int32_t o_shape[] = {s.batch, out_h, out_w, s.out_c};
   tflite::micro::reference_integer_ops::TransposeConv(
       op_params, multipliers, shifts, RuntimeShape(4, in_shape), input,
       RuntimeShape(4, f_shape), filter, RuntimeShape(1, b_shape),
@@ -283,6 +292,16 @@ TEST(HeliaTransposeConvS16Test, DeepInputStrideTwoInt16Bias) {
 TEST(HeliaTransposeConvS16Test, FiveByFiveKernelStrideThree) {
   ExpectMatchesReference(
       Shape{3, 4, 6, 7, 5, 3, kTfLitePaddingValid, Bias::kInt64});
+}
+
+TEST(HeliaTransposeConvS16Test, BatchTwoSameStrideTwo) {
+  ExpectMatchesReference(
+      Shape{4, 5, 3, 5, 3, 2, kTfLitePaddingSame, Bias::kInt64, 2});
+}
+
+TEST(HeliaTransposeConvS16Test, NonzeroZeroPointFailsPrepare) {
+  ExpectMatchesReference(
+      Shape{4, 5, 3, 5, 3, 2, kTfLitePaddingSame, Bias::kInt64, 1, 3});
 }
 
 TF_LITE_MICRO_TESTS_MAIN
