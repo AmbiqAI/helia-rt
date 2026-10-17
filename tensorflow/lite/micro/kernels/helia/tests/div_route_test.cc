@@ -49,9 +49,15 @@ namespace {
 enum class Leaf { kFlatF32, kWalkF32, kFlatF16, kWalkF16, kCount };
 
 int g_leaf_calls[static_cast<int>(Leaf::kCount)] = {};
+// The entry that returns ARM_CMSIS_NN_ARG_ERROR without running.
+Leaf g_fail = Leaf::kCount;
 
 #if HELIA_DIV_LINK_WRAP
-void CountCall(Leaf leaf) { ++g_leaf_calls[static_cast<int>(leaf)]; }
+// Counts a call and reports whether it must fail.
+bool CountCall(Leaf leaf) {
+  ++g_leaf_calls[static_cast<int>(leaf)];
+  return g_fail == leaf;
+}
 #endif
 
 }  // namespace
@@ -68,7 +74,7 @@ arm_cmsis_nn_status __wrap_arm_elementwise_div_f32(const float32_t* a,
                                                    const float32_t* b,
                                                    float32_t* out, float32_t lo,
                                                    float32_t hi, int32_t n) {
-  CountCall(Leaf::kFlatF32);
+  if (CountCall(Leaf::kFlatF32)) return ARM_CMSIS_NN_ARG_ERROR;
   return __real_arm_elementwise_div_f32(a, b, out, lo, hi, n);
 }
 arm_cmsis_nn_status __real_arm_elementwise_div_broadcast_f32(
@@ -79,7 +85,7 @@ arm_cmsis_nn_status __wrap_arm_elementwise_div_broadcast_f32(
     const float32_t* a, const cmsis_nn_dims* da, const float32_t* b,
     const cmsis_nn_dims* db, float32_t* out, const cmsis_nn_dims* dout,
     float32_t lo, float32_t hi) {
-  CountCall(Leaf::kWalkF32);
+  if (CountCall(Leaf::kWalkF32)) return ARM_CMSIS_NN_ARG_ERROR;
   return __real_arm_elementwise_div_broadcast_f32(a, da, b, db, out, dout, lo,
                                                   hi);
 }
@@ -94,7 +100,7 @@ arm_cmsis_nn_status __wrap_arm_elementwise_div_f16(const float16_t* a,
                                                    const float16_t* b,
                                                    float16_t* out, float16_t lo,
                                                    float16_t hi, int32_t n) {
-  CountCall(Leaf::kFlatF16);
+  if (CountCall(Leaf::kFlatF16)) return ARM_CMSIS_NN_ARG_ERROR;
   return __real_arm_elementwise_div_f16(a, b, out, lo, hi, n);
 }
 arm_cmsis_nn_status __real_arm_elementwise_div_broadcast_f16(
@@ -105,7 +111,7 @@ arm_cmsis_nn_status __wrap_arm_elementwise_div_broadcast_f16(
     const float16_t* a, const cmsis_nn_dims* da, const float16_t* b,
     const cmsis_nn_dims* db, float16_t* out, const cmsis_nn_dims* dout,
     float16_t lo, float16_t hi) {
-  CountCall(Leaf::kWalkF16);
+  if (CountCall(Leaf::kWalkF16)) return ARM_CMSIS_NN_ARG_ERROR;
   return __real_arm_elementwise_div_broadcast_f16(a, da, b, db, out, dout, lo,
                                                   hi);
 }
@@ -225,6 +231,8 @@ TfLiteStatus Run(const Shape& s1, const T* in1, const Shape& s2, const T* in2,
   micro::KernelRunner runner(registration, tensors, 3, IntArrayFromInts(inputs),
                              IntArrayFromInts(outputs), &params);
   const TfLiteStatus prepare = runner.InitAndPrepare();
+  // InitAndPrepare checks this itself only when Prepare succeeds.
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
   if (prepare != kTfLiteOk) {
     return prepare;
   }
@@ -354,6 +362,37 @@ TEST(HeliaDivRouteTest, Float32RankFiveBroadcastIsReference) {
 // every non-NaN edge: +/-FLT_MAX for a division by zero or an overflow (the
 // unbounded clamp is +/-FLT_MAX), signed zeros, and a gradual-underflow
 // subnormal. NaN cases are NaN on both (payload not asserted).
+#if HELIA_DIV_LINK_WRAP && ARM_NN_ENABLE_F32
+// A failing float32 entry fails Invoke rather than falling back to the
+// reference.
+TEST(HeliaDivRouteTest, Float32EntryFailureFailsInvoke) {
+  static float in1[2 * 3 * 4] = {};
+  static float in2[2 * 3 * 4] = {};
+  static float out[2 * 3 * 4] = {};
+  for (int i = 0; i < 2 * 3 * 4; ++i) in2[i] = 1.0f;
+  const Shape shape{3, {2, 3, 4}};
+  g_fail = Leaf::kFlatF32;
+  EXPECT_EQ(kTfLiteError, tflite::testing::Run(shape, in1, shape, in2, shape,
+                                               out, kTfLiteActNone));
+  g_fail = Leaf::kWalkF32;
+  EXPECT_EQ(kTfLiteError, tflite::testing::Run(shape, in1, Shape{1, {4}}, in2,
+                                               shape, out, kTfLiteActNone));
+  g_fail = Leaf::kCount;
+}
+#endif
+
+// An empty float32 tensor writes nothing and calls no entry.
+TEST(HeliaDivRouteTest, Float32EmptyTensorSkipsEntry) {
+  float in1[1] = {};
+  float in2[1] = {};
+  float out[1] = {};
+  const Shape shape{2, {0, 3}};
+  EXPECT_EQ(kTfLiteOk, tflite::testing::Run(shape, in1, shape, in2, shape, out,
+                                            kTfLiteActNone));
+  tflite::testing::ExpectRoute(Leaf::kFlatF32, Leaf::kWalkF32,
+                               tflite::testing::Route::kReference);
+}
+
 TEST(HeliaDivRouteTest, Float32EdgeValuesNoActivation) {
   ExpectFloat32EdgesMatchReference(kTfLiteActNone);
 }
@@ -480,5 +519,31 @@ TEST(HeliaDivRouteTest, Float16CoverageMustNotSilentlyDisappear) {
 }
 
 #endif  // ARM_NN_ENABLE_F16
+
+#if !ARM_NN_ENABLE_F16
+// Without the fp16 API Prepare rejects float16 and releases its temporaries.
+TEST(HeliaDivRouteTest, Float16RejectedWithoutFp16Api) {
+  uint16_t in[2] = {};
+  uint16_t out[2] = {};
+  int dims[] = {1, 2};
+  TfLiteTensor tensors[3] = {
+      tflite::testing::CreateTensor(in, tflite::testing::IntArrayFromInts(dims),
+                                    false, kTfLiteFloat16),
+      tflite::testing::CreateTensor(in, tflite::testing::IntArrayFromInts(dims),
+                                    false, kTfLiteFloat16),
+      tflite::testing::CreateTensor(
+          out, tflite::testing::IntArrayFromInts(dims), false, kTfLiteFloat16),
+  };
+  TfLiteDivParams params = {kTfLiteActNone};
+  int inputs[] = {2, 0, 1};
+  int outputs[] = {1, 2};
+  const TFLMRegistration registration = tflite::Register_DIV();
+  tflite::micro::KernelRunner runner(
+      registration, tensors, 3, tflite::testing::IntArrayFromInts(inputs),
+      tflite::testing::IntArrayFromInts(outputs), &params);
+  EXPECT_EQ(kTfLiteError, runner.InitAndPrepare());
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
+}
+#endif
 
 TF_LITE_MICRO_TESTS_MAIN

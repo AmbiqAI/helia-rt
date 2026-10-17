@@ -48,6 +48,22 @@ struct OpDataDiv {
   HeliaBroadcastClass broadcast_class;
 };
 
+// Releases a Prepare temporary on every return.
+class ScopedTempTensor {
+ public:
+  ScopedTempTensor(MicroContext* context, TfLiteTensor* tensor)
+      : context_(context), tensor_(tensor) {}
+  ~ScopedTempTensor() {
+    if (tensor_ != nullptr) {
+      context_->DeallocateTempTfLiteTensor(tensor_);
+    }
+  }
+
+ private:
+  MicroContext* context_;
+  TfLiteTensor* tensor_;
+};
+
 TfLiteStatus CalculateOpDataDiv(TfLiteContext* context, TfLiteTensor* input1,
                                 TfLiteTensor* input2, TfLiteTensor* output,
                                 TfLiteDivParams* params, OpDataDiv* data) {
@@ -82,12 +98,15 @@ TfLiteStatus DivPrepare(TfLiteContext* context, TfLiteNode* node) {
   MicroContext* micro_context = GetMicroContext(context);
   TfLiteTensor* input1 =
       micro_context->AllocateTempInputTensor(node, kInputTensor1);
+  ScopedTempTensor input1_guard(micro_context, input1);
   TF_LITE_ENSURE(context, input1 != nullptr);
   TfLiteTensor* input2 =
       micro_context->AllocateTempInputTensor(node, kInputTensor2);
+  ScopedTempTensor input2_guard(micro_context, input2);
   TF_LITE_ENSURE(context, input2 != nullptr);
   TfLiteTensor* output =
       micro_context->AllocateTempOutputTensor(node, kOutputTensor);
+  ScopedTempTensor output_guard(micro_context, output);
   TF_LITE_ENSURE(context, output != nullptr);
 
   OpDataDiv* data = static_cast<OpDataDiv*>(node->user_data);
@@ -115,10 +134,6 @@ TfLiteStatus DivPrepare(TfLiteContext* context, TfLiteNode* node) {
     TF_LITE_ENSURE_EQ(context, input2->quantization.type,
                       kTfLiteNoQuantization);
   }
-
-  micro_context->DeallocateTempTfLiteTensor(input1);
-  micro_context->DeallocateTempTfLiteTensor(input2);
-  micro_context->DeallocateTempTfLiteTensor(output);
   return kTfLiteOk;
 }
 
@@ -154,38 +169,51 @@ void EvalDiv(TfLiteContext* context, TfLiteNode* node, TfLiteDivParams* params,
 }
 
 #if ARM_NN_ENABLE_F32
-// Returns false when heliaCORE declines, leaving the layer to the reference.
-bool EvalDivFloat32Helia(TfLiteDivParams* params, const OpDataDiv* data,
-                         const TfLiteEvalTensor* input1,
-                         const TfLiteEvalTensor* input2,
-                         TfLiteEvalTensor* output) {
+// Runs float32 DIV on heliaCORE for the shapes it takes and sets `handled`;
+// other shapes stay unhandled for the reference. A failing entry is an error.
+TfLiteStatus EvalDivFloat32Helia(TfLiteDivParams* params, const OpDataDiv* data,
+                                 const TfLiteEvalTensor* input1,
+                                 const TfLiteEvalTensor* input2,
+                                 TfLiteEvalTensor* output, bool* handled) {
+  const int size = tflite::micro::GetTensorShape(output).FlatSize();
+  *handled = data->broadcast_class == HeliaBroadcastClass::kSameShape ||
+             HeliaBroadcastNeedsWalk(data->broadcast_class);
+  // heliaCORE rejects zero-size dims; an empty output has nothing to write.
+  if (!*handled || size == 0) {
+    return kTfLiteOk;
+  }
   float activation_min;
   float activation_max;
   CalculateActivationRange(params->activation, &activation_min,
                            &activation_max);
+  arm_cmsis_nn_status status;
+  const char* entry;
   if (data->broadcast_class == HeliaBroadcastClass::kSameShape) {
-    return arm_elementwise_div_f32(
-               tflite::micro::GetTensorData<float>(input1),
-               tflite::micro::GetTensorData<float>(input2),
-               tflite::micro::GetTensorData<float>(output), activation_min,
-               activation_max,
-               tflite::micro::GetTensorShape(output).FlatSize()) ==
-           ARM_CMSIS_NN_SUCCESS;
-  }
-  if (HeliaBroadcastNeedsWalk(data->broadcast_class)) {
+    entry = "arm_elementwise_div_f32";
+    status =
+        arm_elementwise_div_f32(tflite::micro::GetTensorData<float>(input1),
+                                tflite::micro::GetTensorData<float>(input2),
+                                tflite::micro::GetTensorData<float>(output),
+                                activation_min, activation_max, size);
+  } else {
+    entry = "arm_elementwise_div_broadcast_f32";
     const cmsis_nn_dims input1_dims =
         HeliaNhwcDims(tflite::micro::GetTensorShape(input1));
     const cmsis_nn_dims input2_dims =
         HeliaNhwcDims(tflite::micro::GetTensorShape(input2));
     const cmsis_nn_dims output_dims =
         HeliaNhwcDims(tflite::micro::GetTensorShape(output));
-    return arm_elementwise_div_broadcast_f32(
-               tflite::micro::GetTensorData<float>(input1), &input1_dims,
-               tflite::micro::GetTensorData<float>(input2), &input2_dims,
-               tflite::micro::GetTensorData<float>(output), &output_dims,
-               activation_min, activation_max) == ARM_CMSIS_NN_SUCCESS;
+    status = arm_elementwise_div_broadcast_f32(
+        tflite::micro::GetTensorData<float>(input1), &input1_dims,
+        tflite::micro::GetTensorData<float>(input2), &input2_dims,
+        tflite::micro::GetTensorData<float>(output), &output_dims,
+        activation_min, activation_max);
   }
-  return false;
+  if (status != ARM_CMSIS_NN_SUCCESS) {
+    MicroPrintf("DIV: %s failed (%d).", entry, static_cast<int>(status));
+    return kTfLiteError;
+  }
+  return kTfLiteOk;
 }
 #endif
 
@@ -300,7 +328,10 @@ TfLiteStatus DivEval(TfLiteContext* context, TfLiteNode* node) {
 
   if (output->type == kTfLiteFloat32) {
 #if ARM_NN_ENABLE_F32
-    if (EvalDivFloat32Helia(params, data, input1, input2, output)) {
+    bool handled = false;
+    TF_LITE_ENSURE_OK(context, EvalDivFloat32Helia(params, data, input1, input2,
+                                                   output, &handled));
+    if (handled) {
       return kTfLiteOk;
     }
 #endif
