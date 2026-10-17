@@ -225,11 +225,12 @@ void Sweep(TfLiteType type, Entry entry) {
 
 // Resizes a 2x3 input to 3x2. With match_output false the output tensor is
 // declared 2x3 instead, the same element count but not [N, size[0], size[1],
-// C].
-template <typename Storage>
+// C]. Prepare must return `prepare_status` and release every temporary; only
+// a prepared layer is invoked, and its Invoke status is returned.
 // `eval_output_type`, when set, replaces the output type after Prepare.
+template <typename Storage>
 TfLiteStatus RunSmallLayer(TfLiteType type, bool match_output,
-                           bool* entry_called,
+                           TfLiteStatus prepare_status, bool* entry_called,
                            TfLiteType eval_output_type = kTfLiteNoType) {
   Storage input[2 * 3 * 2] = {};
   Storage output[6 * 2] = {};
@@ -256,6 +257,8 @@ TfLiteStatus RunSmallLayer(TfLiteType type, bool match_output,
                              IntArrayFromInts(outputs), &params);
   memset(g_entry_calls, 0, sizeof(g_entry_calls));
   TfLiteStatus status = runner.InitAndPrepare();
+  EXPECT_EQ(prepare_status, status);
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
   if (eval_output_type != kTfLiteNoType) {
     tensors[2].type = eval_output_type;
   }
@@ -293,41 +296,41 @@ TEST(HeliaResizeNearestNeighborRouteTest, Float32SpecialValuesExactBits) {
 // the bytes it reads, so mismatched types fail without an entry call.
 TEST(HeliaResizeNearestNeighborRouteTest, TypeMismatchFailsInvoke) {
   bool entry_called = true;
-  EXPECT_EQ(kTfLiteError, RunSmallLayer<int8_t>(kTfLiteInt8, true,
+  EXPECT_EQ(kTfLiteError, RunSmallLayer<int8_t>(kTfLiteInt8, true, kTfLiteOk,
                                                 &entry_called, kTfLiteInt16));
   EXPECT_FALSE(entry_called);
 }
 
 TEST(HeliaResizeNearestNeighborRouteTest, MismatchedOutputShapeKeepsReference) {
   bool entry_called = true;
-  EXPECT_EQ(kTfLiteOk, RunSmallLayer<int8_t>(kTfLiteInt8, false, &entry_called));
+  EXPECT_EQ(kTfLiteOk, RunSmallLayer<int8_t>(kTfLiteInt8, false, kTfLiteOk,
+                                             &entry_called));
   EXPECT_FALSE(entry_called);
 }
 
 #if ARM_NN_ENABLE_F16
 TEST(HeliaResizeNearestNeighborRouteTest, Float16EveryEncodingExactBits) {
   Sweep<uint16_t>(kTfLiteFloat16, Entry::kF16);
-  // The sweep's first patterns stop well short of 0xffff; walk the rest.
+  // The sweep's first patterns stop well short of 0xffff. An identity resize
+  // of 1024 elements copies each one, so these blocks compare every encoding.
   for (uint32_t base = 0; base < 65536; base += 1024) {
     tflite::testing::ExpectMatchesReference<uint16_t>(
         kTfLiteFloat16, Entry::kF16,
-        tflite::testing::Shape{1, 16, 16, 4, 8, 16}, false, true, base);
+        tflite::testing::Shape{1, 16, 16, 4, 16, 16}, false, false, base);
   }
 }
 
 TEST(HeliaResizeNearestNeighborRouteTest,
      Float16MismatchedOutputShapeRejectedDuringPrepare) {
   bool entry_called = true;
-  EXPECT_EQ(kTfLiteError,
-            RunSmallLayer<uint16_t>(kTfLiteFloat16, false, &entry_called));
+  RunSmallLayer<uint16_t>(kTfLiteFloat16, false, kTfLiteError, &entry_called);
   EXPECT_FALSE(entry_called);
 }
 #else
 TEST(HeliaResizeNearestNeighborRouteTest,
      UnavailableFloat16RejectedDuringPrepare) {
   bool entry_called = true;
-  EXPECT_EQ(kTfLiteError,
-            RunSmallLayer<uint16_t>(kTfLiteFloat16, true, &entry_called));
+  RunSmallLayer<uint16_t>(kTfLiteFloat16, true, kTfLiteError, &entry_called);
   EXPECT_FALSE(entry_called);
 }
 #endif

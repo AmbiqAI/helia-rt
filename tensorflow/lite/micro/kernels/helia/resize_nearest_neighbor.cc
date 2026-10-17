@@ -41,6 +41,21 @@ struct OpData {
   int32_t scratch_size;
 };
 
+class ScopedTempTensor {
+ public:
+  ScopedTempTensor(MicroContext* context, TfLiteTensor* tensor)
+      : context_(context), tensor_(tensor) {}
+  ~ScopedTempTensor() {
+    if (tensor_ != nullptr) {
+      context_->DeallocateTempTfLiteTensor(tensor_);
+    }
+  }
+
+ private:
+  MicroContext* context_;
+  TfLiteTensor* tensor_;
+};
+
 void* ResizeNearestNeighborInit(TfLiteContext* context, const char* buffer,
                                 size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
@@ -89,10 +104,16 @@ TfLiteStatus ResizeNearestNeighborPrepare(TfLiteContext* context,
 
   TfLiteTensor* input =
       micro_context->AllocateTempInputTensor(node, kInputTensor);
+  ScopedTempTensor input_guard(micro_context, input);
+  TF_LITE_ENSURE(context, input != nullptr);
   TfLiteTensor* size =
       micro_context->AllocateTempInputTensor(node, kSizeTensor);
+  ScopedTempTensor size_guard(micro_context, size);
+  TF_LITE_ENSURE(context, size != nullptr);
   TfLiteTensor* output =
       micro_context->AllocateTempOutputTensor(node, kOutputTensor);
+  ScopedTempTensor output_guard(micro_context, output);
+  TF_LITE_ENSURE(context, output != nullptr);
 
   // Our current implementations rely on the input being 4D,
   // and the size being 1D tensor with exactly 2 elements.
@@ -141,15 +162,9 @@ TfLiteStatus ResizeNearestNeighborPrepare(TfLiteContext* context,
       data->use_helia = true;
     }
   }
-  TF_LITE_ENSURE_MSG(context,
-                     input->type != kTfLiteFloat16 || data->use_helia,
+  TF_LITE_ENSURE_MSG(context, input->type != kTfLiteFloat16 || data->use_helia,
                      "Float16 RESIZE_NEAREST_NEIGHBOR requires an output "
                      "shape of [N, size[0], size[1], C].");
-
-  micro_context->DeallocateTempTfLiteTensor(input);
-  micro_context->DeallocateTempTfLiteTensor(size);
-  micro_context->DeallocateTempTfLiteTensor(output);
-
   return kTfLiteOk;
 }
 
