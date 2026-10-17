@@ -36,7 +36,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "FP16 requires CORE >= 7.35.0, rank 1..4, INT32 axis/output and positive reduced extent. FP32/int8 use Reference."
+    "notes": "int8, FP32 and FP16 run CORE at rank 1..4 with INT32 axis/output and positive reduced extent; other configurations use Reference (FP16 is rejected). A NaN never wins and ties keep the first index. FP16 requires ARM_NN_ENABLE_F16."
   },
   {
     "name": "ARG_MIN",
@@ -48,7 +48,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "FP16 requires CORE >= 7.35.0, rank 1..4, INT32 axis/output and positive reduced extent. FP32/int8 use Reference."
+    "notes": "int8, FP32 and FP16 run CORE at rank 1..4 with INT32 axis/output and positive reduced extent; other configurations use Reference (FP16 is rejected). A NaN never wins and ties keep the first index. FP16 requires ARM_NN_ENABLE_F16."
   },
   {
     "name": "AVERAGE_POOL_2D",
@@ -139,7 +139,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "Output is FP32. FP16 means weight-storage widening, not FP16 computation; it works without ARM_NN_ENABLE_F16."
+    "notes": "Output is FP32. FP16 means weight-storage widening, not FP16 computation; it works without ARM_NN_ENABLE_F16, and a NaN keeps its sign and payload on every target."
   },
   {
     "name": "EQUAL",
@@ -494,10 +494,11 @@
     "types": [
       "int8",
       "int16",
-      "float32"
+      "float32",
+      "float16"
     ],
     "path": "Mixed",
-    "notes": "No FP16 execution path. Axis, output shape and quantization checks apply; implementation is in reduce_common.cc."
+    "notes": "int8/int16 run CORE at rank <= 4 with equal input/output quantization. FP32 uses Reference to keep TFLite's non-finite results (NaN skipped, -FLT_MAX for an all -Inf or empty window). FP16 runs CORE at rank <= 4 and is rejected otherwise or without ARM_NN_ENABLE_F16. Implementation is in reduce_common.cc."
   },
   {
     "name": "REDUCE_MIN",
@@ -506,10 +507,11 @@
     "types": [
       "int8",
       "int16",
-      "float32"
+      "float32",
+      "float16"
     ],
     "path": "Mixed",
-    "notes": "No FP16 execution path. Axis, output shape and quantization checks apply; implementation is in reduce_common.cc."
+    "notes": "int8/int16 run CORE at rank <= 4 with equal input/output quantization. FP32 uses Reference to keep TFLite's non-finite results (NaN skipped, +FLT_MAX for an all +Inf or empty window). FP16 runs CORE at rank <= 4 and is rejected otherwise or without ARM_NN_ENABLE_F16. Implementation is in reduce_common.cc."
   },
   {
     "name": "RELU",
@@ -665,10 +667,11 @@
       "int16",
       "int32",
       "float32",
+      "float16",
       "bool"
     ],
     "path": "Mixed",
-    "notes": "Check slicing masks, strides and shape constraints in the adapter; no FP16 execution branch."
+    "notes": "int8, int16, int32, FP32 and FP16 run CORE; bool uses Reference. Rank is limited to 4; an empty slice writes nothing. FP16 requires ARM_NN_ENABLE_F16; without it preparation fails."
   },
   {
     "name": "SUB",
