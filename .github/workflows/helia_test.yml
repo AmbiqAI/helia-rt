@@ -299,33 +299,33 @@ jobs:
         # add one binary and fifteen cases on every leg.
         # see AmbiqAI/helia-rt#442, AmbiqAI/helia-rt#443
         # TRANSPOSE_CONV float bias, reverse-conv and input-depth cases add one
-        # binary and seven cases on every leg. see AmbiqAI/helia-rt#443
+        # binary and eight cases on every leg. see AmbiqAI/helia-rt#443
         # Depthwise input-width and int16 output zero-point cases add two cases on
         # every leg. see AmbiqAI/helia-rt#433
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 166
-            min-cases: 1459
+            min-cases: 1460
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 166
-            min-cases: 1459
+            min-cases: 1460
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 165
-            min-cases: 1457
+            min-cases: 1458
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 166
-            min-cases: 1511
+            min-cases: 1512
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 165
-            min-cases: 1509
+            min-cases: 1510
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}

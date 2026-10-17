@@ -218,8 +218,11 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, SizeOfDimension(input, 3),
                     SizeOfDimension(filter, 3));
   if (bias != nullptr) {
-    TF_LITE_ENSURE_EQ(context, static_cast<int>(NumElements(bias)),
-                      SizeOfDimension(output, 3));
+    // NumElements is int64_t: compare it whole so a wrapping shape cannot
+    // pass as the channel count.
+    TF_LITE_ENSURE_MSG(context, NumElements(bias) == SizeOfDimension(output, 3),
+                       "TRANSPOSE_CONV needs one bias element per output "
+                       "channel.");
     if (input->type == kTfLiteInt8) {
       TF_LITE_ENSURE_TYPES_EQ(context, bias->type, kTfLiteInt32);
     } else if (input->type == kTfLiteInt16) {

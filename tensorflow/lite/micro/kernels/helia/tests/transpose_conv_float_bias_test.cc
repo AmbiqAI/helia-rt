@@ -39,7 +39,13 @@ constexpr int kOutputCount = 4 * 4 * kOutC;
 // Prepares (and, when it succeeds, invokes) a 1x4x4x4 -> 1x4x4x8 SAME,
 // stride 1 transpose convolution whose input, filter and output are
 // `io_type` and whose bias is `bias_tensor`.
-TfLiteStatus PrepareWithBias(TfLiteType io_type, TfLiteTensor bias_tensor) {
+struct RunResult {
+  TfLiteStatus prepare;
+  TfLiteStatus invoke;
+};
+
+// Prepares the layer and, when that succeeds, invokes it.
+RunResult RunWithBias(TfLiteType io_type, TfLiteTensor bias_tensor) {
   static uint32_t input[kInputCount];
   static uint32_t filter[kFilterCount];
   static uint32_t output[kOutputCount];
@@ -76,10 +82,7 @@ TfLiteStatus PrepareWithBias(TfLiteType io_type, TfLiteTensor bias_tensor) {
                              IntArrayFromInts(outputs), &params);
   const TfLiteStatus prepare =
       runner.InitAndPrepare(reinterpret_cast<const char*>(&params));
-  if (prepare != kTfLiteOk) {
-    return prepare;
-  }
-  return runner.Invoke();
+  return {prepare, prepare == kTfLiteOk ? runner.Invoke() : kTfLiteError};
 }
 
 int g_bias_dims[] = {1, kOutC};
@@ -91,22 +94,24 @@ int g_bias_dims[] = {1, kOutC};
 using tflite::testing::CreateTensor;
 using tflite::testing::g_bias_dims;
 using tflite::testing::IntArrayFromInts;
-using tflite::testing::PrepareWithBias;
+using tflite::testing::RunWithBias;
 
 // The control: a float32 bias prepares and runs.
 TEST(HeliaTransposeConvFloatBiasTest, Float32BiasPrepares) {
   static float bias[8] = {};
-  EXPECT_EQ(kTfLiteOk,
-            PrepareWithBias(kTfLiteFloat32,
-                            CreateTensor(bias, IntArrayFromInts(g_bias_dims))));
+  const auto result = RunWithBias(
+      kTfLiteFloat32, CreateTensor(bias, IntArrayFromInts(g_bias_dims)));
+  EXPECT_EQ(kTfLiteOk, result.prepare);
+  EXPECT_EQ(kTfLiteOk, result.invoke);
 }
 
 // 16 bytes of int16 bias, where the float32 kernel reads 32.
 TEST(HeliaTransposeConvFloatBiasTest, Float32WithInt16BiasFailsPrepare) {
   static int16_t bias[8] = {};
   EXPECT_EQ(kTfLiteError,
-            PrepareWithBias(kTfLiteFloat32,
-                            CreateTensor(bias, IntArrayFromInts(g_bias_dims))));
+            RunWithBias(kTfLiteFloat32,
+                        CreateTensor(bias, IntArrayFromInts(g_bias_dims)))
+                .prepare);
 }
 
 // Float16 builds reject the float32 bias; builds without the fp16 API reject
@@ -114,8 +119,19 @@ TEST(HeliaTransposeConvFloatBiasTest, Float32WithInt16BiasFailsPrepare) {
 TEST(HeliaTransposeConvFloatBiasTest, Float16WithFloat32BiasFailsPrepare) {
   static float bias[8] = {};
   EXPECT_EQ(kTfLiteError,
-            PrepareWithBias(kTfLiteFloat16,
-                            CreateTensor(bias, IntArrayFromInts(g_bias_dims))));
+            RunWithBias(kTfLiteFloat16,
+                        CreateTensor(bias, IntArrayFromInts(g_bias_dims)))
+                .prepare);
+}
+
+// A bias of shape {-2, 2147483644} has -4294967288 elements, which an int
+// truncates to the 8 output channels; the count must be compared whole.
+TEST(HeliaTransposeConvFloatBiasTest, WrappingBiasCountFailsPrepare) {
+  static float bias[8] = {};
+  TfLiteTensor bias_tensor = CreateTensor(bias, IntArrayFromInts(g_bias_dims));
+  static int wrapping_dims[] = {2, -2, 2147483644};
+  bias_tensor.dims = IntArrayFromInts(wrapping_dims);
+  EXPECT_EQ(kTfLiteError, RunWithBias(kTfLiteFloat32, bias_tensor).prepare);
 }
 
 TF_LITE_MICRO_TESTS_MAIN
