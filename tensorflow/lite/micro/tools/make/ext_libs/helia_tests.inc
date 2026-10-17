@@ -246,6 +246,25 @@ $(kernel_prelu_route_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_prelu_f16
 endif
 
+# RESIZE_NEAREST_NEIGHBOR against the reference kernel, bit for bit, for every
+# dtype heliaCORE serves. GCC and ATfE links wrap the entries to prove each
+# route and the scratch context Prepare requested.
+$(eval $(call microlite_test,kernel_resize_nearest_neighbor_route_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/resize_nearest_neighbor_route_test.cc))
+
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
+$(kernel_resize_nearest_neighbor_route_test_BINARY): CXXFLAGS += \
+  -DHELIA_RESIZE_NN_LINK_WRAP=1
+$(kernel_resize_nearest_neighbor_route_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_resize_nearest_neighbor_s8 \
+  -Wl,--wrap=arm_resize_nearest_neighbor_s16 \
+  -Wl,--wrap=arm_resize_nearest_neighbor_f32
+ifneq (,$(filter cortex-m55,$(TARGET_ARCH)))
+$(kernel_resize_nearest_neighbor_route_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_resize_nearest_neighbor_f16
+endif
+endif
+
 # TRANSPOSE_CONV optional bias, and the int8 scratch-context contract on GCC and
 # ATfE links. see AmbiqAI/helia-rt#238
 $(eval $(call microlite_test,kernel_transpose_conv_optional_bias_test,\
