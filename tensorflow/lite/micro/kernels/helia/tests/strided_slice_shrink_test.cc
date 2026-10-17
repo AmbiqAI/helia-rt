@@ -406,29 +406,33 @@ TEST(HeliaStridedSliceShrinkTest, InputPastInt32MaxFailsInvoke) {
 #endif
 }
 
-// Prepare does not check the type, so an unsupported one must fail in Eval
-// even when the slice is empty.
-TEST(HeliaStridedSliceShrinkTest, UnsupportedTypeEmptySliceFailsInvoke) {
+// An empty input holds 0 elements even when its other extents multiply past
+// INT32_MAX, so the slice takes nothing and succeeds without a copy. The dims
+// are set after the tensors are made, so nothing is allocated or read for
+// them.
+TEST(HeliaStridedSliceShrinkTest, EmptyInputWithHugeExtentsSucceeds) {
   using tflite::testing::CreateTensor;
   using tflite::testing::IntArrayFromInts;
-  static uint8_t input[6] = {};
-  static uint8_t output[1] = {};
-  const int32_t begin[] = {1, 0};
-  const int32_t end[] = {1, 3};
-  const int32_t strides[] = {1, 1};
-  int input_dims[] = {2, 2, 3};
-  int index_dims[] = {1, 2};
-  int output_dims[] = {2, 0, 3};
+  static int8_t input[4] = {};
+  static int8_t output[4] = {};
+  const int32_t begin[] = {0, 0, 0};
+  const int32_t end[] = {65536, 65536, 0};
+  const int32_t strides[] = {1, 1, 1};
+  int small_dims[] = {3, 1, 1, 1};
+  int index_dims[] = {1, 3};
+  static int huge_dims[] = {3, 65536, 65536, 0};
   TfLiteTensor tensors[5] = {
-      CreateTensor(input, IntArrayFromInts(input_dims)),
+      CreateTensor(input, IntArrayFromInts(small_dims)),
       CreateTensor(begin, IntArrayFromInts(index_dims)),
       CreateTensor(end, IntArrayFromInts(index_dims)),
       CreateTensor(strides, IntArrayFromInts(index_dims)),
-      CreateTensor(output, IntArrayFromInts(output_dims)),
+      CreateTensor(output, IntArrayFromInts(small_dims)),
   };
   for (int i = 1; i <= 3; ++i) {
     tensors[i].allocation_type = kTfLiteMmapRo;
   }
+  tensors[0].dims = IntArrayFromInts(huge_dims);
+  tensors[4].dims = IntArrayFromInts(huge_dims);
   TfLiteStridedSliceParams params = {};
   int inputs[] = {4, 0, 1, 2, 3};
   int outputs[] = {1, 4};
@@ -437,7 +441,11 @@ TEST(HeliaStridedSliceShrinkTest, UnsupportedTypeEmptySliceFailsInvoke) {
                                      IntArrayFromInts(inputs),
                                      IntArrayFromInts(outputs), &params);
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
-  EXPECT_EQ(kTfLiteError, runner.Invoke());
+  memset(g_leaf_calls, 0, sizeof(g_leaf_calls));
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+#if HELIA_STRIDED_SLICE_SHRINK_LINK_WRAP
+  EXPECT_EQ(0, g_leaf_calls[static_cast<int>(Leaf::kS8)]);
+#endif
 }
 
 // An axis above 2^30 elements could overflow heliaCORE's begin + stride *
@@ -509,9 +517,8 @@ TEST(HeliaStridedSliceShrinkTest, TypeMismatchFailsInvoke) {
   tflite::micro::KernelRunner runner(registration, tensors, 5,
                                      IntArrayFromInts(inputs),
                                      IntArrayFromInts(outputs), &params);
-  if (runner.InitAndPrepare() == kTfLiteOk) {
-    EXPECT_EQ(kTfLiteError, runner.Invoke());
-  }
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteError, runner.Invoke());
 }
 
 TF_LITE_MICRO_TESTS_MAIN

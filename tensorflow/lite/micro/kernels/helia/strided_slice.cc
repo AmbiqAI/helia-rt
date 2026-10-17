@@ -19,6 +19,7 @@ limitations under the License.
 
 #include "Include/arm_nnfunctions.h"
 #include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/internal/strided_slice_logic.h"
 #include "tensorflow/lite/micro/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
@@ -84,15 +85,18 @@ bool ArmPopulateCommonParams(const tflite::StridedSliceParams& op_params,
   return true;
 }
 
-// Number of elements the slice takes, or of the tensor; saturates above
-// INT32_MAX so a product of absurd dims cannot wrap into a match.
+// Number of elements the slice takes, or of the tensor: 0 if any dim is 0 or
+// negative, else saturated above INT32_MAX so a product of absurd dims cannot
+// wrap into a match.
 template <typename D>
 uint64_t SaturatingProduct(const D* dims, int count) {
-  uint64_t elements = 1;
   for (int i = 0; i < count; ++i) {
     if (dims[i] <= 0) {
       return 0;
     }
+  }
+  uint64_t elements = 1;
+  for (int i = 0; i < count; ++i) {
     elements *= static_cast<uint64_t>(dims[i]);
     if (elements > static_cast<uint64_t>(INT32_MAX)) {
       return static_cast<uint64_t>(INT32_MAX) + 1;
@@ -125,6 +129,20 @@ TfLiteStatus EvalArm(const TfLiteEvalTensor* input, TfLiteEvalTensor* output,
   return kTfLiteOk;
 }
 
+TfLiteStatus StridedSliceHeliaPrepare(TfLiteContext* context,
+                                      TfLiteNode* node) {
+  TF_LITE_ENSURE_OK(context, StridedSlicePrepare(context, node));
+  MicroContext* micro_context = GetMicroContext(context);
+  TfLiteTensor* output =
+      micro_context->AllocateTempOutputTensor(node, kStridedSliceOutputTensor);
+  TF_LITE_ENSURE(context, output != nullptr);
+  const bool supported = kHeliaFloat16Enabled || output->type != kTfLiteFloat16;
+  micro_context->DeallocateTempTfLiteTensor(output);
+  TF_LITE_ENSURE_MSG(context, supported,
+                     "Float16 STRIDED_SLICE requires the heliaCORE fp16 API.");
+  return kTfLiteOk;
+}
+
 TfLiteStatus StridedSliceEval(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
   const StridedSliceParams& op_params =
@@ -139,6 +157,9 @@ TfLiteStatus StridedSliceEval(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
   switch (output->type) {
     case kTfLiteFloat32:
+#if ARM_NN_ENABLE_F16
+    case kTfLiteFloat16:
+#endif
     case kTfLiteInt8:
     case kTfLiteInt16:
     case kTfLiteInt32:
@@ -192,14 +213,24 @@ TfLiteStatus StridedSliceEval(TfLiteContext* context, TfLiteNode* node) {
 
   switch (output->type) {
     case kTfLiteFloat32:
+#if ARM_NN_ENABLE_F32
+      return EvalArm<float32_t>(input, output, input_dims, output_dims,
+                                begin_dims, stride_dims, arm_strided_slice_f32,
+                                "arm_strided_slice_f32");
+#else
       reference_ops::StridedSlice(
-        op_params,
-        tflite::micro::GetTensorShape(input),
-        tflite::micro::GetTensorData<float>(input),
-        tflite::micro::GetTensorShape(output),
-        tflite::micro::GetTensorData<float>(output)
-      );
-      break;
+          op_params, tflite::micro::GetTensorShape(input),
+          tflite::micro::GetTensorData<float>(input),
+          tflite::micro::GetTensorShape(output),
+          tflite::micro::GetTensorData<float>(output));
+      return kTfLiteOk;
+#endif
+#if ARM_NN_ENABLE_F16
+    case kTfLiteFloat16:
+      return EvalArm<float16_t>(input, output, input_dims, output_dims,
+                                begin_dims, stride_dims, arm_strided_slice_f16,
+                                "arm_strided_slice_f16");
+#endif
     case kTfLiteInt8:
       return EvalArm<int8_t>(input, output, input_dims, output_dims,
                              begin_dims, stride_dims, arm_strided_slice_s8,
@@ -209,14 +240,9 @@ TfLiteStatus StridedSliceEval(TfLiteContext* context, TfLiteNode* node) {
                               begin_dims, stride_dims, arm_strided_slice_s16,
                               "arm_strided_slice_s16");
     case kTfLiteInt32:
-      reference_ops::StridedSlice(
-        op_params,
-        tflite::micro::GetTensorShape(input),
-        tflite::micro::GetTensorData<int32_t>(input),
-        tflite::micro::GetTensorShape(output),
-        tflite::micro::GetTensorData<int32_t>(output)
-      );
-      break;
+      return EvalArm<int32_t>(input, output, input_dims, output_dims,
+                              begin_dims, stride_dims, arm_strided_slice_s32,
+                              "arm_strided_slice_s32");
     case kTfLiteBool:
       reference_ops::StridedSlice(
         op_params,
@@ -237,7 +263,8 @@ TfLiteStatus StridedSliceEval(TfLiteContext* context, TfLiteNode* node) {
 }  // namespace
 
 TFLMRegistration Register_STRIDED_SLICE() {
-  return tflite::micro::RegisterOp(StridedSliceInit, StridedSlicePrepare, StridedSliceEval);
+  return tflite::micro::RegisterOp(StridedSliceInit, StridedSliceHeliaPrepare,
+                                   StridedSliceEval);
 }
 
 }  // namespace micro

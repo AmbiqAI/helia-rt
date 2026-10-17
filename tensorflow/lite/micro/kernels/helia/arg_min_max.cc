@@ -108,6 +108,7 @@ bool CountFits(const TfLiteIntArray* dims, size_t element_size, size_t* count) {
 }
 
 bool ValidateCoreArgShape(const TfLiteIntArray* input_dims,
+                          size_t input_element_size,
                           const TfLiteIntArray* axis_dims,
                           const int32_t* axis_data,
                           const TfLiteIntArray* output_dims,
@@ -151,7 +152,7 @@ bool ValidateCoreArgShape(const TfLiteIntArray* input_dims,
     }
   }
 
-  if (!CountFits(input_dims, sizeof(uint16_t), &core_shape->input_count) ||
+  if (!CountFits(input_dims, input_element_size, &core_shape->input_count) ||
       !CountFits(output_dims, sizeof(int32_t), &core_shape->output_count)) {
     return false;
   }
@@ -197,8 +198,9 @@ TfLiteStatus ArgMinMaxPrepare(TfLiteContext* context, TfLiteNode* node) {
 
   CoreArgShape core_shape;
   TF_LITE_ENSURE(context,
-                 ValidateCoreArgShape(input->dims, axis->dims, axis->data.i32,
-                                      output->dims, &core_shape));
+                 ValidateCoreArgShape(input->dims, sizeof(uint16_t), axis->dims,
+                                      axis->data.i32, output->dims,
+                                      &core_shape));
   data->input_capacity = core_shape.input_count;
   data->output_capacity = core_shape.output_count;
   data->prepared_float16 = true;
@@ -280,6 +282,54 @@ TfLiteStatus EvalReference(TfLiteContext* context,
   return kTfLiteOk;
 }
 
+// Runs a rank <= 4 float32 or int8 layer on heliaCORE. Sets *ran to false,
+// writing nothing, for a layer the core does not take.
+TfLiteStatus EvalCore(const TfLiteEvalTensor* input,
+                      const TfLiteEvalTensor* axis, TfLiteEvalTensor* output,
+                      bool is_arg_max, bool* ran) {
+  *ran = false;
+  const bool is_float32 = input->type == kTfLiteFloat32;
+  if ((!is_float32 && input->type != kTfLiteInt8) ||
+      (is_float32 && !kHeliaFloat32Enabled) || axis->type != kTfLiteInt32 ||
+      output->type != kTfLiteInt32) {
+    return kTfLiteOk;
+  }
+  CoreArgShape core_shape;
+  if (!ValidateCoreArgShape(input->dims, is_float32 ? sizeof(float) : 1,
+                            axis->dims,
+                            tflite::micro::GetTensorData<int32_t>(axis),
+                            output->dims, &core_shape)) {
+    return kTfLiteOk;
+  }
+  int32_t* output_data = tflite::micro::GetTensorData<int32_t>(output);
+  if ((core_shape.input_count != 0 && input->data.data == nullptr) ||
+      (core_shape.output_count != 0 && output_data == nullptr)) {
+    return kTfLiteOk;
+  }
+  *ran = true;
+  arm_cmsis_nn_status status = ARM_CMSIS_NN_ARG_ERROR;
+  if (is_float32) {
+#if ARM_NN_ENABLE_F32
+    const float32_t* input_data = tflite::micro::GetTensorData<float>(input);
+    status = is_arg_max ? arm_argmax_f32(input_data, &core_shape.input_dims,
+                                         core_shape.axis, output_data)
+                        : arm_argmin_f32(input_data, &core_shape.input_dims,
+                                         core_shape.axis, output_data);
+#endif
+  } else {
+    const int8_t* input_data = tflite::micro::GetTensorData<int8_t>(input);
+    status = is_arg_max ? arm_argmax_s8(input_data, &core_shape.input_dims,
+                                        core_shape.axis, output_data)
+                        : arm_argmin_s8(input_data, &core_shape.input_dims,
+                                        core_shape.axis, output_data);
+  }
+  if (status != ARM_CMSIS_NN_SUCCESS) {
+    MicroPrintf("ARG_%s failed (%d).", is_arg_max ? "MAX" : "MIN", status);
+    return kTfLiteError;
+  }
+  return kTfLiteOk;
+}
+
 TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node, bool is_arg_max) {
   const TfLiteEvalTensor* input =
       tflite::micro::GetEvalInput(context, node, kInputTensor);
@@ -289,6 +339,12 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node, bool is_arg_max) {
       tflite::micro::GetEvalOutput(context, node, kOutputTensor);
 
   if (input->type != kTfLiteFloat16) {
+    bool ran = false;
+    TF_LITE_ENSURE_OK(context,
+                      EvalCore(input, axis, output, is_arg_max, &ran));
+    if (ran) {
+      return kTfLiteOk;
+    }
     return EvalReference(context, input, axis, output, is_arg_max);
   }
   TF_LITE_ENSURE_TYPES_EQ(context, axis->type, kTfLiteInt32);
@@ -300,8 +356,8 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node, bool is_arg_max) {
   const int32_t* axis_data = tflite::micro::GetTensorData<int32_t>(axis);
   CoreArgShape core_shape;
   TF_LITE_ENSURE(context,
-                 ValidateCoreArgShape(input->dims, axis->dims, axis_data,
-                                      output->dims, &core_shape));
+                 ValidateCoreArgShape(input->dims, sizeof(uint16_t), axis->dims,
+                                      axis_data, output->dims, &core_shape));
   TF_LITE_ENSURE(context, core_shape.input_count <= data->input_capacity &&
                               core_shape.output_count <= data->output_capacity);
   const float16_t* input_data = tflite::micro::GetTensorData<float16_t>(input);

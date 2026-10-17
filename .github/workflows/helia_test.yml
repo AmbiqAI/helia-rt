@@ -310,30 +310,56 @@ jobs:
         # leg. see AmbiqAI/helia-rt#433
         # Elementwise shrunk-output cases add two cases on every leg.
         # see AmbiqAI/helia-rt#433
+        # The STRIDED_SLICE shrink-axis regression adds one binary and three cases
+        # on every leg. see AmbiqAI/helia-rt#435
+        # Slicing, extrema and float16 DEQUANTIZE routes add three binaries and
+        # twenty cases on every leg. see AmbiqAI/helia-rt#433
+        # Extreme-stride and mask cases for STRIDED_SLICE add five cases on every
+        # leg. see AmbiqAI/helia-rt#435
+        # Nonzero-begin extreme-stride STRIDED_SLICE cases add two cases on every
+        # leg. see AmbiqAI/helia-rt#435
+        # STRIDED_SLICE and REDUCE short-output rejections add three cases on every
+        # leg. see AmbiqAI/helia-rt#433
+        # All-type STRIDED_SLICE wrong-size cases add two cases on every leg.
+        # see AmbiqAI/helia-rt#435
+        # Reduction output-size, axis and slice-saturation cases add one binary and
+        # eleven cases on every leg. see AmbiqAI/helia-rt#433
+        # STRIDED_SLICE axis-bound and empty-slice type cases add two cases on every
+        # leg. see AmbiqAI/helia-rt#435
+        # The STRIDED_SLICE type-mismatch case adds one case on every leg.
+        # see AmbiqAI/helia-rt#435
+        # Rank-6 and scalar-input reduction cases add two cases on every leg.
+        # see AmbiqAI/helia-rt#433
+        # Reference-route axis-list and empty huge-extent cases add three cases on
+        # every leg. see AmbiqAI/helia-rt#433
+        # The empty-input start-value reduction case adds one case on every leg.
+        # see AmbiqAI/helia-rt#433
+        # MEAN type-mismatch rejection adds one case on every leg.
+        # see AmbiqAI/helia-rt#433
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 167
-            min-cases: 1484
+            min-binaries: 172
+            min-cases: 1540
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 167
-            min-cases: 1484
+            min-binaries: 172
+            min-cases: 1540
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 166
-            min-cases: 1482
+            min-binaries: 171
+            min-cases: 1538
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 167
-            min-cases: 1536
+            min-binaries: 172
+            min-cases: 1592
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 166
-            min-cases: 1534
+            min-binaries: 171
+            min-cases: 1590
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}

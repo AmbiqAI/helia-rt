@@ -90,21 +90,18 @@ TfLiteStatus DequantizeEval(TfLiteContext* context, TfLiteNode* node) {
     // Storage widening, not float16 arithmetic, so it is not gated on
     // kHeliaFloat16Enabled; see AmbiqAI/helia-rt#255.
     case kTfLiteFloat16: {
-      float* output_data = tflite::micro::GetTensorData<float>(output);
-      const int flat_size = ElementCount(*input->dims);
-#if ARM_NN_ENABLE_F16
-      const float16_t* input_data =
-          tflite::micro::GetTensorData<float16_t>(input);
-      for (int i = 0; i < flat_size; ++i) {
-        output_data[i] = static_cast<float>(input_data[i]);
+      static_assert(sizeof(TfLiteFloat16) == sizeof(uint16_t),
+                    "TfLiteFloat16 must be the raw binary16 bits");
+      const arm_cmsis_nn_status status = arm_dequantize_f16_bits_f32(
+          reinterpret_cast<const uint16_t*>(
+              tflite::micro::GetTensorData<TfLiteFloat16>(input)),
+          tflite::micro::GetTensorData<float>(output),
+          ElementCount(*input->dims));
+      if (status != ARM_CMSIS_NN_SUCCESS) {
+        MicroPrintf("DEQUANTIZE: arm_dequantize_f16_bits_f32 failed (%d).",
+                    static_cast<int>(status));
+        return kTfLiteError;
       }
-#else
-      const TfLiteFloat16* input_data =
-          tflite::micro::GetTensorData<TfLiteFloat16>(input);
-      for (int i = 0; i < flat_size; ++i) {
-        output_data[i] = Float16BitsToFloat32(input_data[i].data);
-      }
-#endif
       break;
     }
     default:
