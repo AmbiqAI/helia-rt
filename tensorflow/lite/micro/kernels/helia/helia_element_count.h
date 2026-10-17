@@ -15,7 +15,6 @@ limitations under the License.
 #ifndef TENSORFLOW_LITE_MICRO_KERNELS_HELIA_HELIA_ELEMENT_COUNT_H_
 #define TENSORFLOW_LITE_MICRO_KERNELS_HELIA_HELIA_ELEMENT_COUNT_H_
 
-#include <climits>
 #include <cstdint>
 
 #include "tensorflow/lite/micro/c/common.h"
