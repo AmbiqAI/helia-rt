@@ -404,7 +404,6 @@ TEST(HeliaDepthwiseS8Opt3x3RouteTest, SmallOutputAreaIsWrapper) {
                          Route::kWrapper, Leaf::kCount);
 }
 
-// More than one 64-channel pass: 96 channels, and 130 with a channel tail.
 // Input W 2 is below the gate's 3, so Prepare must not request the entries'
 // scratch: an 8x2 output keeps every other condition in the gate.
 TEST(HeliaDepthwiseS8Opt3x3RouteTest, InputWidthTwoIsWrapper) {
@@ -412,6 +411,7 @@ TEST(HeliaDepthwiseS8Opt3x3RouteTest, InputWidthTwoIsWrapper) {
                          Route::kWrapper, Leaf::kCount);
 }
 
+// More than one 64-channel pass: 96 channels, and 130 with a channel tail.
 TEST(HeliaDepthwiseS8Opt3x3RouteTest, Depth96InGate) {
   ExpectMatchesReference(Shape{6, 7, 96, 1, 1, kTfLitePaddingSame},
                          Route::kOpt3x3, Leaf::kOpt3x3);
