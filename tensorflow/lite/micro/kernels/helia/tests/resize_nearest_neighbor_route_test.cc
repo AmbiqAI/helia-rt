@@ -277,10 +277,45 @@ TfLiteStatus RunSmallLayer(TfLiteType type, bool match_output,
   return status;
 }
 
+// Prepares a resize of a [1, in_h, in_w, 2] input to [1, out_h, out_w, 2] and
+// returns the Prepare status after checking that every temporary is
+// released. A prepared layer is invoked and must succeed.
+template <typename Storage>
+TfLiteStatus PrepareExtents(TfLiteType type, int in_h, int in_w, int out_h,
+                            int out_w) {
+  Storage input[2 * 3 * 2] = {};
+  Storage output[2 * 3 * 2] = {};
+  int input_dims[] = {4, 1, in_h, in_w, 2};
+  int size_dims[] = {1, 2};
+  int output_dims[] = {4, 1, out_h, out_w, 2};
+  int32_t size_data[] = {out_h, out_w};
+  TfLiteTensor tensors[] = {
+      CreateTensor(input, IntArrayFromInts(input_dims), false, type),
+      CreateTensor(size_data, IntArrayFromInts(size_dims)),
+      CreateTensor(output, IntArrayFromInts(output_dims), false, type),
+  };
+  tensors[1].allocation_type = kTfLiteMmapRo;
+  TfLiteResizeNearestNeighborParams params = {false, false};
+  int inputs[] = {2, 0, 1};
+  int outputs[] = {1, 2};
+  const TFLMRegistration registration =
+      tflite::Register_RESIZE_NEAREST_NEIGHBOR();
+  micro::KernelRunner runner(registration, tensors, 3,
+                             IntArrayFromInts(inputs),
+                             IntArrayFromInts(outputs), &params);
+  const TfLiteStatus status = runner.InitAndPrepare();
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
+  if (status == kTfLiteOk) {
+    EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  }
+  return status;
+}
+
 }  // namespace
 }  // namespace testing
 }  // namespace tflite
 
+using tflite::testing::PrepareExtents;
 using tflite::testing::RunSmallLayer;
 using tflite::testing::Sweep;
 
@@ -323,6 +358,19 @@ TEST(HeliaResizeNearestNeighborRouteTest,
   EXPECT_FALSE(entry_called);
   RunSmallLayer<int32_t>(kTfLiteFloat32, false, kTfLiteError, &entry_called);
   EXPECT_FALSE(entry_called);
+}
+
+// The reference reads input row and column 0 for every output position, so an
+// empty input height or width with a nonempty output reads past the input.
+// An empty output reads nothing and still prepares.
+TEST(HeliaResizeNearestNeighborRouteTest,
+     EmptyInputExtentRejectedDuringPrepare) {
+  EXPECT_EQ(kTfLiteError, PrepareExtents<int8_t>(kTfLiteInt8, 0, 3, 2, 2));
+  EXPECT_EQ(kTfLiteError, PrepareExtents<int8_t>(kTfLiteInt8, 3, 0, 2, 2));
+  EXPECT_EQ(kTfLiteError, PrepareExtents<int16_t>(kTfLiteInt16, 0, 3, 2, 2));
+  EXPECT_EQ(kTfLiteError, PrepareExtents<float>(kTfLiteFloat32, 3, 0, 2, 2));
+  EXPECT_EQ(kTfLiteOk, PrepareExtents<int8_t>(kTfLiteInt8, 0, 3, 0, 2));
+  EXPECT_EQ(kTfLiteOk, PrepareExtents<float>(kTfLiteFloat32, 2, 3, 2, 0));
 }
 
 #if ARM_NN_ENABLE_F16

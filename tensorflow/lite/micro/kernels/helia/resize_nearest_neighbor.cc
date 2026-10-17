@@ -124,8 +124,6 @@ TfLiteStatus ResizeNearestNeighborPrepare(TfLiteContext* context,
   // Every route reads the input as the output's type.
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
 
-  output->type = input->type;
-
   TF_LITE_ENSURE_MSG(context, IsConstantTensor(size),
                      "Non-constant >size< tensor is not supported");
   // Float16 has no reference kernel to fall back to.
@@ -151,6 +149,16 @@ TfLiteStatus ResizeNearestNeighborPrepare(TfLiteContext* context,
                          output->dims->data[3] == input->dims->data[3],
                      "RESIZE_NEAREST_NEIGHBOR requires an output shape of "
                      "[N, size[0], size[1], C].");
+  // Every route reads the input at each output position.
+  const bool output_empty = output->dims->data[0] <= 0 ||
+                            output->dims->data[1] <= 0 ||
+                            output->dims->data[2] <= 0 ||
+                            output->dims->data[3] <= 0;
+  TF_LITE_ENSURE_MSG(context,
+                     output_empty || (input->dims->data[1] > 0 &&
+                                      input->dims->data[2] > 0),
+                     "RESIZE_NEAREST_NEIGHBOR requires a nonempty input "
+                     "height and width for a nonempty output.");
   const cmsis_nn_dims output_dims = {
       output->dims->data[0], output->dims->data[1], output->dims->data[2],
       output->dims->data[3]};

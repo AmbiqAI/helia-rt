@@ -593,7 +593,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "Runs CORE, bit-exact with the reference for every align_corners/half_pixel_centers setting; layers with an empty extent use Reference and FP16 is rejected there. Preparation fails unless the output matches the input type and has shape [N, size[0], size[1], C]. Needs an (height + width) int32 scratch. FP32 uses Reference without ARM_NN_ENABLE_F32. FP16 requires ARM_NN_ENABLE_F16; without it preparation fails."
+    "notes": "Runs CORE, bit-exact with the reference for every align_corners/half_pixel_centers setting; layers with an empty extent use Reference and FP16 is rejected there. Preparation fails unless the output matches the input type and has shape [N, size[0], size[1], C], and fails for an empty input height or width with a nonempty output. Needs an (height + width) int32 scratch. FP32 uses Reference without ARM_NN_ENABLE_F32. FP16 requires ARM_NN_ENABLE_F16; without it preparation fails."
   },
   {
     "name": "RSQRT",
