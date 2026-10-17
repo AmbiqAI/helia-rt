@@ -121,6 +121,8 @@ TfLiteStatus ResizeNearestNeighborPrepare(TfLiteContext* context,
   TF_LITE_ENSURE_EQ(context, NumDimensions(size), 1);
   TF_LITE_ENSURE_EQ(context, size->type, kTfLiteInt32);
   TF_LITE_ENSURE_EQ(context, size->dims->data[0], 2);
+  // Every route reads the input as the output's type.
+  TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
 
   output->type = input->type;
 
@@ -137,23 +139,27 @@ TfLiteStatus ResizeNearestNeighborPrepare(TfLiteContext* context,
   data->scratch_index = -1;
   data->scratch_size = 0;
 
-  // The entries reject a layer whose output shape is not
-  // [N, size[0], size[1], C]; such a layer keeps the reference path.
+  // Every route writes N * size[0] * size[1] * C elements, whatever the
+  // output tensor holds.
   const int32_t* size_data = GetTensorData<int32_t>(size);
+  TF_LITE_ENSURE(context, size_data != nullptr);
+  TF_LITE_ENSURE_MSG(context,
+                     output->dims->size == 4 &&
+                         output->dims->data[0] == input->dims->data[0] &&
+                         output->dims->data[1] == size_data[0] &&
+                         output->dims->data[2] == size_data[1] &&
+                         output->dims->data[3] == input->dims->data[3],
+                     "RESIZE_NEAREST_NEIGHBOR requires an output shape of "
+                     "[N, size[0], size[1], C].");
   const cmsis_nn_dims output_dims = {
-      output->dims->size == 4 ? output->dims->data[0] : 0,
-      output->dims->size == 4 ? output->dims->data[1] : 0,
-      output->dims->size == 4 ? output->dims->data[2] : 0,
-      output->dims->size == 4 ? output->dims->data[3] : 0};
-  const bool shapes_match =
-      HasHeliaEntry(input->type) && size_data != nullptr &&
-      output->dims->size == 4 && input->dims->data[0] > 0 &&
-      input->dims->data[1] > 0 && input->dims->data[2] > 0 &&
-      input->dims->data[3] > 0 && output_dims.n == input->dims->data[0] &&
-      output_dims.c == input->dims->data[3] && size_data[0] > 0 &&
-      size_data[1] > 0 && output_dims.h == size_data[0] &&
-      output_dims.w == size_data[1];
-  if (shapes_match) {
+      output->dims->data[0], output->dims->data[1], output->dims->data[2],
+      output->dims->data[3]};
+  // The entries reject an empty extent.
+  const bool extents_positive =
+      input->dims->data[0] > 0 && input->dims->data[1] > 0 &&
+      input->dims->data[2] > 0 && input->dims->data[3] > 0 &&
+      output_dims.h > 0 && output_dims.w > 0;
+  if (HasHeliaEntry(input->type) && extents_positive) {
     const int32_t scratch_size = HeliaScratchSize(input->type, output_dims);
     if (scratch_size > 0) {
       TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
@@ -163,8 +169,8 @@ TfLiteStatus ResizeNearestNeighborPrepare(TfLiteContext* context,
     }
   }
   TF_LITE_ENSURE_MSG(context, input->type != kTfLiteFloat16 || data->use_helia,
-                     "Float16 RESIZE_NEAREST_NEIGHBOR requires an output "
-                     "shape of [N, size[0], size[1], C].");
+                     "Float16 RESIZE_NEAREST_NEIGHBOR requires nonempty "
+                     "input and output extents.");
   return kTfLiteOk;
 }
 

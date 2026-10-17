@@ -227,13 +227,16 @@ void Sweep(TfLiteType type, Entry entry) {
 // declared 2x3 instead, the same element count but not [N, size[0], size[1],
 // C]. Prepare must return `prepare_status` and release every temporary; only
 // a prepared layer is invoked, and its Invoke status is returned.
+// `output_type`, when set, declares the output with that type instead, and
 // `eval_output_type`, when set, replaces the output type after Prepare.
 template <typename Storage>
 TfLiteStatus RunSmallLayer(TfLiteType type, bool match_output,
                            TfLiteStatus prepare_status, bool* entry_called,
-                           TfLiteType eval_output_type = kTfLiteNoType) {
+                           TfLiteType eval_output_type = kTfLiteNoType,
+                           TfLiteType output_type = kTfLiteNoType) {
   Storage input[2 * 3 * 2] = {};
-  Storage output[6 * 2] = {};
+  // Room for 12 elements of any tested type.
+  int32_t output[6 * 2] = {};
   int input_dims[] = {4, 1, 2, 3, 2};
   int size_dims[] = {1, 2};
   int output_dims[] = {4, 1, match_output ? 3 : 2, match_output ? 2 : 3, 2};
@@ -244,7 +247,8 @@ TfLiteStatus RunSmallLayer(TfLiteType type, bool match_output,
   TfLiteTensor tensors[] = {
       CreateTensor(input, IntArrayFromInts(input_dims), false, type),
       CreateTensor(size_data, IntArrayFromInts(size_dims)),
-      CreateTensor(output, IntArrayFromInts(output_dims), false, type),
+      CreateTensor(output, IntArrayFromInts(output_dims), false,
+                   output_type != kTfLiteNoType ? output_type : type),
   };
   tensors[1].allocation_type = kTfLiteMmapRo;
   TfLiteResizeNearestNeighborParams params = {false, false};
@@ -301,10 +305,23 @@ TEST(HeliaResizeNearestNeighborRouteTest, TypeMismatchFailsInvoke) {
   EXPECT_FALSE(entry_called);
 }
 
-TEST(HeliaResizeNearestNeighborRouteTest, MismatchedOutputShapeKeepsReference) {
+// The reference kernel would read the int8 input as int16.
+TEST(HeliaResizeNearestNeighborRouteTest, TypeMismatchRejectedDuringPrepare) {
   bool entry_called = true;
-  EXPECT_EQ(kTfLiteOk, RunSmallLayer<int8_t>(kTfLiteInt8, false, kTfLiteOk,
-                                             &entry_called));
+  RunSmallLayer<int8_t>(kTfLiteInt8, true, kTfLiteError, &entry_called,
+                        kTfLiteNoType, kTfLiteInt16);
+  EXPECT_FALSE(entry_called);
+}
+
+// Every route writes [N, size[0], size[1], C] whatever the output holds.
+TEST(HeliaResizeNearestNeighborRouteTest,
+     MismatchedOutputShapeRejectedDuringPrepare) {
+  bool entry_called = true;
+  RunSmallLayer<int8_t>(kTfLiteInt8, false, kTfLiteError, &entry_called);
+  EXPECT_FALSE(entry_called);
+  RunSmallLayer<int16_t>(kTfLiteInt16, false, kTfLiteError, &entry_called);
+  EXPECT_FALSE(entry_called);
+  RunSmallLayer<int32_t>(kTfLiteFloat32, false, kTfLiteError, &entry_called);
   EXPECT_FALSE(entry_called);
 }
 
