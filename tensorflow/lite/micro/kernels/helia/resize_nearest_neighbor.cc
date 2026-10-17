@@ -150,15 +150,14 @@ TfLiteStatus ResizeNearestNeighborPrepare(TfLiteContext* context,
                      "RESIZE_NEAREST_NEIGHBOR requires an output shape of "
                      "[N, size[0], size[1], C].");
   // Every route reads the input at each output position.
-  const bool output_empty = output->dims->data[0] <= 0 ||
-                            output->dims->data[1] <= 0 ||
-                            output->dims->data[2] <= 0 ||
-                            output->dims->data[3] <= 0;
-  TF_LITE_ENSURE_MSG(context,
-                     output_empty || (input->dims->data[1] > 0 &&
-                                      input->dims->data[2] > 0),
-                     "RESIZE_NEAREST_NEIGHBOR requires a nonempty input "
-                     "height and width for a nonempty output.");
+  const bool output_empty =
+      output->dims->data[0] <= 0 || output->dims->data[1] <= 0 ||
+      output->dims->data[2] <= 0 || output->dims->data[3] <= 0;
+  TF_LITE_ENSURE_MSG(
+      context,
+      output_empty || (input->dims->data[1] > 0 && input->dims->data[2] > 0),
+      "RESIZE_NEAREST_NEIGHBOR requires a nonempty input "
+      "height and width for a nonempty output.");
   const cmsis_nn_dims output_dims = {
       output->dims->data[0], output->dims->data[1], output->dims->data[2],
       output->dims->data[3]};

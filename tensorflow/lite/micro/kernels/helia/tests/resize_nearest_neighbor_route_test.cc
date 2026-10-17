@@ -300,8 +300,7 @@ TfLiteStatus PrepareExtents(TfLiteType type, int in_h, int in_w, int out_h,
   int outputs[] = {1, 2};
   const TFLMRegistration registration =
       tflite::Register_RESIZE_NEAREST_NEIGHBOR();
-  micro::KernelRunner runner(registration, tensors, 3,
-                             IntArrayFromInts(inputs),
+  micro::KernelRunner runner(registration, tensors, 3, IntArrayFromInts(inputs),
                              IntArrayFromInts(outputs), &params);
   const TfLiteStatus status = runner.InitAndPrepare();
   EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
