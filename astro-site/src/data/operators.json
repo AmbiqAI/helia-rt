@@ -6,10 +6,11 @@
     "types": [
       "int8",
       "int16",
-      "float32"
+      "float32",
+      "float16"
     ],
-    "path": "Reference",
-    "notes": "Reference implementation in the HELIA adapter source. Quantized scaling requirements apply."
+    "path": "Mixed",
+    "notes": "FP32, int8 and quantized int16 run CORE; quantized scaling requirements apply. Unquantized int16 uses Reference, which wraps -32768. FP16 requires ARM_NN_ENABLE_F16; without it preparation fails."
   },
   {
     "name": "ADD",
@@ -394,6 +395,17 @@
     "notes": "Float identical-shape inputs support arbitrary rank. Optimized broadcasting supports rank <= 4; higher-rank FP32 uses Reference and FP16 is rejected. int32 follows the adapter reference path."
   },
   {
+    "name": "NEG",
+    "family": "Arithmetic",
+    "source": "neg.cc",
+    "types": [
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "FP32 and FP16 run CORE as sign-bit flips, NaN payloads kept. FP16 requires ARM_NN_ENABLE_F16; without it preparation fails."
+  },
+  {
     "name": "NOT_EQUAL",
     "family": "Comparison",
     "source": "comparisons.cc",
@@ -553,7 +565,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "FP32 and integer paths use Reference. FP16 requires CORE >= 7.33.0 and ARM_NN_ENABLE_F16; input/output shapes and types must match."
+    "notes": "FP32 and FP16 run CORE; integer paths use Reference. FP16 requires CORE >= 7.33.0 and ARM_NN_ENABLE_F16; input/output shapes and types must match. A negative input gives the positive quiet NaN."
   },
   {
     "name": "SIN",
@@ -615,7 +627,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "FP32 uses Reference. FP16 requires CORE >= 7.33.0 and ARM_NN_ENABLE_F16; input/output shapes and types must match."
+    "notes": "FP32 and FP16 run CORE. FP16 requires CORE >= 7.33.0 and ARM_NN_ENABLE_F16; input/output shapes and types must match. A negative input gives the positive quiet NaN."
   },
   {
     "name": "SQUARE",
