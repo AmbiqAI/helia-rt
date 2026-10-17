@@ -32,6 +32,21 @@ namespace tflite {
 namespace micro {
 namespace {
 
+class ScopedTempTensor {
+ public:
+  ScopedTempTensor(MicroContext* context, TfLiteTensor* tensor)
+      : context_(context), tensor_(tensor) {}
+  ~ScopedTempTensor() {
+    if (tensor_ != nullptr) {
+      context_->DeallocateTempTfLiteTensor(tensor_);
+    }
+  }
+
+ private:
+  MicroContext* context_;
+  TfLiteTensor* tensor_;
+};
+
 // For the TfLite transpose_conv implementation, input tensor 0 corresponds to
 // the OutputShapeTensor. However, since TFLM does not support dynamic tensors,
 // the TFLM implementation ignores input tensor 0 and the only inputs we care
@@ -105,19 +120,23 @@ TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteNode* node,
 
     TfLiteTensor* input =
         micro_context->AllocateTempInputTensor(node, kInputTensor);
+    ScopedTempTensor input_guard(micro_context, input);
     TF_LITE_ENSURE(context, input != nullptr);
     TfLiteTensor* filter =
         micro_context->AllocateTempInputTensor(node, kFilterTensor);
+    ScopedTempTensor filter_guard(micro_context, filter);
     TF_LITE_ENSURE(context, filter != nullptr);
     TfLiteTensor* bias =
         micro_context->AllocateTempInputTensor(node, kBiasTensor);
+    ScopedTempTensor bias_guard(micro_context, bias);
     TfLiteTensor* output =
         micro_context->AllocateTempOutputTensor(node, kOutputTensor);
+    ScopedTempTensor output_guard(micro_context, output);
     TF_LITE_ENSURE(context, output != nullptr);
     int output_channels = filter->dims->data[kConvQuantizedDimension];
 
     TF_LITE_ENSURE_STATUS(tflite::PopulateConvolutionQuantizationParams(
-        context, input, filter, bias, output, kTfLiteActNone,
+        context, input, filter, bias, output, params->activation,
         &data->params.output_multiplier, &data->params.output_shift,
         &data->params.quantized_activation_min,
         &data->params.quantized_activation_max,
@@ -131,8 +150,7 @@ TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteNode* node,
       TFLITE_DCHECK(output->type == kTfLiteInt16);
       // bias is optional for TRANSPOSE_CONV: a legal 3-input int16 model
       // omits it and AllocateTempInputTensor() returns nullptr for it, so the
-      // type read below has to be guarded. Eval and the dealloc path below
-      // already guard it; only Prepare did not.
+      // type read below has to be guarded.
       if (bias != nullptr && bias->type == kTfLiteInt16) {
         // Checked outside TFLITE_DCHECK: the request is made either way (the
         // macro only elides the assert, not the condition it wraps), but in
@@ -146,13 +164,6 @@ TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteNode* node,
                 context, GetTensorShape(bias).FlatSize() * sizeof(std::int64_t),
                 &(data->bias_converted_buffer_index)));
       }
-    }
-
-    micro_context->DeallocateTempTfLiteTensor(input);
-    micro_context->DeallocateTempTfLiteTensor(filter);
-    micro_context->DeallocateTempTfLiteTensor(output);
-    if (bias != nullptr) {
-      micro_context->DeallocateTempTfLiteTensor(bias);
     }
   }
   return kTfLiteOk;
@@ -175,12 +186,15 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
 
   TfLiteTensor* output =
       micro_context->AllocateTempOutputTensor(node, kOutputTensor);
+  ScopedTempTensor output_guard(micro_context, output);
   TF_LITE_ENSURE(context, output != nullptr);
   TfLiteTensor* input =
       micro_context->AllocateTempInputTensor(node, kInputTensor);
+  ScopedTempTensor input_guard(micro_context, input);
   TF_LITE_ENSURE(context, input != nullptr);
   TfLiteTensor* filter =
       micro_context->AllocateTempInputTensor(node, kFilterTensor);
+  ScopedTempTensor filter_guard(micro_context, filter);
   TF_LITE_ENSURE(context, filter != nullptr);
   // Bias is input 3, not an output. Fetching it with AllocateTempOutputTensor
   // asked for output index 3 on a node with one output; GetTensorIndex rejects
@@ -189,6 +203,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   // genuine nullptr is still valid here and is tolerated by GetTensorData<>().
   TfLiteTensor* bias =
         micro_context->AllocateTempInputTensor(node, kBiasTensor);
+  ScopedTempTensor bias_guard(micro_context, bias);
 
   TF_LITE_ENSURE_EQ(context, input->type, output->type);
   TF_LITE_ENSURE_MSG(context,
@@ -205,6 +220,48 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
           (input->type == kTfLiteInt16 && filter->type == kTfLiteInt8) ||
           (input->type == kTfLiteInt8 && filter->type == kTfLiteInt8),
       "Hybrid models are not supported on TFLite Micro.");
+
+  // The kernels read these extents and the bias unchecked; MatchingDim only
+  // DCHECKs. see AmbiqAI/helia-rt#443
+  TF_LITE_ENSURE_EQ(context, NumDimensions(input), 4);
+  TF_LITE_ENSURE_EQ(context, NumDimensions(filter), 4);
+  TF_LITE_ENSURE_EQ(context, NumDimensions(output), 4);
+  for (int i = 0; i < 4; ++i) {
+    TF_LITE_ENSURE(context, SizeOfDimension(input, i) > 0 &&
+                                SizeOfDimension(filter, i) > 0 &&
+                                SizeOfDimension(output, i) > 0);
+  }
+  TF_LITE_ENSURE_EQ(context, SizeOfDimension(input, 0),
+                    SizeOfDimension(output, 0));
+  TF_LITE_ENSURE_EQ(context, SizeOfDimension(filter, 0),
+                    SizeOfDimension(output, 3));
+  TF_LITE_ENSURE_EQ(context, SizeOfDimension(input, 3),
+                    SizeOfDimension(filter, 3));
+  if (bias != nullptr) {
+    // GetTensorShape(bias) copies the dims into a fixed six-entry array.
+    TF_LITE_ENSURE(context, NumDimensions(bias) <= RuntimeShape::kMaxSmallSize);
+    // Stop at the first nonpositive extent or past INT32_MAX, so the count
+    // cannot wrap into a match.
+    int64_t bias_elements = 1;
+    for (int i = 0; i < NumDimensions(bias) && bias_elements > 0 &&
+                    bias_elements <= INT32_MAX;
+         ++i) {
+      const int extent = SizeOfDimension(bias, i);
+      bias_elements = extent > 0 ? bias_elements * extent : -1;
+    }
+    TF_LITE_ENSURE_MSG(context, bias_elements == SizeOfDimension(output, 3),
+                       "TRANSPOSE_CONV needs one bias element per output "
+                       "channel.");
+    if (input->type == kTfLiteInt8) {
+      TF_LITE_ENSURE_TYPES_EQ(context, bias->type, kTfLiteInt32);
+    } else if (input->type == kTfLiteInt16) {
+      TF_LITE_ENSURE_MSG(
+          context, bias->type == kTfLiteInt16 || bias->type == kTfLiteInt64,
+          "16x8 TRANSPOSE_CONV needs an int16 or int64 bias.");
+    } else {
+      TF_LITE_ENSURE_TYPES_EQ(context, bias->type, input->type);
+    }
+  }
 
   data->weight_buffer_idx = -1;
   data->weight_sum_buf = nullptr;
@@ -400,16 +457,6 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   // Stride
   data->params.stride_width = params->stride_width;
   data->params.stride_height = params->stride_height;
-
-  micro_context->DeallocateTempTfLiteTensor(output);
-  micro_context->DeallocateTempTfLiteTensor(input);
-  micro_context->DeallocateTempTfLiteTensor(filter);
-  // The fetch above now actually allocates, so it has to be released. Guarded
-  // because bias is optional for TRANSPOSE_CONV -- same form as
-  // CalculateOpData().
-  if (bias != nullptr) {
-    micro_context->DeallocateTempTfLiteTensor(bias);
-  }
   return kTfLiteOk;
 }
 

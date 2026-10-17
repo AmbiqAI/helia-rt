@@ -198,6 +198,17 @@ $(kernel_elementwise_unary_route_test_BINARY): LDFLAGS += \
 endif
 endif
 
+# int8 TRANSPOSE_CONV under each fused activation against the reference
+# kernel. see AmbiqAI/helia-rt#442
+$(eval $(call microlite_test,kernel_transpose_conv_s8_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/transpose_conv_s8_test.cc))
+
+# Float TRANSPOSE_CONV Prepare rejects a bias of another type, a rank above six
+# or an element count other than the output channels.
+# see AmbiqAI/helia-rt#443
+$(eval $(call microlite_test,kernel_transpose_conv_float_bias_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/transpose_conv_float_bias_test.cc))
+
 # 16x8 TRANSPOSE_CONV against the reference kernel over strides, paddings and
 # bias types. GCC and ATfE links wrap arm_transpose_conv_s16 to prove the route.
 $(eval $(call microlite_test,kernel_transpose_conv_s16_test,\
@@ -379,4 +390,18 @@ $(kernel_float_context_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_depthwise_conv_wrapper_f16 \
   -Wl,--wrap=arm_batch_matmul_f16_get_buffer_size \
   -Wl,--wrap=arm_batch_matmul_f16
+endif
+
+# int8 and int16 STRIDED_SLICE with shrunk axes, empty slices, masks and extreme
+# strides, against the reference. GCC and ATfE links wrap the heliaCORE entries
+# to prove each route. see AmbiqAI/helia-rt#435
+$(eval $(call microlite_test,kernel_strided_slice_shrink_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/strided_slice_shrink_test.cc))
+
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
+$(kernel_strided_slice_shrink_test_BINARY): CXXFLAGS += \
+  -DHELIA_STRIDED_SLICE_SHRINK_LINK_WRAP=1
+$(kernel_strided_slice_shrink_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_strided_slice_s8 \
+  -Wl,--wrap=arm_strided_slice_s16
 endif
