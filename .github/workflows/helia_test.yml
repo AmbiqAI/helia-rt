@@ -337,26 +337,26 @@ jobs:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 174
-            min-cases: 1549
+            min-cases: 1550
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 174
-            min-cases: 1549
+            min-cases: 1550
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 173
-            min-cases: 1547
+            min-cases: 1548
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 174
-            min-cases: 1614
+            min-cases: 1615
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 173
-            min-cases: 1612
+            min-cases: 1613
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
