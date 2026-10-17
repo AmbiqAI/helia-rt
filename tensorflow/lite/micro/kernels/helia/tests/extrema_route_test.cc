@@ -344,13 +344,18 @@ void ExpectReduceF32MatchesReference(const Layer& l, const float* input,
   }
 }
 
-// One float32 REDUCE at the layer's rank, which must run the _tflite entry.
+// One float32 REDUCE at the layer's rank, which must run the _tflite entry,
+// except on an empty input, which fills the start value without one.
 void ReduceF32(const Layer& l, bool is_max, const float* input,
                float* output) {
+  bool empty = false;
+  for (int i = 0; i < l.rank; ++i) {
+    empty = empty || l.dims[i] == 0;
+  }
   memset(g_leaf_calls, 0, sizeof(g_leaf_calls));
   EXPECT_EQ(kTfLiteOk, RunReduce(l, is_max, /*keep_dims=*/false,
                                  kTfLiteFloat32, input, output));
-  ExpectTfliteF32Calls(is_max, 1);
+  ExpectTfliteF32Calls(is_max, empty ? 0 : 1);
 }
 
 }  // namespace
