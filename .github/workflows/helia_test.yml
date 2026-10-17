@@ -342,30 +342,33 @@ jobs:
         # the cortex-m55 legs and two on the others. see AmbiqAI/helia-rt#433
         # PRELU alpha-type and output-shape rejections add two cases on every leg.
         # see AmbiqAI/helia-rt#433
+        # DIV and SQUARED_DIFFERENCE entry-failure, empty-tensor and no-fp16
+        # rejection cases add six cases on every leg but the cortex-m55 ones, which
+        # have the fp16 API and add four. see AmbiqAI/helia-rt#433
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 175
-            min-cases: 1574
+            min-cases: 1580
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 175
-            min-cases: 1574
+            min-cases: 1580
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 174
-            min-cases: 1572
+            min-cases: 1578
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 175
-            min-cases: 1638
+            min-cases: 1642
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 174
-            min-cases: 1636
+            min-cases: 1640
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
