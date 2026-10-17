@@ -296,12 +296,13 @@ TEST(HeliaStridedSliceShrinkTest, FourDShrinkLeadingAxisWithMasks) {
 }
 
 // Prepare checks the output shape with a float ceil, which rounds above 2^24
-// elements on an axis, so a hostile model can declare an output one element
-// short of the slice. Such an axis cannot be allocated here; instead Prepare
-// sees the true [2, 4] output and Invoke a [1, 7] one. The kernel must fail
-// the op without reaching heliaCORE or writing past the tensor.
+// elements on an axis, so a hostile model can declare an output that does not
+// hold the slice. Such an axis cannot be allocated here; instead Prepare sees
+// the true [2, 4] output and Invoke a [1, `elements`] one. Every type must
+// fail the op without reaching heliaCORE or writing past the tensor; `leaf`
+// is kCount for the types that run the reference.
 template <typename T>
-void ExpectShortOutputFails(TfLiteType type, Leaf leaf) {
+void ExpectWrongOutputSizeFails(TfLiteType type, Leaf leaf, int elements) {
   using tflite::testing::CreateTensor;
   using tflite::testing::IntArrayFromInts;
   T input[24];
@@ -335,23 +336,34 @@ void ExpectShortOutputFails(TfLiteType type, Leaf leaf) {
                                      IntArrayFromInts(outputs), &params);
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
   output_dims[1] = 1;
-  output_dims[2] = 7;
+  output_dims[2] = elements;
   memset(output, 0x5A, sizeof(output));
   memset(g_leaf_calls, 0, sizeof(g_leaf_calls));
   EXPECT_EQ(kTfLiteError, runner.Invoke());
 #if HELIA_STRIDED_SLICE_SHRINK_LINK_WRAP
-  EXPECT_EQ(0, g_leaf_calls[static_cast<int>(leaf)]);
-#else
-  (void)leaf;
+  for (int i = 0; i < static_cast<int>(Leaf::kCount); ++i) {
+    EXPECT_EQ(0, g_leaf_calls[i]);
+  }
 #endif
-  for (size_t i = 7 * sizeof(T); i < sizeof(output); ++i) {
+  (void)leaf;
+  const int kept = elements < 8 ? elements : 8;
+  for (size_t i = kept * sizeof(T); i < sizeof(output); ++i) {
     EXPECT_EQ(0x5A, reinterpret_cast<const uint8_t*>(output)[i]);
   }
 }
 
 TEST(HeliaStridedSliceShrinkTest, OutputShorterThanSliceFailsInvoke) {
-  ExpectShortOutputFails<int8_t>(kTfLiteInt8, Leaf::kS8);
-  ExpectShortOutputFails<int16_t>(kTfLiteInt16, Leaf::kS16);
+  ExpectWrongOutputSizeFails<int8_t>(kTfLiteInt8, Leaf::kS8, 7);
+  ExpectWrongOutputSizeFails<int16_t>(kTfLiteInt16, Leaf::kS16, 7);
+  ExpectWrongOutputSizeFails<float>(kTfLiteFloat32, Leaf::kCount, 7);
+  ExpectWrongOutputSizeFails<int32_t>(kTfLiteInt32, Leaf::kCount, 7);
+  ExpectWrongOutputSizeFails<bool>(kTfLiteBool, Leaf::kCount, 7);
+}
+
+// The check is for equality, so a larger output fails too.
+TEST(HeliaStridedSliceShrinkTest, OutputLargerThanSliceFailsInvoke) {
+  ExpectWrongOutputSizeFails<int8_t>(kTfLiteInt8, Leaf::kS8, 9);
+  ExpectWrongOutputSizeFails<float>(kTfLiteFloat32, Leaf::kCount, 9);
 }
 
 TF_LITE_MICRO_TESTS_MAIN
