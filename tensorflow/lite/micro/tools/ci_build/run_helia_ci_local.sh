@@ -19,7 +19,7 @@
 #                      contains <text> (e.g. 'cortex-m4+fp', 'atfe-SPEED').
 #   --opt <SPEED|SIZE|BOTH>
 #                      Kernel optimization profiles (default: BOTH).
-#   --parallel <n>     Units run at once (default: 2).
+#   --parallel <n>     Units run at once (default: 2; at most --cpus).
 #   --cpus <n>         CPUs shared by the running units (default: half of
 #                      nproc). Each unit gets cpus/parallel, and its make -j
 #                      follows: test_helia.sh sizes -j from nproc, which
@@ -38,6 +38,13 @@
 # Environment:
 #   HELIA_LOCAL_CI_DIR  Cache root for per-unit trees, shared downloads,
 #                       ccache and logs (default: ~/.cache/helia-rt-local-ci).
+#                       One run holds it at a time; a second run on the same
+#                       root exits at once, so give concurrent runs their own.
+#
+# Downloads are reused only while their inputs are unchanged: the files the
+# workflow's downloads cache key hashes, the patches the download scripts
+# apply, and the image digest (or, with --native, the host OS and machine).
+# Any change empties the downloads directory before it is fetched again.
 #
 # Exit status is 0 only when every source check and every unit passes.
 
@@ -149,8 +156,19 @@ if [[ ${LIST_ONLY} -eq 1 ]]; then
 fi
 [[ ${PARALLEL} -ge 1 && ${CPUS} -ge 1 ]] || { echo "--parallel and --cpus must be >= 1" >&2; exit 2; }
 [[ ${PARALLEL} -le ${#UNITS[@]} ]] || PARALLEL=${#UNITS[@]}
+# Each unit needs a whole CPU, so --cpus also bounds how many run at once.
+[[ ${PARALLEL} -le ${CPUS} ]] || PARALLEL=${CPUS}
 UNIT_CPUS=$(( CPUS / PARALLEL ))
-[[ ${UNIT_CPUS} -ge 1 ]] || UNIT_CPUS=1
+
+# Trees, downloads and ccache under the cache root are rewritten by a run
+# (rsync --delete, make clean), so two runs must not share one. The lock is
+# held on fd 9 until this script and every unit it started have exited.
+mkdir -p "${CACHE_DIR}"
+exec 9>"${CACHE_DIR}/.lock"
+if ! flock -n 9; then
+  echo "Another run holds ${CACHE_DIR}; wait for it, or set HELIA_LOCAL_CI_DIR to another cache root." >&2
+  exit 2
+fi
 
 RUN_ID="$(date +%Y%m%d-%H%M%S)"
 LOG_DIR="${CACHE_DIR}/logs/${RUN_ID}"
@@ -183,6 +201,35 @@ fi
 # download scripts reach patches through ../ from it, so it cannot be a
 # symlink. Native units keep their own downloads in their copy.
 DOWNLOADS_REL=tensorflow/lite/micro/tools/make/downloads
+
+# Hash of everything that decides a downloads directory's contents. Covers
+# the files helia_test.yml's downloads cache key hashes, plus the patches,
+# helpers and platform that key leaves to the runner OS.
+downloads_key() {
+  {
+    if [[ ${NATIVE} -eq 1 ]]; then echo "native $(uname -sm)"; else echo "${IMAGE}"; fi
+    (cd "${ROOT_DIR}/tensorflow/lite/micro/tools/make" &&
+      find . -maxdepth 2 -type f -not -path './downloads/*' \( \
+        -name Makefile -o -name third_party_downloads.inc \
+        -o -name download_dependencies.py -o -name helia.inc \
+        -o -name '*_download.sh' -o -name '*.patch' \
+        -o -name bash_helpers.sh -o -name download_and_extract.sh \) |
+      LC_ALL=C sort | xargs sha256sum)
+  } | sha256sum | cut -d' ' -f1
+}
+DOWNLOADS_KEY="$(downloads_key)"
+
+# The download scripts skip a dependency whose directory exists, so a
+# directory fetched from other inputs is emptied rather than reused.
+check_downloads() {
+  local dir="$1" stamp="$1/.helia-local-ci-key"
+  if [[ "$(cat "${stamp}" 2>/dev/null || true)" != "${DOWNLOADS_KEY}" ]]; then
+    rm -rf "${dir:?}"
+    mkdir -p "${dir}"
+    echo "${DOWNLOADS_KEY}" > "${stamp}"
+  fi
+}
+[[ ${NATIVE} -eq 1 ]] || check_downloads "${DOWNLOADS}"
 sync_tree() {
   local tree="$1"
   mkdir -p "${tree}/${DOWNLOADS_REL}"
@@ -216,6 +263,7 @@ declare -A fetched=()
 for unit in "${UNITS[@]}"; do
   read -r name arch tc opt _ _ <<<"${unit}"
   sync_tree "${CACHE_DIR}/trees/${name}"
+  [[ ${NATIVE} -eq 0 ]] || check_downloads "${CACHE_DIR}/trees/${name}/${DOWNLOADS_REL}"
   key="${arch}-${tc}"
   [[ ${NATIVE} -eq 1 ]] && key="${name}"
   if [[ -z "${fetched[${key}]:-}" ]]; then
@@ -259,13 +307,27 @@ run_unit() {
 
 echo "==> ${#UNITS[@]} units, ${PARALLEL} at a time, ${UNIT_CPUS} CPUs each"
 
+# Job control puts each unit in its own process group, led by the unit's
+# shell, so a signal reaches make, the FVP and every other descendant.
+set -m
+
 # Stop every unit, and the containers they started, if the run is interrupted.
 stop_units() {
   trap - INT TERM
-  jobs -p | xargs -r kill 2>/dev/null || true
+  local pgids pgid
+  pgids="$(jobs -p)"
+  for pgid in ${pgids}; do kill -TERM -- "-${pgid}" 2>/dev/null || true; done
   if [[ ${NATIVE} -eq 0 ]]; then
     docker ps -q --filter "name=helia-local-ci-${RUN_ID}-" | xargs -r docker kill >/dev/null 2>&1 || true
   fi
+  for _ in {1..50}; do
+    for pgid in ${pgids}; do
+      kill -0 -- "-${pgid}" 2>/dev/null && { sleep 0.2; continue 2; }
+    done
+    break
+  done
+  for pgid in ${pgids}; do kill -KILL -- "-${pgid}" 2>/dev/null || true; done
+  wait 2>/dev/null || true
   echo "==> interrupted; units stopped. logs: ${LOG_DIR}" >&2
   exit 130
 }
@@ -275,8 +337,9 @@ results="${LOG_DIR}/results.txt"
 running=0
 for unit in "${UNITS[@]}"; do
   read -r name arch tc opt min_bins min_cases <<<"${unit}"
+  # Job control no longer points a background job's stdin at /dev/null.
   run_unit "${name}" "${arch}" "${tc}" "${opt}" "${min_bins}" "${min_cases}" \
-    >> "${results}" &
+    < /dev/null >> "${results}" &
   running=$((running + 1))
   if [[ ${running} -ge ${PARALLEL} ]]; then
     wait -n || true
