@@ -17,11 +17,11 @@ limitations under the License.
 
 #include "Include/arm_nnfunctions.h"
 #include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_element_count.h"
 #include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_log.h"
-#include "tensorflow/lite/micro/micro_utils.h"
 
 namespace tflite {
 namespace micro {
@@ -31,8 +31,8 @@ constexpr int kInputTensor = 0;
 constexpr int kOutputTensor = 0;
 
 // float16 has no reference path, so it is rejected here on builds without
-// ARM_NN_ENABLE_F16. arm_nn_neg_f16 writes as many elements as the input
-// holds, so a float16 output must have the input's shape.
+// ARM_NN_ENABLE_F16, and needs an output of the input's shape, as the other
+// float16 elementwise kernels do.
 TfLiteStatus NegPrepare(TfLiteContext* context, TfLiteNode* node) {
   MicroContext* micro_context = GetMicroContext(context);
   TfLiteTensor* input =
@@ -44,26 +44,34 @@ TfLiteStatus NegPrepare(TfLiteContext* context, TfLiteNode* node) {
     micro_context->DeallocateTempTfLiteTensor(input);
     return kTfLiteError;
   }
-  const TfLiteType type = input->type;
-  const bool same_shape = TfLiteIntArrayEqual(input->dims, output->dims);
+  TfLiteStatus status = kTfLiteOk;
+  if (input->type == kTfLiteFloat16) {
+    if (!kHeliaFloat16Enabled) {
+      MicroPrintf("Float16 NEG requires ARM_NN_ENABLE_F16.");
+      status = kTfLiteError;
+    } else {
+      int32_t count;
+      status = HeliaCheckedSameShapeElementCount(context, input->dims,
+                                                 output->dims, &count);
+    }
+  }
   micro_context->DeallocateTempTfLiteTensor(input);
   micro_context->DeallocateTempTfLiteTensor(output);
-  TF_LITE_ENSURE_MSG(context,
-                     type != kTfLiteFloat16 || kHeliaFloat16Enabled,
-                     "Float16 NEG requires ARM_NN_ENABLE_F16.");
-  TF_LITE_ENSURE_MSG(context, type != kTfLiteFloat16 || same_shape,
-                     "Float16 NEG requires matching input and output shapes.");
-  return kTfLiteOk;
+  return status;
 }
 
-// Runs arm_nn_neg_f32/f16, a sign-bit toggle like reference_ops::Negate.
+// Runs arm_nn_neg_f32/f16, a sign-bit toggle like reference_ops::Negate. The
+// entry writes as many elements as it reads, so the output must hold the
+// input's count.
 template <typename T>
 TfLiteStatus EvalHeliaNeg(TfLiteContext* context, const TfLiteEvalTensor* input,
                           TfLiteEvalTensor* output,
                           arm_cmsis_nn_status (*entry)(const T*, T*, int32_t),
                           const char* entry_name) {
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
-  const int count = ElementCount(*input->dims);
+  int32_t count;
+  TF_LITE_ENSURE_OK(context, HeliaCheckedMatchingElementCount(
+                                 context, input->dims, output->dims, &count));
   if (count == 0) {
     return kTfLiteOk;
   }
@@ -96,11 +104,14 @@ TfLiteStatus NegEval(TfLiteContext* context, TfLiteNode* node) {
       break;
 #endif
 #if ARM_NN_ENABLE_F16
-    case kTfLiteFloat16:
-      TF_LITE_ENSURE_EQ(context, ElementCount(*input->dims),
-                        ElementCount(*output->dims));
+    case kTfLiteFloat16: {
+      int32_t count;
+      TF_LITE_ENSURE_OK(context, HeliaCheckedSameShapeElementCount(
+                                     context, input->dims, output->dims,
+                                     &count));
       return EvalHeliaNeg<float16_t>(context, input, output, arm_nn_neg_f16,
                                      "arm_nn_neg_f16");
+    }
 #endif
     default:
       MicroPrintf("Type %s (%d) not supported.", TfLiteTypeGetName(input->type),

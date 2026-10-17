@@ -440,6 +440,59 @@ void ExpectFloat16ShapeMismatchFails(const TFLMRegistration& registration) {
   EXPECT_EQ(0, overwrites);
 }
 
+// Prepare sees an 8-element output matching the input; Invoke sees it shrunk
+// to 2 elements. The op must fail without calling heliaCORE or writing past
+// the shrunk output. A float16 case on a build without ARM_NN_ENABLE_F16 is
+// rejected at Prepare instead.
+template <typename T>
+void ExpectShrunkOutputFailsInvoke(const TFLMRegistration& registration,
+                                   Entry entry, TfLiteType type,
+                                   bool quantized = false) {
+  T input[8];
+  memset(input, 0x11, sizeof(input));
+  T output[8];
+  int input_dims[] = {2, 1, 8};
+  int output_dims[] = {2, 1, 8};
+  TfLiteTensor tensors[2] = {
+      CreateTensor(input, IntArrayFromInts(input_dims), false, type),
+      CreateTensor(output, IntArrayFromInts(output_dims), false, type),
+  };
+  float scales[] = {1, 0.5f};
+  int zero_points[] = {1, 0};
+  float output_scales[] = {1, 0.25f};
+  TfLiteAffineQuantization input_quant = {FloatArrayFromFloats(scales),
+                                          IntArrayFromInts(zero_points), 0};
+  TfLiteAffineQuantization output_quant = {
+      FloatArrayFromFloats(output_scales), IntArrayFromInts(zero_points), 0};
+  if (quantized) {
+    tensors[0].params = {0.5f, 0};
+    tensors[0].quantization = {kTfLiteAffineQuantization, &input_quant};
+    tensors[1].params = {0.25f, 0};
+    tensors[1].quantization = {kTfLiteAffineQuantization, &output_quant};
+  }
+  int inputs[] = {1, 0};
+  int outputs[] = {1, 1};
+  micro::KernelRunner runner(registration, tensors, 2,
+                             IntArrayFromInts(inputs),
+                             IntArrayFromInts(outputs), nullptr);
+  const TfLiteStatus prepare = runner.InitAndPrepare();
+  if (!kF16 && type == kTfLiteFloat16) {
+    EXPECT_EQ(kTfLiteError, prepare);
+    return;
+  }
+  EXPECT_EQ(kTfLiteOk, prepare);
+  output_dims[2] = 2;
+  memset(output, 0x5A, sizeof(output));
+  memset(g_calls, 0, sizeof(g_calls));
+  EXPECT_EQ(kTfLiteError, runner.Invoke());
+  ExpectCalls(entry, 0);
+  int overwrites = 0;
+  for (size_t i = 2 * sizeof(T); i < sizeof(output); ++i) {
+    overwrites += reinterpret_cast<const uint8_t*>(output)[i] != 0x5A;
+  }
+  EXPECT_EQ(0, overwrites);
+}
+
 void ExpectFailingEntryFailsInvoke(const TFLMRegistration& registration,
                                    Entry entry, TfLiteType type) {
   if (!kWrapped || (!kF16 && type == kTfLiteFloat16)) {
@@ -576,6 +629,29 @@ TEST(HeliaElementwiseUnaryRouteTest, AbsFloat16ShapeMismatchFails) {
 
 TEST(HeliaElementwiseUnaryRouteTest, NegFloat16ShapeMismatchFails) {
   ExpectFloat16ShapeMismatchFails(tflite::Register_NEG());
+}
+
+TEST(HeliaElementwiseUnaryRouteTest, ShrunkOutputFailsInvoke) {
+  ExpectShrunkOutputFailsInvoke<float>(tflite::Register_ABS(), Entry::kAbsF32,
+                                       kTfLiteFloat32);
+  ExpectShrunkOutputFailsInvoke<float>(tflite::Register_NEG(), Entry::kNegF32,
+                                       kTfLiteFloat32);
+  ExpectShrunkOutputFailsInvoke<float>(tflite::Register_SQRT(),
+                                       Entry::kSqrtF32, kTfLiteFloat32);
+  ExpectShrunkOutputFailsInvoke<float>(tflite::Register_RSQRT(),
+                                       Entry::kRsqrtF32, kTfLiteFloat32);
+  ExpectShrunkOutputFailsInvoke<int8_t>(tflite::Register_ABS(), Entry::kAbsS8,
+                                        kTfLiteInt8, /*quantized=*/true);
+  ExpectShrunkOutputFailsInvoke<int16_t>(tflite::Register_ABS(),
+                                         Entry::kAbsS16, kTfLiteInt16,
+                                         /*quantized=*/true);
+}
+
+TEST(HeliaElementwiseUnaryRouteTest, ShrunkFloat16OutputFailsInvoke) {
+  ExpectShrunkOutputFailsInvoke<uint16_t>(tflite::Register_ABS(),
+                                          Entry::kAbsF16, kTfLiteFloat16);
+  ExpectShrunkOutputFailsInvoke<uint16_t>(tflite::Register_NEG(),
+                                          Entry::kNegF16, kTfLiteFloat16);
 }
 
 // heliaCORE rejects a zero count, so an empty tensor never reaches it.

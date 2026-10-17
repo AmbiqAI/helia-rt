@@ -19,6 +19,7 @@ limitations under the License.
 
 #include "Include/arm_nnfunctions.h"
 #include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_element_count.h"
 #include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/internal/common.h"
 #include "tensorflow/lite/micro/kernels/internal/quantization_util.h"
@@ -30,9 +31,6 @@ limitations under the License.
 namespace tflite {
 namespace micro {
 namespace {
-
-constexpr int kAbsNameId = 0;
-constexpr int kRsrqtNameId = 1;
 
 const int kElementwiseInputTensor = 0;
 const int kElementwiseOutputTensor = 0;
@@ -72,36 +70,8 @@ bool IsSqrtSupportedType(const TfLiteType type) {
          (kHeliaFloat16Enabled && type == kTfLiteFloat16);
 }
 
-TfLiteStatus CheckedFloat16ElementCount(TfLiteContext* context,
-                                        const TfLiteIntArray* input_dims,
-                                        const TfLiteIntArray* output_dims,
-                                        int32_t* count) {
-  TF_LITE_ENSURE(context, input_dims != nullptr && output_dims != nullptr &&
-                              count != nullptr);
-  TF_LITE_ENSURE(context, input_dims->size >= 0 && output_dims->size >= 0);
-  TF_LITE_ENSURE_EQ(context, input_dims->size, output_dims->size);
-  bool empty = false;
-  for (int i = 0; i < input_dims->size; ++i) {
-    TF_LITE_ENSURE(context,
-                   input_dims->data[i] >= 0 && output_dims->data[i] >= 0);
-    TF_LITE_ENSURE_EQ(context, input_dims->data[i], output_dims->data[i]);
-    empty = empty || input_dims->data[i] == 0;
-  }
-  if (empty) {
-    *count = 0;
-    return kTfLiteOk;
-  }
-  int32_t elements = 1;
-  for (int i = 0; i < input_dims->size; ++i) {
-    const int32_t extent = input_dims->data[i];
-    TF_LITE_ENSURE(context, extent <= INT32_MAX / elements);
-    elements *= extent;
-  }
-  *count = elements;
-  return kTfLiteOk;
-}
-
-// Runs a heliaCORE float unary entry over the whole tensor.
+// Runs a heliaCORE float unary entry over the whole tensor. The entry writes
+// as many elements as it reads, so the output must hold the input's count.
 template <typename T>
 TfLiteStatus EvalHeliaUnary(TfLiteContext* context, TfLiteNode* node,
                             arm_cmsis_nn_status (*entry)(const T*, T*,
@@ -110,7 +80,9 @@ TfLiteStatus EvalHeliaUnary(TfLiteContext* context, TfLiteNode* node,
   const TfLiteEvalTensor* input = GetEvalInput(context, node, 0);
   TfLiteEvalTensor* output = GetEvalOutput(context, node, 0);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
-  const int count = ElementCount(*input->dims);
+  int32_t count;
+  TF_LITE_ENSURE_OK(context, HeliaCheckedMatchingElementCount(
+                                 context, input->dims, output->dims, &count));
   if (count == 0) {
     return kTfLiteOk;
   }
@@ -127,7 +99,8 @@ TfLiteStatus EvalHeliaUnary(TfLiteContext* context, TfLiteNode* node,
 // Quantized ABS through arm_abs_s8/s16: |x - input zero point|, requantized
 // when the scales differ, plus the output zero point, clamped to the type
 // range. Bit-exact with the reference while CMSIS_NN_USE_SINGLE_ROUNDING and
-// TFLITE_SINGLE_ROUNDING agree.
+// TFLITE_SINGLE_ROUNDING agree. As for EvalHeliaUnary, the output must hold
+// the input's element count.
 template <typename T>
 TfLiteStatus EvalHeliaAbsQuantized(
     TfLiteContext* context, TfLiteNode* node,
@@ -138,7 +111,9 @@ TfLiteStatus EvalHeliaAbsQuantized(
   const TfLiteEvalTensor* input = GetEvalInput(context, node, 0);
   TfLiteEvalTensor* output = GetEvalOutput(context, node, 0);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
-  const int count = ElementCount(*input->dims);
+  int32_t count;
+  TF_LITE_ENSURE_OK(context, HeliaCheckedMatchingElementCount(
+                                 context, input->dims, output->dims, &count));
   if (count == 0) {
     return kTfLiteOk;
   }
@@ -206,7 +181,7 @@ TfLiteStatus ValidateSqrtTensors(TfLiteContext* context,
   }
   if (input->type == kTfLiteFloat16) {
     int32_t count;
-    TF_LITE_ENSURE_OK(context, CheckedFloat16ElementCount(
+    TF_LITE_ENSURE_OK(context, HeliaCheckedSameShapeElementCount(
                                    context, input->dims, output->dims, &count));
   }
   return kTfLiteOk;
@@ -231,44 +206,32 @@ TfLiteStatus SqrtPrepare(TfLiteContext* context, TfLiteNode* node) {
   return status;
 }
 
-typedef bool (*IsSupportedType)(TfLiteType);
-template <IsSupportedType is_supported_type, const int op_nameid>
-TfLiteStatus PrepareAbsRsqrt(TfLiteContext* context, TfLiteNode* node) {
-  MicroContext* micro_context = GetMicroContext(context);
-  TF_LITE_ENSURE_EQ(context, NumInputs(node), 1);
-  TF_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
-  TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
-  TF_LITE_ENSURE(context, input != nullptr);
-  TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
-  TF_LITE_ENSURE(context, output != nullptr);
+TfLiteStatus ValidateAndPopulateAbsData(TfLiteContext* context,
+                                        TfLiteNode* node,
+                                        const TfLiteTensor* input,
+                                        const TfLiteTensor* output) {
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
-  if (!is_supported_type(input->type)) {
+  if (!IsAbsSupportedType(input->type)) {
     MicroPrintf("Input data type %s (%d) is not supported.",
                 TfLiteTypeGetName(input->type), input->type);
-    micro_context->DeallocateTempTfLiteTensor(input);
-    micro_context->DeallocateTempTfLiteTensor(output);
     return kTfLiteError;
   }
 
   if (input->type == kTfLiteFloat16) {
     int32_t count;
-    const TfLiteStatus shape_status = CheckedFloat16ElementCount(
-        context, input->dims, output->dims, &count);
-    if (shape_status != kTfLiteOk) {
-      micro_context->DeallocateTempTfLiteTensor(input);
-      micro_context->DeallocateTempTfLiteTensor(output);
-      return shape_status;
-    }
+    TF_LITE_ENSURE_OK(context, HeliaCheckedSameShapeElementCount(
+                                   context, input->dims, output->dims, &count));
   }
 
   auto* op_data = static_cast<OpDataAbsRsqrt*>(node->user_data);
+  TF_LITE_ENSURE(context, op_data != nullptr);
   op_data->input_type = input->type;
-
   // For int16 type input, we support both quantized and non-quantized
   // evaluation.
-  if (op_nameid == kAbsNameId) {
-    op_data->input_quantization_type = input->quantization.type;
-  }
+  op_data->input_quantization_type = input->quantization.type;
+  // arm_abs_s8/s16 take both on every call, rescaled or not.
+  op_data->multiplier = 0;
+  op_data->shift = 0;
 
   if (input->type == kTfLiteInt8 ||
       (input->type == kTfLiteInt16 &&
@@ -284,10 +247,12 @@ TfLiteStatus PrepareAbsRsqrt(TfLiteContext* context, TfLiteNode* node) {
     TF_LITE_ENSURE(context, input_params != nullptr);
     TF_LITE_ENSURE(context, input_params->scale != nullptr);
     TF_LITE_ENSURE(context, input_params->scale->size > 0);
+    TF_LITE_ENSURE(context, input_params->zero_point != nullptr);
     TF_LITE_ENSURE(context, input_params->zero_point->size > 0);
     TF_LITE_ENSURE(context, output_params != nullptr);
     TF_LITE_ENSURE(context, output_params->scale != nullptr);
     TF_LITE_ENSURE(context, output_params->scale->size > 0);
+    TF_LITE_ENSURE(context, output_params->zero_point != nullptr);
     TF_LITE_ENSURE(context, output_params->zero_point->size > 0);
     op_data->input_offset = input_params->zero_point->data[0];
     op_data->output_offset = output_params->zero_point->data[0];
@@ -298,20 +263,32 @@ TfLiteStatus PrepareAbsRsqrt(TfLiteContext* context, TfLiteNode* node) {
     const float input_scale = input_params->scale->data[0];
     const float output_scale = output_params->scale->data[0];
     op_data->needs_rescale = input_scale != output_scale;
-    // arm_abs_s8/s16 take both on every call, rescaled or not.
-    op_data->multiplier = 0;
-    op_data->shift = 0;
-    if (op_nameid == kAbsNameId && op_data->needs_rescale) {
+    if (op_data->needs_rescale) {
       SetAbsOutputMultiplier(input_scale, output_scale, &op_data->multiplier,
                              &op_data->shift);
-    } else if (op_nameid == kRsrqtNameId) {
-      SetRsqrtOutputMultiplier(input_scale, output_scale, &op_data->multiplier,
-                               &op_data->shift);
     }
   }
+  return kTfLiteOk;
+}
+
+TfLiteStatus AbsPrepare(TfLiteContext* context, TfLiteNode* node) {
+  TF_LITE_ENSURE_EQ(context, NumInputs(node), 1);
+  TF_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
+  MicroContext* micro_context = GetMicroContext(context);
+  TfLiteTensor* input =
+      micro_context->AllocateTempInputTensor(node, kElementwiseInputTensor);
+  TF_LITE_ENSURE(context, input != nullptr);
+  TfLiteTensor* output =
+      micro_context->AllocateTempOutputTensor(node, kElementwiseOutputTensor);
+  if (output == nullptr) {
+    micro_context->DeallocateTempTfLiteTensor(input);
+    return kTfLiteError;
+  }
+  const TfLiteStatus status =
+      ValidateAndPopulateAbsData(context, node, input, output);
   micro_context->DeallocateTempTfLiteTensor(input);
   micro_context->DeallocateTempTfLiteTensor(output);
-  return kTfLiteOk;
+  return status;
 }
 
 TfLiteStatus ValidateAndPopulateRsqrtData(TfLiteContext* context,
@@ -327,7 +304,7 @@ TfLiteStatus ValidateAndPopulateRsqrtData(TfLiteContext* context,
 
   if (input->type == kTfLiteFloat16) {
     int32_t count;
-    TF_LITE_ENSURE_OK(context, CheckedFloat16ElementCount(
+    TF_LITE_ENSURE_OK(context, HeliaCheckedSameShapeElementCount(
                                    context, input->dims, output->dims, &count));
   }
 
@@ -527,7 +504,7 @@ TfLiteStatus AbsEval(TfLiteContext* context, TfLiteNode* node) {
     case kTfLiteFloat16: {
       int32_t count;
       TF_LITE_ENSURE_OK(context,
-                        CheckedFloat16ElementCount(
+                        HeliaCheckedSameShapeElementCount(
                             context, GetEvalInput(context, node, 0)->dims,
                             GetEvalOutput(context, node, 0)->dims, &count));
       eval_result = EvalHeliaUnary<float16_t>(context, node, arm_nn_abs_f16,
@@ -570,7 +547,7 @@ TfLiteStatus SqrtEval(TfLiteContext* context, TfLiteNode* node) {
   if (input->type == kTfLiteFloat16) {
     TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
     int32_t count;
-    TF_LITE_ENSURE_OK(context, CheckedFloat16ElementCount(
+    TF_LITE_ENSURE_OK(context, HeliaCheckedSameShapeElementCount(
                                    context, input->dims, output->dims, &count));
     if (count == 0) return kTfLiteOk;
     TF_LITE_ENSURE(context,
@@ -615,7 +592,7 @@ TfLiteStatus RsqrtEval(TfLiteContext* context, TfLiteNode* node) {
       TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
       int32_t count;
       TF_LITE_ENSURE_OK(context,
-                        CheckedFloat16ElementCount(context, input->dims,
+                        HeliaCheckedSameShapeElementCount(context, input->dims,
                                                    output->dims, &count));
       if (count == 0) return kTfLiteOk;
       TF_LITE_ENSURE(context,
@@ -649,9 +626,8 @@ TfLiteStatus LogicalNotEval(TfLiteContext* context, TfLiteNode* node) {
 }  // namespace
 
 TFLMRegistration Register_ABS() {
-  return tflite::micro::RegisterOp(
-      ElementWiseAbsRsqrtInit, PrepareAbsRsqrt<IsAbsSupportedType, kAbsNameId>,
-      AbsEval);
+  return tflite::micro::RegisterOp(ElementWiseAbsRsqrtInit, AbsPrepare,
+                                   AbsEval);
 }
 
 TFLMRegistration Register_SIN() {
