@@ -180,6 +180,11 @@ endif
 $(eval $(call microlite_test,kernel_transpose_conv_s8_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/transpose_conv_s8_test.cc))
 
+# Float TRANSPOSE_CONV Prepare rejects a bias of another type.
+# see AmbiqAI/helia-rt#443
+$(eval $(call microlite_test,kernel_transpose_conv_float_bias_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/transpose_conv_float_bias_test.cc))
+
 # 16x8 TRANSPOSE_CONV against the reference kernel over strides, paddings and
 # bias types. GCC and ATfE links wrap arm_transpose_conv_s16 to prove the route.
 $(eval $(call microlite_test,kernel_transpose_conv_s16_test,\
