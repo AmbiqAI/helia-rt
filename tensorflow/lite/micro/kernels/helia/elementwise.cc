@@ -15,6 +15,7 @@ limitations under the License.
 
 #include <climits>
 #include <cmath>
+#include <limits>
 
 #include "Include/arm_nnfunctions.h"
 #include "tensorflow/lite/micro/c/common.h"
@@ -55,7 +56,9 @@ bool IsLogicalSupportedType(const TfLiteType type) {
 }
 
 bool IsAbsSupportedType(const TfLiteType type) {
-  return type == kTfLiteFloat32 || type == kTfLiteInt8 || type == kTfLiteInt16;
+  return type == kTfLiteFloat32 || type == kTfLiteInt8 ||
+         type == kTfLiteInt16 ||
+         (kHeliaFloat16Enabled && type == kTfLiteFloat16);
 }
 
 bool IsRsqrtSupportedType(const TfLiteType type) {
@@ -95,6 +98,59 @@ TfLiteStatus CheckedFloat16ElementCount(TfLiteContext* context,
     elements *= extent;
   }
   *count = elements;
+  return kTfLiteOk;
+}
+
+// Runs a heliaCORE float unary entry over the whole tensor.
+template <typename T>
+TfLiteStatus EvalHeliaUnary(TfLiteContext* context, TfLiteNode* node,
+                            arm_cmsis_nn_status (*entry)(const T*, T*,
+                                                         int32_t),
+                            const char* op_name, const char* entry_name) {
+  const TfLiteEvalTensor* input = GetEvalInput(context, node, 0);
+  TfLiteEvalTensor* output = GetEvalOutput(context, node, 0);
+  TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
+  const int count = ElementCount(*input->dims);
+  if (count == 0) {
+    return kTfLiteOk;
+  }
+  const arm_cmsis_nn_status status =
+      entry(GetTensorData<T>(input), GetTensorData<T>(output), count);
+  if (status != ARM_CMSIS_NN_SUCCESS) {
+    MicroPrintf("%s: %s failed (%d).", op_name, entry_name,
+                static_cast<int>(status));
+    return kTfLiteError;
+  }
+  return kTfLiteOk;
+}
+
+// Quantized ABS through arm_abs_s8/s16: |x - input zero point|, requantized
+// when the scales differ, plus the output zero point, clamped to the type
+// range. Bit-exact with the reference while CMSIS_NN_USE_SINGLE_ROUNDING and
+// TFLITE_SINGLE_ROUNDING agree.
+template <typename T>
+TfLiteStatus EvalHeliaAbsQuantized(
+    TfLiteContext* context, TfLiteNode* node,
+    arm_cmsis_nn_status (*entry)(const T*, int32_t, T*, int32_t, int32_t,
+                                 int32_t, bool, int32_t, int32_t, int32_t),
+    const char* entry_name) {
+  const auto* op_data = static_cast<const OpDataAbsRsqrt*>(node->user_data);
+  const TfLiteEvalTensor* input = GetEvalInput(context, node, 0);
+  TfLiteEvalTensor* output = GetEvalOutput(context, node, 0);
+  TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
+  const int count = ElementCount(*input->dims);
+  if (count == 0) {
+    return kTfLiteOk;
+  }
+  const arm_cmsis_nn_status status = entry(
+      GetTensorData<T>(input), op_data->input_offset, GetTensorData<T>(output),
+      op_data->output_offset, op_data->multiplier, op_data->shift,
+      op_data->needs_rescale, std::numeric_limits<T>::min(),
+      std::numeric_limits<T>::max(), count);
+  if (status != ARM_CMSIS_NN_SUCCESS) {
+    MicroPrintf("ABS: %s failed (%d).", entry_name, static_cast<int>(status));
+    return kTfLiteError;
+  }
   return kTfLiteOk;
 }
 
@@ -387,28 +443,6 @@ void* ElementWiseAbsRsqrtInit(TfLiteContext* context, const char* buffer,
 }
 
 template <typename T>
-inline T AbsEvalQuantized(TfLiteContext* context, TfLiteNode* node, T i) {
-  const auto* op_data = static_cast<const OpDataAbsRsqrt*>(node->user_data);
-  const int kMin = std::numeric_limits<T>::min();
-  const int kMax = std::numeric_limits<T>::max();
-
-  const int32_t value = std::abs(i - op_data->input_offset);
-  if (!op_data->needs_rescale) {
-    return static_cast<T>(
-        std::min(std::max(static_cast<long int>(value + op_data->output_offset),
-                          static_cast<long int>(kMin)),
-                 static_cast<long int>(kMax)));
-  }
-
-  const int32_t output = tflite::MultiplyByQuantizedMultiplier(
-                             value, op_data->multiplier, op_data->shift) +
-                         op_data->output_offset;
-  return static_cast<T>(std::min(
-      std::max(static_cast<long int>(output), static_cast<long int>(kMin)),
-      static_cast<long int>(kMax)));
-}
-
-template <typename T>
 inline T RsqrtEvalQuantized(TfLiteContext* context, TfLiteNode* node, T i) {
   const auto* op_data = static_cast<const OpDataAbsRsqrt*>(node->user_data);
   const int kMin = std::numeric_limits<T>::min();
@@ -454,22 +488,33 @@ TfLiteStatus AbsEval(TfLiteContext* context, TfLiteNode* node) {
 
   switch (type) {
     case kTfLiteFloat32:
+#if ARM_NN_ENABLE_F32
+      eval_result = EvalHeliaUnary<float>(context, node, arm_nn_abs_f32, "ABS",
+                                          "arm_nn_abs_f32");
+#else
       eval_result = EvalNumeric(context, node, std::abs);
+#endif
       break;
     case kTfLiteInt8:
       eval_result =
-          EvalImplQuantized<int8_t>(context, node, AbsEvalQuantized,
-                                    /*validate_input_func=*/nullptr, type);
+          EvalHeliaAbsQuantized<int8_t>(context, node, arm_abs_s8, "arm_abs_s8");
       break;
     case kTfLiteInt16:
+      // Unquantized int16 keeps std::abs, which wraps -32768 where
+      // arm_abs_s16 clamps it to 32767.
       eval_result =
           input_quantization_type == kTfLiteNoQuantization
               ? EvalImpl<int16_t>(context, node, AbsHelper,
                                   /*validate_input_func=*/nullptr, type)
-              : EvalImplQuantized<int16_t>(context, node, AbsEvalQuantized,
-                                           /*validate_input_func=*/nullptr,
-                                           type);
+              : EvalHeliaAbsQuantized<int16_t>(context, node, arm_abs_s16,
+                                               "arm_abs_s16");
       break;
+#if ARM_NN_ENABLE_F16
+    case kTfLiteFloat16:
+      eval_result = EvalHeliaUnary<float16_t>(context, node, arm_nn_abs_f16,
+                                              "ABS", "arm_nn_abs_f16");
+      break;
+#endif
     default:
       MicroPrintf("Current data type %s is not supported.",
                   TfLiteTypeGetName(type));
@@ -495,7 +540,12 @@ TfLiteStatus SqrtEval(TfLiteContext* context, TfLiteNode* node) {
   const TfLiteEvalTensor* input = micro::GetEvalInput(context, node, 0);
   TfLiteEvalTensor* output = micro::GetEvalOutput(context, node, 0);
   if (input->type == kTfLiteFloat32) {
+#if ARM_NN_ENABLE_F32
+    return EvalHeliaUnary<float>(context, node, arm_nn_sqrt_f32, "SQRT",
+                                 "arm_nn_sqrt_f32");
+#else
     return EvalNumeric(context, node, std::sqrt);
+#endif
   }
   if (input->type == kTfLiteFloat16) {
     TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
@@ -525,9 +575,14 @@ TfLiteStatus RsqrtEval(TfLiteContext* context, TfLiteNode* node) {
   TfLiteType type = op_data->input_type;
   switch (type) {
     case kTfLiteFloat32:
+#if ARM_NN_ENABLE_F32
+      return EvalHeliaUnary<float>(context, node, arm_rsqrt_f32, "RSQRT",
+                                   "arm_rsqrt_f32");
+#else
       return EvalImpl<float>(
           context, node, [](float f) { return 1.f / std::sqrt(f); },
           /*validate_input_func=*/nullptr, type);
+#endif
     case kTfLiteInt8:
       return EvalImplQuantized<int8_t>(context, node, RsqrtEvalQuantized,
                                        validate_input_func, type);
