@@ -374,31 +374,27 @@ TEST(HeliaPreluRouteTest, Float32EdgeValues) {
   }
 }
 
-// CHARACTERIZATION: a negative subnormal input. The reference and the scalar
-// heliaCORE leg compute x * alpha. The MVE float32 leg compares with
-// vcmpgeq_n_f32, which flushes the subnormal to -0 and finds it >= 0, so it
-// returns x unchanged.
-// TODO(AmbiqAI/ns-cmsis-nn#873): expect x * alpha on every leg once fixed.
-TEST(HeliaPreluRouteTest, Float32NegativeSubnormalInput) {
-  const float x = -8 * std::numeric_limits<float>::denorm_min();
-  float in[] = {x, x, x, x};
-  float alpha[] = {0.25f, 0.25f, 0.25f, 0.25f};
-  float out[4] = {};
-  float expected[4] = {};
-  const Shape shape{1, {4}};
+// Subnormal edges match the reference bit for bit on every leg, including the
+// MVE float32 leg, which redoes such lanes on the scalar FPU: a negative
+// subnormal x, a subnormal alpha, and a product that underflows to a
+// subnormal or to zero.
+TEST(HeliaPreluRouteTest, Float32SubnormalEdgesMatchReference) {
+  const float denorm = std::numeric_limits<float>::denorm_min();
+  const float tiny = std::numeric_limits<float>::min();
+  float in[] = {-8 * denorm, -8 * denorm, -1.0f, -tiny, -tiny, -2 * denorm,
+                -1.0f, -8 * denorm};
+  float alpha[] = {0.25f, -0.5f, 4 * denorm, 0.5f, 1e-30f, 1.0f, 0.0f, 0.0f};
+  float out[8] = {};
+  float expected[8] = {};
+  const Shape shape{1, {8}};
   EXPECT_EQ(kTfLiteOk, tflite::testing::Run(shape, in, shape, alpha, shape, out,
                                             0, 0, 0, 0, 0, 0));
   tflite::micro::BroadcastPrelu4DSlowFloat(shape.Runtime(), in,
                                            shape.Runtime(), alpha,
                                            shape.Runtime(), expected);
-#if ARM_NN_ENABLE_F32 && defined(ARM_MATH_MVEF) && \
-    !defined(ARM_MATH_AUTOVECTORIZE)
-  const float pinned = x;
-#else
-  const float pinned = expected[0];
-#endif
-  for (int i = 0; i < 4; ++i) {
-    EXPECT_EQ(tflite::testing::Bits(pinned), tflite::testing::Bits(out[i]));
+  for (int i = 0; i < 8; ++i) {
+    EXPECT_EQ(tflite::testing::Bits(expected[i]),
+              tflite::testing::Bits(out[i]));
   }
 }
 
