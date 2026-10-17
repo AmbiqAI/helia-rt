@@ -25,6 +25,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/kernels/op_macros.h"
 #include "tensorflow/lite/micro/kernels/strided_slice.h"
 #include "tensorflow/lite/micro/micro_log.h"
+#include "tensorflow/lite/micro/micro_utils.h"
 
 namespace tflite {
 namespace micro {
@@ -77,7 +78,7 @@ bool ArmPopulateCommonParams(const tflite::StridedSliceParams& op_params,
     *begin[axis] = start;
     // heliaCORE forms begin + stride * count in int32_t. An axis that takes one
     // element never steps, so give it stride 1; a longer one has |stride| <
-    // dim and cannot overflow.
+    // dim, which keeps that sum under 2 * dim, inside int32_t below 2^30.
     *stride[axis] = count == 1u ? 1 : step;
   }
   return true;
@@ -100,6 +101,21 @@ TfLiteStatus EvalArm(const tflite::StridedSliceParams& op_params,
                                &input_dims, &output_dims, &begin_dims,
                                &stride_dims)) {
     return kTfLiteOk;
+  }
+  // Prepare sizes the output with a float ceil, which rounds above 2^24
+  // elements on an axis, so check the tensor holds every element written.
+  const int32_t counts[4] = {output_dims.n, output_dims.h, output_dims.w,
+                             output_dims.c};
+  uint64_t elements = 1;
+  for (const int32_t count : counts) {
+    elements *= static_cast<uint64_t>(count);
+    if (elements > static_cast<uint64_t>(INT32_MAX)) {
+      break;
+    }
+  }
+  if (elements != static_cast<uint64_t>(ElementCount(*output->dims))) {
+    MicroPrintf("STRIDED_SLICE: the slice does not fit the output tensor.");
+    return kTfLiteError;
   }
   const arm_cmsis_nn_status status =
       slice(tflite::micro::GetTensorData<T>(input),
