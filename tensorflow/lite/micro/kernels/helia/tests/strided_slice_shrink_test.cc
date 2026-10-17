@@ -295,4 +295,63 @@ TEST(HeliaStridedSliceShrinkTest, FourDShrinkLeadingAxisWithMasks) {
                             {1, 1, 2, 1}, 0b0010, 0b0010, 0b0001});
 }
 
+// Prepare checks the output shape with a float ceil, which rounds above 2^24
+// elements on an axis, so a hostile model can declare an output one element
+// short of the slice. Such an axis cannot be allocated here; instead Prepare
+// sees the true [2, 4] output and Invoke a [1, 7] one. The kernel must fail
+// the op without reaching heliaCORE or writing past the tensor.
+template <typename T>
+void ExpectShortOutputFails(TfLiteType type, Leaf leaf) {
+  using tflite::testing::CreateTensor;
+  using tflite::testing::IntArrayFromInts;
+  T input[24];
+  for (int i = 0; i < 24; ++i) {
+    input[i] = static_cast<T>(i + 1);
+  }
+  T output[9];
+  const int32_t begin[] = {0, 1, 0};
+  const int32_t end[] = {2, 2, 4};
+  const int32_t strides[] = {1, 1, 1};
+  int input_dims[] = {3, 2, 3, 4};
+  int index_dims[] = {1, 3};
+  int output_dims[] = {2, 2, 4};
+  TfLiteTensor tensors[5] = {
+      CreateTensor(input, IntArrayFromInts(input_dims), false, type),
+      CreateTensor(begin, IntArrayFromInts(index_dims)),
+      CreateTensor(end, IntArrayFromInts(index_dims)),
+      CreateTensor(strides, IntArrayFromInts(index_dims)),
+      CreateTensor(output, IntArrayFromInts(output_dims), false, type),
+  };
+  for (int i = 1; i <= 3; ++i) {
+    tensors[i].allocation_type = kTfLiteMmapRo;
+  }
+  TfLiteStridedSliceParams params = {};
+  params.shrink_axis_mask = 0b010;
+  int inputs[] = {4, 0, 1, 2, 3};
+  int outputs[] = {1, 4};
+  const TFLMRegistration registration = tflite::Register_STRIDED_SLICE();
+  tflite::micro::KernelRunner runner(registration, tensors, 5,
+                                     IntArrayFromInts(inputs),
+                                     IntArrayFromInts(outputs), &params);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  output_dims[1] = 1;
+  output_dims[2] = 7;
+  memset(output, 0x5A, sizeof(output));
+  memset(g_leaf_calls, 0, sizeof(g_leaf_calls));
+  EXPECT_EQ(kTfLiteError, runner.Invoke());
+#if HELIA_STRIDED_SLICE_SHRINK_LINK_WRAP
+  EXPECT_EQ(0, g_leaf_calls[static_cast<int>(leaf)]);
+#else
+  (void)leaf;
+#endif
+  for (size_t i = 7 * sizeof(T); i < sizeof(output); ++i) {
+    EXPECT_EQ(0x5A, reinterpret_cast<const uint8_t*>(output)[i]);
+  }
+}
+
+TEST(HeliaStridedSliceShrinkTest, OutputShorterThanSliceFailsInvoke) {
+  ExpectShortOutputFails<int8_t>(kTfLiteInt8, Leaf::kS8);
+  ExpectShortOutputFails<int16_t>(kTfLiteInt16, Leaf::kS16);
+}
+
 TF_LITE_MICRO_TESTS_MAIN
