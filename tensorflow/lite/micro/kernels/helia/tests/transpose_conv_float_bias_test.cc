@@ -36,16 +36,17 @@ constexpr int kInputCount = 4 * 4 * kInC;
 constexpr int kFilterCount = kOutC * 3 * 3 * kInC;
 constexpr int kOutputCount = 4 * 4 * kOutC;
 
-// Prepares (and, when it succeeds, invokes) a 1x4x4x4 -> 1x4x4x8 SAME,
-// stride 1 transpose convolution whose input, filter and output are
-// `io_type` and whose bias is `bias_tensor`.
 struct RunResult {
   TfLiteStatus prepare;
   TfLiteStatus invoke;
 };
 
-// Prepares the layer and, when that succeeds, invokes it.
-RunResult RunWithBias(TfLiteType io_type, TfLiteTensor bias_tensor) {
+// Prepares (and, when it succeeds, invokes) a 1x4x4x4 -> 1x4x4x8 SAME,
+// stride 1 transpose convolution whose input, filter and output are
+// `io_type` and whose bias is `bias_tensor`. `output_dims_override`, when
+// set, replaces the output dims after the tensor is made.
+RunResult RunWithBias(TfLiteType io_type, TfLiteTensor bias_tensor,
+                      int* output_dims_override = nullptr) {
   static uint32_t input[kInputCount];
   static uint32_t filter[kFilterCount];
   static uint32_t output[kOutputCount];
@@ -68,6 +69,9 @@ RunResult RunWithBias(TfLiteType io_type, TfLiteTensor bias_tensor) {
       bias_tensor,
       CreateTensor(output, IntArrayFromInts(output_dims), false, io_type),
   };
+  if (output_dims_override != nullptr) {
+    tensors[4].dims = IntArrayFromInts(output_dims_override);
+  }
 
   TfLiteTransposeConvParams params = {};
   params.padding = kTfLitePaddingSame;
@@ -132,6 +136,29 @@ TEST(HeliaTransposeConvFloatBiasTest, WrappingBiasCountFailsPrepare) {
   static int wrapping_dims[] = {2, -2, 2147483644};
   bias_tensor.dims = IntArrayFromInts(wrapping_dims);
   EXPECT_EQ(kTfLiteError, RunWithBias(kTfLiteFloat32, bias_tensor).prepare);
+}
+
+// {2, 2, 2, 5, 5581, 8681, 49477, 384773} holds 2^65 + 8 elements, which an
+// int64_t product wraps to the 8 output channels; the count must stop at
+// INT32_MAX.
+TEST(HeliaTransposeConvFloatBiasTest, HighRankWrappingBiasFailsPrepare) {
+  static float bias[8] = {};
+  TfLiteTensor bias_tensor = CreateTensor(bias, IntArrayFromInts(g_bias_dims));
+  static int wrapping_dims[] = {8, 2, 2, 2, 5, 5581, 8681, 49477, 384773};
+  bias_tensor.dims = IntArrayFromInts(wrapping_dims);
+  EXPECT_EQ(kTfLiteError, RunWithBias(kTfLiteFloat32, bias_tensor).prepare);
+}
+
+// Equal negative extents passed the shape equalities; every extent must be
+// positive.
+TEST(HeliaTransposeConvFloatBiasTest, NegativeExtentFailsPrepare) {
+  static float bias[8] = {};
+  static int negative_dims[] = {4, 1, -4, 4, 8};
+  EXPECT_EQ(kTfLiteError,
+            RunWithBias(kTfLiteFloat32,
+                        CreateTensor(bias, IntArrayFromInts(g_bias_dims)),
+                        negative_dims)
+                .prepare);
 }
 
 TF_LITE_MICRO_TESTS_MAIN

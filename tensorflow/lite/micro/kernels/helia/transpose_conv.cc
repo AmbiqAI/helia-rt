@@ -211,6 +211,11 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, NumDimensions(input), 4);
   TF_LITE_ENSURE_EQ(context, NumDimensions(filter), 4);
   TF_LITE_ENSURE_EQ(context, NumDimensions(output), 4);
+  for (int i = 0; i < 4; ++i) {
+    TF_LITE_ENSURE(context, SizeOfDimension(input, i) > 0 &&
+                                SizeOfDimension(filter, i) > 0 &&
+                                SizeOfDimension(output, i) > 0);
+  }
   TF_LITE_ENSURE_EQ(context, SizeOfDimension(input, 0),
                     SizeOfDimension(output, 0));
   TF_LITE_ENSURE_EQ(context, SizeOfDimension(filter, 0),
@@ -218,9 +223,15 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, SizeOfDimension(input, 3),
                     SizeOfDimension(filter, 3));
   if (bias != nullptr) {
-    // NumElements is int64_t: compare it whole so a wrapping shape cannot
-    // pass as the channel count.
-    TF_LITE_ENSURE_MSG(context, NumElements(bias) == SizeOfDimension(output, 3),
+    // Count with every extent positive and stop past INT32_MAX: NumElements
+    // can wrap int64_t into a match on a high-rank shape.
+    int64_t bias_elements = 1;
+    for (int i = 0; i < NumDimensions(bias) && bias_elements <= INT32_MAX;
+         ++i) {
+      const int extent = SizeOfDimension(bias, i);
+      bias_elements = extent > 0 ? bias_elements * extent : -1;
+    }
+    TF_LITE_ENSURE_MSG(context, bias_elements == SizeOfDimension(output, 3),
                        "TRANSPOSE_CONV needs one bias element per output "
                        "channel.");
     if (input->type == kTfLiteInt8) {

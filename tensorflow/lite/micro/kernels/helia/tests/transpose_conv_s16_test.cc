@@ -83,8 +83,8 @@ enum class Malform {
   kBiasCount
 };
 
-// A nonzero input or output zero point must fail Prepare: 16x8 requires
-// symmetric activations.
+// A layer to run. A nonzero input or output zero point, or a malform, must
+// fail Prepare: 16x8 requires symmetric activations.
 struct Shape {
   int in_h, in_w, in_c, out_c, kernel, stride;
   TfLitePadding padding;
