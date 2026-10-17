@@ -295,32 +295,39 @@ jobs:
         # binaries and twenty-five cases on every leg. see AmbiqAI/helia-rt#433
         # Depthwise 3x3, 1x1 short-K and int16 TRANSPOSE_CONV review cases add nine
         # cases on every leg. see AmbiqAI/helia-rt#433
+        # Quantized TRANSPOSE_CONV fused-activation and Prepare-validation cases
+        # add one binary and fifteen cases on every leg.
+        # see AmbiqAI/helia-rt#442, AmbiqAI/helia-rt#443
+        # TRANSPOSE_CONV float bias, reverse-conv and input-depth cases add one
+        # binary and ten cases on every leg. see AmbiqAI/helia-rt#443
         # Depthwise input-width and int16 output zero-point cases add two cases on
         # every leg. see AmbiqAI/helia-rt#433
+        # TRANSPOSE_CONV bias-rank and zero-extent cases add two cases on every
+        # leg. see AmbiqAI/helia-rt#443
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 164
-            min-cases: 1437
+            min-binaries: 166
+            min-cases: 1464
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 164
-            min-cases: 1437
+            min-binaries: 166
+            min-cases: 1464
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 163
-            min-cases: 1435
+            min-binaries: 165
+            min-cases: 1462
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 164
-            min-cases: 1489
+            min-binaries: 166
+            min-cases: 1516
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 163
-            min-cases: 1487
+            min-binaries: 165
+            min-cases: 1514
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
