@@ -376,7 +376,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "Float optimized paths support rank <= 4 and axis sets; higher-rank FP32 uses Reference, FP16 is rejected. On every route and dtype, an output whose element count differs from the input's elements on the kept axes, an axis outside the input rank, or an input above rank 5, fails at Invoke; a scalar input ignores its axes, as in TFLite. See reduce_common.cc."
+    "notes": "Float optimized paths support rank <= 4 and axis sets; higher-rank FP32 uses Reference, FP16 is rejected. On every route and dtype, an output whose element count differs from the input's elements on the kept axes, an axis outside the input rank, or an input above rank 5, fails at Invoke; a scalar input ignores its axes, as in TFLite, FP16 included. An input whose nonzero extents multiply past INT32_MAX fails there too, even when another extent is 0. An empty input runs no kernel: every output element gets 0, the value TFLite's reference writes, quantized types included. See reduce_common.cc."
   },
   {
     "name": "MINIMUM",
@@ -511,7 +511,7 @@
       "bool"
     ],
     "path": "Reference",
-    "notes": "Boolean reduction using Reference in reduce_common.cc. On every route and dtype, an output whose element count differs from the input's elements on the kept axes, or an axis outside the input rank, fails at Invoke; a scalar input ignores its axes, as in TFLite."
+    "notes": "Boolean reduction using Reference in reduce_common.cc. On every route and dtype, an output whose element count differs from the input's elements on the kept axes, or an axis outside the input rank, fails at Invoke; a scalar input ignores its axes, as in TFLite. An input whose nonzero extents multiply past INT32_MAX fails there too, even when another extent is 0."
   },
   {
     "name": "REDUCE_MAX",
@@ -524,7 +524,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "int8/int16 run CORE at rank <= 4 with equal input/output quantization. FP32 runs CORE (arm_reduce_max_tflite_f32) at rank <= 4 with ARM_NN_ENABLE_F32 and Reference otherwise; FP16 runs CORE (arm_reduce_max_tflite_f16) at rank <= 4 and is rejected otherwise or without ARM_NN_ENABLE_F16. Both follow TFLite: a NaN is skipped, a window of NaNs, of -Inf only or an empty one gives the start value (-FLT_MAX, -65504 for FP16), and an empty axis list folds each element into it. On every route, dtype and rank, an output whose element count differs from the input's elements on the kept axes, or an axis outside the input rank, fails at Invoke; a scalar input ignores its axes, as in TFLite. Implementation is in reduce_common.cc."
+    "notes": "int8/int16 run CORE at rank <= 4 with equal input/output quantization. FP32 runs CORE (arm_reduce_max_tflite_f32) at rank <= 4 with ARM_NN_ENABLE_F32 and Reference otherwise; FP16 runs CORE (arm_reduce_max_tflite_f16) at rank <= 4 and is rejected otherwise or without ARM_NN_ENABLE_F16. Both follow TFLite: a NaN is skipped, a window of NaNs, of -Inf only or an empty one gives the start value (-FLT_MAX, -65504 for FP16), and an empty axis list folds each element into it. On every route, dtype and rank, an output whose element count differs from the input's elements on the kept axes, or an axis outside the input rank, fails at Invoke; a scalar input ignores its axes, as in TFLite, FP16 included. An input whose nonzero extents multiply past INT32_MAX fails there too, even when another extent is 0. An empty input runs no kernel and every output element gets the start value. Implementation is in reduce_common.cc."
   },
   {
     "name": "REDUCE_MIN",
@@ -537,7 +537,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "int8/int16 run CORE at rank <= 4 with equal input/output quantization. FP32 runs CORE (arm_reduce_min_tflite_f32) at rank <= 4 with ARM_NN_ENABLE_F32 and Reference otherwise; FP16 runs CORE (arm_reduce_min_tflite_f16) at rank <= 4 and is rejected otherwise or without ARM_NN_ENABLE_F16. Both follow TFLite: a NaN is skipped, a window of NaNs, of +Inf only or an empty one gives the start value (+FLT_MAX, +65504 for FP16), and an empty axis list folds each element into it. On every route, dtype and rank, an output whose element count differs from the input's elements on the kept axes, or an axis outside the input rank, fails at Invoke; a scalar input ignores its axes, as in TFLite. Implementation is in reduce_common.cc."
+    "notes": "int8/int16 run CORE at rank <= 4 with equal input/output quantization. FP32 runs CORE (arm_reduce_min_tflite_f32) at rank <= 4 with ARM_NN_ENABLE_F32 and Reference otherwise; FP16 runs CORE (arm_reduce_min_tflite_f16) at rank <= 4 and is rejected otherwise or without ARM_NN_ENABLE_F16. Both follow TFLite: a NaN is skipped, a window of NaNs, of +Inf only or an empty one gives the start value (+FLT_MAX, +65504 for FP16), and an empty axis list folds each element into it. On every route, dtype and rank, an output whose element count differs from the input's elements on the kept axes, or an axis outside the input rank, fails at Invoke; a scalar input ignores its axes, as in TFLite, FP16 included. An input whose nonzero extents multiply past INT32_MAX fails there too, even when another extent is 0. An empty input runs no kernel and every output element gets the start value. Implementation is in reduce_common.cc."
   },
   {
     "name": "RELU",
@@ -738,7 +738,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "SUM is LiteRT REDUCE_SUM. Float optimized paths support rank <= 4 and axis sets; higher-rank FP32 uses Reference, FP16 is rejected. On every route and dtype, an output whose element count differs from the input's elements on the kept axes, an axis outside the input rank, or an input above rank 5, fails at Invoke; a scalar input ignores its axes, as in TFLite. See reduce_common.cc."
+    "notes": "SUM is LiteRT REDUCE_SUM. Float optimized paths support rank <= 4 and axis sets; higher-rank FP32 uses Reference, FP16 is rejected. On every route and dtype, an output whose element count differs from the input's elements on the kept axes, an axis outside the input rank, or an input above rank 5, fails at Invoke; a scalar input ignores its axes, as in TFLite, FP16 included. An input whose nonzero extents multiply past INT32_MAX fails there too, even when another extent is 0. An empty input runs no kernel: every output element gets 0, the value TFLite's reference writes, quantized types included. See reduce_common.cc."
   },
   {
     "name": "SVDF",

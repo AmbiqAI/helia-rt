@@ -20,6 +20,7 @@ limitations under the License.
 // MEAN, SUM, REDUCE_MIN/MAX and REDUCE_ALL, heliaCORE and reference routes,
 // rank 0 through rank 6. A matching output still succeeds.
 
+#include <cfloat>
 #include <cstdint>
 #include <cstring>
 #include <type_traits>
@@ -42,10 +43,12 @@ constexpr uint8_t kCanary = 0x5A;
 // `axis`) with an output declared as `output_dims`, and returns the invoke
 // status. Prepare must succeed. `written` is the number of leading output
 // elements the call may write; every byte past them must keep the canary.
+// When `expected` is set, those elements must equal it bit for bit.
 template <typename T>
 TfLiteStatus RunReduce(const TFLMRegistration& registration, TfLiteType type,
                        int* input_dims, const int32_t* axis, int axis_count,
-                       int* output_dims, int written) {
+                       int* output_dims, int written,
+                       const T* expected = nullptr) {
   static T input[kCapacity * 4];
   static T output[kCapacity];
   for (int i = 0; i < kCapacity * 4; ++i) {
@@ -77,7 +80,47 @@ TfLiteStatus RunReduce(const TFLMRegistration& registration, TfLiteType type,
   for (size_t i = written * sizeof(T); i < sizeof(output); ++i) {
     EXPECT_EQ(kCanary, reinterpret_cast<const uint8_t*>(output)[i]);
   }
+  if (expected != nullptr) {
+    EXPECT_EQ(0, memcmp(expected, output, written * sizeof(T)));
+  }
   return status;
+}
+
+// Prepares and invokes `registration` on a [65536, 65536, 0, 1] input reduced
+// over axis 3 into a 0-element output. The dims are set after the tensors are
+// made, so nothing is allocated or read for them.
+template <typename T>
+TfLiteStatus RunEmptyHugeReduce(const TFLMRegistration& registration,
+                                TfLiteType type) {
+  static T input[1] = {};
+  static T output[1] = {};
+  const int32_t axis[] = {3};
+  int small_dims[] = {1, 1};
+  int axis_dims[] = {1, 1};
+  static int huge_dims[] = {4, 65536, 65536, 0, 1};
+  static int empty_dims[] = {1, 0};
+  TfLiteTensor tensors[3];
+  if constexpr (std::is_same_v<T, int8_t> || std::is_same_v<T, int16_t>) {
+    tensors[0] =
+        CreateQuantizedTensor(input, IntArrayFromInts(small_dims), 0.5f, 0);
+    tensors[2] =
+        CreateQuantizedTensor(output, IntArrayFromInts(small_dims), 0.5f, 0);
+  } else {
+    tensors[0] = CreateTensor(input, IntArrayFromInts(small_dims), false, type);
+    tensors[2] =
+        CreateTensor(output, IntArrayFromInts(small_dims), false, type);
+  }
+  tensors[1] = CreateTensor(axis, IntArrayFromInts(axis_dims));
+  tensors[1].allocation_type = kTfLiteMmapRo;
+  tensors[0].dims = IntArrayFromInts(huge_dims);
+  tensors[2].dims = IntArrayFromInts(empty_dims);
+  TfLiteReducerParams params = {};
+  int inputs[] = {2, 0, 1};
+  int outputs[] = {1, 2};
+  micro::KernelRunner runner(registration, tensors, 3, IntArrayFromInts(inputs),
+                             IntArrayFromInts(outputs), &params);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  return runner.Invoke();
 }
 
 // [2, 3] reduced over axis 1 holds two elements; an output declared [1] or
@@ -103,6 +146,7 @@ void ExpectRank2SizeRule(const TFLMRegistration& registration,
 }  // namespace tflite
 
 using tflite::testing::ExpectRank2SizeRule;
+using tflite::testing::RunEmptyHugeReduce;
 using tflite::testing::RunReduce;
 
 // MEAN int8 runs heliaCORE.
@@ -232,47 +276,116 @@ TEST(HeliaReduceOutputSizeTest, ThreeDistinctAxesOnReferenceRoutes) {
                                           input_dims, axis, 3, output_dims, 4));
 }
 
-// An empty input holds 0 elements even when its other extents multiply past
-// INT32_MAX, so a 0-element output matches. The dims are set after the
-// tensors are made, so nothing is allocated or read for them.
-TEST(HeliaReduceOutputSizeTest, EmptyInputWithHugeExtents) {
-  using tflite::testing::CreateTensor;
-  using tflite::testing::IntArrayFromInts;
-  static bool input[1] = {};
-  static bool output[1] = {};
-  const int32_t axis[1] = {};
-  int small_dims[] = {1, 1};
-  int axis_dims[] = {1, 0};
-  static int huge_dims[] = {3, 65536, 65536, 0};
-  static int empty_dims[] = {1, 0};
-  TfLiteTensor tensors[3] = {
-      CreateTensor(input, IntArrayFromInts(small_dims)),
-      CreateTensor(axis, IntArrayFromInts(axis_dims)),
-      CreateTensor(output, IntArrayFromInts(small_dims)),
-  };
-  tensors[1].allocation_type = kTfLiteMmapRo;
-  tensors[0].dims = IntArrayFromInts(huge_dims);
-  tensors[2].dims = IntArrayFromInts(empty_dims);
-  TfLiteReducerParams params = {};
-  int inputs[] = {2, 0, 1};
-  int outputs[] = {1, 2};
-  const TFLMRegistration registration = tflite::Register_REDUCE_ALL();
-  tflite::micro::KernelRunner runner(registration, tensors, 3,
-                                     IntArrayFromInts(inputs),
-                                     IntArrayFromInts(outputs), &params);
-  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
-  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+// The kernels take every extent as an int dim, so an input whose nonzero
+// extents multiply past INT32_MAX fails even when another extent empties it.
+TEST(HeliaReduceOutputSizeTest, EmptyInputWithHugeExtentsFails) {
+  EXPECT_EQ(kTfLiteError,
+            RunEmptyHugeReduce<float>(tflite::Register_MEAN(), kTfLiteFloat32));
+  EXPECT_EQ(kTfLiteError,
+            RunEmptyHugeReduce<int8_t>(tflite::Register_MEAN(), kTfLiteInt8));
+  EXPECT_EQ(kTfLiteError,
+            RunEmptyHugeReduce<int16_t>(tflite::Register_MEAN(), kTfLiteInt16));
+  EXPECT_EQ(kTfLiteError,
+            RunEmptyHugeReduce<float>(tflite::Register_SUM(), kTfLiteFloat32));
+  EXPECT_EQ(kTfLiteError,
+            RunEmptyHugeReduce<int8_t>(tflite::Register_SUM(), kTfLiteInt8));
+  EXPECT_EQ(kTfLiteError, RunEmptyHugeReduce<int8_t>(
+                              tflite::Register_REDUCE_MAX(), kTfLiteInt8));
+  EXPECT_EQ(kTfLiteError, RunEmptyHugeReduce<int16_t>(
+                              tflite::Register_REDUCE_MIN(), kTfLiteInt16));
+  EXPECT_EQ(kTfLiteError, RunEmptyHugeReduce<float>(
+                              tflite::Register_REDUCE_MAX(), kTfLiteFloat32));
+  EXPECT_EQ(kTfLiteError, RunEmptyHugeReduce<bool>(
+                              tflite::Register_REDUCE_ALL(), kTfLiteBool));
+}
+
+// An empty input reaches no kernel: every output element gets the
+// reduction's start value, as the reference writes it (0 for MEAN and SUM,
+// including quantized ones, and the type's extreme for REDUCE_MIN/MAX). An
+// empty output is a no-op.
+TEST(HeliaReduceOutputSizeTest, EmptyInputWritesStartValue) {
+  const int32_t axis[] = {1};
+  int input_dims[] = {2, 3, 0};
+  int output_dims[] = {1, 3};
+  const float zeros_f[3] = {};
+  const int8_t zeros_s8[3] = {};
+  const int16_t zeros_s16[3] = {};
+  EXPECT_EQ(kTfLiteOk,
+            RunReduce<float>(tflite::Register_MEAN(), kTfLiteFloat32,
+                             input_dims, axis, 1, output_dims, 3, zeros_f));
+  EXPECT_EQ(kTfLiteOk,
+            RunReduce<float>(tflite::Register_SUM(), kTfLiteFloat32, input_dims,
+                             axis, 1, output_dims, 3, zeros_f));
+  EXPECT_EQ(kTfLiteOk,
+            RunReduce<int8_t>(tflite::Register_MEAN(), kTfLiteInt8, input_dims,
+                              axis, 1, output_dims, 3, zeros_s8));
+  EXPECT_EQ(kTfLiteOk,
+            RunReduce<int16_t>(tflite::Register_MEAN(), kTfLiteInt16,
+                               input_dims, axis, 1, output_dims, 3, zeros_s16));
+  EXPECT_EQ(kTfLiteOk,
+            RunReduce<int16_t>(tflite::Register_SUM(), kTfLiteInt16, input_dims,
+                               axis, 1, output_dims, 3, zeros_s16));
+  const int8_t lowest_s8[3] = {-128, -128, -128};
+  const int16_t max_s16[3] = {32767, 32767, 32767};
+  const float lowest_f[3] = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
+  const float max_f[3] = {FLT_MAX, FLT_MAX, FLT_MAX};
+  EXPECT_EQ(kTfLiteOk,
+            RunReduce<int8_t>(tflite::Register_REDUCE_MAX(), kTfLiteInt8,
+                              input_dims, axis, 1, output_dims, 3, lowest_s8));
+  EXPECT_EQ(kTfLiteOk,
+            RunReduce<int16_t>(tflite::Register_REDUCE_MIN(), kTfLiteInt16,
+                               input_dims, axis, 1, output_dims, 3, max_s16));
+  EXPECT_EQ(kTfLiteOk,
+            RunReduce<float>(tflite::Register_REDUCE_MAX(), kTfLiteFloat32,
+                             input_dims, axis, 1, output_dims, 3, lowest_f));
+  EXPECT_EQ(kTfLiteOk,
+            RunReduce<float>(tflite::Register_REDUCE_MIN(), kTfLiteFloat32,
+                             input_dims, axis, 1, output_dims, 3, max_f));
+  // Rank 5 takes the reference MEAN route.
+  const int32_t axis4[] = {4};
+  int rank5_dims[] = {5, 1, 1, 1, 3, 0};
+  int rank5_out_dims[] = {4, 1, 1, 1, 3};
+  EXPECT_EQ(kTfLiteOk,
+            RunReduce<float>(tflite::Register_MEAN(), kTfLiteFloat32,
+                             rank5_dims, axis4, 1, rank5_out_dims, 3, zeros_f));
+  int kept_empty_dims[] = {2, 0, 3};
+  int empty_out_dims[] = {1, 0};
+  EXPECT_EQ(kTfLiteOk,
+            RunReduce<float>(tflite::Register_MEAN(), kTfLiteFloat32,
+                             kept_empty_dims, axis, 1, empty_out_dims, 0));
+  EXPECT_EQ(kTfLiteOk,
+            RunReduce<int8_t>(tflite::Register_MEAN(), kTfLiteInt8,
+                              kept_empty_dims, axis, 1, empty_out_dims, 0));
 }
 
 // float16 MEAN, SUM and REDUCE_MAX run heliaCORE on fp16 builds; elsewhere
 // Prepare rejects float16, which RunReduce asserts against, so only fp16
-// builds run them.
+// builds run them. A scalar ignores its axes and an empty input writes the
+// start value, as for float32.
 TEST(HeliaReduceOutputSizeTest, Float16) {
 #if ARM_NN_ENABLE_F16
   ExpectRank2SizeRule<uint16_t>(tflite::Register_MEAN(), kTfLiteFloat16);
   ExpectRank2SizeRule<uint16_t>(tflite::Register_SUM(), kTfLiteFloat16);
   ExpectRank2SizeRule<uint16_t>(tflite::Register_REDUCE_MAX(),
                                 kTfLiteFloat16);
+  int scalar_dims[] = {0};
+  for (const int32_t a : {0, -1}) {
+    const int32_t axis[] = {a};
+    EXPECT_EQ(kTfLiteOk,
+              RunReduce<uint16_t>(tflite::Register_MEAN(), kTfLiteFloat16,
+                                  scalar_dims, axis, 1, scalar_dims, 1));
+  }
+  const int32_t axis[] = {1};
+  int input_dims[] = {2, 3, 0};
+  int output_dims[] = {1, 3};
+  const uint16_t zeros[3] = {};
+  const uint16_t lowest[3] = {0xFBFF, 0xFBFF, 0xFBFF};
+  EXPECT_EQ(kTfLiteOk,
+            RunReduce<uint16_t>(tflite::Register_SUM(), kTfLiteFloat16,
+                                input_dims, axis, 1, output_dims, 3, zeros));
+  EXPECT_EQ(kTfLiteOk,
+            RunReduce<uint16_t>(tflite::Register_REDUCE_MAX(), kTfLiteFloat16,
+                                input_dims, axis, 1, output_dims, 3, lowest));
 #endif
 }
 
@@ -282,9 +395,11 @@ TEST(HeliaReduceOutputSizeTest, EmptyReducedAxisStillSucceeds) {
   const int32_t axis[] = {1};
   int input_dims[] = {3, 2, 0, 3};
   int output_dims[] = {2, 2, 3};
+  const float lowest[6] = {-FLT_MAX, -FLT_MAX, -FLT_MAX,
+                           -FLT_MAX, -FLT_MAX, -FLT_MAX};
   EXPECT_EQ(kTfLiteOk,
             RunReduce<float>(tflite::Register_REDUCE_MAX(), kTfLiteFloat32,
-                             input_dims, axis, 1, output_dims, 6));
+                             input_dims, axis, 1, output_dims, 6, lowest));
 }
 
 TF_LITE_MICRO_TESTS_MAIN

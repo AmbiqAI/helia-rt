@@ -293,32 +293,37 @@ jobs:
         # every leg. see AmbiqAI/helia-rt#427
         # Depthwise 3x3, 1x1 short-K and int16 TRANSPOSE_CONV routes add three
         # binaries and twenty-five cases on every leg. see AmbiqAI/helia-rt#433
+        # Depthwise 3x3, 1x1 short-K and int16 TRANSPOSE_CONV review cases add nine
+        # cases on every leg. see AmbiqAI/helia-rt#433
+        # Quantized TRANSPOSE_CONV fused-activation and Prepare-validation cases
+        # add one binary and fifteen cases on every leg.
+        # see AmbiqAI/helia-rt#442, AmbiqAI/helia-rt#443
+        # TRANSPOSE_CONV float bias, reverse-conv and input-depth cases add one
+        # binary and ten cases on every leg. see AmbiqAI/helia-rt#443
+        # Depthwise input-width and int16 output zero-point cases add two cases on
+        # every leg. see AmbiqAI/helia-rt#433
+        # TRANSPOSE_CONV bias-rank and zero-extent cases add two cases on every
+        # leg. see AmbiqAI/helia-rt#443
         # ABS, NEG, SQRT and RSQRT routes add one binary and sixteen cases on
         # every leg. see AmbiqAI/helia-rt#433
+        # Float16 ABS and NEG shape-mismatch rejections add two cases on every
+        # leg. see AmbiqAI/helia-rt#433
+        # Elementwise shrunk-output cases add two cases on every leg.
+        # see AmbiqAI/helia-rt#433
         # The STRIDED_SLICE shrink-axis regression adds one binary and three cases
         # on every leg. see AmbiqAI/helia-rt#435
         # Slicing, extrema and float16 DEQUANTIZE routes add three binaries and
         # twenty cases on every leg. see AmbiqAI/helia-rt#433
         # Extreme-stride and mask cases for STRIDED_SLICE add five cases on every
         # leg. see AmbiqAI/helia-rt#435
-        # SQUARED_DIFFERENCE, DIV and PRELU routes add three binaries and thirty
-        # cases on every leg, forty with F16. see AmbiqAI/helia-rt#433
-        # Float16 ABS and NEG shape-mismatch rejections add two cases on every
-        # leg. see AmbiqAI/helia-rt#433
         # Nonzero-begin extreme-stride STRIDED_SLICE cases add two cases on every
         # leg. see AmbiqAI/helia-rt#435
-        # Depthwise 3x3, 1x1 short-K and int16 TRANSPOSE_CONV review cases add nine
-        # cases on every leg. see AmbiqAI/helia-rt#433
         # STRIDED_SLICE and REDUCE short-output rejections add three cases on every
         # leg. see AmbiqAI/helia-rt#433
         # All-type STRIDED_SLICE wrong-size cases add two cases on every leg.
         # see AmbiqAI/helia-rt#435
-        # Elementwise shrunk-output cases add two cases on every leg.
-        # see AmbiqAI/helia-rt#433
         # Reduction output-size, axis and slice-saturation cases add one binary and
         # eleven cases on every leg. see AmbiqAI/helia-rt#433
-        # Depthwise input-width and int16 output zero-point cases add two cases on
-        # every leg. see AmbiqAI/helia-rt#433
         # STRIDED_SLICE axis-bound and empty-slice type cases add two cases on every
         # leg. see AmbiqAI/helia-rt#435
         # The STRIDED_SLICE type-mismatch case adds one case on every leg.
@@ -327,6 +332,10 @@ jobs:
         # see AmbiqAI/helia-rt#433
         # Reference-route axis-list and empty huge-extent cases add three cases on
         # every leg. see AmbiqAI/helia-rt#433
+        # The empty-input start-value reduction case adds one case on every leg.
+        # see AmbiqAI/helia-rt#433
+        # SQUARED_DIFFERENCE, DIV and PRELU routes add three binaries and thirty
+        # cases on every leg, forty with F16. see AmbiqAI/helia-rt#433
         # SQUARED_DIFFERENCE subnormal and PRELU output-type cases add four cases on
         # the cortex-m55 legs and two on the others. see AmbiqAI/helia-rt#433
         # PRELU alpha-type and output-shape rejections add two cases on every leg.
@@ -334,27 +343,27 @@ jobs:
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 173
-            min-cases: 1545
+            min-binaries: 175
+            min-cases: 1573
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 173
-            min-cases: 1545
+            min-binaries: 175
+            min-cases: 1573
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 172
-            min-cases: 1543
+            min-binaries: 174
+            min-cases: 1571
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 173
-            min-cases: 1609
+            min-binaries: 175
+            min-cases: 1637
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 172
-            min-cases: 1607
+            min-binaries: 174
+            min-cases: 1635
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}

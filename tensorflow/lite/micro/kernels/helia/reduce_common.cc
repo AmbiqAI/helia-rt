@@ -209,12 +209,16 @@ void ResolveAxis(const int* axis_data, int axis_count,
 // heliaCORE's float reductions take a 4-D NHWC shape and a 4-D axis mask, so
 // they cover any axis-mask combination and either keep_dims setting at rank up
 // to 4; a higher rank, or an axis outside the input rank, has no such spelling.
+// A scalar input ignores its axes, as the reference's axis resolution does.
 // see AmbiqAI/ns-cmsis-nn#428
 bool HeliaFloatReduceSupported(const TfLiteEvalTensor* input,
                                const int32_t* axis_data, int axis_count) {
   const int input_rank = input->dims->size;
   if (input_rank > kCmsisRank) {
     return false;
+  }
+  if (input_rank == 0) {
+    return true;
   }
   for (int i = 0; i < axis_count; ++i) {
     int axis = axis_data[i];
@@ -243,7 +247,7 @@ TfLiteStatus PrepareFloat16Reduce(TfLiteContext* context,
     MicroPrintf("Float16 %s supports rank 4 and below.", op);
     return kTfLiteError;
   }
-  if (IsConstantTensor(axis)) {
+  if (input_rank > 0 && IsConstantTensor(axis)) {
     const int32_t* axis_data = GetTensorData<int32_t>(axis);
     for (int i = 0; i < NumElements(axis); ++i) {
       const int32_t reduce_axis =
@@ -355,8 +359,9 @@ constexpr int kAnyReduceRank = INT32_MAX;
 // route checks here that the output holds exactly the input's elements on the
 // axes the reduction keeps. An input above `max_rank` or an axis outside the
 // input rank fails, as the reference's axis resolution does; a scalar input
-// ignores its axes, as that resolution does; a reduced axis of extent 0 still
-// yields the start value.
+// ignores its axes, as that resolution does. The kernels take every extent as
+// an int dim, so the input's nonzero extents must multiply to at most
+// INT32_MAX even when another extent empties it.
 TfLiteStatus EnsureReducedOutputSize(const TfLiteEvalTensor* input,
                                      const TfLiteEvalTensor* axis,
                                      const TfLiteEvalTensor* output,
@@ -365,37 +370,56 @@ TfLiteStatus EnsureReducedOutputSize(const TfLiteEvalTensor* input,
   const int num_axis =
       rank == 0 ? 0 : static_cast<int>(ElementCount(*axis->dims));
   const int32_t* axis_data = tflite::micro::GetTensorData<int32_t>(axis);
-  int64_t expected = rank <= max_rank ? 1 : -1;
-  bool past_int32 = false;
-  for (int i = 0; expected >= 0 && i < num_axis; ++i) {
+  bool valid = rank <= max_rank;
+  for (int i = 0; valid && i < num_axis; ++i) {
     const int32_t a = axis_data[i] < 0 ? axis_data[i] + rank : axis_data[i];
-    if (a < 0 || a >= rank) {
-      expected = -1;
-    }
+    valid = a >= 0 && a < rank;
   }
-  for (int d = 0; expected >= 0 && d < rank; ++d) {
+  int64_t nonzero_elements = 1;
+  int64_t expected = 1;
+  for (int d = 0; valid && d < rank; ++d) {
     const int32_t extent = input->dims->data[d];
     bool reduced = false;
     for (int i = 0; !reduced && i < num_axis; ++i) {
       reduced = (axis_data[i] < 0 ? axis_data[i] + rank : axis_data[i]) == d;
     }
     if (extent < 0) {
-      expected = -1;
-    } else if (!reduced && extent == 0) {
-      expected = 0;
-    } else if (!reduced && expected != 0 && !past_int32) {
-      expected *= extent;
-      past_int32 = expected > INT32_MAX;
+      valid = false;
+    } else if (extent > 0) {
+      nonzero_elements *= extent;
+      valid = nonzero_elements <= INT32_MAX;
     }
-  }
-  if (expected != 0 && past_int32) {
-    expected = -1;
+    if (!reduced) {
+      expected *= extent;
+    }
   }
   const int64_t actual =
       CheckedElementCount(output->dims->data, output->dims->size);
-  if (expected < 0 || expected != actual) {
+  if (!valid || expected != actual) {
     MicroPrintf("%s: the output size does not match the reduction.", op);
     return kTfLiteError;
+  }
+  return kTfLiteOk;
+}
+
+bool HasZeroExtent(const TfLiteEvalTensor* input) {
+  for (int i = 0; i < input->dims->size; ++i) {
+    if (input->dims->data[i] == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// An empty input reaches neither heliaCORE nor a reference loop: every output
+// element, as sized by EnsureReducedOutputSize, gets the reduction's start
+// value, as the reference reducers write it.
+template <typename T>
+TfLiteStatus FillEmptyReduction(TfLiteEvalTensor* output, T start) {
+  T* data = tflite::micro::GetTensorData<T>(output);
+  const int count = ElementCount(*output->dims);
+  for (int i = 0; i < count; ++i) {
+    data[i] = start;
   }
   return kTfLiteOk;
 }
@@ -432,6 +456,10 @@ TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
   const bool is_max = evalType == kEvalMax;
   switch (input->type) {
     case kTfLiteFloat32: {
+      if (HasZeroExtent(input)) {
+        return FillEmptyReduction<float>(
+            output, MinMaxReducerCompare<float>(evalType).initialValue());
+      }
 #if ARM_NN_ENABLE_F32
       if (HeliaFloatReduceSupported(input, axis_data, num_axis)) {
         cmsis_nn_dims in_d, ax_d, out_d;
@@ -467,6 +495,11 @@ TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
             "the rank.");
         return kTfLiteError;
       }
+      // float16's lowest and largest finite values.
+      if (HasZeroExtent(input)) {
+        return FillEmptyReduction<float16_t>(
+            output, static_cast<float16_t>(is_max ? -65504.0f : 65504.0f));
+      }
       cmsis_nn_dims in_d, ax_d, out_d;
       PopulateCmsisShapeAndAxis(input, axis_data, num_axis, &in_d, &ax_d,
                                 &out_d);
@@ -487,6 +520,10 @@ TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
       TF_LITE_ENSURE_EQ(context, static_cast<double>(op_data->input_scale),
                         static_cast<double>(op_data->output_scale));
       TF_LITE_ENSURE_EQ(context, op_data->input_zp, op_data->output_zp);
+      if (HasZeroExtent(input)) {
+        return FillEmptyReduction<int8_t>(
+            output, MinMaxReducerCompare<int8_t>(evalType).initialValue());
+      }
       if (input->dims->size <= kCmsisRank) {
         cmsis_nn_dims in_d, ax_d, out_d;
         PopulateCmsisShapeAndAxis(input, axis_data, num_axis, &in_d, &ax_d,
@@ -518,6 +555,10 @@ TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
       TF_LITE_ENSURE_EQ(context, static_cast<double>(op_data->input_scale),
                         static_cast<double>(op_data->output_scale));
       TF_LITE_ENSURE_EQ(context, op_data->input_zp, op_data->output_zp);
+      if (HasZeroExtent(input)) {
+        return FillEmptyReduction<int16_t>(
+            output, MinMaxReducerCompare<int16_t>(evalType).initialValue());
+      }
       if (input->dims->size <= kCmsisRank) {
         cmsis_nn_dims in_d, ax_d, out_d;
         PopulateCmsisShapeAndAxis(input, axis_data, num_axis, &in_d, &ax_d,
@@ -653,6 +694,10 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
   switch (input->type) {
     case kTfLiteFloat16: {
 #if ARM_NN_ENABLE_F16
+      if (HasZeroExtent(input)) {
+        return FillEmptyReduction<float16_t>(output,
+                                             static_cast<float16_t>(0.0f));
+      }
       if (HeliaFloatReduceSupported(
               input, tflite::micro::GetTensorData<int32_t>(axis), num_axis)) {
         cmsis_nn_dims in_d, ax_d, out_d;
@@ -673,6 +718,9 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
       return kTfLiteError;
     }
     case kTfLiteFloat32: {
+      if (HasZeroExtent(input)) {
+        return FillEmptyReduction<float>(output, 0.0f);
+      }
 #if ARM_NN_ENABLE_F32
       if (HeliaFloatReduceSupported(
               input, tflite::micro::GetTensorData<int32_t>(axis), num_axis)) {
@@ -717,6 +765,10 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
       }
     } break;
     case kTfLiteInt8: {
+      // The reference writes T(), not the zero point, for an empty input.
+      if (HasZeroExtent(input)) {
+        return FillEmptyReduction<int8_t>(output, 0);
+      }
       if (input->dims->size <= kCmsisRank) {
         cmsis_nn_dims in_d, ax_d, out_d;
         int32_t output_mult = op_data->multiplier;
@@ -749,6 +801,9 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
                                            temp_index, resolved_axis));
     } break;
     case kTfLiteInt16: {
+      if (HasZeroExtent(input)) {
+        return FillEmptyReduction<int16_t>(output, 0);
+      }
       if (input->dims->size <= kCmsisRank) {
         cmsis_nn_dims in_d, ax_d, out_d;
         int32_t output_mult = op_data->multiplier;
@@ -817,6 +872,10 @@ TfLiteStatus EvalSumHelper(TfLiteContext* context, TfLiteNode* node,
   switch (input->type) {
     case kTfLiteFloat16: {
 #if ARM_NN_ENABLE_F16
+      if (HasZeroExtent(input)) {
+        return FillEmptyReduction<float16_t>(output,
+                                             static_cast<float16_t>(0.0f));
+      }
       if (HeliaFloatReduceSupported(
               input, tflite::micro::GetTensorData<int32_t>(axis), num_axis)) {
         cmsis_nn_dims in_d, ax_d, out_d;
@@ -837,6 +896,9 @@ TfLiteStatus EvalSumHelper(TfLiteContext* context, TfLiteNode* node,
       return kTfLiteError;
     }
     case kTfLiteFloat32: {
+      if (HasZeroExtent(input)) {
+        return FillEmptyReduction<float>(output, 0.0f);
+      }
 #if ARM_NN_ENABLE_F32
       if (HeliaFloatReduceSupported(
               input, tflite::micro::GetTensorData<int32_t>(axis), num_axis)) {
@@ -865,7 +927,9 @@ TfLiteStatus EvalSumHelper(TfLiteContext* context, TfLiteNode* node,
               }));
     } break;
     case kTfLiteInt8: {
-
+      if (HasZeroExtent(input)) {
+        return FillEmptyReduction<int8_t>(output, 0);
+      }
       if (input->dims->size <= kCmsisRank) {
         cmsis_nn_dims in_d, ax_d, out_d;
         int32_t output_mult = op_data->multiplier;
@@ -901,7 +965,9 @@ TfLiteStatus EvalSumHelper(TfLiteContext* context, TfLiteNode* node,
                                      temp_sum, op_data, /*compute_sum=*/true));
     } break;
     case kTfLiteInt16: {
-
+      if (HasZeroExtent(input)) {
+        return FillEmptyReduction<int16_t>(output, 0);
+      }
       if (input->dims->size <= kCmsisRank) {
         cmsis_nn_dims in_d, ax_d, out_d;
         int32_t output_mult = op_data->multiplier;
