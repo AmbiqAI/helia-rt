@@ -314,3 +314,17 @@ $(kernel_float_context_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_batch_matmul_f16_get_buffer_size \
   -Wl,--wrap=arm_batch_matmul_f16
 endif
+
+# int8 and int16 STRIDED_SLICE with a shrunk inner axis and an empty slice,
+# against the reference. GCC and ATfE links wrap the heliaCORE entries to prove
+# each route. see AmbiqAI/helia-rt#435
+$(eval $(call microlite_test,kernel_strided_slice_shrink_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/strided_slice_shrink_test.cc))
+
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
+$(kernel_strided_slice_shrink_test_BINARY): CXXFLAGS += \
+  -DHELIA_STRIDED_SLICE_SHRINK_LINK_WRAP=1
+$(kernel_strided_slice_shrink_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_strided_slice_s8 \
+  -Wl,--wrap=arm_strided_slice_s16
+endif
