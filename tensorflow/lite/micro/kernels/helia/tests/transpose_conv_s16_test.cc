@@ -74,7 +74,14 @@ namespace {
 enum class Bias { kInt64, kInt16, kNone };
 
 // A model defect Prepare must reject. see AmbiqAI/helia-rt#443
-enum class Malform { kNone, kInt32Bias, kBatch, kChannels, kBiasCount };
+enum class Malform {
+  kNone,
+  kInt32Bias,
+  kBatch,
+  kChannels,
+  kInputDepth,
+  kBiasCount
+};
 
 // A nonzero input or output zero point must fail Prepare: 16x8 requires
 // symmetric activations.
@@ -206,7 +213,12 @@ void ExpectMatchesReference(const Shape& s) {
   if (s.malform == Malform::kBatch) {
     output_dims[1] = s.batch + 1;
   } else if (s.malform == Malform::kChannels) {
+    // Scales sized to the shrunk dim 0, so only the channel check rejects it.
     filter_dims[1] = s.out_c - 1;
+    filter_scales[0] = static_cast<float>(s.out_c - 1);
+    filter_zero_points[0] = s.out_c - 1;
+  } else if (s.malform == Malform::kInputDepth) {
+    filter_dims[4] = s.in_c - 1;
   } else if (s.malform == Malform::kBiasCount) {
     bias_dims[1] = s.out_c - 1;
   }
@@ -374,6 +386,12 @@ TEST(HeliaTransposeConvS16Test, FilterChannelMismatchFailsPrepare) {
   ExpectMatchesReference(Shape{4, 5, 3, 5, 3, 2, kTfLitePaddingSame,
                                Bias::kNone, 1, 0, kTfLiteActNone,
                                Malform::kChannels});
+}
+
+TEST(HeliaTransposeConvS16Test, InputDepthMismatchFailsPrepare) {
+  ExpectMatchesReference(Shape{4, 5, 3, 5, 3, 2, kTfLitePaddingSame,
+                               Bias::kNone, 1, 0, kTfLiteActNone,
+                               Malform::kInputDepth});
 }
 
 TEST(HeliaTransposeConvS16Test, BiasCountMismatchFailsPrepare) {

@@ -37,7 +37,14 @@ namespace testing {
 namespace {
 
 // A model defect Prepare must reject. see AmbiqAI/helia-rt#443
-enum class Malform { kNone, kInt64Bias, kBatch, kChannels, kBiasCount };
+enum class Malform {
+  kNone,
+  kInt64Bias,
+  kBatch,
+  kChannels,
+  kInputDepth,
+  kBiasCount
+};
 
 struct Shape {
   int in_h, in_w, in_c, out_c, kernel, stride;
@@ -46,10 +53,11 @@ struct Shape {
   Malform malform = Malform::kNone;
 };
 
-constexpr int kMaxInput = 6 * 7 * 16;
-constexpr int kMaxFilter = 8 * 3 * 3 * 16;
+constexpr int kMaxInput = 6 * 7 * 32;
+constexpr int kMaxFilter = 8 * 3 * 3 * 32;
 constexpr int kMaxChannels = 8;
-constexpr int kMaxOutput = 12 * 14 * 8;
+// Room past the largest output, so a write past it shows.
+constexpr int kMaxOutput = 12 * 14 * 8 + 64;
 constexpr int kInputZeroPoint = 4;
 constexpr int kOutputZeroPoint = -6;
 
@@ -158,7 +166,12 @@ void ExpectMatchesReference(const Shape& s) {
   if (s.malform == Malform::kBatch) {
     output_dims[1] = 2;
   } else if (s.malform == Malform::kChannels) {
+    // Scales sized to the shrunk dim 0, so only the channel check rejects it.
     filter_dims[1] = s.out_c - 1;
+    filter_scales[0] = static_cast<float>(s.out_c - 1);
+    filter_zero_points[0] = s.out_c - 1;
+  } else if (s.malform == Malform::kInputDepth) {
+    filter_dims[4] = s.in_c - 1;
   } else if (s.malform == Malform::kBiasCount) {
     bias_dims[1] = s.out_c - 1;
   }
@@ -258,6 +271,18 @@ TEST(HeliaTransposeConvS8Test, FusedRelu) {
       Shape{6, 7, 16, 8, 3, 2, kTfLitePaddingSame, kTfLiteActRelu});
 }
 
+// More than 16 input channels at stride <= 2 takes the wrapper's reverse-conv
+// route through arm_convolve_s8.
+TEST(HeliaTransposeConvS8Test, ReverseConvRouteNoActivation) {
+  ExpectMatchesReference(
+      Shape{5, 6, 32, 8, 3, 2, kTfLitePaddingSame, kTfLiteActNone});
+}
+
+TEST(HeliaTransposeConvS8Test, ReverseConvRouteFusedRelu) {
+  ExpectMatchesReference(
+      Shape{5, 6, 24, 8, 3, 1, kTfLitePaddingValid, kTfLiteActRelu});
+}
+
 TEST(HeliaTransposeConvS8Test, FusedRelu6) {
   ExpectMatchesReference(
       Shape{5, 6, 4, 6, 3, 1, kTfLitePaddingValid, kTfLiteActRelu6});
@@ -282,6 +307,11 @@ TEST(HeliaTransposeConvS8Test, FilterChannelMismatchFailsPrepare) {
   ExpectMatchesReference(Shape{5, 6, 4, 6, 3, 1, kTfLitePaddingValid,
                                kTfLiteActNone,
                                Malform::kChannels});
+}
+
+TEST(HeliaTransposeConvS8Test, InputDepthMismatchFailsPrepare) {
+  ExpectMatchesReference(Shape{5, 6, 4, 6, 3, 1, kTfLitePaddingValid,
+                               kTfLiteActNone, Malform::kInputDepth});
 }
 
 TEST(HeliaTransposeConvS8Test, BiasCountMismatchFailsPrepare) {
