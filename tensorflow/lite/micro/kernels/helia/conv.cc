@@ -16,6 +16,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/kernels/conv.h"
 
 #include "Include/arm_nnfunctions.h"
+#include "Include/arm_nnsupportfunctions.h"
 #include "tensorflow/lite/micro/c/builtin_op_data.h"
 #include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
@@ -42,7 +43,18 @@ struct OpData {
   int32_t activation_buffer_size;
   int32_t weight_sum_buffer_size;
   int32_t* weight_sum_buf;
+  // Try arm_convolve_1x1_s8_short_k before the wrapper. Set only on MVEI
+  // builds.
+  bool use_s8_1x1_short_k;
 };
+
+// arm_convolve_1x1_s8_short_k returns ARM_CMSIS_NN_NO_IMPL_ERROR without
+// writing output on any other build, so it is not compiled in there.
+#if defined(ARM_MATH_MVEI) && !defined(ARM_MATH_AUTOVECTORIZE)
+#define HELIA_CONV_S8_1X1_SHORT_K 1
+#else
+#define HELIA_CONV_S8_1X1_SHORT_K 0
+#endif
 
 void* Init(TfLiteContext* context, const char* buffer, size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
@@ -121,6 +133,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   data->activation_buffer_size = 0;
   data->weight_sum_buffer_size = 0;
   data->weight_sum_buf = nullptr;
+  data->use_s8_1x1_short_k = false;
 
   // Initialize cmsis_nn dimensions
   cmsis_nn_dims input_dims;
@@ -217,6 +230,14 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
           TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
               context, weight_sum_length, &data->weight_buffer_idx));
         }
+#endif
+#if HELIA_CONV_S8_1X1_SHORT_K
+        // The entry takes the weight sums of arm_convolve_1x1_s8_fast and no
+        // scratch.
+        data->use_s8_1x1_short_k =
+            weight_sum_length > 0 &&
+            arm_nn_is_convolve_s8_1x1_short_k(&conv_params, &input_dims,
+                                              &filter_dims);
 #endif
       }
 
@@ -475,6 +496,24 @@ TfLiteStatus EvalQuantizedPerChannel(TfLiteContext* context, TfLiteNode* node,
         }
       }
     }
+#if HELIA_CONV_S8_1X1_SHORT_K
+    if (data.use_s8_1x1_short_k) {
+      const arm_cmsis_nn_status short_k_status = arm_convolve_1x1_s8_short_k(
+          &ctx, &weight_sum_ctx, &conv_params, &quant_params, &input_dims,
+          tflite::micro::GetTensorData<int8_t>(input), &filter_dims,
+          tflite::micro::GetTensorData<const int8_t>(filter), &bias_dims,
+          tflite::micro::GetOptionalTensorData<const int32_t>(bias),
+          &output_dims, tflite::micro::GetTensorData<int8_t>(output));
+      if (short_k_status == ARM_CMSIS_NN_SUCCESS) {
+        return kTfLiteOk;
+      }
+      if (short_k_status != ARM_CMSIS_NN_NO_IMPL_ERROR) {
+        MicroPrintf("CONV_2D: arm_convolve_1x1_s8_short_k failed (%d).",
+                    static_cast<int>(short_k_status));
+        return kTfLiteError;
+      }
+    }
+#endif
     const arm_cmsis_nn_status status = arm_convolve_wrapper_s8(
         &ctx, &weight_sum_ctx, &conv_params, &quant_params, &input_dims,
         tflite::micro::GetTensorData<int8_t>(input), &filter_dims,

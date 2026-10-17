@@ -2,6 +2,7 @@
 
 import contextlib
 import io
+import re
 import shutil
 import sys
 import tempfile
@@ -31,9 +32,12 @@ class DependencyFloorTest(unittest.TestCase):
     for floor, numeric in (("7.41.0", "7041000"), ("7.42.0", "7042000")):
       root = cls.scratch / floor
       (root / "cmake").mkdir(parents=True)
-      (root / build_pack.CORE_VERSION_GUARD).write_text(
-        guard.replace("7041000", numeric).replace("7.41.0", floor)
+      # Rewrite whatever floor the real guard carries.
+      fixture = re.sub(
+        r"(NS_CMSIS_NN_VERSION\s*<\s*)\d+", rf"\g<1>{numeric}", guard
       )
+      fixture = re.sub(r"v\d+\.\d+\.\d+", f"v{floor}", fixture)
+      (root / build_pack.CORE_VERSION_GUARD).write_text(fixture)
       (root / "cmake/helia_rt_sources.cmake").write_text(
         "# Metadata fixture only\n"
       )

@@ -425,10 +425,12 @@ RunResult RunInt8(bool depthwise, bool int4,
   int inputs_data[] = {3, 0, 1, 2};
   int outputs_data[] = {1, 3};
 
+  // Stride 2 keeps the 1x1 output but leaves the arm_convolve_1x1_s8_short_k
+  // gate, so the int8 layer reaches arm_convolve_wrapper_s8 on MVE builds too.
   TfLiteConvParams conv_params = {};
   conv_params.padding = kTfLitePaddingValid;
-  conv_params.stride_width = 1;
-  conv_params.stride_height = 1;
+  conv_params.stride_width = 2;
+  conv_params.stride_height = 2;
   conv_params.activation = kTfLiteActNone;
   conv_params.dilation_width_factor = 1;
   conv_params.dilation_height_factor = 1;
