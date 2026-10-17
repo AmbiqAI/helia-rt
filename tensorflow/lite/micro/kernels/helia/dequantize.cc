@@ -90,18 +90,6 @@ TfLiteStatus DequantizeEval(TfLiteContext* context, TfLiteNode* node) {
     // Storage widening, not float16 arithmetic, so it is not gated on
     // kHeliaFloat16Enabled; see AmbiqAI/helia-rt#255.
     case kTfLiteFloat16: {
-#if defined(ARM_NN_DEQUANTIZE_F16_MVE)
-      // TODO(AmbiqAI/ns-cmsis-nn#871): MVE widening drops NaN payloads.
-      // A float16_t cast loop compiles to that same conversion, so widen bits.
-      float* output_data = tflite::micro::GetTensorData<float>(output);
-      const int flat_size = ElementCount(*input->dims);
-      const TfLiteFloat16* input_data =
-          tflite::micro::GetTensorData<TfLiteFloat16>(input);
-      for (int i = 0; i < flat_size; ++i) {
-        output_data[i] = Float16BitsToFloat32(input_data[i].data);
-      }
-      break;
-#else
       static_assert(sizeof(TfLiteFloat16) == sizeof(uint16_t),
                     "TfLiteFloat16 must be the raw binary16 bits");
       const arm_cmsis_nn_status status = arm_dequantize_f16_bits_f32(
@@ -115,7 +103,6 @@ TfLiteStatus DequantizeEval(TfLiteContext* context, TfLiteNode* node) {
         return kTfLiteError;
       }
       break;
-#endif
     }
     default:
       MicroPrintf("Input %s, output %s not supported.",

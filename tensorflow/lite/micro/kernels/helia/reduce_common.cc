@@ -405,7 +405,22 @@ TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
   const bool is_max = evalType == kEvalMax;
   switch (input->type) {
     case kTfLiteFloat32: {
-      // TODO(AmbiqAI/ns-cmsis-nn#870): f32 entries miss TFLite NaN/Inf rules.
+#if ARM_NN_ENABLE_F32
+      if (HeliaFloatReduceSupported(input, axis_data, num_axis)) {
+        cmsis_nn_dims in_d, ax_d, out_d;
+        PopulateCmsisShapeAndAxis(input, axis_data, num_axis, &in_d, &ax_d,
+                                  &out_d);
+        const float* input_data = tflite::micro::GetTensorData<float>(input);
+        float* output_data = tflite::micro::GetTensorData<float>(output);
+        const arm_cmsis_nn_status status =
+            is_max ? arm_reduce_max_tflite_f32(input_data, &in_d, &ax_d,
+                                               output_data, &out_d)
+                   : arm_reduce_min_tflite_f32(input_data, &in_d, &ax_d,
+                                               output_data, &out_d);
+        return MinMaxStatus(status, is_max ? "arm_reduce_max_tflite_f32"
+                                           : "arm_reduce_min_tflite_f32");
+      }
+#endif
       MinMaxReducerCompare<float> reducer(evalType);
       TF_LITE_ENSURE(
           context,
@@ -432,12 +447,12 @@ TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
           tflite::micro::GetTensorData<float16_t>(input);
       float16_t* output_data = tflite::micro::GetTensorData<float16_t>(output);
       const arm_cmsis_nn_status status =
-          is_max ? arm_reduce_max_f16(input_data, &in_d, &ax_d, output_data,
-                                      &out_d)
-                 : arm_reduce_min_f16(input_data, &in_d, &ax_d, output_data,
-                                      &out_d);
-      return MinMaxStatus(status,
-                          is_max ? "arm_reduce_max_f16" : "arm_reduce_min_f16");
+          is_max ? arm_reduce_max_tflite_f16(input_data, &in_d, &ax_d,
+                                             output_data, &out_d)
+                 : arm_reduce_min_tflite_f16(input_data, &in_d, &ax_d,
+                                             output_data, &out_d);
+      return MinMaxStatus(status, is_max ? "arm_reduce_max_tflite_f16"
+                                         : "arm_reduce_min_tflite_f16");
     }
 #endif
     case kTfLiteInt8: {

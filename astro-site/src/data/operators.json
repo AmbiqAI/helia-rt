@@ -139,7 +139,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "Output is FP32. FP16 means weight-storage widening, not FP16 computation; it works without ARM_NN_ENABLE_F16 and matches the reference widening bit for bit at reset FPSCR: a NaN keeps its sign and payload and comes back quiet. On cores with an FPU but no MVE float16 (for example cortex-m4+fp) the widening runs on the FPU, so with FPSCR.DN (default NaN) set every NaN becomes 0x7FC00000."
+    "notes": "Output is FP32. FP16 means weight-storage widening, not FP16 computation; it calls arm_dequantize_f16_bits_f32 on every target, works without ARM_NN_ENABLE_F16, and matches the reference widening bit for bit at reset FPSCR: a NaN keeps its sign and payload and comes back quiet, on the MVE path too. On cores with an FPU but no MVE float16 (for example cortex-m4+fp) the widening runs on the FPU, so with FPSCR.DN (default NaN) set every NaN becomes 0x7FC00000."
   },
   {
     "name": "EQUAL",
@@ -498,7 +498,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "int8/int16 run CORE at rank <= 4 with equal input/output quantization. FP32 uses Reference to keep TFLite's non-finite results (NaN skipped, -FLT_MAX for an all -Inf or empty window). FP16 runs CORE at rank <= 4 and is rejected otherwise or without ARM_NN_ENABLE_F16; unlike FP32 it propagates NaN (canonical 0x7e00) and gives -Inf for an all -Inf or empty window, and with an empty axis list it copies each element, NaN payload included. On every route and dtype, FP32 Reference and rank 5 included, an output whose element count differs from the input's elements on the kept axes, or an axis outside the input rank, fails at Invoke. Implementation is in reduce_common.cc."
+    "notes": "int8/int16 run CORE at rank <= 4 with equal input/output quantization. FP32 runs CORE (arm_reduce_max_tflite_f32) at rank <= 4 with ARM_NN_ENABLE_F32 and Reference otherwise; FP16 runs CORE (arm_reduce_max_tflite_f16) at rank <= 4 and is rejected otherwise or without ARM_NN_ENABLE_F16. Both follow TFLite: a NaN is skipped, a window of NaNs, of -Inf only or an empty one gives the start value (-FLT_MAX, -65504 for FP16), and an empty axis list folds each element into it. On every route and dtype, rank 5 included, an output whose element count differs from the input's elements on the kept axes, or an axis outside the input rank, fails at Invoke. Implementation is in reduce_common.cc."
   },
   {
     "name": "REDUCE_MIN",
@@ -511,7 +511,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "int8/int16 run CORE at rank <= 4 with equal input/output quantization. FP32 uses Reference to keep TFLite's non-finite results (NaN skipped, +FLT_MAX for an all +Inf or empty window). FP16 runs CORE at rank <= 4 and is rejected otherwise or without ARM_NN_ENABLE_F16; unlike FP32 it propagates NaN (canonical 0x7e00) and gives +Inf for an all +Inf or empty window, and with an empty axis list it copies each element, NaN payload included. On every route and dtype, FP32 Reference and rank 5 included, an output whose element count differs from the input's elements on the kept axes, or an axis outside the input rank, fails at Invoke. Implementation is in reduce_common.cc."
+    "notes": "int8/int16 run CORE at rank <= 4 with equal input/output quantization. FP32 runs CORE (arm_reduce_min_tflite_f32) at rank <= 4 with ARM_NN_ENABLE_F32 and Reference otherwise; FP16 runs CORE (arm_reduce_min_tflite_f16) at rank <= 4 and is rejected otherwise or without ARM_NN_ENABLE_F16. Both follow TFLite: a NaN is skipped, a window of NaNs, of +Inf only or an empty one gives the start value (+FLT_MAX, +65504 for FP16), and an empty axis list folds each element into it. On every route and dtype, rank 5 included, an output whose element count differs from the input's elements on the kept axes, or an axis outside the input rank, fails at Invoke. Implementation is in reduce_common.cc."
   },
   {
     "name": "RELU",

@@ -18,11 +18,11 @@ limitations under the License.
 // heliaCORE, and padded to rank 5 they take the helia reference path; the two
 // agree on every input, NaN included (AmbiqAI/helia-rt#359).
 //
-// Float32 REDUCE_MAX/REDUCE_MIN stay on the reference at every rank, because
-// arm_reduce_max/min_f32 propagate NaN and start from -/+Inf; the tests pin
-// the TFLite results heliaCORE would change. Float16 runs on heliaCORE, which
-// has no reference to differ from. GCC and ATfE links wrap the heliaCORE
-// entries to prove each route.
+// Float32 REDUCE_MAX/REDUCE_MIN run arm_reduce_max/min_tflite_f32 at rank <= 4
+// and the reference at rank 5; the two agree bit for bit, and the tests pin
+// the TFLite results for NaN, infinities, empty windows and an empty axis
+// list. Float16 runs the _tflite_f16 entries with the same semantics. GCC and
+// ATfE links wrap the heliaCORE entries to prove each route.
 
 #include <cmath>
 #include <cstdint>
@@ -45,10 +45,10 @@ enum class Leaf {
   kArgMinF32,
   kArgMaxS8,
   kArgMinS8,
-  kReduceMaxF32,
-  kReduceMinF32,
-  kReduceMaxF16,
-  kReduceMinF16,
+  kReduceMaxTfliteF32,
+  kReduceMinTfliteF32,
+  kReduceMaxTfliteF16,
+  kReduceMinTfliteF16,
   kReduceMaxS8,
   kReduceMaxS16,
   kCount
@@ -95,13 +95,17 @@ HELIA_WRAP_ARG(arm_argmax_f32, float32_t, Leaf::kArgMaxF32)
 HELIA_WRAP_ARG(arm_argmin_f32, float32_t, Leaf::kArgMinF32)
 HELIA_WRAP_ARG(arm_argmax_s8, int8_t, Leaf::kArgMaxS8)
 HELIA_WRAP_ARG(arm_argmin_s8, int8_t, Leaf::kArgMinS8)
-HELIA_WRAP_REDUCE(arm_reduce_max_f32, float32_t, Leaf::kReduceMaxF32)
-HELIA_WRAP_REDUCE(arm_reduce_min_f32, float32_t, Leaf::kReduceMinF32)
+HELIA_WRAP_REDUCE(arm_reduce_max_tflite_f32, float32_t,
+                  Leaf::kReduceMaxTfliteF32)
+HELIA_WRAP_REDUCE(arm_reduce_min_tflite_f32, float32_t,
+                  Leaf::kReduceMinTfliteF32)
 HELIA_WRAP_REDUCE(arm_reduce_max_s8, int8_t, Leaf::kReduceMaxS8)
 HELIA_WRAP_REDUCE(arm_reduce_max_s16, int16_t, Leaf::kReduceMaxS16)
 #if ARM_NN_ENABLE_F16
-HELIA_WRAP_REDUCE(arm_reduce_max_f16, float16_t, Leaf::kReduceMaxF16)
-HELIA_WRAP_REDUCE(arm_reduce_min_f16, float16_t, Leaf::kReduceMinF16)
+HELIA_WRAP_REDUCE(arm_reduce_max_tflite_f16, float16_t,
+                  Leaf::kReduceMaxTfliteF16)
+HELIA_WRAP_REDUCE(arm_reduce_min_tflite_f16, float16_t,
+                  Leaf::kReduceMinTfliteF16)
 #endif
 
 #undef HELIA_WRAP_REDUCE
@@ -303,10 +307,23 @@ int ReducedOutputCount(const Layer& l) {
   return count;
 }
 
-// Float32 REDUCE at the layer's rank and padded to rank 5: neither may reach
-// heliaCORE, and the two must agree bit for bit.
-void ExpectReduceF32OnReference(const Layer& l, const float* input,
-                                bool keep_dims) {
+// Calls of the float32 _tflite entry for REDUCE_MAX (is_max) or REDUCE_MIN.
+void ExpectTfliteF32Calls(bool is_max, int calls) {
+#if HELIA_EXTREMA_LINK_WRAP
+  EXPECT_EQ(calls, g_leaf_calls[static_cast<int>(
+                       is_max ? Leaf::kReduceMaxTfliteF32
+                              : Leaf::kReduceMinTfliteF32)]);
+  EXPECT_EQ(calls, CoreCalls());
+#else
+  (void)is_max;
+  (void)calls;
+#endif
+}
+
+// Float32 REDUCE at the layer's rank, on heliaCORE, and padded to rank 5, on
+// the reference: the two must agree bit for bit.
+void ExpectReduceF32MatchesReference(const Layer& l, const float* input,
+                                     bool keep_dims) {
   Layer promoted;
   Promote(l, &promoted);
   const int output_count = ReducedOutputCount(l);
@@ -316,22 +333,24 @@ void ExpectReduceF32OnReference(const Layer& l, const float* input,
     memset(g_leaf_calls, 0, sizeof(g_leaf_calls));
     EXPECT_EQ(kTfLiteOk,
               RunReduce(l, is_max, keep_dims, kTfLiteFloat32, input, at_rank));
+    ExpectTfliteF32Calls(is_max, 1);
+    memset(g_leaf_calls, 0, sizeof(g_leaf_calls));
     EXPECT_EQ(kTfLiteOk, RunReduce(promoted, is_max, keep_dims, kTfLiteFloat32,
                                    input, padded));
-    EXPECT_EQ(0, CoreCalls());
+    ExpectTfliteF32Calls(is_max, 0);
     for (int i = 0; i < output_count; ++i) {
       EXPECT_EQ(Bits(padded[i]), Bits(at_rank[i]));
     }
   }
 }
 
-// One float32 REDUCE at the layer's rank, which must stay off heliaCORE.
+// One float32 REDUCE at the layer's rank, which must run the _tflite entry.
 void ReduceF32(const Layer& l, bool is_max, const float* input,
                float* output) {
   memset(g_leaf_calls, 0, sizeof(g_leaf_calls));
   EXPECT_EQ(kTfLiteOk, RunReduce(l, is_max, /*keep_dims=*/false,
                                  kTfLiteFloat32, input, output));
-  EXPECT_EQ(0, CoreCalls());
+  ExpectTfliteF32Calls(is_max, 1);
 }
 
 }  // namespace
@@ -386,7 +405,7 @@ TEST(HeliaExtremaRouteTest, ArgInt8MatchesReferenceWithTies) {
 
 // Ties, zero signs, subnormals, infinities and NaNs, over axis masks and both
 // keep_dims settings.
-TEST(HeliaExtremaRouteTest, ReduceFloat32StaysOnReference) {
+TEST(HeliaExtremaRouteTest, ReduceFloat32MatchesReference) {
   float input[kMaxElements];
   tflite::testing::FillFloatSpecials(input, kMaxElements, /*with_nan=*/true);
   const Layer layers[] = {
@@ -395,8 +414,10 @@ TEST(HeliaExtremaRouteTest, ReduceFloat32StaysOnReference) {
       {2, {24, 5}, 1, {1}},          {4, {2, 3, 4, 5}, 4, {0, 1, 2, 3}},
   };
   for (const Layer& l : layers) {
-    tflite::testing::ExpectReduceF32OnReference(l, input, /*keep_dims=*/false);
-    tflite::testing::ExpectReduceF32OnReference(l, input, /*keep_dims=*/true);
+    tflite::testing::ExpectReduceF32MatchesReference(l, input,
+                                                     /*keep_dims=*/false);
+    tflite::testing::ExpectReduceF32MatchesReference(l, input,
+                                                     /*keep_dims=*/true);
   }
 }
 
@@ -467,30 +488,50 @@ TEST(HeliaExtremaRouteTest, ReduceInt8RejectsRescaledOutput) {
   EXPECT_EQ(6, output[1]);
 }
 
-// Float16 REDUCE_MAX/MIN have no reference kernel: fp16 builds run them on
-// heliaCORE, and other builds reject them when the model is prepared.
-// CHARACTERIZATION: a NaN in a window gives the canonical quiet NaN 0x7e00,
-// where float32's TFLite reference would skip it.
+// Float16 REDUCE_MAX/MIN have no reference kernel: fp16 builds run the
+// _tflite_f16 entries, with float32's TFLite semantics at the float16 start
+// values -/+65504, and other builds reject float16 when the model is prepared.
 TEST(HeliaExtremaRouteTest, ReduceFloat16) {
-  // 1.0, -2.0, 0.5 | NaN, 4.0, -0.0 | -Inf, -0.0, 0.0 | 6.0, 6.0, -6.0
-  const uint16_t input[12] = {0x3C00, 0xC000, 0x3800, 0x7E55, 0x4400, 0x8000,
-                              0xFC00, 0x8000, 0x0000, 0x4600, 0x4600, 0xC600};
-  uint16_t output[4] = {};
-  const Layer l{2, {4, 3}, 1, {1}};
+  // 1.0, -2.0, 0.5 | NaN, 4.0, -0.0 | -Inf, -0.0, 0.0 | 6.0, 6.0, -6.0 |
+  // NaN, NaN, NaN | -Inf, -Inf, -Inf
+  const uint16_t input[18] = {0x3C00, 0xC000, 0x3800, 0x7E55, 0x4400, 0x8000,
+                              0xFC00, 0x8000, 0x0000, 0x4600, 0x4600, 0xC600,
+                              0x7E01, 0xFE02, 0x7C03, 0xFC00, 0xFC00, 0xFC00};
+  uint16_t output[18] = {};
+  const Layer l{2, {6, 3}, 1, {1}};
 #if ARM_NN_ENABLE_F16
   for (int is_max = 0; is_max < 2; ++is_max) {
     memset(g_leaf_calls, 0, sizeof(g_leaf_calls));
     EXPECT_EQ(kTfLiteOk, tflite::testing::RunReduce(
                              l, is_max, false, kTfLiteFloat16, input, output));
 #if HELIA_EXTREMA_LINK_WRAP
-    EXPECT_EQ(1, g_leaf_calls[static_cast<int>(is_max ? Leaf::kReduceMaxF16
-                                                      : Leaf::kReduceMinF16)]);
+    EXPECT_EQ(1, g_leaf_calls[static_cast<int>(
+                     is_max ? Leaf::kReduceMaxTfliteF16
+                            : Leaf::kReduceMinTfliteF16)]);
 #endif
     EXPECT_EQ(is_max ? 0x3C00 : 0xC000, output[0]);
-    EXPECT_EQ(0x7E00, output[1]);
+    // A NaN never wins.
+    EXPECT_EQ(is_max ? 0x4400 : 0x8000, output[1]);
     // Equal values keep the first in row-major order, zero signs included.
     EXPECT_EQ(is_max ? 0x8000 : 0xFC00, output[2]);
     EXPECT_EQ(is_max ? 0x4600 : 0xC600, output[3]);
+    // A window of NaNs, or of the start side's infinity, gives -/+65504.
+    EXPECT_EQ(is_max ? 0xFBFF : 0x7BFF, output[4]);
+    EXPECT_EQ(is_max ? 0xFBFF : 0xFC00, output[5]);
+  }
+  // An empty axis list folds each element into the start value.
+  const Layer no_axes{1, {6}, 0, {}};
+  const uint16_t row[6] = {0x7E55, 0xFC00, 0x7C00, 0x4000, 0x8000, 0xFE01};
+  for (int is_max = 0; is_max < 2; ++is_max) {
+    EXPECT_EQ(kTfLiteOk, tflite::testing::RunReduce(
+                             no_axes, is_max, false, kTfLiteFloat16, row,
+                             output));
+    EXPECT_EQ(is_max ? 0xFBFF : 0x7BFF, output[0]);
+    EXPECT_EQ(is_max ? 0xFBFF : 0xFC00, output[1]);
+    EXPECT_EQ(is_max ? 0x7C00 : 0x7BFF, output[2]);
+    EXPECT_EQ(0x4000, output[3]);
+    EXPECT_EQ(0x8000, output[4]);
+    EXPECT_EQ(is_max ? 0xFBFF : 0x7BFF, output[5]);
   }
 #else
   for (int is_max = 0; is_max < 2; ++is_max) {

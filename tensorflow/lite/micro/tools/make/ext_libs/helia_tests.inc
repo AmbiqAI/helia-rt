@@ -412,8 +412,8 @@ $(kernel_strided_slice_route_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_strided_slice_f16
 endif
 
-# ARG_MAX/ARG_MIN on heliaCORE against the reference path in the same binary,
-# float32 REDUCE_MAX/REDUCE_MIN pinned to the reference, float16 on heliaCORE.
+# ARG_MAX/ARG_MIN and float32 REDUCE_MAX/REDUCE_MIN on heliaCORE against the
+# reference path in the same binary, float16 REDUCE_MAX/REDUCE_MIN on heliaCORE.
 # GCC and ATfE links wrap the heliaCORE entries to prove each route.
 # see AmbiqAI/helia-rt#433
 $(eval $(call microlite_test,kernel_extrema_route_test,\
@@ -427,10 +427,10 @@ $(kernel_extrema_route_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_argmin_f32 \
   -Wl,--wrap=arm_argmax_s8 \
   -Wl,--wrap=arm_argmin_s8 \
-  -Wl,--wrap=arm_reduce_max_f32 \
-  -Wl,--wrap=arm_reduce_min_f32 \
-  -Wl,--wrap=arm_reduce_max_f16 \
-  -Wl,--wrap=arm_reduce_min_f16 \
+  -Wl,--wrap=arm_reduce_max_tflite_f32 \
+  -Wl,--wrap=arm_reduce_min_tflite_f32 \
+  -Wl,--wrap=arm_reduce_max_tflite_f16 \
+  -Wl,--wrap=arm_reduce_min_tflite_f16 \
   -Wl,--wrap=arm_reduce_max_s8 \
   -Wl,--wrap=arm_reduce_max_s16
 endif

@@ -121,9 +121,8 @@ TEST(HeliaReduceOutputSizeTest, SumInt8AndFloat32) {
   ExpectRank2SizeRule<float>(tflite::Register_SUM(), kTfLiteFloat32);
 }
 
-// float32 REDUCE_MIN/MAX run the reference reducer, which writes by the input
-// shape too.
-TEST(HeliaReduceOutputSizeTest, ReduceMinMaxFloat32Reference) {
+// float32 REDUCE_MIN/MAX run heliaCORE's _tflite entries at rank <= 4.
+TEST(HeliaReduceOutputSizeTest, ReduceMinMaxFloat32) {
   ExpectRank2SizeRule<float>(tflite::Register_REDUCE_MIN(), kTfLiteFloat32);
   ExpectRank2SizeRule<float>(tflite::Register_REDUCE_MAX(), kTfLiteFloat32);
 }

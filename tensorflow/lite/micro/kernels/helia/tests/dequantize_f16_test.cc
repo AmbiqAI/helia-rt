@@ -16,15 +16,13 @@ limitations under the License.
 // float16 -> float32 DEQUANTIZE through the helia kernel for all 65536 binary16
 // patterns, against Float16BitsToFloat32, the reference widening: every
 // pattern matches bit for bit on every build, a NaN keeping its sign and
-// payload. The kernel calls arm_dequantize_f16_bits_f32 except on MVE float16
-// builds, whose vector conversion returns the default NaN; GCC and ATfE links
-// wrap the entry to prove which.
+// payload. The kernel calls arm_dequantize_f16_bits_f32 on every build; GCC
+// and ATfE links wrap the entry to prove it.
 
 #include <cstdint>
 #include <cstring>
 
 #include "Include/arm_nnfunctions.h"
-#include "Include/arm_nnsupportfunctions.h"
 #include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/dequantize.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
@@ -57,11 +55,6 @@ namespace tflite {
 namespace testing {
 namespace {
 
-#if defined(ARM_NN_DEQUANTIZE_F16_MVE)
-constexpr int kEntryCalls = 0;
-#else
-constexpr int kEntryCalls = 1;
-#endif
 
 // An odd chunk exercises the conversion's tail as well as its full blocks.
 constexpr int kChunk = 2047;
@@ -99,9 +92,7 @@ void RunChunk(uint32_t first, int count, int* number_mismatches,
   g_bits_calls = 0;
   EXPECT_EQ(kTfLiteOk, runner.Invoke());
 #if HELIA_DEQUANTIZE_F16_LINK_WRAP
-  EXPECT_EQ(kEntryCalls, g_bits_calls);
-#else
-  (void)kEntryCalls;
+  EXPECT_EQ(1, g_bits_calls);
 #endif
   for (int i = 0; i < count; ++i) {
     const uint32_t expected = Bits(micro::Float16BitsToFloat32(input[i]));
