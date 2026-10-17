@@ -105,8 +105,7 @@ void ExpectRank2SizeRule(const TFLMRegistration& registration,
 using tflite::testing::ExpectRank2SizeRule;
 using tflite::testing::RunReduce;
 
-// MEAN int8 runs heliaCORE: a one-element output for a two-element
-// reduction used to take a write past its end.
+// MEAN int8 runs heliaCORE.
 TEST(HeliaReduceOutputSizeTest, MeanInt8) {
   ExpectRank2SizeRule<int8_t>(tflite::Register_MEAN(), kTfLiteInt8);
 }
@@ -198,7 +197,74 @@ TEST(HeliaReduceOutputSizeTest, ScalarInputIgnoresAxes) {
   }
 }
 
-// float16 MEAN/SUM/REDUCE_MIN/MAX run heliaCORE on fp16 builds; elsewhere
+// An axis list may repeat axes and run longer than the rank. At rank 5 MEAN
+// and SUM take the reference, whose MeanParams hold four axes and whose axis
+// resolution keeps one entry per distinct axis.
+TEST(HeliaReduceOutputSizeTest, LongAxisListsOnReferenceRoutes) {
+  const int32_t repeated[] = {4, 4, 4, 4, 4, 4};
+  int input_dims[] = {5, 1, 2, 2, 2, 2};
+  int output_dims[] = {4, 1, 2, 2, 2};
+  EXPECT_EQ(kTfLiteOk,
+            RunReduce<float>(tflite::Register_MEAN(), kTfLiteFloat32,
+                             input_dims, repeated, 6, output_dims, 8));
+  EXPECT_EQ(kTfLiteOk,
+            RunReduce<float>(tflite::Register_SUM(), kTfLiteFloat32, input_dims,
+                             repeated, 6, output_dims, 8));
+  const int32_t pair_repeated[] = {1, 1, 1};
+  int pair_dims[] = {2, 2, 3};
+  int kept_dims[] = {1, 2};
+  EXPECT_EQ(kTfLiteOk,
+            RunReduce<float>(tflite::Register_REDUCE_MIN(), kTfLiteFloat32,
+                             pair_dims, pair_repeated, 3, kept_dims, 2));
+}
+
+TEST(HeliaReduceOutputSizeTest, ThreeDistinctAxesOnReferenceRoutes) {
+  const int32_t axis[] = {0, 1, 2};
+  int input_dims[] = {5, 2, 2, 2, 2, 2};
+  int output_dims[] = {2, 2, 2};
+  EXPECT_EQ(kTfLiteOk, RunReduce<float>(tflite::Register_MEAN(), kTfLiteFloat32,
+                                        input_dims, axis, 3, output_dims, 4));
+  EXPECT_EQ(kTfLiteOk, RunReduce<float>(tflite::Register_SUM(), kTfLiteFloat32,
+                                        input_dims, axis, 3, output_dims, 4));
+  EXPECT_EQ(kTfLiteOk, RunReduce<int8_t>(tflite::Register_MEAN(), kTfLiteInt8,
+                                         input_dims, axis, 3, output_dims, 4));
+  EXPECT_EQ(kTfLiteOk, RunReduce<int16_t>(tflite::Register_SUM(), kTfLiteInt16,
+                                          input_dims, axis, 3, output_dims, 4));
+}
+
+// An empty input holds 0 elements even when its other extents multiply past
+// INT32_MAX, so a 0-element output matches. The dims are set after the
+// tensors are made, so nothing is allocated or read for them.
+TEST(HeliaReduceOutputSizeTest, EmptyInputWithHugeExtents) {
+  using tflite::testing::CreateTensor;
+  using tflite::testing::IntArrayFromInts;
+  static bool input[1] = {};
+  static bool output[1] = {};
+  const int32_t axis[1] = {};
+  int small_dims[] = {1, 1};
+  int axis_dims[] = {1, 0};
+  static int huge_dims[] = {3, 65536, 65536, 0};
+  static int empty_dims[] = {1, 0};
+  TfLiteTensor tensors[3] = {
+      CreateTensor(input, IntArrayFromInts(small_dims)),
+      CreateTensor(axis, IntArrayFromInts(axis_dims)),
+      CreateTensor(output, IntArrayFromInts(small_dims)),
+  };
+  tensors[1].allocation_type = kTfLiteMmapRo;
+  tensors[0].dims = IntArrayFromInts(huge_dims);
+  tensors[2].dims = IntArrayFromInts(empty_dims);
+  TfLiteReducerParams params = {};
+  int inputs[] = {2, 0, 1};
+  int outputs[] = {1, 2};
+  const TFLMRegistration registration = tflite::Register_REDUCE_ALL();
+  tflite::micro::KernelRunner runner(registration, tensors, 3,
+                                     IntArrayFromInts(inputs),
+                                     IntArrayFromInts(outputs), &params);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+}
+
+// float16 MEAN, SUM and REDUCE_MAX run heliaCORE on fp16 builds; elsewhere
 // Prepare rejects float16, which RunReduce asserts against, so only fp16
 // builds run them.
 TEST(HeliaReduceOutputSizeTest, Float16) {

@@ -323,30 +323,32 @@ jobs:
         # see AmbiqAI/helia-rt#435
         # Rank-6 and scalar-input reduction cases add two cases on every leg.
         # see AmbiqAI/helia-rt#433
+        # Reference-route axis-list and empty huge-extent cases add three cases on
+        # every leg. see AmbiqAI/helia-rt#433
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 170
-            min-cases: 1508
+            min-cases: 1511
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 170
-            min-cases: 1508
+            min-cases: 1511
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 169
-            min-cases: 1506
+            min-cases: 1509
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 170
-            min-cases: 1560
+            min-cases: 1563
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 169
-            min-cases: 1558
+            min-cases: 1561
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}

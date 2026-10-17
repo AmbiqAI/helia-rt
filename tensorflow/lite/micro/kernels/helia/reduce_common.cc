@@ -31,8 +31,9 @@ limitations under the License.
 namespace tflite {
 namespace micro {
 
+// MEAN and SUM iterate with fixed arrays: an input rank above this fails, and
+// the reference axis resolution keeps at most one entry per input axis.
 const int kMaxNumberOfAxis = 5;
-const int kMaxNumberOfReducedAxis = 2;
 constexpr int kCmsisRank = 4;
 
 /**
@@ -190,16 +191,19 @@ TfLiteStatus PrepareSimple(TfLiteContext* context, TfLiteNode* node,
   return kTfLiteOk;
 }
 
+// MeanParams holds four axes, so a longer list keeps its first four and an
+// axis_count of 4; only the two-axis 4-D special case reads them.
 void ResolveAxis(const int* axis_data, int axis_count,
                  tflite::MeanParams* op_params) {
+  const int count = axis_count < 4 ? axis_count : 4;
   int i = 0;
-  for (; i < axis_count; ++i) {
+  for (; i < count; ++i) {
     op_params->axis[i] = static_cast<int16_t>(axis_data[i]);
   }
   for (; i < 4; ++i) {
     op_params->axis[i] = 1;
   }
-  op_params->axis_count = axis_count;
+  op_params->axis_count = count;
 }
 
 // heliaCORE's float reductions take a 4-D NHWC shape and a 4-D axis mask, so
@@ -287,8 +291,9 @@ TfLiteStatus EvalIntegerMean(TfLiteContext* context, TfLiteNode* node,
   int32_t* temp_sum = static_cast<int32_t*>(
       context->GetScratchBuffer(context, op_data->scratch_accumulator_idx));
 
-  QuantizedMeanOrSum<integer_type>(context, node, temp_index, resolved_axis,
-                                   temp_sum, op_data, /*compute_sum=*/false);
+  TF_LITE_ENSURE_OK(context, QuantizedMeanOrSum<integer_type>(
+                                 context, node, temp_index, resolved_axis,
+                                 temp_sum, op_data, /*compute_sum=*/false));
 
   return kTfLiteOk;
 }
@@ -322,21 +327,23 @@ struct MinMaxReducerCompare {
   MinMaxEvalType type_;
 };
 
-// Element count of `dims`, or -1 for a negative dim or a count past
+// Element count of `dims`, or -1 for a negative dim or a nonzero count past
 // INT32_MAX: such a count is not compared, since saturated counts could match.
-template <typename D>
-int64_t CheckedElementCount(const D* dims, int count) {
+int64_t CheckedElementCount(const int* dims, int count) {
   int64_t elements = 1;
+  bool past_int32 = false;
   for (int i = 0; i < count; ++i) {
     if (dims[i] < 0) {
       return -1;
     }
-    elements *= static_cast<int64_t>(dims[i]);
-    if (elements > INT32_MAX) {
-      return -1;
+    if (dims[i] == 0) {
+      elements = 0;
+    } else if (elements != 0 && !past_int32) {
+      elements *= dims[i];
+      past_int32 = elements > INT32_MAX;
     }
   }
-  return elements;
+  return elements != 0 && past_int32 ? -1 : elements;
 }
 
 // No rank limit beyond the input's own: REDUCE_MIN/MAX and REDUCE_ALL size
@@ -359,6 +366,7 @@ TfLiteStatus EnsureReducedOutputSize(const TfLiteEvalTensor* input,
       rank == 0 ? 0 : static_cast<int>(ElementCount(*axis->dims));
   const int32_t* axis_data = tflite::micro::GetTensorData<int32_t>(axis);
   int64_t expected = rank <= max_rank ? 1 : -1;
+  bool past_int32 = false;
   for (int i = 0; expected >= 0 && i < num_axis; ++i) {
     const int32_t a = axis_data[i] < 0 ? axis_data[i] + rank : axis_data[i];
     if (a < 0 || a >= rank) {
@@ -373,10 +381,15 @@ TfLiteStatus EnsureReducedOutputSize(const TfLiteEvalTensor* input,
     }
     if (extent < 0) {
       expected = -1;
-    } else if (!reduced) {
+    } else if (!reduced && extent == 0) {
+      expected = 0;
+    } else if (!reduced && expected != 0 && !past_int32) {
       expected *= extent;
-      expected = expected > INT32_MAX ? -1 : expected;
+      past_int32 = expected > INT32_MAX;
     }
+  }
+  if (expected != 0 && past_int32) {
+    expected = -1;
   }
   const int64_t actual =
       CheckedElementCount(output->dims->data, output->dims->size);
@@ -635,7 +648,7 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
   TF_LITE_ENSURE_OK(context, EnsureReducedOutputSize(input, axis, output,
                                                      kMaxNumberOfAxis, "MEAN"));
   int temp_index[kMaxNumberOfAxis];
-  int resolved_axis[kMaxNumberOfReducedAxis];
+  int resolved_axis[kMaxNumberOfAxis];
 
   switch (input->type) {
     case kTfLiteFloat16: {
@@ -799,7 +812,7 @@ TfLiteStatus EvalSumHelper(TfLiteContext* context, TfLiteNode* node,
   TF_LITE_ENSURE_OK(context, EnsureReducedOutputSize(input, axis, output,
                                                      kMaxNumberOfAxis, "SUM"));
   int temp_index[kMaxNumberOfAxis];
-  int resolved_axis[kMaxNumberOfReducedAxis];
+  int resolved_axis[kMaxNumberOfAxis];
 
   switch (input->type) {
     case kTfLiteFloat16: {
@@ -883,8 +896,9 @@ TfLiteStatus EvalSumHelper(TfLiteContext* context, TfLiteNode* node,
 
       int32_t* temp_sum = static_cast<int32_t*>(
           context->GetScratchBuffer(context, op_data->scratch_accumulator_idx));
-      QuantizedMeanOrSum<int8_t>(context, node, temp_index, resolved_axis,
-                                 temp_sum, op_data, /*compute_sum=*/true);
+      TF_LITE_ENSURE_OK(context, QuantizedMeanOrSum<int8_t>(
+                                     context, node, temp_index, resolved_axis,
+                                     temp_sum, op_data, /*compute_sum=*/true));
     } break;
     case kTfLiteInt16: {
 
@@ -918,8 +932,9 @@ TfLiteStatus EvalSumHelper(TfLiteContext* context, TfLiteNode* node,
 
       int32_t* temp_sum = static_cast<int32_t*>(
           context->GetScratchBuffer(context, op_data->scratch_accumulator_idx));
-      QuantizedMeanOrSum<int16_t>(context, node, temp_index, resolved_axis,
-                                  temp_sum, op_data, /*compute_sum=*/true);
+      TF_LITE_ENSURE_OK(context, QuantizedMeanOrSum<int16_t>(
+                                     context, node, temp_index, resolved_axis,
+                                     temp_sum, op_data, /*compute_sum=*/true));
     } break;
     default:
       MicroPrintf(

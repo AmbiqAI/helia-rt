@@ -671,7 +671,7 @@
       "bool"
     ],
     "path": "Mixed",
-    "notes": "int8, int16 and int32 run CORE; FP32 runs CORE with ARM_NN_ENABLE_F32 and Reference without it; FP16 runs CORE with ARM_NN_ENABLE_F16 and fails preparation without it; bool uses Reference. Rank is limited to 4; an empty slice writes nothing. For every type, an output whose element count differs from the slice's, or a slice past INT32_MAX elements, fails at Invoke."
+    "notes": "int8, int16 and int32 run CORE; FP32 runs CORE with ARM_NN_ENABLE_F32 and Reference without it; FP16 runs CORE with ARM_NN_ENABLE_F16 and fails preparation without it; bool uses Reference. Rank is limited to 4. For every type, an input axis above 2^30 or an input above INT32_MAX elements fails at Invoke, however small the slice; otherwise an empty slice writes nothing and succeeds, and a nonempty slice whose output element count differs from the slice's fails at Invoke. The input and output types must match."
   },
   {
     "name": "SUB",

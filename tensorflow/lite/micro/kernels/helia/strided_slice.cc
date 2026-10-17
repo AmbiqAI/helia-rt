@@ -85,15 +85,18 @@ bool ArmPopulateCommonParams(const tflite::StridedSliceParams& op_params,
   return true;
 }
 
-// Number of elements the slice takes, or of the tensor; saturates above
-// INT32_MAX so a product of absurd dims cannot wrap into a match.
+// Number of elements the slice takes, or of the tensor: 0 if any dim is 0 or
+// negative, else saturated above INT32_MAX so a product of absurd dims cannot
+// wrap into a match.
 template <typename D>
 uint64_t SaturatingProduct(const D* dims, int count) {
-  uint64_t elements = 1;
   for (int i = 0; i < count; ++i) {
     if (dims[i] <= 0) {
       return 0;
     }
+  }
+  uint64_t elements = 1;
+  for (int i = 0; i < count; ++i) {
     elements *= static_cast<uint64_t>(dims[i]);
     if (elements > static_cast<uint64_t>(INT32_MAX)) {
       return static_cast<uint64_t>(INT32_MAX) + 1;
