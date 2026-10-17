@@ -358,7 +358,11 @@ TEST(HeliaSqrtRsqrtFp16Test, SiblingAdmissionAndLegacyRoutes) {
   uint16_t output = 0;
   int dims[] = {1, 1};
   ExpectPrepareError(tflite::Register_SQUARE(), &input, &output, dims);
+#if !ARM_NN_ENABLE_F16
+  // float16 ABS needs ARM_NN_ENABLE_F16; elementwise_unary_route_test covers
+  // the enabled build.
   ExpectPrepareError(tflite::Register_ABS(), &input, &output, dims);
+#endif
 
   float f32_input = 4.0f;
   float f32_output = 0.0f;

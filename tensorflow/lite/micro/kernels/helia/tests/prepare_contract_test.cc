@@ -104,9 +104,15 @@ TEST(HeliaPrepareContractTest, AbsRejectsInt32AtPrepare) {
   EXPECT_EQ(kTfLiteError,
             tflite::testing::PrepareUnary(tflite::Register_ABS(), input, output,
                                           kTfLiteInt32));
+  // float16 ABS prepares only where ARM_NN_ENABLE_F16 compiles it in.
+#if ARM_NN_ENABLE_F16
+  constexpr TfLiteStatus kHalfStatus = kTfLiteOk;
+#else
+  constexpr TfLiteStatus kHalfStatus = kTfLiteError;
+#endif
   uint16_t half_input[4] = {};
   uint16_t half_output[4] = {};
-  EXPECT_EQ(kTfLiteError,
+  EXPECT_EQ(kHalfStatus,
             tflite::testing::PrepareUnary(tflite::Register_ABS(), half_input,
                                           half_output, kTfLiteFloat16));
 }

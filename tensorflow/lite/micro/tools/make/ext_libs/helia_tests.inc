@@ -175,6 +175,29 @@ $(kernel_depthwise_s8_3x3_route_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_depthwise_conv_wrapper_s8
 endif
 
+# ABS, NEG, SQRT and RSQRT against the reference they replace, NaN payloads and
+# signed zeros included. GCC and ATfE links wrap every entry to prove the route
+# and inject a failing status; the float16 entries exist only on cortex-m55.
+$(eval $(call microlite_test,kernel_elementwise_unary_route_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/elementwise_unary_route_test.cc))
+
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
+$(kernel_elementwise_unary_route_test_BINARY): CXXFLAGS += \
+  -DHELIA_UNARY_LINK_WRAP=1
+$(kernel_elementwise_unary_route_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_nn_abs_f32 \
+  -Wl,--wrap=arm_nn_sqrt_f32 \
+  -Wl,--wrap=arm_rsqrt_f32 \
+  -Wl,--wrap=arm_nn_neg_f32 \
+  -Wl,--wrap=arm_abs_s8 \
+  -Wl,--wrap=arm_abs_s16
+ifneq (,$(filter cortex-m55,$(TARGET_ARCH)))
+$(kernel_elementwise_unary_route_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_nn_abs_f16 \
+  -Wl,--wrap=arm_nn_neg_f16
+endif
+endif
+
 # int8 TRANSPOSE_CONV under each fused activation against the reference
 # kernel. see AmbiqAI/helia-rt#442
 $(eval $(call microlite_test,kernel_transpose_conv_s8_test,\
