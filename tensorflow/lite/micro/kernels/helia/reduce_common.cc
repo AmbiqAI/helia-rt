@@ -224,6 +224,38 @@ bool HeliaFloatReduceSupported(const TfLiteEvalTensor* input,
   return true;
 }
 
+// Float16 reductions are optimized-only (TFLM has no float16 reference) and
+// heliaCORE takes 4-D NHWC dims, so reject the rest at Prepare. A non-constant
+// axis tensor holds no data until Invoke; Eval re-checks it either way.
+TfLiteStatus PrepareFloat16Reduce(TfLiteContext* context,
+                                  const TfLiteTensor* input,
+                                  const TfLiteTensor* axis, const char* op) {
+  if (!kHeliaFloat16Enabled) {
+    MicroPrintf("Float16 %s requires ARM_NN_ENABLE_F16.", op);
+    return kTfLiteError;
+  }
+  const int input_rank = NumDimensions(input);
+  if (input_rank > kCmsisRank) {
+    MicroPrintf("Float16 %s supports rank 4 and below.", op);
+    return kTfLiteError;
+  }
+  if (IsConstantTensor(axis)) {
+    const int32_t* axis_data = GetTensorData<int32_t>(axis);
+    for (int i = 0; i < NumElements(axis); ++i) {
+      const int32_t reduce_axis =
+          axis_data[i] < 0 ? axis_data[i] + input_rank : axis_data[i];
+      if (reduce_axis < 0 || reduce_axis >= input_rank) {
+        MicroPrintf(
+            "Float16 %s requires every axis, after normalizing a negative "
+            "value against the rank, to be inside [0, rank).",
+            op);
+        return kTfLiteError;
+      }
+    }
+  }
+  return kTfLiteOk;
+}
+
 template <typename T>
 TfLiteStatus QuantizedMeanOrSum(TfLiteContext* context, TfLiteNode* node,
                                 int* temp_index, int* resolved_axis,
@@ -290,6 +322,15 @@ struct MinMaxReducerCompare {
   MinMaxEvalType type_;
 };
 
+TfLiteStatus MinMaxStatus(arm_cmsis_nn_status status, const char* entry) {
+  if (status != ARM_CMSIS_NN_SUCCESS) {
+    MicroPrintf("REDUCE_MAX/REDUCE_MIN: %s failed (%d).", entry,
+                static_cast<int>(status));
+    return kTfLiteError;
+  }
+  return kTfLiteOk;
+}
+
 TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
                               OpDataReduce* op_data, MinMaxEvalType evalType) {
   const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
@@ -305,8 +346,12 @@ TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
       context->GetScratchBuffer(context, op_data->scratch_input_iter_idx));
   int* resolved_axis = static_cast<int*>(
       context->GetScratchBuffer(context, op_data->scratch_resolved_axis_idx));
+  const int32_t* axis_data = tflite::micro::GetTensorData<int32_t>(axis);
+  const bool is_max = evalType == kEvalMax;
   switch (input->type) {
     case kTfLiteFloat32: {
+      // arm_reduce_max/min_f32 propagate NaN and start from -/+Inf where
+      // TFLite skips NaN and starts from -/+FLT_MAX, so float32 stays here.
       MinMaxReducerCompare<float> reducer(evalType);
       TF_LITE_ENSURE(
           context,
@@ -318,47 +363,50 @@ TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
               params->keep_dims, temp_buffer, resolved_axis,
               reducer.initialValue(), reducer.compare()));
     } break;
-    case kTfLiteInt8: {
-
-      if (input->dims->size <= kCmsisRank) {
-        arm_cmsis_nn_status rst;
-        cmsis_nn_dims in_d, ax_d, out_d;
-        int32_t output_mult = op_data->multiplier; // Not used
-        int32_t output_shift = op_data->shift; // Not used
-
-        PopulateCmsisParams(
-          input, output,
-          tflite::micro::GetTensorData<int32_t>(axis),
-          num_axis,
-          &in_d, &ax_d, &out_d,
-          &output_mult, &output_shift,
-          /*compute_sum=*/true
-        );
-
-        if (evalType == kEvalMax) {
-          rst = arm_reduce_max_s8(
-            tflite::micro::GetTensorData<int8_t>(input),
-            &in_d,
-            &ax_d,
-            tflite::micro::GetTensorData<int8_t>(output),
-            &out_d
-          );
-        } else {
-          rst = arm_reduce_min_s8(
-            tflite::micro::GetTensorData<int8_t>(input),
-            &in_d,
-            &ax_d,
-            tflite::micro::GetTensorData<int8_t>(output),
-            &out_d
-          );
-        }
-        return rst == ARM_CMSIS_NN_SUCCESS ? kTfLiteOk : kTfLiteError;
+#if ARM_NN_ENABLE_F16
+    case kTfLiteFloat16: {
+      if (!HeliaFloatReduceSupported(input, axis_data, num_axis)) {
+        MicroPrintf(
+            "Float16 REDUCE_MAX/REDUCE_MIN requires rank <= 4 and axes inside "
+            "the rank.");
+        return kTfLiteError;
       }
-
-      MinMaxReducerCompare<int8_t> reducer(evalType);
+      cmsis_nn_dims in_d, ax_d, out_d;
+      PopulateCmsisShapeAndAxis(input, axis_data, num_axis, &in_d, &ax_d,
+                                &out_d);
+      const float16_t* input_data =
+          tflite::micro::GetTensorData<float16_t>(input);
+      float16_t* output_data = tflite::micro::GetTensorData<float16_t>(output);
+      const arm_cmsis_nn_status status =
+          is_max ? arm_reduce_max_f16(input_data, &in_d, &ax_d, output_data,
+                                      &out_d)
+                 : arm_reduce_min_f16(input_data, &in_d, &ax_d, output_data,
+                                      &out_d);
+      return MinMaxStatus(status,
+                          is_max ? "arm_reduce_max_f16" : "arm_reduce_min_f16");
+    }
+#endif
+    case kTfLiteInt8: {
+      // The kernels copy values without requantizing, as the reference does.
       TF_LITE_ENSURE_EQ(context, static_cast<double>(op_data->input_scale),
                         static_cast<double>(op_data->output_scale));
       TF_LITE_ENSURE_EQ(context, op_data->input_zp, op_data->output_zp);
+      if (input->dims->size <= kCmsisRank) {
+        cmsis_nn_dims in_d, ax_d, out_d;
+        PopulateCmsisShapeAndAxis(input, axis_data, num_axis, &in_d, &ax_d,
+                                  &out_d);
+        const int8_t* input_data = tflite::micro::GetTensorData<int8_t>(input);
+        int8_t* output_data = tflite::micro::GetTensorData<int8_t>(output);
+        const arm_cmsis_nn_status status =
+            is_max ? arm_reduce_max_s8(input_data, &in_d, &ax_d, output_data,
+                                       &out_d)
+                   : arm_reduce_min_s8(input_data, &in_d, &ax_d, output_data,
+                                       &out_d);
+        return MinMaxStatus(status,
+                            is_max ? "arm_reduce_max_s8" : "arm_reduce_min_s8");
+      }
+
+      MinMaxReducerCompare<int8_t> reducer(evalType);
       TF_LITE_ENSURE(
           context,
           reference_ops::ReduceGeneric<int8_t>(
@@ -371,46 +419,26 @@ TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
     } break;
 
     case kTfLiteInt16: {
-
-      if (input->dims->size <= kCmsisRank) {
-        arm_cmsis_nn_status rst;
-        cmsis_nn_dims in_d, ax_d, out_d;
-        int32_t output_mult = op_data->multiplier; // Not used
-        int32_t output_shift = op_data->shift; // Not used
-
-        PopulateCmsisParams(
-          input, output,
-          tflite::micro::GetTensorData<int32_t>(axis),
-          num_axis,
-          &in_d, &ax_d, &out_d,
-          &output_mult, &output_shift,
-          /*compute_sum=*/true
-        );
-
-        if (evalType == kEvalMax) {
-          rst = arm_reduce_max_s16(
-            tflite::micro::GetTensorData<int16_t>(input),
-            &in_d,
-            &ax_d,
-            tflite::micro::GetTensorData<int16_t>(output),
-            &out_d
-          );
-        } else {
-          rst = arm_reduce_min_s16(
-            tflite::micro::GetTensorData<int16_t>(input),
-            &in_d,
-            &ax_d,
-            tflite::micro::GetTensorData<int16_t>(output),
-            &out_d
-          );
-        }
-        return rst == ARM_CMSIS_NN_SUCCESS ? kTfLiteOk : kTfLiteError;
-      }
-
-      MinMaxReducerCompare<int16_t> reducer(evalType);
       TF_LITE_ENSURE_EQ(context, static_cast<double>(op_data->input_scale),
                         static_cast<double>(op_data->output_scale));
       TF_LITE_ENSURE_EQ(context, op_data->input_zp, op_data->output_zp);
+      if (input->dims->size <= kCmsisRank) {
+        cmsis_nn_dims in_d, ax_d, out_d;
+        PopulateCmsisShapeAndAxis(input, axis_data, num_axis, &in_d, &ax_d,
+                                  &out_d);
+        const int16_t* input_data =
+            tflite::micro::GetTensorData<int16_t>(input);
+        int16_t* output_data = tflite::micro::GetTensorData<int16_t>(output);
+        const arm_cmsis_nn_status status =
+            is_max ? arm_reduce_max_s16(input_data, &in_d, &ax_d, output_data,
+                                        &out_d)
+                   : arm_reduce_min_s16(input_data, &in_d, &ax_d, output_data,
+                                        &out_d);
+        return MinMaxStatus(status, is_max ? "arm_reduce_max_s16"
+                                           : "arm_reduce_min_s16");
+      }
+
+      MinMaxReducerCompare<int16_t> reducer(evalType);
       TF_LITE_ENSURE(
           context,
           reference_ops::ReduceGeneric<int16_t>(
@@ -423,7 +451,7 @@ TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
     } break;
 
     default:
-      MicroPrintf("Only float32, int8, and int16 types are supported.");
+      MicroPrintf("Only float16, float32, int8, and int16 types are supported.");
       return kTfLiteError;
   }
   return kTfLiteOk;
@@ -440,6 +468,11 @@ TfLiteStatus PrepareMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
   TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
   TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
   TfLiteTensor* axis = micro_context->AllocateTempInputTensor(node, 1);
+
+  if (input->type == kTfLiteFloat16) {
+    TF_LITE_ENSURE_OK(context, PrepareFloat16Reduce(context, input, axis,
+                                                    "REDUCE_MAX/REDUCE_MIN"));
+  }
 
   op_data->input_zp = input->params.zero_point;
   op_data->input_scale = input->params.scale;
@@ -466,28 +499,9 @@ TfLiteStatus PrepareMeanOrSumHelper(TfLiteContext* context, TfLiteNode* node,
   TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
   TfLiteTensor* axis = micro_context->AllocateTempInputTensor(node, 1);
 
-  // The float16 MEAN and REDUCE_SUM paths are optimized-only (TFLM has no
-  // float16 reference to fall back to) and heliaCore takes 4-D NHWC dims;
-  // reject the rest here so AllocateTensors fails rather than Invoke. A
-  // non-constant axis tensor holds no data until Invoke, so the axis range is
-  // only checked here when it is constant; Eval re-checks it either way.
   if (input->type == kTfLiteFloat16) {
-    TF_LITE_ENSURE_MSG(context, kHeliaFloat16Enabled,
-                       "Float16 MEAN/REDUCE_SUM requires ARM_NN_ENABLE_F16.");
-    const int input_rank = NumDimensions(input);
-    TF_LITE_ENSURE_MSG(context, input_rank <= kCmsisRank,
-                       "Float16 MEAN/REDUCE_SUM supports rank 4 and below.");
-    if (IsConstantTensor(axis)) {
-      const int32_t* axis_data = GetTensorData<int32_t>(axis);
-      for (int i = 0; i < NumElements(axis); ++i) {
-        const int32_t reduce_axis =
-            axis_data[i] < 0 ? axis_data[i] + input_rank : axis_data[i];
-        TF_LITE_ENSURE_MSG(
-            context, reduce_axis >= 0 && reduce_axis < input_rank,
-            "Float16 MEAN/REDUCE_SUM requires every axis, after normalizing a "
-            "negative value against the rank, to be inside [0, rank).");
-      }
-    }
+    TF_LITE_ENSURE_OK(context, PrepareFloat16Reduce(context, input, axis,
+                                                    "MEAN/REDUCE_SUM"));
   }
 
   if (input->type == kTfLiteInt8 || input->type == kTfLiteInt16) {

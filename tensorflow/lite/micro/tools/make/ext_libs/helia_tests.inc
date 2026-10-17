@@ -394,3 +394,54 @@ $(kernel_strided_slice_shrink_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_strided_slice_s8 \
   -Wl,--wrap=arm_strided_slice_s16
 endif
+
+# STRIDED_SLICE against the reference for every routed type, shrunk inner axes
+# included. GCC and ATfE links wrap the heliaCORE entries to prove each route;
+# the float16 wrap is compiled in only on fp16 builds. see AmbiqAI/helia-rt#433
+$(eval $(call microlite_test,kernel_strided_slice_route_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/strided_slice_route_test.cc))
+
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
+$(kernel_strided_slice_route_test_BINARY): CXXFLAGS += \
+  -DHELIA_STRIDED_SLICE_LINK_WRAP=1
+$(kernel_strided_slice_route_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_strided_slice_f32 \
+  -Wl,--wrap=arm_strided_slice_s8 \
+  -Wl,--wrap=arm_strided_slice_s16 \
+  -Wl,--wrap=arm_strided_slice_s32 \
+  -Wl,--wrap=arm_strided_slice_f16
+endif
+
+# ARG_MAX/ARG_MIN on heliaCORE against the reference path in the same binary,
+# float32 REDUCE_MAX/REDUCE_MIN pinned to the reference, float16 on heliaCORE.
+# GCC and ATfE links wrap the heliaCORE entries to prove each route.
+# see AmbiqAI/helia-rt#433
+$(eval $(call microlite_test,kernel_extrema_route_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/extrema_route_test.cc))
+
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
+$(kernel_extrema_route_test_BINARY): CXXFLAGS += \
+  -DHELIA_EXTREMA_LINK_WRAP=1
+$(kernel_extrema_route_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_argmax_f32 \
+  -Wl,--wrap=arm_argmin_f32 \
+  -Wl,--wrap=arm_argmax_s8 \
+  -Wl,--wrap=arm_argmin_s8 \
+  -Wl,--wrap=arm_reduce_max_f32 \
+  -Wl,--wrap=arm_reduce_min_f32 \
+  -Wl,--wrap=arm_reduce_max_f16 \
+  -Wl,--wrap=arm_reduce_min_f16
+endif
+
+# float16 DEQUANTIZE for every binary16 pattern against the reference widening.
+# GCC and ATfE links wrap the heliaCORE entry to prove the route.
+# see AmbiqAI/helia-rt#433
+$(eval $(call microlite_test,kernel_dequantize_f16_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/dequantize_f16_test.cc))
+
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
+$(kernel_dequantize_f16_test_BINARY): CXXFLAGS += \
+  -DHELIA_DEQUANTIZE_F16_LINK_WRAP=1
+$(kernel_dequantize_f16_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_dequantize_f16_bits_f32
+endif
