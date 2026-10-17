@@ -218,6 +218,40 @@ TEST(HeliaReduceOutputSizeTest, Rank6ReferenceRoute) {
 
 // The reference ignores the axes of a scalar input, so axis 0 or -1 reduces
 // nothing and writes the one output element.
+// MEAN writes the output as the input's type, so a float32 input with an int8
+// output of the same element count would write four bytes per int8 element.
+TEST(HeliaReduceOutputSizeTest, MeanTypeMismatchFailsInvoke) {
+  static float input[6] = {1, 2, 3, 4, 5, 6};
+  static int8_t output[3 * 4];
+  const int32_t axis[] = {1};
+  int input_dims[] = {2, 3, 2};
+  int axis_dims[] = {1, 1};
+  int output_dims[] = {1, 3};
+  TfLiteTensor tensors[3] = {
+      tflite::testing::CreateTensor(
+          input, tflite::testing::IntArrayFromInts(input_dims)),
+      tflite::testing::CreateTensor(
+          axis, tflite::testing::IntArrayFromInts(axis_dims)),
+      tflite::testing::CreateQuantizedTensor(
+          output, tflite::testing::IntArrayFromInts(output_dims), 0.5f, 0),
+  };
+  tensors[1].allocation_type = kTfLiteMmapRo;
+  TfLiteReducerParams params = {};
+  int inputs[] = {2, 0, 1};
+  int outputs[] = {1, 2};
+  tflite::micro::KernelRunner runner(tflite::Register_MEAN(), tensors, 3,
+                                     tflite::testing::IntArrayFromInts(inputs),
+                                     tflite::testing::IntArrayFromInts(outputs),
+                                     &params);
+  if (runner.InitAndPrepare() == kTfLiteOk) {
+    memset(output, 0x5A, sizeof(output));
+    EXPECT_EQ(kTfLiteError, runner.Invoke());
+    for (size_t i = 0; i < sizeof(output); ++i) {
+      EXPECT_EQ(0x5A, reinterpret_cast<const uint8_t*>(output)[i]);
+    }
+  }
+}
+
 TEST(HeliaReduceOutputSizeTest, ScalarInputIgnoresAxes) {
   int scalar_dims[] = {0};
   int pair_dims[] = {1, 2};

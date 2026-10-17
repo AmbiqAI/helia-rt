@@ -359,9 +359,9 @@ constexpr int kAnyReduceRank = INT32_MAX;
 // route checks here that the output holds exactly the input's elements on the
 // axes the reduction keeps. An input above `max_rank` or an axis outside the
 // input rank fails, as the reference's axis resolution does; a scalar input
-// ignores its axes, as that resolution does. The kernels take every extent as
-// an int dim, so the input's nonzero extents must multiply to at most
-// INT32_MAX even when another extent empties it.
+// ignores its axes, as that resolution does. The input's nonzero extents must
+// multiply to at most INT32_MAX even when another extent empties it: the bound
+// the kernels' int dims need on a nonempty input, kept for empty ones too.
 TfLiteStatus EnsureReducedOutputSize(const TfLiteEvalTensor* input,
                                      const TfLiteEvalTensor* axis,
                                      const TfLiteEvalTensor* output,
@@ -686,6 +686,7 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
       reinterpret_cast<TfLiteReducerParams*>(node->builtin_data);
 
   int num_axis = static_cast<int>(ElementCount(*axis->dims));
+  TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
   TF_LITE_ENSURE_OK(context, EnsureReducedOutputSize(input, axis, output,
                                                      kMaxNumberOfAxis, "MEAN"));
   int temp_index[kMaxNumberOfAxis];

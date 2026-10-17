@@ -334,30 +334,32 @@ jobs:
         # every leg. see AmbiqAI/helia-rt#433
         # The empty-input start-value reduction case adds one case on every leg.
         # see AmbiqAI/helia-rt#433
+        # MEAN type-mismatch rejection adds one case on every leg.
+        # see AmbiqAI/helia-rt#433
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 172
-            min-cases: 1539
+            min-cases: 1540
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 172
-            min-cases: 1539
+            min-cases: 1540
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 171
-            min-cases: 1537
+            min-cases: 1538
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 172
-            min-cases: 1591
+            min-cases: 1592
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 171
-            min-cases: 1589
+            min-cases: 1590
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
