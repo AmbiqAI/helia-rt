@@ -325,14 +325,11 @@ struct MinMaxReducerCompare {
 // Element count of `dims`, or -1 for a negative dim or a count past
 // INT32_MAX: such a count is not compared, since saturated counts could match.
 template <typename D>
-int64_t CheckedElementCount(const D* dims, int count, const bool* skip) {
+int64_t CheckedElementCount(const D* dims, int count) {
   int64_t elements = 1;
   for (int i = 0; i < count; ++i) {
     if (dims[i] < 0) {
       return -1;
-    }
-    if (skip != nullptr && skip[i]) {
-      continue;
     }
     elements *= static_cast<int64_t>(dims[i]);
     if (elements > INT32_MAX) {
@@ -342,32 +339,47 @@ int64_t CheckedElementCount(const D* dims, int count, const bool* skip) {
   return elements;
 }
 
+// No rank limit beyond the input's own: REDUCE_MIN/MAX and REDUCE_ALL size
+// their reference iteration scratch from the input rank in Prepare.
+constexpr int kAnyReduceRank = INT32_MAX;
+
 // Both heliaCORE and the reference reducers write the reduction by the input
 // shape, and Prepare never compares that with the output tensor, so every
 // route checks here that the output holds exactly the input's elements on the
-// axes the reduction keeps. An axis outside the input rank fails, as the
-// reference's axis resolution does; a reduced axis of extent 0 still yields
-// the start value.
+// axes the reduction keeps. An input above `max_rank` or an axis outside the
+// input rank fails, as the reference's axis resolution does; a scalar input
+// ignores its axes, as that resolution does; a reduced axis of extent 0 still
+// yields the start value.
 TfLiteStatus EnsureReducedOutputSize(const TfLiteEvalTensor* input,
                                      const TfLiteEvalTensor* axis,
                                      const TfLiteEvalTensor* output,
-                                     const char* op) {
+                                     int max_rank, const char* op) {
   const int rank = input->dims->size;
-  const int num_axis = static_cast<int>(ElementCount(*axis->dims));
+  const int num_axis =
+      rank == 0 ? 0 : static_cast<int>(ElementCount(*axis->dims));
   const int32_t* axis_data = tflite::micro::GetTensorData<int32_t>(axis);
-  bool reduced[kMaxNumberOfAxis] = {};
-  bool valid = rank <= kMaxNumberOfAxis;
-  for (int i = 0; valid && i < num_axis; ++i) {
+  int64_t expected = rank <= max_rank ? 1 : -1;
+  for (int i = 0; expected >= 0 && i < num_axis; ++i) {
     const int32_t a = axis_data[i] < 0 ? axis_data[i] + rank : axis_data[i];
-    valid = a >= 0 && a < rank;
-    if (valid) {
-      reduced[a] = true;
+    if (a < 0 || a >= rank) {
+      expected = -1;
     }
   }
-  const int64_t expected =
-      valid ? CheckedElementCount(input->dims->data, rank, reduced) : -1;
+  for (int d = 0; expected >= 0 && d < rank; ++d) {
+    const int32_t extent = input->dims->data[d];
+    bool reduced = false;
+    for (int i = 0; !reduced && i < num_axis; ++i) {
+      reduced = (axis_data[i] < 0 ? axis_data[i] + rank : axis_data[i]) == d;
+    }
+    if (extent < 0) {
+      expected = -1;
+    } else if (!reduced) {
+      expected *= extent;
+      expected = expected > INT32_MAX ? -1 : expected;
+    }
+  }
   const int64_t actual =
-      CheckedElementCount(output->dims->data, output->dims->size, nullptr);
+      CheckedElementCount(output->dims->data, output->dims->size);
   if (expected < 0 || expected != actual) {
     MicroPrintf("%s: the output size does not match the reduction.", op);
     return kTfLiteError;
@@ -395,8 +407,10 @@ TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
 
   // Interpret an axis tensor with null dimensions as a scalar
   int num_axis = static_cast<int>(ElementCount(*axis->dims));
-  TF_LITE_ENSURE_OK(context, EnsureReducedOutputSize(input, axis, output,
-                                                     evalType == kEvalMax ? "REDUCE_MAX" : "REDUCE_MIN"));
+  TF_LITE_ENSURE_OK(context,
+                    EnsureReducedOutputSize(
+                        input, axis, output, kAnyReduceRank,
+                        evalType == kEvalMax ? "REDUCE_MAX" : "REDUCE_MIN"));
   int* temp_buffer = static_cast<int*>(
       context->GetScratchBuffer(context, op_data->scratch_input_iter_idx));
   int* resolved_axis = static_cast<int*>(
@@ -619,7 +633,7 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
 
   int num_axis = static_cast<int>(ElementCount(*axis->dims));
   TF_LITE_ENSURE_OK(context, EnsureReducedOutputSize(input, axis, output,
-                                                     "MEAN"));
+                                                     kMaxNumberOfAxis, "MEAN"));
   int temp_index[kMaxNumberOfAxis];
   int resolved_axis[kMaxNumberOfReducedAxis];
 
@@ -783,7 +797,7 @@ TfLiteStatus EvalSumHelper(TfLiteContext* context, TfLiteNode* node,
   // Interpret an axis tensor with null dimensions as a scalar.
   int num_axis = static_cast<int>(ElementCount(*axis->dims));
   TF_LITE_ENSURE_OK(context, EnsureReducedOutputSize(input, axis, output,
-                                                     "SUM"));
+                                                     kMaxNumberOfAxis, "SUM"));
   int temp_index[kMaxNumberOfAxis];
   int resolved_axis[kMaxNumberOfReducedAxis];
 
@@ -958,8 +972,9 @@ TfLiteStatus EvalAllHelper(TfLiteContext* context, TfLiteNode* node,
       static_cast<TfLiteReducerParams*>(node->builtin_data);
 
   int num_axis = static_cast<int>(ElementCount(*axis->dims));
-  TF_LITE_ENSURE_OK(context, EnsureReducedOutputSize(input, axis, output,
-                                                     "REDUCE_ALL"));
+  TF_LITE_ENSURE_OK(context,
+                    EnsureReducedOutputSize(input, axis, output, kAnyReduceRank,
+                                            "REDUCE_ALL"));
   int* input_iter = static_cast<int*>(
       context->GetScratchBuffer(context, op_data->scratch_input_iter_idx));
   int* resolved_axis = static_cast<int*>(

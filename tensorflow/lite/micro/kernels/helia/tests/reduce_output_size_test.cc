@@ -18,7 +18,7 @@ limitations under the License.
 // input shape. Every REDUCE op and route must therefore fail at Invoke when the
 // output does not hold exactly the reduced elements, without writing past it:
 // MEAN, SUM, REDUCE_MIN/MAX and REDUCE_ALL, heliaCORE and reference routes,
-// rank 4 and below and rank 5. A matching output still succeeds.
+// rank 0 through rank 6. A matching output still succeeds.
 
 #include <cstdint>
 #include <cstring>
@@ -146,6 +146,56 @@ TEST(HeliaReduceOutputSizeTest, Rank5ReferenceRoute) {
   EXPECT_EQ(kTfLiteOk,
             RunReduce<int8_t>(tflite::Register_REDUCE_MIN(), kTfLiteInt8,
                               input_dims, axis, 1, exact_dims, 2));
+}
+
+// REDUCE_MIN/MAX and REDUCE_ALL size their reference scratch by the input
+// rank, so rank 6 still runs; MEAN and SUM iterate with five-axis arrays and
+// fail above rank 5.
+TEST(HeliaReduceOutputSizeTest, Rank6ReferenceRoute) {
+  const int32_t axis[] = {5};
+  int input_dims[] = {6, 1, 1, 1, 1, 2, 3};
+  int short_dims[] = {1, 1};
+  int exact_dims[] = {5, 1, 1, 1, 1, 2};
+  EXPECT_EQ(kTfLiteOk,
+            RunReduce<int8_t>(tflite::Register_REDUCE_MIN(), kTfLiteInt8,
+                              input_dims, axis, 1, exact_dims, 2));
+  EXPECT_EQ(kTfLiteOk,
+            RunReduce<float>(tflite::Register_REDUCE_MAX(), kTfLiteFloat32,
+                             input_dims, axis, 1, exact_dims, 2));
+  EXPECT_EQ(kTfLiteOk,
+            RunReduce<bool>(tflite::Register_REDUCE_ALL(), kTfLiteBool,
+                            input_dims, axis, 1, exact_dims, 2));
+  EXPECT_EQ(kTfLiteError,
+            RunReduce<float>(tflite::Register_REDUCE_MAX(), kTfLiteFloat32,
+                             input_dims, axis, 1, short_dims, 0));
+  EXPECT_EQ(kTfLiteError,
+            RunReduce<float>(tflite::Register_SUM(), kTfLiteFloat32, input_dims,
+                             axis, 1, exact_dims, 0));
+}
+
+// The reference ignores the axes of a scalar input, so axis 0 or -1 reduces
+// nothing and writes the one output element.
+TEST(HeliaReduceOutputSizeTest, ScalarInputIgnoresAxes) {
+  int scalar_dims[] = {0};
+  int pair_dims[] = {1, 2};
+  for (const int32_t a : {0, -1}) {
+    const int32_t axis[] = {a};
+    EXPECT_EQ(kTfLiteOk,
+              RunReduce<float>(tflite::Register_REDUCE_MIN(), kTfLiteFloat32,
+                               scalar_dims, axis, 1, scalar_dims, 1));
+    EXPECT_EQ(kTfLiteOk,
+              RunReduce<int8_t>(tflite::Register_REDUCE_MAX(), kTfLiteInt8,
+                                scalar_dims, axis, 1, scalar_dims, 1));
+    EXPECT_EQ(kTfLiteOk,
+              RunReduce<float>(tflite::Register_SUM(), kTfLiteFloat32,
+                               scalar_dims, axis, 1, scalar_dims, 1));
+    EXPECT_EQ(kTfLiteOk,
+              RunReduce<bool>(tflite::Register_REDUCE_ALL(), kTfLiteBool,
+                              scalar_dims, axis, 1, scalar_dims, 1));
+    EXPECT_EQ(kTfLiteError,
+              RunReduce<float>(tflite::Register_REDUCE_MIN(), kTfLiteFloat32,
+                               scalar_dims, axis, 1, pair_dims, 0));
+  }
 }
 
 // float16 MEAN/SUM/REDUCE_MIN/MAX run heliaCORE on fp16 builds; elsewhere
