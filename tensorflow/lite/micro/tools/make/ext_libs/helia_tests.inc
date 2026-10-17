@@ -430,7 +430,9 @@ $(kernel_extrema_route_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_reduce_max_f32 \
   -Wl,--wrap=arm_reduce_min_f32 \
   -Wl,--wrap=arm_reduce_max_f16 \
-  -Wl,--wrap=arm_reduce_min_f16
+  -Wl,--wrap=arm_reduce_min_f16 \
+  -Wl,--wrap=arm_reduce_max_s8 \
+  -Wl,--wrap=arm_reduce_max_s16
 endif
 
 # float16 DEQUANTIZE for every binary16 pattern against the reference widening.

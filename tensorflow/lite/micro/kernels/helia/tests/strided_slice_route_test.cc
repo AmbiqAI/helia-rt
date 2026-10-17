@@ -378,4 +378,63 @@ TEST(HeliaStridedSliceRouteTest, Float16PrepareNeedsTheFp16Api) {
 #endif
 }
 
+// A declared output one element short of the slice (see the int8/int16 case
+// in strided_slice_shrink_test.cc) fails the op for every routed type, without
+// reaching heliaCORE or writing past the tensor.
+template <typename T>
+void ExpectShortOutputFails(TfLiteType type, Leaf leaf) {
+  using tflite::testing::CreateTensor;
+  using tflite::testing::IntArrayFromInts;
+  T input[24] = {};
+  T output[9];
+  const int32_t begin[] = {0, 1, 0};
+  const int32_t end[] = {2, 2, 4};
+  const int32_t strides[] = {1, 1, 1};
+  int input_dims[] = {3, 2, 3, 4};
+  int index_dims[] = {1, 3};
+  int output_dims[] = {2, 2, 4};
+  TfLiteTensor tensors[5] = {
+      CreateTensor(input, IntArrayFromInts(input_dims), false, type),
+      CreateTensor(begin, IntArrayFromInts(index_dims)),
+      CreateTensor(end, IntArrayFromInts(index_dims)),
+      CreateTensor(strides, IntArrayFromInts(index_dims)),
+      CreateTensor(output, IntArrayFromInts(output_dims), false, type),
+  };
+  for (int i = 1; i <= 3; ++i) {
+    tensors[i].allocation_type = kTfLiteMmapRo;
+  }
+  TfLiteStridedSliceParams params = {};
+  params.shrink_axis_mask = 0b010;
+  int inputs[] = {4, 0, 1, 2, 3};
+  int outputs[] = {1, 4};
+  const TFLMRegistration registration = tflite::Register_STRIDED_SLICE();
+  tflite::micro::KernelRunner runner(registration, tensors, 5,
+                                     IntArrayFromInts(inputs),
+                                     IntArrayFromInts(outputs), &params);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  output_dims[1] = 1;
+  output_dims[2] = 7;
+  memset(output, 0x5A, sizeof(output));
+  memset(g_leaf_calls, 0, sizeof(g_leaf_calls));
+  EXPECT_EQ(kTfLiteError, runner.Invoke());
+#if HELIA_STRIDED_SLICE_LINK_WRAP
+  EXPECT_EQ(0, g_leaf_calls[static_cast<int>(leaf)]);
+#else
+  (void)leaf;
+#endif
+  for (size_t i = 7 * sizeof(T); i < sizeof(output); ++i) {
+    EXPECT_EQ(0x5A, reinterpret_cast<const uint8_t*>(output)[i]);
+  }
+}
+
+TEST(HeliaStridedSliceRouteTest, OutputShorterThanSliceFailsInvoke) {
+#if ARM_NN_ENABLE_F32
+  ExpectShortOutputFails<float>(kTfLiteFloat32, Leaf::kF32);
+#endif
+  ExpectShortOutputFails<int32_t>(kTfLiteInt32, Leaf::kS32);
+#if ARM_NN_ENABLE_F16
+  ExpectShortOutputFails<uint16_t>(kTfLiteFloat16, Leaf::kF16);
+#endif
+}
+
 TF_LITE_MICRO_TESTS_MAIN

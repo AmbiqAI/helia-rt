@@ -36,7 +36,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "int8, FP32 and FP16 run CORE at rank 1..4 with INT32 axis/output and positive reduced extent; other configurations use Reference (FP16 is rejected). A NaN never wins and ties keep the first index. FP16 requires ARM_NN_ENABLE_F16."
+    "notes": "int8 runs CORE, FP32 runs CORE with ARM_NN_ENABLE_F32 and FP16 with ARM_NN_ENABLE_F16, at rank 1..4 with INT32 axis/output and positive reduced extent; other configurations use Reference (FP16 is rejected). A NaN never wins and ties keep the first index."
   },
   {
     "name": "ARG_MIN",
@@ -48,7 +48,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "int8, FP32 and FP16 run CORE at rank 1..4 with INT32 axis/output and positive reduced extent; other configurations use Reference (FP16 is rejected). A NaN never wins and ties keep the first index. FP16 requires ARM_NN_ENABLE_F16."
+    "notes": "int8 runs CORE, FP32 runs CORE with ARM_NN_ENABLE_F32 and FP16 with ARM_NN_ENABLE_F16, at rank 1..4 with INT32 axis/output and positive reduced extent; other configurations use Reference (FP16 is rejected). A NaN never wins and ties keep the first index."
   },
   {
     "name": "AVERAGE_POOL_2D",
@@ -139,7 +139,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "Output is FP32. FP16 means weight-storage widening, not FP16 computation; it works without ARM_NN_ENABLE_F16, and a NaN keeps its sign and payload on every target."
+    "notes": "Output is FP32. FP16 means weight-storage widening, not FP16 computation; it works without ARM_NN_ENABLE_F16 and matches the reference widening bit for bit at reset FPSCR: a NaN keeps its sign and payload and comes back quiet. On cores with an FPU but no MVE float16 (for example cortex-m4+fp) the widening runs on the FPU, so with FPSCR.DN (default NaN) set every NaN becomes 0x7FC00000."
   },
   {
     "name": "EQUAL",
@@ -498,7 +498,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "int8/int16 run CORE at rank <= 4 with equal input/output quantization. FP32 uses Reference to keep TFLite's non-finite results (NaN skipped, -FLT_MAX for an all -Inf or empty window). FP16 runs CORE at rank <= 4 and is rejected otherwise or without ARM_NN_ENABLE_F16. Implementation is in reduce_common.cc."
+    "notes": "int8/int16 run CORE at rank <= 4 with equal input/output quantization. FP32 uses Reference to keep TFLite's non-finite results (NaN skipped, -FLT_MAX for an all -Inf or empty window). FP16 runs CORE at rank <= 4 and is rejected otherwise or without ARM_NN_ENABLE_F16; unlike FP32 it propagates NaN (canonical 0x7e00) and gives -Inf for an all -Inf or empty window. An output tensor whose size differs from the reduction fails the op. Implementation is in reduce_common.cc."
   },
   {
     "name": "REDUCE_MIN",
@@ -511,7 +511,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "int8/int16 run CORE at rank <= 4 with equal input/output quantization. FP32 uses Reference to keep TFLite's non-finite results (NaN skipped, +FLT_MAX for an all +Inf or empty window). FP16 runs CORE at rank <= 4 and is rejected otherwise or without ARM_NN_ENABLE_F16. Implementation is in reduce_common.cc."
+    "notes": "int8/int16 run CORE at rank <= 4 with equal input/output quantization. FP32 uses Reference to keep TFLite's non-finite results (NaN skipped, +FLT_MAX for an all +Inf or empty window). FP16 runs CORE at rank <= 4 and is rejected otherwise or without ARM_NN_ENABLE_F16; unlike FP32 it propagates NaN (canonical 0x7e00) and gives +Inf for an all +Inf or empty window. An output tensor whose size differs from the reduction fails the op. Implementation is in reduce_common.cc."
   },
   {
     "name": "RELU",
@@ -671,7 +671,7 @@
       "bool"
     ],
     "path": "Mixed",
-    "notes": "int8, int16, int32, FP32 and FP16 run CORE; bool uses Reference. Rank is limited to 4; an empty slice writes nothing. FP16 requires ARM_NN_ENABLE_F16; without it preparation fails."
+    "notes": "int8, int16 and int32 run CORE; FP32 runs CORE with ARM_NN_ENABLE_F32 and Reference without it; FP16 runs CORE with ARM_NN_ENABLE_F16 and fails preparation without it; bool uses Reference. Rank is limited to 4; an empty slice writes nothing, and an output tensor smaller than the slice fails the op."
   },
   {
     "name": "SUB",

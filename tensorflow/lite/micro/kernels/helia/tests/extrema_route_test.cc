@@ -28,6 +28,7 @@ limitations under the License.
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <type_traits>
 
 #include "Include/arm_nnfunctions.h"
 #include "tensorflow/lite/micro/c/builtin_op_data.h"
@@ -48,6 +49,8 @@ enum class Leaf {
   kReduceMinF32,
   kReduceMaxF16,
   kReduceMinF16,
+  kReduceMaxS8,
+  kReduceMaxS16,
   kCount
 };
 
@@ -94,6 +97,8 @@ HELIA_WRAP_ARG(arm_argmax_s8, int8_t, Leaf::kArgMaxS8)
 HELIA_WRAP_ARG(arm_argmin_s8, int8_t, Leaf::kArgMinS8)
 HELIA_WRAP_REDUCE(arm_reduce_max_f32, float32_t, Leaf::kReduceMaxF32)
 HELIA_WRAP_REDUCE(arm_reduce_min_f32, float32_t, Leaf::kReduceMinF32)
+HELIA_WRAP_REDUCE(arm_reduce_max_s8, int8_t, Leaf::kReduceMaxS8)
+HELIA_WRAP_REDUCE(arm_reduce_max_s16, int16_t, Leaf::kReduceMaxS16)
 #if ARM_NN_ENABLE_F16
 HELIA_WRAP_REDUCE(arm_reduce_max_f16, float16_t, Leaf::kReduceMaxF16)
 HELIA_WRAP_REDUCE(arm_reduce_min_f16, float16_t, Leaf::kReduceMinF16)
@@ -492,6 +497,64 @@ TEST(HeliaExtremaRouteTest, ReduceFloat16) {
     EXPECT_EQ(kTfLiteError, tflite::testing::RunReduce(
                                 l, is_max, false, kTfLiteFloat16, input, output));
   }
+#endif
+}
+
+// Prepare never compares the output tensor with the reduced shape, so a model
+// can declare a [2, 3] -> axis 1 reduction's output as one element. The kernel
+// must fail the op without reaching heliaCORE or writing past the tensor.
+template <typename T>
+TfLiteStatus RunShortReduceOutput(TfLiteType type, T* output, int capacity) {
+  using tflite::testing::CreateQuantizedTensor;
+  using tflite::testing::CreateTensor;
+  using tflite::testing::IntArrayFromInts;
+  const T input[6] = {1, 2, 3, 4, 5, 6};
+  const int32_t axis[1] = {1};
+  int input_dims[] = {2, 2, 3};
+  int axis_dims[] = {1, 1};
+  int output_dims[] = {1, 1};
+  TfLiteTensor tensors[3];
+  if constexpr (std::is_same_v<T, uint16_t>) {
+    tensors[0] =
+        CreateTensor(input, IntArrayFromInts(input_dims), false, type);
+    tensors[2] =
+        CreateTensor(output, IntArrayFromInts(output_dims), false, type);
+  } else {
+    tensors[0] =
+        CreateQuantizedTensor(input, IntArrayFromInts(input_dims), 0.5f, 0);
+    tensors[2] =
+        CreateQuantizedTensor(output, IntArrayFromInts(output_dims), 0.5f, 0);
+  }
+  tensors[1] = CreateTensor(axis, IntArrayFromInts(axis_dims));
+  tensors[1].allocation_type = kTfLiteMmapRo;
+  TfLiteReducerParams params = {};
+  int inputs[] = {2, 0, 1};
+  int outputs[] = {1, 2};
+  const TFLMRegistration registration = tflite::Register_REDUCE_MAX();
+  tflite::micro::KernelRunner runner(registration, tensors, 3,
+                                     IntArrayFromInts(inputs),
+                                     IntArrayFromInts(outputs), &params);
+  TF_LITE_ENSURE_STATUS(runner.InitAndPrepare());
+  memset(output, 0x5A, sizeof(T) * capacity);
+  memset(g_leaf_calls, 0, sizeof(g_leaf_calls));
+  return runner.Invoke();
+}
+
+template <typename T>
+void ExpectShortReduceOutputFails(TfLiteType type) {
+  T output[4];
+  EXPECT_EQ(kTfLiteError, RunShortReduceOutput<T>(type, output, 4));
+  EXPECT_EQ(0, CoreCalls());
+  for (size_t i = sizeof(T); i < sizeof(output); ++i) {
+    EXPECT_EQ(0x5A, reinterpret_cast<const uint8_t*>(output)[i]);
+  }
+}
+
+TEST(HeliaExtremaRouteTest, ReduceOutputShorterThanReductionFailsInvoke) {
+  ExpectShortReduceOutputFails<int8_t>(kTfLiteInt8);
+  ExpectShortReduceOutputFails<int16_t>(kTfLiteInt16);
+#if ARM_NN_ENABLE_F16
+  ExpectShortReduceOutputFails<uint16_t>(kTfLiteFloat16);
 #endif
 }
 

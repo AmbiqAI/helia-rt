@@ -322,6 +322,21 @@ struct MinMaxReducerCompare {
   MinMaxEvalType type_;
 };
 
+// heliaCORE writes the reduced shape it derives from the input and axes, and
+// Prepare never compares that with the output tensor.
+TfLiteStatus EnsureReducedOutputFits(const cmsis_nn_dims& out_d,
+                                     const TfLiteEvalTensor* output) {
+  const int64_t elements = static_cast<int64_t>(out_d.n) * out_d.h * out_d.w *
+                           out_d.c;
+  if (elements != static_cast<int64_t>(ElementCount(*output->dims))) {
+    MicroPrintf(
+        "REDUCE_MAX/REDUCE_MIN: the reduction does not fit the output "
+        "tensor.");
+    return kTfLiteError;
+  }
+  return kTfLiteOk;
+}
+
 TfLiteStatus MinMaxStatus(arm_cmsis_nn_status status, const char* entry) {
   if (status != ARM_CMSIS_NN_SUCCESS) {
     MicroPrintf("REDUCE_MAX/REDUCE_MIN: %s failed (%d).", entry,
@@ -373,6 +388,7 @@ TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
       cmsis_nn_dims in_d, ax_d, out_d;
       PopulateCmsisShapeAndAxis(input, axis_data, num_axis, &in_d, &ax_d,
                                 &out_d);
+      TF_LITE_ENSURE_OK(context, EnsureReducedOutputFits(out_d, output));
       const float16_t* input_data =
           tflite::micro::GetTensorData<float16_t>(input);
       float16_t* output_data = tflite::micro::GetTensorData<float16_t>(output);
@@ -394,6 +410,7 @@ TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
         cmsis_nn_dims in_d, ax_d, out_d;
         PopulateCmsisShapeAndAxis(input, axis_data, num_axis, &in_d, &ax_d,
                                   &out_d);
+        TF_LITE_ENSURE_OK(context, EnsureReducedOutputFits(out_d, output));
         const int8_t* input_data = tflite::micro::GetTensorData<int8_t>(input);
         int8_t* output_data = tflite::micro::GetTensorData<int8_t>(output);
         const arm_cmsis_nn_status status =
@@ -425,6 +442,7 @@ TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
         cmsis_nn_dims in_d, ax_d, out_d;
         PopulateCmsisShapeAndAxis(input, axis_data, num_axis, &in_d, &ax_d,
                                   &out_d);
+        TF_LITE_ENSURE_OK(context, EnsureReducedOutputFits(out_d, output));
         const int16_t* input_data =
             tflite::micro::GetTensorData<int16_t>(input);
         int16_t* output_data = tflite::micro::GetTensorData<int16_t>(output);
@@ -468,9 +486,13 @@ TfLiteStatus PrepareMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
   TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
   TfLiteTensor* axis = micro_context->AllocateTempInputTensor(node, 1);
 
-  if (input->type == kTfLiteFloat16) {
-    TF_LITE_ENSURE_OK(context, PrepareFloat16Reduce(context, input, axis,
-                                                    "REDUCE_MAX/REDUCE_MIN"));
+  if (input->type == kTfLiteFloat16 &&
+      PrepareFloat16Reduce(context, input, axis, "REDUCE_MAX/REDUCE_MIN") !=
+          kTfLiteOk) {
+    micro_context->DeallocateTempTfLiteTensor(input);
+    micro_context->DeallocateTempTfLiteTensor(output);
+    micro_context->DeallocateTempTfLiteTensor(axis);
+    return kTfLiteError;
   }
 
   op_data->input_zp = input->params.zero_point;
@@ -498,9 +520,13 @@ TfLiteStatus PrepareMeanOrSumHelper(TfLiteContext* context, TfLiteNode* node,
   TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
   TfLiteTensor* axis = micro_context->AllocateTempInputTensor(node, 1);
 
-  if (input->type == kTfLiteFloat16) {
-    TF_LITE_ENSURE_OK(context, PrepareFloat16Reduce(context, input, axis,
-                                                    "MEAN/REDUCE_SUM"));
+  if (input->type == kTfLiteFloat16 &&
+      PrepareFloat16Reduce(context, input, axis, "MEAN/REDUCE_SUM") !=
+          kTfLiteOk) {
+    micro_context->DeallocateTempTfLiteTensor(input);
+    micro_context->DeallocateTempTfLiteTensor(output);
+    micro_context->DeallocateTempTfLiteTensor(axis);
+    return kTfLiteError;
   }
 
   if (input->type == kTfLiteInt8 || input->type == kTfLiteInt16) {
