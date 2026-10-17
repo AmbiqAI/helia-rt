@@ -19,6 +19,7 @@ limitations under the License.
 
 #include "Include/arm_nnfunctions.h"
 #include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/kernels/internal/strided_slice_logic.h"
 #include "tensorflow/lite/micro/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/op_macros.h"
@@ -30,127 +31,98 @@ namespace micro {
 
 namespace {
 
-void ArmPopulateCommonParams(const tflite::StridedSliceParams& op_params,
+// Fills the 4-D heliaCORE operands. Each output dim counts the elements the
+// reference loop visits on that axis, so a shrunk axis keeps its position.
+// Returns false when some axis visits nothing, i.e. the output is empty.
+bool ArmPopulateCommonParams(const tflite::StridedSliceParams& op_params,
                              const RuntimeShape& unextended_input_shape,
-                             const RuntimeShape& unextended_output_shape,
                              cmsis_nn_dims* const input_dims,
                              cmsis_nn_dims* const output_dims,
                              cmsis_nn_dims* const begin_dims,
-                             cmsis_nn_dims* const stride_dims)
-{
-
-  using ::tflite::strided_slice::StartForAxis;
-  using ::tflite::strided_slice::StopForAxis;
-
-  ruy::profiler::ScopeLabel label("StridedSlice");
-
-  tflite::StridedSliceParams params_copy = op_params;
+                             cmsis_nn_dims* const stride_dims) {
+  using ::tflite::strided_slice::StridedSliceEndForAxis;
+  using ::tflite::strided_slice::StridedSliceStartForAxis;
 
   TFLITE_DCHECK_LE(unextended_input_shape.DimensionsCount(), 4);
-  TFLITE_DCHECK_LE(unextended_output_shape.DimensionsCount(), 4);
-  const RuntimeShape input_shape = RuntimeShape::ExtendedShape(4, unextended_input_shape);
-  const RuntimeShape output_shape = RuntimeShape::ExtendedShape(4, unextended_output_shape);
-
-  // Reverse and pad to 4 dimensions
+  const RuntimeShape input_shape =
+      RuntimeShape::ExtendedShape(4, unextended_input_shape);
+  tflite::StridedSliceParams params_copy = op_params;
   ::tflite::strided_slice::StridedSlicePadIndices(&params_copy, 4);
 
-  const int start_0 = StartForAxis(params_copy, input_shape, 0);
-  // const int stop_0 = StopForAxis(params_copy, input_shape, 0, start_0);
-  const int start_1 = StartForAxis(params_copy, input_shape, 1);
-  // const int stop_1 = StopForAxis(params_copy, input_shape, 1, start_1);
-  const int start_2 = StartForAxis(params_copy, input_shape, 2);
-  // const int stop_2 = StopForAxis(params_copy, input_shape, 2, start_2);
-  const int start_3 = StartForAxis(params_copy, input_shape, 3);
-  // const int stop_3 = StopForAxis(params_copy, input_shape, 3, start_3);
-
-  input_dims->n = input_shape.Dims(0);
-  input_dims->h = input_shape.Dims(1);
-  input_dims->w = input_shape.Dims(2);
-  input_dims->c = input_shape.Dims(3);
-
-  output_dims->n = output_shape.Dims(0);
-  output_dims->h = output_shape.Dims(1);
-  output_dims->w = output_shape.Dims(2);
-  output_dims->c = output_shape.Dims(3);
-
-  begin_dims->n = start_0;
-  begin_dims->h = start_1;
-  begin_dims->w = start_2;
-  begin_dims->c = start_3;
-
-  stride_dims->n = params_copy.strides[0];
-  stride_dims->h = params_copy.strides[1];
-  stride_dims->w = params_copy.strides[2];
-  stride_dims->c = params_copy.strides[3];
-
+  int32_t* const in[4] = {&input_dims->n, &input_dims->h, &input_dims->w,
+                          &input_dims->c};
+  int32_t* const out[4] = {&output_dims->n, &output_dims->h,
+                           &output_dims->w, &output_dims->c};
+  int32_t* const begin[4] = {&begin_dims->n, &begin_dims->h, &begin_dims->w,
+                             &begin_dims->c};
+  int32_t* const stride[4] = {&stride_dims->n, &stride_dims->h,
+                              &stride_dims->w, &stride_dims->c};
+  for (int axis = 0; axis < 4; ++axis) {
+    const int32_t start =
+        StridedSliceStartForAxis(params_copy, input_shape, axis);
+    const int32_t stop =
+        StridedSliceEndForAxis(params_copy, input_shape, axis, start);
+    const int32_t step = params_copy.strides[axis];
+    // start and stop lie in [-1, dim], so the span fits int32_t; the stride
+    // magnitude of INT32_MIN needs uint32_t.
+    const int32_t span = step > 0 ? stop - start : start - stop;
+    if (span <= 0) {
+      return false;
+    }
+    const uint32_t magnitude = step > 0 ? static_cast<uint32_t>(step)
+                                        : 0u - static_cast<uint32_t>(step);
+    const uint32_t count = (static_cast<uint32_t>(span) - 1u) / magnitude + 1u;
+    *in[axis] = input_shape.Dims(axis);
+    *out[axis] = static_cast<int32_t>(count);
+    *begin[axis] = start;
+    // heliaCORE forms begin + stride * count in int32_t. An axis that takes one
+    // element never steps, so give it stride 1; a longer one has |stride| <
+    // dim, which keeps that sum under 2 * dim, in range because Eval rejects
+    // axes above 2^30.
+    *stride[axis] = count == 1u ? 1 : step;
+  }
+  return true;
 }
 
-
-int32_t
-ArmStridedSliceS8(
-  const tflite::StridedSliceParams& op_params,
-  const RuntimeShape& unextended_input_shape,
-  const int8_t* input_data,
-  const RuntimeShape& unextended_output_shape,
-  int8_t* output_data
-) {
-  cmsis_nn_dims input_dims;
-  cmsis_nn_dims output_dims;
-  cmsis_nn_dims begin_dims;
-  cmsis_nn_dims stride_dims;
-
-  ArmPopulateCommonParams(
-    op_params,
-    unextended_input_shape,
-    unextended_output_shape,
-    &input_dims,
-    &output_dims,
-    &begin_dims,
-    &stride_dims
-  );
-
-  return arm_strided_slice_s8(
-    input_data,
-    output_data,
-    &input_dims,
-    &begin_dims,
-    &stride_dims,
-    &output_dims
-  );
+// Number of elements the slice takes, or of the tensor; saturates above
+// INT32_MAX so a product of absurd dims cannot wrap into a match.
+template <typename D>
+uint64_t SaturatingProduct(const D* dims, int count) {
+  uint64_t elements = 1;
+  for (int i = 0; i < count; ++i) {
+    if (dims[i] <= 0) {
+      return 0;
+    }
+    elements *= static_cast<uint64_t>(dims[i]);
+    if (elements > static_cast<uint64_t>(INT32_MAX)) {
+      return static_cast<uint64_t>(INT32_MAX) + 1;
+    }
+  }
+  return elements;
 }
 
-int32_t
-ArmStridedSliceS16(
-  const tflite::StridedSliceParams& op_params,
-  const RuntimeShape& unextended_input_shape,
-  const int16_t* input_data,
-  const RuntimeShape& unextended_output_shape,
-  int16_t* output_data
-) {
-
-  cmsis_nn_dims input_dims;
-  cmsis_nn_dims output_dims;
-  cmsis_nn_dims begin_dims;
-  cmsis_nn_dims stride_dims;
-
-  ArmPopulateCommonParams(
-    op_params,
-    unextended_input_shape,
-    unextended_output_shape,
-    &input_dims,
-    &output_dims,
-    &begin_dims,
-    &stride_dims
-  );
-
-  return arm_strided_slice_s16(
-    input_data,
-    output_data,
-    &input_dims,
-    &begin_dims,
-    &stride_dims,
-    &output_dims
-  );
+template <typename T>
+TfLiteStatus EvalArm(const TfLiteEvalTensor* input, TfLiteEvalTensor* output,
+                     const cmsis_nn_dims& input_dims,
+                     const cmsis_nn_dims& output_dims,
+                     const cmsis_nn_dims& begin_dims,
+                     const cmsis_nn_dims& stride_dims,
+                     arm_cmsis_nn_status (*slice)(
+                         const T*, T*, const cmsis_nn_dims* const,
+                         const cmsis_nn_dims* const,
+                         const cmsis_nn_dims* const,
+                         const cmsis_nn_dims* const),
+                     const char* entry) {
+  const arm_cmsis_nn_status status =
+      slice(tflite::micro::GetTensorData<T>(input),
+            tflite::micro::GetTensorData<T>(output), &input_dims, &begin_dims,
+            &stride_dims, &output_dims);
+  if (status != ARM_CMSIS_NN_SUCCESS) {
+    MicroPrintf("STRIDED_SLICE: %s failed (%d).", entry,
+                static_cast<int>(status));
+    return kTfLiteError;
+  }
+  return kTfLiteOk;
 }
 
 TfLiteStatus StridedSliceEval(TfLiteContext* context, TfLiteNode* node) {
@@ -163,8 +135,60 @@ TfLiteStatus StridedSliceEval(TfLiteContext* context, TfLiteNode* node) {
   TfLiteEvalTensor* output =
       tflite::micro::GetEvalOutput(context, node, kStridedSliceOutputTensor);
 
-  const RuntimeShape input_shape = tflite::micro::GetTensorShape(input);
-  const int32_t input_dims_count = input_shape.DimensionsCount();
+  // The copy reads input elements of the output's type.
+  TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
+  switch (output->type) {
+    case kTfLiteFloat32:
+    case kTfLiteInt8:
+    case kTfLiteInt16:
+    case kTfLiteInt32:
+    case kTfLiteBool:
+      break;
+    default:
+      MicroPrintf("Type %s (%d) not supported.",
+                  TfLiteTypeGetName(output->type), output->type);
+      return kTfLiteError;
+  }
+
+  // heliaCORE's offsets and the reference's indices are int32_t: each axis
+  // must stay at most 2^30 so begin + stride * count fits, and the input
+  // below 2^31 elements so element offsets fit.
+  constexpr int32_t kMaxAxis = int32_t{1} << 30;
+  for (int i = 0; i < input->dims->size; ++i) {
+    if (input->dims->data[i] < 0 || input->dims->data[i] > kMaxAxis) {
+      MicroPrintf("STRIDED_SLICE: input axis %d is negative or above 2^30.", i);
+      return kTfLiteError;
+    }
+  }
+  if (SaturatingProduct(input->dims->data, input->dims->size) >
+      static_cast<uint64_t>(INT32_MAX)) {
+    MicroPrintf("STRIDED_SLICE: the input exceeds INT32_MAX elements.");
+    return kTfLiteError;
+  }
+
+  // Prepare checks only the output shape, which it derives with a float ceil
+  // that rounds above 2^24 elements on an axis, so check for every type that
+  // the output holds exactly the elements the slice writes. A slice that takes
+  // nothing writes nothing, as in the reference, even when a shrunk axis
+  // leaves a one-element output.
+  cmsis_nn_dims input_dims = {};
+  cmsis_nn_dims output_dims = {};
+  cmsis_nn_dims begin_dims = {};
+  cmsis_nn_dims stride_dims = {};
+  if (!ArmPopulateCommonParams(op_params, tflite::micro::GetTensorShape(input),
+                               &input_dims, &output_dims, &begin_dims,
+                               &stride_dims)) {
+    return kTfLiteOk;
+  }
+  const int32_t counts[4] = {output_dims.n, output_dims.h, output_dims.w,
+                             output_dims.c};
+  // The input bound keeps the slice below 2^31 elements, so neither count
+  // saturates and they compare exactly.
+  if (SaturatingProduct(counts, 4) !=
+      SaturatingProduct(output->dims->data, output->dims->size)) {
+    MicroPrintf("STRIDED_SLICE: the output size does not match the slice.");
+    return kTfLiteError;
+  }
 
   switch (output->type) {
     case kTfLiteFloat32:
@@ -177,45 +201,13 @@ TfLiteStatus StridedSliceEval(TfLiteContext* context, TfLiteNode* node) {
       );
       break;
     case kTfLiteInt8:
-      if (input_dims_count <= 4) {
-        ArmStridedSliceS8(
-          op_params,
-          tflite::micro::GetTensorShape(input),
-          tflite::micro::GetTensorData<int8_t>(input),
-          tflite::micro::GetTensorShape(output),
-          tflite::micro::GetTensorData<int8_t>(output)
-        );
-      }
-      else {
-        reference_ops::StridedSlice(
-          op_params,
-          tflite::micro::GetTensorShape(input),
-          tflite::micro::GetTensorData<int8_t>(input),
-          tflite::micro::GetTensorShape(output),
-          tflite::micro::GetTensorData<int8_t>(output)
-        );
-      }
-      break;
+      return EvalArm<int8_t>(input, output, input_dims, output_dims,
+                             begin_dims, stride_dims, arm_strided_slice_s8,
+                             "arm_strided_slice_s8");
     case kTfLiteInt16:
-      if (input_dims_count <= 4) {
-        ArmStridedSliceS16(
-          op_params,
-          tflite::micro::GetTensorShape(input),
-          tflite::micro::GetTensorData<int16_t>(input),
-          tflite::micro::GetTensorShape(output),
-          tflite::micro::GetTensorData<int16_t>(output)
-        );
-      }
-      else {
-        reference_ops::StridedSlice(
-          op_params,
-          tflite::micro::GetTensorShape(input),
-          tflite::micro::GetTensorData<int16_t>(input),
-          tflite::micro::GetTensorShape(output),
-          tflite::micro::GetTensorData<int16_t>(output)
-        );
-      }
-      break;
+      return EvalArm<int16_t>(input, output, input_dims, output_dims,
+                              begin_dims, stride_dims, arm_strided_slice_s16,
+                              "arm_strided_slice_s16");
     case kTfLiteInt32:
       reference_ops::StridedSlice(
         op_params,
