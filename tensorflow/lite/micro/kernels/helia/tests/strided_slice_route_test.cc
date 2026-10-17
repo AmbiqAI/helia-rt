@@ -98,8 +98,10 @@ int ElementsOf(const D* dims, int rank) {
   return count;
 }
 
-// Output dims after dropping shrunk axes, as StridedSlicePrepare checks them.
-int OutputShape(const Slice& s, int* out_dims) {
+// Output dims after dropping shrunk axes, counted by stepping through each
+// axis in 64 bits so they do not share the kernel's arithmetic. Clears
+// *visits_any when some axis, shrunk or not, visits nothing.
+int OutputShape(const Slice& s, int* out_dims, bool* visits_any) {
   using micro::strided_slice::StridedSliceEndForAxis;
   using micro::strided_slice::StridedSliceStartForAxis;
   micro::StridedSliceParams params = {};
@@ -116,13 +118,16 @@ int OutputShape(const Slice& s, int* out_dims) {
   params.shrink_axis_mask = s.shrink_axis_mask;
   const RuntimeShape input_shape(s.rank, s.shape);
   int out_rank = 0;
+  *visits_any = true;
   for (int axis = 0; axis < s.rank; ++axis) {
     const int start = StridedSliceStartForAxis(params, input_shape, axis);
     const int stop = StridedSliceEndForAxis(params, input_shape, axis, start);
-    const int step = s.strides[axis];
-    int count = step > 0 ? (stop - start + step - 1) / step
-                         : (start - stop - step - 1) / -step;
-    count = count < 0 ? 0 : count;
+    const int64_t step = s.strides[axis];
+    int count = 0;
+    for (int64_t i = start; step > 0 ? i < stop : i > stop; i += step) {
+      ++count;
+    }
+    *visits_any = *visits_any && count > 0;
     if ((s.shrink_axis_mask & (1 << axis)) == 0) {
       out_dims[out_rank++] = count;
     }
@@ -191,10 +196,9 @@ void ExpectMatchesReference(const Slice& s, TfLiteType type, Leaf leaf) {
   static T expected[kMaxElements];
 
   int output_dims_data[1 + kMaxRank] = {};
-  output_dims_data[0] = OutputShape(s, &output_dims_data[1]);
+  bool visits_any = true;
+  output_dims_data[0] = OutputShape(s, &output_dims_data[1], &visits_any);
   const int input_count = ElementsOf(s.shape, s.rank);
-  const int output_count =
-      ElementsOf(&output_dims_data[1], output_dims_data[0]);
   EXPECT_LE(input_count, kMaxElements);
   if (input_count > kMaxElements) {
     return;
@@ -233,7 +237,7 @@ void ExpectMatchesReference(const Slice& s, TfLiteType type, Leaf leaf) {
   EXPECT_EQ(kTfLiteOk, runner.Invoke());
 #if HELIA_STRIDED_SLICE_LINK_WRAP
   for (int i = 0; i < static_cast<int>(Leaf::kCount); ++i) {
-    const bool expect_call = i == static_cast<int>(leaf) && output_count > 0;
+    const bool expect_call = i == static_cast<int>(leaf) && visits_any;
     EXPECT_EQ(expect_call ? 1 : 0, g_leaf_calls[i]);
   }
 #else
@@ -302,6 +306,15 @@ TEST(HeliaStridedSliceRouteTest, Rank1NegativeIndices) {
 
 TEST(HeliaStridedSliceRouteTest, ShrinkEveryAxisToScalar) {
   ExpectAllTypesMatch(Slice{2, {3, 4}, {1, 2}, {2, 3}, {1, 1}, 0, 0, 0b11});
+}
+
+// The per-axis element count must not overflow for extreme strides: each
+// axis below takes one element.
+TEST(HeliaStridedSliceRouteTest, ExtremeStridesTakeOneElement) {
+  ExpectAllTypesMatch(Slice{2, {3, 4}, {0, 3}, {3, 0},
+                            {std::numeric_limits<int32_t>::max(),
+                             std::numeric_limits<int32_t>::min()},
+                            0, 0, 0});
 }
 
 // begin == end on one axis: nothing to copy, and no heliaCORE call.

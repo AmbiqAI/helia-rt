@@ -64,13 +64,15 @@ bool ArmPopulateCommonParams(const tflite::StridedSliceParams& op_params,
     const int32_t stop =
         StridedSliceEndForAxis(params_copy, input_shape, axis, start);
     const int32_t step = params_copy.strides[axis];
-    const int32_t count = step > 0 ? (stop - start + step - 1) / step
-                                   : (start - stop - step - 1) / -step;
-    if (count <= 0) {
+    // In 64 bits: a stride near INT32_MAX, or INT32_MIN, overflows 32.
+    const int64_t span =
+        step > 0 ? int64_t{stop} - start : int64_t{start} - stop;
+    if (span <= 0) {
       return false;
     }
+    const int64_t magnitude = step > 0 ? int64_t{step} : -int64_t{step};
     *in[axis] = input_shape.Dims(axis);
-    *out[axis] = count;
+    *out[axis] = static_cast<int32_t>((span - 1) / magnitude + 1);
     *begin[axis] = start;
     *stride[axis] = step;
   }
