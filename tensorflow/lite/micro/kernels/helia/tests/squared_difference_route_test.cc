@@ -16,10 +16,11 @@ limitations under the License.
 // SQUARED_DIFFERENCE through the helia kernel. int8 and int16 compare bit for
 // bit with the TFLM quantized formula (kernels/squared_difference.cc) on equal
 // shapes at any rank and on 4-D broadcasts; float32 compares with (a - b)^2 on
-// equal shapes, where heliaCORE runs, and on broadcasts, which stay on the
-// reference. GCC and ATfE links wrap the heliaCORE entries and assert which
-// ran. The float edge cases assert IEEE results; float16 (M55) has no
-// reference kernel, so it is checked against the formula evaluated in float16.
+// equal shapes, where heliaCORE runs except on MVE float builds, and on
+// broadcasts, which stay on the reference. GCC and ATfE links wrap the
+// heliaCORE entries and assert which ran. The float edge cases assert IEEE
+// results; float16 (M55) has no reference kernel, so it is checked against the
+// formula evaluated in float16.
 
 #include <cmath>
 #include <cstdint>
@@ -437,7 +438,8 @@ TEST(HeliaSquaredDifferenceRouteTest, Float32EdgeValues) {
 // CHARACTERIZATION on clang builds with MVE float: clang may auto-vectorize
 // the reference kernel's loop with MVE, which flushes subnormal results, so
 // each element there is the IEEE result or +0; the observed bits print.
-TEST(HeliaSquaredDifferenceRouteTest, Float32SubnormalResultsMatchReference) {
+// see AmbiqAI/ns-cmsis-nn#877
+TEST(HeliaSquaredDifferenceRouteTest, Float32SubnormalResults) {
   float in1[] = {1e-20f, 1e-20f, 1e-19f, 3e-20f, -2e-20f, 1e-22f, 1e-23f, 3.0f};
   float in2[] = {0.0f, -1e-20f, 0.0f, 1e-20f, 0.0f, 0.0f, 0.0f, 1.0f};
   float out[8] = {};
