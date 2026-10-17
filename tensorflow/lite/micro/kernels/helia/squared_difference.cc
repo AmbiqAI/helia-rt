@@ -44,6 +44,22 @@ struct OpData {
   ArithmeticParams arithmetic_params;
 };
 
+// Releases a Prepare temporary on every return.
+class ScopedTempTensor {
+ public:
+  ScopedTempTensor(MicroContext* context, TfLiteTensor* tensor)
+      : context_(context), tensor_(tensor) {}
+  ~ScopedTempTensor() {
+    if (tensor_ != nullptr) {
+      context_->DeallocateTempTfLiteTensor(tensor_);
+    }
+  }
+
+ private:
+  MicroContext* context_;
+  TfLiteTensor* tensor_;
+};
+
 template <typename T>
 T SquaredDifference(T input1, T input2) {
   const T difference = input1 - input2;
@@ -107,12 +123,15 @@ TfLiteStatus SquaredDifferencePrepare(TfLiteContext* context,
 
   TfLiteTensor* input1 =
       micro_context->AllocateTempInputTensor(node, kInputTensor1);
+  ScopedTempTensor input1_guard(micro_context, input1);
   TF_LITE_ENSURE(context, input1 != nullptr);
   TfLiteTensor* input2 =
       micro_context->AllocateTempInputTensor(node, kInputTensor2);
+  ScopedTempTensor input2_guard(micro_context, input2);
   TF_LITE_ENSURE(context, input2 != nullptr);
   TfLiteTensor* output =
       micro_context->AllocateTempOutputTensor(node, kOutputTensor);
+  ScopedTempTensor output_guard(micro_context, output);
   TF_LITE_ENSURE(context, output != nullptr);
 
   TF_LITE_ENSURE_TYPES_EQ(context, input1->type, input2->type);
@@ -170,10 +189,6 @@ TfLiteStatus SquaredDifferencePrepare(TfLiteContext* context,
         context, data->broadcast_class == HeliaBroadcastClass::kSameShape,
         "Float16 SQUARED_DIFFERENCE requires equal input shapes.");
   }
-
-  micro_context->DeallocateTempTfLiteTensor(input1);
-  micro_context->DeallocateTempTfLiteTensor(input2);
-  micro_context->DeallocateTempTfLiteTensor(output);
   return kTfLiteOk;
 }
 
@@ -341,14 +356,25 @@ TfLiteStatus SquaredDifferenceEval(TfLiteContext* context, TfLiteNode* node) {
 
   if (output->type == kTfLiteFloat32) {
 #if HELIA_SQDIFF_F32
-    // The reference covers what heliaCORE declines, an empty tensor included.
-    if (data->broadcast_class == HeliaBroadcastClass::kSameShape &&
-        arm_elementwise_squared_difference_f32(
-            tflite::micro::GetTensorData<float>(input1),
-            tflite::micro::GetTensorData<float>(input2),
-            tflite::micro::GetTensorData<float>(output),
-            tflite::micro::GetTensorShape(output).FlatSize()) ==
-            ARM_CMSIS_NN_SUCCESS) {
+    // heliaCORE has no float32 broadcast; those shapes use the reference.
+    if (data->broadcast_class == HeliaBroadcastClass::kSameShape) {
+      const int size = tflite::micro::GetTensorShape(output).FlatSize();
+      // heliaCORE rejects zero-size dims; an empty output has nothing to
+      // write.
+      if (size == 0) {
+        return kTfLiteOk;
+      }
+      const arm_cmsis_nn_status status = arm_elementwise_squared_difference_f32(
+          tflite::micro::GetTensorData<float>(input1),
+          tflite::micro::GetTensorData<float>(input2),
+          tflite::micro::GetTensorData<float>(output), size);
+      if (status != ARM_CMSIS_NN_SUCCESS) {
+        MicroPrintf(
+            "SQUARED_DIFFERENCE: arm_elementwise_squared_difference_f32 "
+            "failed (%d).",
+            static_cast<int>(status));
+        return kTfLiteError;
+      }
       return kTfLiteOk;
     }
 #endif

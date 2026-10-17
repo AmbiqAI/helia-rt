@@ -47,9 +47,15 @@ enum class Leaf { kFlatS8, kWalkS8, kFlatS16, kWalkS16, kFlatF32, kFlatF16,
                   kCount };
 
 int g_leaf_calls[static_cast<int>(Leaf::kCount)] = {};
+// The entry that returns ARM_CMSIS_NN_ARG_ERROR without running.
+Leaf g_fail = Leaf::kCount;
 
 #if HELIA_SQDIFF_LINK_WRAP
-void CountCall(Leaf leaf) { ++g_leaf_calls[static_cast<int>(leaf)]; }
+// Counts a call and reports whether it must fail.
+bool CountCall(Leaf leaf) {
+  ++g_leaf_calls[static_cast<int>(leaf)];
+  return g_fail == leaf;
+}
 #endif
 
 }  // namespace
@@ -76,14 +82,14 @@ arm_cmsis_nn_status __real_arm_elementwise_squared_difference_s8(
     HELIA_SQDIFF_FLAT_ARGS(int8_t));
 arm_cmsis_nn_status __wrap_arm_elementwise_squared_difference_s8(
     HELIA_SQDIFF_FLAT_ARGS(int8_t)) {
-  CountCall(Leaf::kFlatS8);
+  if (CountCall(Leaf::kFlatS8)) return ARM_CMSIS_NN_ARG_ERROR;
   return __real_arm_elementwise_squared_difference_s8(HELIA_SQDIFF_FLAT_FORWARD);
 }
 arm_cmsis_nn_status __real_arm_elementwise_squared_difference_s16(
     HELIA_SQDIFF_FLAT_ARGS(int16_t));
 arm_cmsis_nn_status __wrap_arm_elementwise_squared_difference_s16(
     HELIA_SQDIFF_FLAT_ARGS(int16_t)) {
-  CountCall(Leaf::kFlatS16);
+  if (CountCall(Leaf::kFlatS16)) return ARM_CMSIS_NN_ARG_ERROR;
   return __real_arm_elementwise_squared_difference_s16(
       HELIA_SQDIFF_FLAT_FORWARD);
 }
@@ -91,14 +97,14 @@ arm_cmsis_nn_status __real_arm_squared_difference_s8(
     HELIA_SQDIFF_WALK_ARGS(int8_t));
 arm_cmsis_nn_status __wrap_arm_squared_difference_s8(
     HELIA_SQDIFF_WALK_ARGS(int8_t)) {
-  CountCall(Leaf::kWalkS8);
+  if (CountCall(Leaf::kWalkS8)) return ARM_CMSIS_NN_ARG_ERROR;
   return __real_arm_squared_difference_s8(HELIA_SQDIFF_WALK_FORWARD);
 }
 arm_cmsis_nn_status __real_arm_squared_difference_s16(
     HELIA_SQDIFF_WALK_ARGS(int16_t));
 arm_cmsis_nn_status __wrap_arm_squared_difference_s16(
     HELIA_SQDIFF_WALK_ARGS(int16_t)) {
-  CountCall(Leaf::kWalkS16);
+  if (CountCall(Leaf::kWalkS16)) return ARM_CMSIS_NN_ARG_ERROR;
   return __real_arm_squared_difference_s16(HELIA_SQDIFF_WALK_FORWARD);
 }
 
@@ -107,7 +113,7 @@ arm_cmsis_nn_status __real_arm_elementwise_squared_difference_f32(
     const float32_t*, const float32_t*, float32_t*, int32_t);
 arm_cmsis_nn_status __wrap_arm_elementwise_squared_difference_f32(
     const float32_t* a, const float32_t* b, float32_t* out, int32_t n) {
-  CountCall(Leaf::kFlatF32);
+  if (CountCall(Leaf::kFlatF32)) return ARM_CMSIS_NN_ARG_ERROR;
   return __real_arm_elementwise_squared_difference_f32(a, b, out, n);
 }
 #endif
@@ -117,7 +123,7 @@ arm_cmsis_nn_status __real_arm_elementwise_squared_difference_f16(
     const float16_t*, const float16_t*, float16_t*, int32_t);
 arm_cmsis_nn_status __wrap_arm_elementwise_squared_difference_f16(
     const float16_t* a, const float16_t* b, float16_t* out, int32_t n) {
-  CountCall(Leaf::kFlatF16);
+  if (CountCall(Leaf::kFlatF16)) return ARM_CMSIS_NN_ARG_ERROR;
   return __real_arm_elementwise_squared_difference_f16(a, b, out, n);
 }
 #endif
@@ -226,7 +232,8 @@ constexpr TfLiteType FloatTensorType() {
 template <typename T>
 void Run(const Shape& s1, const T* in1, const Shape& s2, const T* in2,
          const Shape& so, T* out, float scale1, int zp1, float scale2, int zp2,
-         float scale_out, int zp_out, TfLiteStatus expected_prepare) {
+         float scale_out, int zp_out, TfLiteStatus expected_prepare,
+         TfLiteStatus expected_invoke = kTfLiteOk) {
   int d1[kMaxRank + 1] = {s1.rank};
   int d2[kMaxRank + 1] = {s2.rank};
   int dout[kMaxRank + 1] = {so.rank};
@@ -253,11 +260,13 @@ void Run(const Shape& s1, const T* in1, const Shape& s2, const T* in2,
   micro::KernelRunner runner(registration, tensors, 3, IntArrayFromInts(inputs),
                              IntArrayFromInts(outputs), nullptr);
   EXPECT_EQ(expected_prepare, runner.InitAndPrepare());
+  // InitAndPrepare checks this itself only when Prepare succeeds.
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
   if (expected_prepare != kTfLiteOk) {
     return;
   }
   memset(g_leaf_calls, 0, sizeof(g_leaf_calls));
-  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  EXPECT_EQ(expected_invoke, runner.Invoke());
 }
 
 // The TFLM quantized formula, with the parameters its Prepare derives.
@@ -440,10 +449,14 @@ TEST(HeliaSquaredDifferenceRouteTest, Float32EdgeValues) {
 // each element there is the IEEE result or +0; the observed bits print.
 // see AmbiqAI/ns-cmsis-nn#877
 TEST(HeliaSquaredDifferenceRouteTest, Float32SubnormalResults) {
-  float in1[] = {1e-20f, 1e-20f, 1e-19f, 3e-20f, -2e-20f, 1e-22f, 1e-23f, 3.0f};
-  float in2[] = {0.0f, -1e-20f, 0.0f, 1e-20f, 0.0f, 0.0f, 0.0f, 1.0f};
-  float out[8] = {};
-  const Shape shape{1, {8}};
+  // 2^-65 squared is the subnormal 2^-130 (0x00080000).
+  float in1[] = {1e-20f, 1e-20f,  1e-19f,
+                 3e-20f, -2e-20f, 1e-22f,
+                 1e-23f, 3.0f,    std::ldexp(1.0f, -65)};
+  float in2[] = {0.0f, -1e-20f, 0.0f, 1e-20f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
+  constexpr int kCount = sizeof(in1) / sizeof(in1[0]);
+  float out[kCount] = {};
+  const Shape shape{1, {kCount}};
   tflite::testing::Run(shape, in1, shape, in2, shape, out, 0, 0, 0, 0, 0, 0,
                        kTfLiteOk);
   tflite::testing::ExpectRoute(Leaf::kFlatF32, Leaf::kCount,
@@ -455,7 +468,7 @@ TEST(HeliaSquaredDifferenceRouteTest, Float32SubnormalResults) {
   constexpr bool kFlushAllowed = false;
 #endif
   int mismatches = 0;
-  for (int i = 0; i < 8; ++i) {
+  for (int i = 0; i < kCount; ++i) {
     const double d = static_cast<double>(in1[i] - in2[i]);
     const float expected = static_cast<float>(d * d);
     const bool flushed = kFlushAllowed &&
@@ -472,6 +485,42 @@ TEST(HeliaSquaredDifferenceRouteTest, Float32SubnormalResults) {
     }
   }
   EXPECT_EQ(0, mismatches);
+}
+
+#if HELIA_SQDIFF_LINK_WRAP
+// A failing heliaCORE entry fails Invoke rather than falling back to the
+// reference.
+TEST(HeliaSquaredDifferenceRouteTest, EntryFailureFailsInvoke) {
+  const Shape shape{2, {2, 3}};
+  int8_t s8_in[6] = {};
+  int8_t s8_out[6] = {};
+  g_fail = Leaf::kFlatS8;
+  tflite::testing::Run(shape, s8_in, shape, s8_in, shape, s8_out, 0.5f, 0, 0.5f,
+                       0, 0.5f, 0, kTfLiteOk, kTfLiteError);
+  g_fail = Leaf::kWalkS8;
+  tflite::testing::Run(shape, s8_in, Shape{1, {3}}, s8_in, shape, s8_out, 0.5f,
+                       0, 0.5f, 0, 0.5f, 0, kTfLiteOk, kTfLiteError);
+#if ARM_NN_ENABLE_F32
+  if (tflite::testing::kHeliaFloat32Route == Route::kFlat) {
+    float f32_in[6] = {};
+    float f32_out[6] = {};
+    g_fail = Leaf::kFlatF32;
+    tflite::testing::Run(shape, f32_in, shape, f32_in, shape, f32_out, 0, 0, 0,
+                         0, 0, 0, kTfLiteOk, kTfLiteError);
+  }
+#endif
+  g_fail = Leaf::kCount;
+}
+#endif
+
+// An empty float32 tensor writes nothing and calls no entry.
+TEST(HeliaSquaredDifferenceRouteTest, Float32EmptyTensorSkipsEntry) {
+  float in[1] = {};
+  float out[1] = {};
+  const Shape shape{2, {0, 3}};
+  tflite::testing::Run(shape, in, shape, in, shape, out, 0, 0, 0, 0, 0, 0,
+                       kTfLiteOk);
+  tflite::testing::ExpectRoute(Leaf::kFlatF32, Leaf::kCount, Route::kReference);
 }
 
 #if ARM_NN_ENABLE_F16
@@ -544,5 +593,30 @@ TEST(HeliaSquaredDifferenceRouteTest, Float16CoverageMustNotSilentlyDisappear) {
 }
 
 #endif  // ARM_NN_ENABLE_F16
+
+#if !ARM_NN_ENABLE_F16
+// Without the fp16 API Prepare rejects float16 and releases its temporaries.
+TEST(HeliaSquaredDifferenceRouteTest, Float16RejectedWithoutFp16Api) {
+  uint16_t in[2] = {};
+  uint16_t out[2] = {};
+  int dims[] = {1, 2};
+  TfLiteTensor tensors[3] = {
+      tflite::testing::CreateTensor(in, tflite::testing::IntArrayFromInts(dims),
+                                    false, kTfLiteFloat16),
+      tflite::testing::CreateTensor(in, tflite::testing::IntArrayFromInts(dims),
+                                    false, kTfLiteFloat16),
+      tflite::testing::CreateTensor(
+          out, tflite::testing::IntArrayFromInts(dims), false, kTfLiteFloat16),
+  };
+  int inputs[] = {2, 0, 1};
+  int outputs[] = {1, 2};
+  const TFLMRegistration registration = tflite::Register_SQUARED_DIFFERENCE();
+  tflite::micro::KernelRunner runner(
+      registration, tensors, 3, tflite::testing::IntArrayFromInts(inputs),
+      tflite::testing::IntArrayFromInts(outputs), nullptr);
+  EXPECT_EQ(kTfLiteError, runner.InitAndPrepare());
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
+}
+#endif
 
 TF_LITE_MICRO_TESTS_MAIN
