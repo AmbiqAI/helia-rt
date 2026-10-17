@@ -556,8 +556,9 @@ is a function-pointer cast and every dtype passes Prepare. On a rejected dtype
 both release their input and output temps before returning, as the success
 path does. `IsRsqrtSupportedType` admits int16, which `RsqrtEval` already
 handles. `kernels/elementwise_test.cc`
-adds a rejected dtype for SIN, ABS, RSQRT and LOGICAL_NOT. The helia copy has
-the same change (AmbiqAI/helia-rt#342). See AmbiqAI/helia-rt#376.
+adds a rejected dtype for SIN, ABS, RSQRT and LOGICAL_NOT. The helia copy
+applies the same rule in `GenericPrepare`, `AbsPrepare` and `RsqrtPrepare`
+(AmbiqAI/helia-rt#342). See AmbiqAI/helia-rt#376.
 
 This correctness fix stays in the shared kernel: a build_helia.sh patch would
 leave reference/CMSIS-NN, direct CMake, Bazel and source consumers unfixed.
