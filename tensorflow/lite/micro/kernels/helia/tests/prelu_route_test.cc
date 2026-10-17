@@ -378,6 +378,7 @@ TEST(HeliaPreluRouteTest, Float32EdgeValues) {
 // heliaCORE leg compute x * alpha. The MVE float32 leg compares with
 // vcmpgeq_n_f32, which flushes the subnormal to -0 and finds it >= 0, so it
 // returns x unchanged.
+// TODO(AmbiqAI/ns-cmsis-nn#873): expect x * alpha on every leg once fixed.
 TEST(HeliaPreluRouteTest, Float32NegativeSubnormalInput) {
   const float x = -8 * std::numeric_limits<float>::denorm_min();
   float in[] = {x, x, x, x};
