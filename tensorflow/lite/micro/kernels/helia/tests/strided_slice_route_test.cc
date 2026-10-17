@@ -378,11 +378,12 @@ TEST(HeliaStridedSliceRouteTest, Float16PrepareNeedsTheFp16Api) {
 #endif
 }
 
-// A declared output one element short of the slice (see the int8/int16 case
-// in strided_slice_shrink_test.cc) fails the op for every routed type, without
-// reaching heliaCORE or writing past the tensor.
+// A declared output that does not hold exactly the slice (see
+// strided_slice_shrink_test.cc) fails the op for every type, without reaching
+// heliaCORE or writing past the tensor. Prepare sees the true [2, 4] output,
+// Invoke a [1, `elements`] one.
 template <typename T>
-void ExpectShortOutputFails(TfLiteType type, Leaf leaf) {
+void ExpectWrongOutputSizeFails(TfLiteType type, int elements) {
   using tflite::testing::CreateTensor;
   using tflite::testing::IntArrayFromInts;
   T input[24] = {};
@@ -413,28 +414,37 @@ void ExpectShortOutputFails(TfLiteType type, Leaf leaf) {
                                      IntArrayFromInts(outputs), &params);
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
   output_dims[1] = 1;
-  output_dims[2] = 7;
+  output_dims[2] = elements;
   memset(output, 0x5A, sizeof(output));
   memset(g_leaf_calls, 0, sizeof(g_leaf_calls));
   EXPECT_EQ(kTfLiteError, runner.Invoke());
 #if HELIA_STRIDED_SLICE_LINK_WRAP
-  EXPECT_EQ(0, g_leaf_calls[static_cast<int>(leaf)]);
-#else
-  (void)leaf;
+  for (int i = 0; i < static_cast<int>(Leaf::kCount); ++i) {
+    EXPECT_EQ(0, g_leaf_calls[i]);
+  }
 #endif
-  for (size_t i = 7 * sizeof(T); i < sizeof(output); ++i) {
+  const int kept = elements < 8 ? elements : 8;
+  for (size_t i = kept * sizeof(T); i < sizeof(output); ++i) {
     EXPECT_EQ(0x5A, reinterpret_cast<const uint8_t*>(output)[i]);
   }
 }
 
-TEST(HeliaStridedSliceRouteTest, OutputShorterThanSliceFailsInvoke) {
-#if ARM_NN_ENABLE_F32
-  ExpectShortOutputFails<float>(kTfLiteFloat32, Leaf::kF32);
-#endif
-  ExpectShortOutputFails<int32_t>(kTfLiteInt32, Leaf::kS32);
+void ExpectWrongOutputSizeFailsForEveryType(int elements) {
+  ExpectWrongOutputSizeFails<float>(kTfLiteFloat32, elements);
+  ExpectWrongOutputSizeFails<int32_t>(kTfLiteInt32, elements);
+  ExpectWrongOutputSizeFails<bool>(kTfLiteBool, elements);
 #if ARM_NN_ENABLE_F16
-  ExpectShortOutputFails<uint16_t>(kTfLiteFloat16, Leaf::kF16);
+  ExpectWrongOutputSizeFails<uint16_t>(kTfLiteFloat16, elements);
 #endif
+}
+
+TEST(HeliaStridedSliceRouteTest, OutputShorterThanSliceFailsInvoke) {
+  ExpectWrongOutputSizeFailsForEveryType(7);
+}
+
+// The check is for equality, so a larger output fails too.
+TEST(HeliaStridedSliceRouteTest, OutputLargerThanSliceFailsInvoke) {
+  ExpectWrongOutputSizeFailsForEveryType(9);
 }
 
 TF_LITE_MICRO_TESTS_MAIN

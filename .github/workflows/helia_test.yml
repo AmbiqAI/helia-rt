@@ -309,6 +309,8 @@ jobs:
         # cases on every leg. see AmbiqAI/helia-rt#433
         # STRIDED_SLICE and REDUCE short-output rejections add three cases on every
         # leg. see AmbiqAI/helia-rt#433
+        # All-type STRIDED_SLICE wrong-size cases add two cases on every leg.
+        # see AmbiqAI/helia-rt#435
         # Elementwise shrunk-output cases add two cases on every leg.
         # see AmbiqAI/helia-rt#433
         # Depthwise input-width and int16 output zero-point cases add two cases on
