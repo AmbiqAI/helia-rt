@@ -73,6 +73,9 @@ namespace {
 
 enum class Bias { kInt64, kInt16, kNone };
 
+// A model defect Prepare must reject. see AmbiqAI/helia-rt#443
+enum class Malform { kNone, kInt32Bias, kBatch, kChannels, kBiasCount };
+
 // A nonzero input or output zero point must fail Prepare: 16x8 requires
 // symmetric activations.
 struct Shape {
@@ -82,6 +85,7 @@ struct Shape {
   int batch = 1;
   int input_zero_point = 0;
   TfLiteFusedActivation activation = kTfLiteActNone;
+  Malform malform = Malform::kNone;
   int output_zero_point = 0;
 };
 
@@ -138,6 +142,7 @@ void ExpectMatchesReference(const Shape& s) {
   static int8_t filter[kMaxFilter];
   static int64_t bias64[kMaxChannels];
   static int16_t bias16[kMaxChannels];
+  static int32_t bias32[kMaxChannels];
   static int16_t output[kMaxOutput];
   static int16_t expected[kMaxOutput];
   static int64_t scratch[kMaxOutput];
@@ -198,6 +203,13 @@ void ExpectMatchesReference(const Shape& s) {
   int filter_dims[] = {4, s.out_c, s.kernel, s.kernel, s.in_c};
   int bias_dims[] = {1, s.out_c};
   int output_dims[] = {4, s.batch, out_h, out_w, s.out_c};
+  if (s.malform == Malform::kBatch) {
+    output_dims[1] = s.batch + 1;
+  } else if (s.malform == Malform::kChannels) {
+    filter_dims[1] = s.out_c - 1;
+  } else if (s.malform == Malform::kBiasCount) {
+    bias_dims[1] = s.out_c - 1;
+  }
   TfLiteAffineQuantization filter_quant = {FloatArrayFromFloats(filter_scales),
                                            IntArrayFromInts(filter_zero_points),
                                            0};
@@ -208,7 +220,9 @@ void ExpectMatchesReference(const Shape& s) {
       CreateTensor(filter, IntArrayFromInts(filter_dims)),
       CreateQuantizedTensor(input, IntArrayFromInts(input_dims), input_scale,
                             s.input_zero_point),
-      s.bias == Bias::kInt16
+      s.malform == Malform::kInt32Bias
+          ? CreateTensor(bias32, IntArrayFromInts(bias_dims))
+      : s.bias == Bias::kInt16
           ? CreateTensor(bias16, IntArrayFromInts(bias_dims))
           : CreateTensor(bias64, IntArrayFromInts(bias_dims)),
       CreateQuantizedTensor(output, IntArrayFromInts(output_dims), output_scale,
@@ -234,7 +248,8 @@ void ExpectMatchesReference(const Shape& s) {
       IntArrayFromInts(outputs), &params);
   const TfLiteStatus prepare =
       runner.InitAndPrepare(reinterpret_cast<const char*>(&params));
-  if (s.input_zero_point != 0 || s.output_zero_point != 0) {
+  if (s.input_zero_point != 0 || s.output_zero_point != 0 ||
+      s.malform != Malform::kNone) {
     EXPECT_EQ(kTfLiteError, prepare);
     return;
   }
@@ -286,6 +301,7 @@ void ExpectMatchesReference(const Shape& s) {
 }  // namespace tflite
 
 using tflite::testing::Bias;
+using tflite::testing::Malform;
 using tflite::testing::ExpectMatchesReference;
 using tflite::testing::Shape;
 
@@ -342,6 +358,30 @@ TEST(HeliaTransposeConvS16Test, FusedReluN1To1) {
                                Bias::kNone, 1, 0, kTfLiteActReluN1To1});
 }
 
+TEST(HeliaTransposeConvS16Test, Int32BiasFailsPrepare) {
+  ExpectMatchesReference(Shape{4, 5, 3, 5, 3, 2, kTfLitePaddingSame,
+                               Bias::kInt64, 1, 0, kTfLiteActNone,
+                               Malform::kInt32Bias});
+}
+
+TEST(HeliaTransposeConvS16Test, BatchMismatchFailsPrepare) {
+  ExpectMatchesReference(Shape{4, 5, 3, 5, 3, 2, kTfLitePaddingSame,
+                               Bias::kInt64, 1, 0, kTfLiteActNone,
+                               Malform::kBatch});
+}
+
+TEST(HeliaTransposeConvS16Test, FilterChannelMismatchFailsPrepare) {
+  ExpectMatchesReference(Shape{4, 5, 3, 5, 3, 2, kTfLitePaddingSame,
+                               Bias::kNone, 1, 0, kTfLiteActNone,
+                               Malform::kChannels});
+}
+
+TEST(HeliaTransposeConvS16Test, BiasCountMismatchFailsPrepare) {
+  ExpectMatchesReference(Shape{4, 5, 3, 5, 3, 2, kTfLitePaddingSame,
+                               Bias::kInt64, 1, 0, kTfLiteActNone,
+                               Malform::kBiasCount});
+}
+
 TEST(HeliaTransposeConvS16Test, NonzeroZeroPointFailsPrepare) {
   ExpectMatchesReference(
       Shape{4, 5, 3, 5, 3, 2, kTfLitePaddingSame, Bias::kInt64, 1, 3});
@@ -350,7 +390,7 @@ TEST(HeliaTransposeConvS16Test, NonzeroZeroPointFailsPrepare) {
 TEST(HeliaTransposeConvS16Test, NonzeroOutputZeroPointFailsPrepare) {
   ExpectMatchesReference(
       Shape{4, 5, 3, 5, 3, 2, kTfLitePaddingSame, Bias::kInt64, 1, 0,
-            kTfLiteActNone, 3});
+            kTfLiteActNone, Malform::kNone, 3});
 }
 
 TF_LITE_MICRO_TESTS_MAIN

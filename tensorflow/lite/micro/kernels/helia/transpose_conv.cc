@@ -206,6 +206,28 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
           (input->type == kTfLiteInt8 && filter->type == kTfLiteInt8),
       "Hybrid models are not supported on TFLite Micro.");
 
+  // The kernels read these extents and the bias unchecked; MatchingDim only
+  // DCHECKs. see AmbiqAI/helia-rt#443
+  TF_LITE_ENSURE_EQ(context, NumDimensions(input), 4);
+  TF_LITE_ENSURE_EQ(context, NumDimensions(filter), 4);
+  TF_LITE_ENSURE_EQ(context, NumDimensions(output), 4);
+  TF_LITE_ENSURE_EQ(context, SizeOfDimension(input, 0),
+                    SizeOfDimension(output, 0));
+  TF_LITE_ENSURE_EQ(context, SizeOfDimension(filter, 0),
+                    SizeOfDimension(output, 3));
+  TF_LITE_ENSURE_EQ(context, SizeOfDimension(input, 3),
+                    SizeOfDimension(filter, 3));
+  if (bias != nullptr) {
+    TF_LITE_ENSURE_EQ(context, NumElements(bias), SizeOfDimension(output, 3));
+    if (input->type == kTfLiteInt8) {
+      TF_LITE_ENSURE_TYPES_EQ(context, bias->type, kTfLiteInt32);
+    } else if (input->type == kTfLiteInt16) {
+      TF_LITE_ENSURE_MSG(
+          context, bias->type == kTfLiteInt16 || bias->type == kTfLiteInt64,
+          "16x8 TRANSPOSE_CONV needs an int16 or int64 bias.");
+    }
+  }
+
   data->weight_buffer_idx = -1;
   data->weight_sum_buf = nullptr;
   // Sentinels, so that a path that never requests a scratch buffer (e.g. the

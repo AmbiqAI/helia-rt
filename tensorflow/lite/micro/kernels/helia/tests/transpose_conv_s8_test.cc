@@ -14,7 +14,8 @@ limitations under the License.
 ==============================================================================*/
 
 // int8 TRANSPOSE_CONV through the helia kernel, compared bit for bit with the
-// reference integer implementation under each fused activation.
+// reference integer implementation under each fused activation, and the
+// shape and bias defects Prepare must reject.
 
 #include <algorithm>
 #include <cmath>
@@ -35,10 +36,14 @@ namespace tflite {
 namespace testing {
 namespace {
 
+// A model defect Prepare must reject. see AmbiqAI/helia-rt#443
+enum class Malform { kNone, kInt64Bias, kBatch, kChannels, kBiasCount };
+
 struct Shape {
   int in_h, in_w, in_c, out_c, kernel, stride;
   TfLitePadding padding;
   TfLiteFusedActivation activation;
+  Malform malform = Malform::kNone;
 };
 
 constexpr int kMaxInput = 6 * 7 * 16;
@@ -92,6 +97,7 @@ void ExpectMatchesReference(const Shape& s) {
   static int8_t input[kMaxInput];
   static int8_t filter[kMaxFilter];
   static int32_t bias[kMaxChannels];
+  static int64_t bias64[kMaxChannels];
   static int8_t output[kMaxOutput];
   static int8_t expected[kMaxOutput];
   static int32_t scratch[kMaxOutput];
@@ -149,6 +155,13 @@ void ExpectMatchesReference(const Shape& s) {
   int filter_dims[] = {4, s.out_c, s.kernel, s.kernel, s.in_c};
   int bias_dims[] = {1, s.out_c};
   int output_dims[] = {4, 1, out_h, out_w, s.out_c};
+  if (s.malform == Malform::kBatch) {
+    output_dims[1] = 2;
+  } else if (s.malform == Malform::kChannels) {
+    filter_dims[1] = s.out_c - 1;
+  } else if (s.malform == Malform::kBiasCount) {
+    bias_dims[1] = s.out_c - 1;
+  }
   TfLiteAffineQuantization filter_quant = {FloatArrayFromFloats(filter_scales),
                                            IntArrayFromInts(filter_zero_points),
                                            0};
@@ -159,7 +172,9 @@ void ExpectMatchesReference(const Shape& s) {
       CreateTensor(filter, IntArrayFromInts(filter_dims)),
       CreateQuantizedTensor(input, IntArrayFromInts(input_dims), input_scale,
                             kInputZeroPoint),
-      CreateTensor(bias, IntArrayFromInts(bias_dims)),
+      s.malform == Malform::kInt64Bias
+          ? CreateTensor(bias64, IntArrayFromInts(bias_dims))
+          : CreateTensor(bias, IntArrayFromInts(bias_dims)),
       CreateQuantizedTensor(output, IntArrayFromInts(output_dims), output_scale,
                             kOutputZeroPoint),
   };
@@ -177,8 +192,13 @@ void ExpectMatchesReference(const Shape& s) {
   const TFLMRegistration registration = Register_TRANSPOSE_CONV();
   micro::KernelRunner runner(registration, tensors, 5, IntArrayFromInts(inputs),
                              IntArrayFromInts(outputs), &params);
-  EXPECT_EQ(kTfLiteOk,
-            runner.InitAndPrepare(reinterpret_cast<const char*>(&params)));
+  const TfLiteStatus prepare =
+      runner.InitAndPrepare(reinterpret_cast<const char*>(&params));
+  if (s.malform != Malform::kNone) {
+    EXPECT_EQ(kTfLiteError, prepare);
+    return;
+  }
+  EXPECT_EQ(kTfLiteOk, prepare);
   memset(output, 0x55, sizeof(output));
   EXPECT_EQ(kTfLiteOk, runner.Invoke());
 
@@ -224,6 +244,7 @@ void ExpectMatchesReference(const Shape& s) {
 }  // namespace tflite
 
 using tflite::testing::ExpectMatchesReference;
+using tflite::testing::Malform;
 using tflite::testing::Shape;
 
 TEST(HeliaTransposeConvS8Test, NoActivation) {
@@ -245,6 +266,28 @@ TEST(HeliaTransposeConvS8Test, FusedRelu6) {
 TEST(HeliaTransposeConvS8Test, FusedReluN1To1) {
   ExpectMatchesReference(
       Shape{5, 6, 4, 6, 3, 1, kTfLitePaddingValid, kTfLiteActReluN1To1});
+}
+
+TEST(HeliaTransposeConvS8Test, Int64BiasFailsPrepare) {
+  ExpectMatchesReference(Shape{5, 6, 4, 6, 3, 1, kTfLitePaddingValid,
+                               kTfLiteActNone, Malform::kInt64Bias});
+}
+
+TEST(HeliaTransposeConvS8Test, BatchMismatchFailsPrepare) {
+  ExpectMatchesReference(Shape{5, 6, 4, 6, 3, 1, kTfLitePaddingValid,
+                               kTfLiteActNone, Malform::kBatch});
+}
+
+TEST(HeliaTransposeConvS8Test, FilterChannelMismatchFailsPrepare) {
+  ExpectMatchesReference(Shape{5, 6, 4, 6, 3, 1, kTfLitePaddingValid,
+                               kTfLiteActNone,
+                               Malform::kChannels});
+}
+
+TEST(HeliaTransposeConvS8Test, BiasCountMismatchFailsPrepare) {
+  ExpectMatchesReference(Shape{5, 6, 4, 6, 3, 1, kTfLitePaddingValid,
+                               kTfLiteActNone,
+                               Malform::kBiasCount});
 }
 
 TF_LITE_MICRO_TESTS_MAIN
