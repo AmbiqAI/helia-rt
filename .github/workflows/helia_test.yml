@@ -295,6 +295,8 @@ jobs:
         # binaries and twenty-five cases on every leg. see AmbiqAI/helia-rt#433
         # ABS, NEG, SQRT and RSQRT routes add one binary and sixteen cases on
         # every leg. see AmbiqAI/helia-rt#433
+        # Float16 ABS and NEG shape-mismatch rejections add two cases on every
+        # leg. see AmbiqAI/helia-rt#433
         # Depthwise 3x3, 1x1 short-K and int16 TRANSPOSE_CONV review cases add nine
         # cases on every leg. see AmbiqAI/helia-rt#433
         # Depthwise input-width and int16 output zero-point cases add two cases on

@@ -250,6 +250,17 @@ TfLiteStatus PrepareAbsRsqrt(TfLiteContext* context, TfLiteNode* node) {
     return kTfLiteError;
   }
 
+  if (input->type == kTfLiteFloat16) {
+    int32_t count;
+    const TfLiteStatus shape_status = CheckedFloat16ElementCount(
+        context, input->dims, output->dims, &count);
+    if (shape_status != kTfLiteOk) {
+      micro_context->DeallocateTempTfLiteTensor(input);
+      micro_context->DeallocateTempTfLiteTensor(output);
+      return shape_status;
+    }
+  }
+
   auto* op_data = static_cast<OpDataAbsRsqrt*>(node->user_data);
   op_data->input_type = input->type;
 
@@ -287,6 +298,9 @@ TfLiteStatus PrepareAbsRsqrt(TfLiteContext* context, TfLiteNode* node) {
     const float input_scale = input_params->scale->data[0];
     const float output_scale = output_params->scale->data[0];
     op_data->needs_rescale = input_scale != output_scale;
+    // arm_abs_s8/s16 take both on every call, rescaled or not.
+    op_data->multiplier = 0;
+    op_data->shift = 0;
     if (op_nameid == kAbsNameId && op_data->needs_rescale) {
       SetAbsOutputMultiplier(input_scale, output_scale, &op_data->multiplier,
                              &op_data->shift);
@@ -510,10 +524,16 @@ TfLiteStatus AbsEval(TfLiteContext* context, TfLiteNode* node) {
                                                "arm_abs_s16");
       break;
 #if ARM_NN_ENABLE_F16
-    case kTfLiteFloat16:
+    case kTfLiteFloat16: {
+      int32_t count;
+      TF_LITE_ENSURE_OK(context,
+                        CheckedFloat16ElementCount(
+                            context, GetEvalInput(context, node, 0)->dims,
+                            GetEvalOutput(context, node, 0)->dims, &count));
       eval_result = EvalHeliaUnary<float16_t>(context, node, arm_nn_abs_f16,
                                               "ABS", "arm_nn_abs_f16");
       break;
+    }
 #endif
     default:
       MicroPrintf("Current data type %s is not supported.",

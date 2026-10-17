@@ -31,17 +31,28 @@ constexpr int kInputTensor = 0;
 constexpr int kOutputTensor = 0;
 
 // float16 has no reference path, so it is rejected here on builds without
-// ARM_NN_ENABLE_F16.
+// ARM_NN_ENABLE_F16. arm_nn_neg_f16 writes as many elements as the input
+// holds, so a float16 output must have the input's shape.
 TfLiteStatus NegPrepare(TfLiteContext* context, TfLiteNode* node) {
   MicroContext* micro_context = GetMicroContext(context);
   TfLiteTensor* input =
       micro_context->AllocateTempInputTensor(node, kInputTensor);
   TF_LITE_ENSURE(context, input != nullptr);
+  TfLiteTensor* output =
+      micro_context->AllocateTempOutputTensor(node, kOutputTensor);
+  if (output == nullptr) {
+    micro_context->DeallocateTempTfLiteTensor(input);
+    return kTfLiteError;
+  }
   const TfLiteType type = input->type;
+  const bool same_shape = TfLiteIntArrayEqual(input->dims, output->dims);
   micro_context->DeallocateTempTfLiteTensor(input);
+  micro_context->DeallocateTempTfLiteTensor(output);
   TF_LITE_ENSURE_MSG(context,
                      type != kTfLiteFloat16 || kHeliaFloat16Enabled,
                      "Float16 NEG requires ARM_NN_ENABLE_F16.");
+  TF_LITE_ENSURE_MSG(context, type != kTfLiteFloat16 || same_shape,
+                     "Float16 NEG requires matching input and output shapes.");
   return kTfLiteOk;
 }
 
@@ -86,6 +97,8 @@ TfLiteStatus NegEval(TfLiteContext* context, TfLiteNode* node) {
 #endif
 #if ARM_NN_ENABLE_F16
     case kTfLiteFloat16:
+      TF_LITE_ENSURE_EQ(context, ElementCount(*input->dims),
+                        ElementCount(*output->dims));
       return EvalHeliaNeg<float16_t>(context, input, output, arm_nn_neg_f16,
                                      "arm_nn_neg_f16");
 #endif

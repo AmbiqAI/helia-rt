@@ -405,6 +405,41 @@ void ExpectFloat16Contract(const TFLMRegistration& registration, Entry entry,
   EXPECT_EQ(0, mismatches);
 }
 
+// A float16 input of 8 elements against an output of 2 must fail the op and
+// leave the bytes past the output untouched. Builds without
+// ARM_NN_ENABLE_F16 reject float16 at Prepare, with the same outcome.
+void ExpectFloat16ShapeMismatchFails(const TFLMRegistration& registration) {
+  constexpr uint16_t kGuard = 0xAAAAu;
+  uint16_t input[8];
+  memcpy(input, kSpecialF16, sizeof(input));
+  uint16_t output[8];
+  for (int i = 0; i < 8; ++i) {
+    output[i] = kGuard;
+  }
+  int input_dims[] = {2, 1, 8};
+  int output_dims[] = {2, 1, 2};
+  TfLiteTensor tensors[2] = {
+      CreateTensor(input, IntArrayFromInts(input_dims), false, kTfLiteFloat16),
+      CreateTensor(output, IntArrayFromInts(output_dims), false,
+                   kTfLiteFloat16),
+  };
+  int inputs[] = {1, 0};
+  int outputs[] = {1, 1};
+  micro::KernelRunner runner(registration, tensors, 2,
+                             IntArrayFromInts(inputs),
+                             IntArrayFromInts(outputs), nullptr);
+  TfLiteStatus status = runner.InitAndPrepare();
+  if (status == kTfLiteOk) {
+    status = runner.Invoke();
+  }
+  EXPECT_EQ(kTfLiteError, status);
+  int overwrites = 0;
+  for (int i = 2; i < 8; ++i) {
+    overwrites += output[i] != kGuard;
+  }
+  EXPECT_EQ(0, overwrites);
+}
+
 void ExpectFailingEntryFailsInvoke(const TFLMRegistration& registration,
                                    Entry entry, TfLiteType type) {
   if (!kWrapped || (!kF16 && type == kTfLiteFloat16)) {
@@ -533,6 +568,14 @@ TEST(HeliaElementwiseUnaryRouteTest, AbsFloat16ClearsSignBit) {
 TEST(HeliaElementwiseUnaryRouteTest, NegFloat16TogglesSignBit) {
   ExpectFloat16Contract(tflite::Register_NEG(), Entry::kNegF16,
                         ContractNegF16);
+}
+
+TEST(HeliaElementwiseUnaryRouteTest, AbsFloat16ShapeMismatchFails) {
+  ExpectFloat16ShapeMismatchFails(tflite::Register_ABS());
+}
+
+TEST(HeliaElementwiseUnaryRouteTest, NegFloat16ShapeMismatchFails) {
+  ExpectFloat16ShapeMismatchFails(tflite::Register_NEG());
 }
 
 // heliaCORE rejects a zero count, so an empty tensor never reaches it.
