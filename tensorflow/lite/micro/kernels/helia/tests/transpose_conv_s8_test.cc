@@ -209,6 +209,8 @@ void ExpectMatchesReference(const Shape& s) {
       runner.InitAndPrepare(reinterpret_cast<const char*>(&params));
   if (s.malform != Malform::kNone) {
     EXPECT_EQ(kTfLiteError, prepare);
+    // InitAndPrepare() checks this only when Prepare succeeds.
+    EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
     return;
   }
   EXPECT_EQ(kTfLiteOk, prepare);

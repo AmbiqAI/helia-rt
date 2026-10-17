@@ -263,6 +263,8 @@ void ExpectMatchesReference(const Shape& s) {
   if (s.input_zero_point != 0 || s.output_zero_point != 0 ||
       s.malform != Malform::kNone) {
     EXPECT_EQ(kTfLiteError, prepare);
+    // InitAndPrepare() checks this only when Prepare succeeds.
+    EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
     return;
   }
   EXPECT_EQ(kTfLiteOk, prepare);

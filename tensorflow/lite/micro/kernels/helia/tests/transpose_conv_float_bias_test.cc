@@ -86,6 +86,8 @@ RunResult RunWithBias(TfLiteType io_type, TfLiteTensor bias_tensor,
                              IntArrayFromInts(outputs), &params);
   const TfLiteStatus prepare =
       runner.InitAndPrepare(reinterpret_cast<const char*>(&params));
+  // InitAndPrepare() checks this only when Prepare succeeds.
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
   return {prepare, prepare == kTfLiteOk ? runner.Invoke() : kTfLiteError};
 }
 
@@ -146,6 +148,25 @@ TEST(HeliaTransposeConvFloatBiasTest, HighRankWrappingBiasFailsPrepare) {
   TfLiteTensor bias_tensor = CreateTensor(bias, IntArrayFromInts(g_bias_dims));
   static int wrapping_dims[] = {8, 2, 2, 2, 5, 5581, 8681, 49477, 384773};
   bias_tensor.dims = IntArrayFromInts(wrapping_dims);
+  EXPECT_EQ(kTfLiteError, RunWithBias(kTfLiteFloat32, bias_tensor).prepare);
+}
+
+// {0, 8, 2147483647, 3, 715827883} multiplied on past the zero wraps to the 8
+// output channels; the count must stop at the first nonpositive extent.
+TEST(HeliaTransposeConvFloatBiasTest, ZeroExtentStopsBiasCountFailsPrepare) {
+  static float bias[8] = {};
+  TfLiteTensor bias_tensor = CreateTensor(bias, IntArrayFromInts(g_bias_dims));
+  static int wrapping_dims[] = {5, 0, 8, 2147483647, 3, 715827883};
+  bias_tensor.dims = IntArrayFromInts(wrapping_dims);
+  EXPECT_EQ(kTfLiteError, RunWithBias(kTfLiteFloat32, bias_tensor).prepare);
+}
+
+// Eight bias elements in rank 7: GetTensorShape(bias) holds six dims.
+TEST(HeliaTransposeConvFloatBiasTest, BiasRankAboveSixFailsPrepare) {
+  static float bias[8] = {};
+  TfLiteTensor bias_tensor = CreateTensor(bias, IntArrayFromInts(g_bias_dims));
+  static int rank7_dims[] = {7, 1, 1, 1, 1, 1, 1, 8};
+  bias_tensor.dims = IntArrayFromInts(rank7_dims);
   EXPECT_EQ(kTfLiteError, RunWithBias(kTfLiteFloat32, bias_tensor).prepare);
 }
 
