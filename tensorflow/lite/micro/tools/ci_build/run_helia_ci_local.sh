@@ -58,6 +58,7 @@ LEGS_RE=""
 OPT_CHOICE="BOTH"
 PARALLEL=2
 CPUS=$(( $(nproc) / 2 ))
+[[ ${CPUS} -ge 1 ]] || CPUS=1
 MEM=8g
 USE_FLOORS=1
 RUN_CHECKS=1
@@ -164,13 +165,14 @@ UNIT_CPUS=$(( CPUS / PARALLEL ))
 # (rsync --delete, make clean), so two runs must not share one. The lock is
 # held on fd 9 until this script and every unit it started have exited.
 mkdir -p "${CACHE_DIR}"
+command -v flock >/dev/null || { echo "flock (util-linux) is required" >&2; exit 2; }
 exec 9>"${CACHE_DIR}/.lock"
 if ! flock -n 9; then
   echo "Another run holds ${CACHE_DIR}; wait for it, or set HELIA_LOCAL_CI_DIR to another cache root." >&2
   exit 2
 fi
 
-RUN_ID="$(date +%Y%m%d-%H%M%S)"
+RUN_ID="$(date +%Y%m%d-%H%M%S)-$$"
 LOG_DIR="${CACHE_DIR}/logs/${RUN_ID}"
 DOWNLOADS="${CACHE_DIR}/downloads"
 mkdir -p "${LOG_DIR}" "${DOWNLOADS}" "${CACHE_DIR}/ccache" "${CACHE_DIR}/trees"
@@ -219,7 +221,8 @@ downloads_key() {
 }
 DOWNLOADS_KEY="$(downloads_key)"
 
-# The download scripts skip a dependency whose directory exists, so a
+# Some download scripts skip a dependency whose directory exists and the rest
+# check only its URL or commit, which misses patch and platform changes, so a
 # directory fetched from other inputs is emptied rather than reused.
 check_downloads() {
   local dir="$1" stamp="$1/.helia-local-ci-key"
@@ -313,7 +316,7 @@ set -m
 
 # Stop every unit, and the containers they started, if the run is interrupted.
 stop_units() {
-  trap - INT TERM
+  trap - HUP INT TERM
   local pgids pgid
   pgids="$(jobs -p)"
   for pgid in ${pgids}; do kill -TERM -- "-${pgid}" 2>/dev/null || true; done
@@ -329,9 +332,11 @@ stop_units() {
   for pgid in ${pgids}; do kill -KILL -- "-${pgid}" 2>/dev/null || true; done
   wait 2>/dev/null || true
   echo "==> interrupted; units stopped. logs: ${LOG_DIR}" >&2
-  exit 130
+  exit "$1"
 }
-trap stop_units INT TERM
+trap 'stop_units 129' HUP
+trap 'stop_units 130' INT
+trap 'stop_units 143' TERM
 results="${LOG_DIR}/results.txt"
 : > "${results}"
 running=0
