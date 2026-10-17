@@ -239,10 +239,10 @@ TEST(HeliaReduceOutputSizeTest, MeanTypeMismatchFailsInvoke) {
   TfLiteReducerParams params = {};
   int inputs[] = {2, 0, 1};
   int outputs[] = {1, 2};
-  tflite::micro::KernelRunner runner(tflite::Register_MEAN(), tensors, 3,
-                                     tflite::testing::IntArrayFromInts(inputs),
-                                     tflite::testing::IntArrayFromInts(outputs),
-                                     &params);
+  const TFLMRegistration registration = tflite::Register_MEAN();
+  tflite::micro::KernelRunner runner(
+      registration, tensors, 3, tflite::testing::IntArrayFromInts(inputs),
+      tflite::testing::IntArrayFromInts(outputs), &params);
   if (runner.InitAndPrepare() == kTfLiteOk) {
     memset(output, 0x5A, sizeof(output));
     EXPECT_EQ(kTfLiteError, runner.Invoke());
