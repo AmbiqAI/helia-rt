@@ -50,11 +50,12 @@ enum class Leaf { kFlatF32, kWalkF32, kFlatF16, kWalkF16, kCount };
 
 int g_leaf_calls[static_cast<int>(Leaf::kCount)] = {};
 // The entry that returns ARM_CMSIS_NN_ARG_ERROR without running.
-Leaf g_fail = Leaf::kCount;
+// Read only by the link-wrapped entries.
+[[maybe_unused]] Leaf g_fail = Leaf::kCount;
 
 #if HELIA_DIV_LINK_WRAP
 // Counts a call and reports whether it must fail.
-bool CountCall(Leaf leaf) {
+[[maybe_unused]] bool CountCall(Leaf leaf) {
   ++g_leaf_calls[static_cast<int>(leaf)];
   return g_fail == leaf;
 }
@@ -358,10 +359,6 @@ TEST(HeliaDivRouteTest, Float32RankFiveBroadcastIsReference) {
                        Route::kReference, kTfLiteActNone);
 }
 
-// The heliaCORE quotient and clamp give the reference's result bit for bit on
-// every non-NaN edge: +/-FLT_MAX for a division by zero or an overflow (the
-// unbounded clamp is +/-FLT_MAX), signed zeros, and a gradual-underflow
-// subnormal. NaN cases are NaN on both (payload not asserted).
 #if HELIA_DIV_LINK_WRAP && ARM_NN_ENABLE_F32
 // A failing float32 entry fails Invoke rather than falling back to the
 // reference.
@@ -393,6 +390,10 @@ TEST(HeliaDivRouteTest, Float32EmptyTensorSkipsEntry) {
                                tflite::testing::Route::kReference);
 }
 
+// The heliaCORE quotient and clamp give the reference's result bit for bit on
+// every non-NaN edge: +/-FLT_MAX for a division by zero or an overflow (the
+// unbounded clamp is +/-FLT_MAX), signed zeros, and a gradual-underflow
+// subnormal. NaN cases are NaN on both (payload not asserted).
 TEST(HeliaDivRouteTest, Float32EdgeValuesNoActivation) {
   ExpectFloat32EdgesMatchReference(kTfLiteActNone);
 }

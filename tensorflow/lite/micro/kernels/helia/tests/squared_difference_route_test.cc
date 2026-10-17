@@ -48,7 +48,8 @@ enum class Leaf { kFlatS8, kWalkS8, kFlatS16, kWalkS16, kFlatF32, kFlatF16,
 
 int g_leaf_calls[static_cast<int>(Leaf::kCount)] = {};
 // The entry that returns ARM_CMSIS_NN_ARG_ERROR without running.
-Leaf g_fail = Leaf::kCount;
+// Read only by the link-wrapped entries.
+[[maybe_unused]] Leaf g_fail = Leaf::kCount;
 
 #if HELIA_SQDIFF_LINK_WRAP
 // Counts a call and reports whether it must fail.
