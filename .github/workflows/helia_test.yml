@@ -295,6 +295,10 @@ jobs:
         # binaries and twenty-five cases on every leg. see AmbiqAI/helia-rt#433
         # ABS, NEG, SQRT and RSQRT routes add one binary and sixteen cases on
         # every leg. see AmbiqAI/helia-rt#433
+        # The STRIDED_SLICE shrink-axis regression adds one binary and three cases
+        # on every leg. see AmbiqAI/helia-rt#435
+        # Slicing, extrema and float16 DEQUANTIZE routes add three binaries and
+        # twenty cases on every leg. see AmbiqAI/helia-rt#433
         # Float16 ABS and NEG shape-mismatch rejections add two cases on every
         # leg. see AmbiqAI/helia-rt#433
         # Depthwise 3x3, 1x1 short-K and int16 TRANSPOSE_CONV review cases add nine
@@ -306,27 +310,27 @@ jobs:
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 165
-            min-cases: 1457
+            min-binaries: 169
+            min-cases: 1480
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 165
-            min-cases: 1457
+            min-binaries: 169
+            min-cases: 1480
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 164
-            min-cases: 1455
+            min-binaries: 168
+            min-cases: 1478
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 165
-            min-cases: 1509
+            min-binaries: 169
+            min-cases: 1532
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 164
-            min-cases: 1507
+            min-binaries: 168
+            min-cases: 1530
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
