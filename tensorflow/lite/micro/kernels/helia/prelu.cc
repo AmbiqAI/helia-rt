@@ -39,6 +39,22 @@ struct OpDataPrelu {
   bool helia_shapes;
 };
 
+// Releases a Prepare temporary on every return.
+class ScopedTempTensor {
+ public:
+  ScopedTempTensor(MicroContext* context, TfLiteTensor* tensor)
+      : context_(context), tensor_(tensor) {}
+  ~ScopedTempTensor() {
+    if (tensor_ != nullptr) {
+      context_->DeallocateTempTfLiteTensor(tensor_);
+    }
+  }
+
+ private:
+  MicroContext* context_;
+  TfLiteTensor* tensor_;
+};
+
 bool HeliaPreluShapes(const RuntimeShape& input_shape,
                       const RuntimeShape& alpha_shape,
                       const RuntimeShape& output_shape) {
@@ -66,14 +82,21 @@ TfLiteStatus HeliaPreluPrepare(TfLiteContext* context, TfLiteNode* node) {
 
   MicroContext* micro_context = GetMicroContext(context);
   TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
+  ScopedTempTensor input_guard(micro_context, input);
   TF_LITE_ENSURE(context, input != nullptr);
   TfLiteTensor* alpha = micro_context->AllocateTempInputTensor(node, 1);
+  ScopedTempTensor alpha_guard(micro_context, alpha);
   TF_LITE_ENSURE(context, alpha != nullptr);
   TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
+  ScopedTempTensor output_guard(micro_context, output);
   TF_LITE_ENSURE(context, output != nullptr);
 
-  // Eval writes through the input's type.
+  // Eval writes through the input's type, and the float kernels read alpha as
+  // it too.
   TF_LITE_ENSURE_TYPES_EQ(context, output->type, input->type);
+  if (input->type == kTfLiteFloat32) {
+    TF_LITE_ENSURE_TYPES_EQ(context, alpha->type, kTfLiteFloat32);
+  }
 
   data->helia_shapes =
       HeliaPreluShapes(GetTensorShape(input), GetTensorShape(alpha),
@@ -88,10 +111,6 @@ TfLiteStatus HeliaPreluPrepare(TfLiteContext* context, TfLiteNode* node) {
                        data->helia_shapes || NumElements(output) == 0,
                        "Float16 PRELU does not support these shapes.");
   }
-
-  micro_context->DeallocateTempTfLiteTensor(input);
-  micro_context->DeallocateTempTfLiteTensor(alpha);
-  micro_context->DeallocateTempTfLiteTensor(output);
   return kTfLiteOk;
 }
 

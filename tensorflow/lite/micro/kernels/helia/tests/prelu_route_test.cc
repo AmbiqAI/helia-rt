@@ -218,22 +218,32 @@ TfLiteStatus Run(const Shape& si, const T* in, const Shape& sa, const U* alpha,
   return runner.Invoke();
 }
 
-// Prepare status for a float input and alpha with an int8 output.
 template <typename T>
-TfLiteStatus PrepareWithInt8Output(const T* in, const T* alpha,
-                                   int8_t* out, int count) {
+TfLiteTensor PreluTensor(T* data, TfLiteIntArray* dims) {
+  if constexpr (std::numeric_limits<T>::is_integer) {
+    return CreateQuantizedTensor(data, dims, 1.0f, 0);
+  } else {
+    return CreateTensor(data, dims, false, FloatTensorType<T>());
+  }
+}
+
+// Prepare must reject a T input, U alpha and V output, and release its
+// temporaries.
+template <typename T, typename U, typename V>
+void ExpectPrepareRejected(T* in, U* alpha, V* out, int count) {
   int dims[] = {1, count};
   TfLiteTensor tensors[3] = {
-      CreateTensor(in, IntArrayFromInts(dims), false, FloatTensorType<T>()),
-      CreateTensor(alpha, IntArrayFromInts(dims), false, FloatTensorType<T>()),
-      CreateQuantizedTensor(out, IntArrayFromInts(dims), 1.0f, 0),
+      PreluTensor(in, IntArrayFromInts(dims)),
+      PreluTensor(alpha, IntArrayFromInts(dims)),
+      PreluTensor(out, IntArrayFromInts(dims)),
   };
   int inputs[] = {2, 0, 1};
   int outputs[] = {1, 2};
   const TFLMRegistration registration = Register_PRELU();
   micro::KernelRunner runner(registration, tensors, 3, IntArrayFromInts(inputs),
                              IntArrayFromInts(outputs), nullptr);
-  return runner.InitAndPrepare();
+  EXPECT_EQ(kTfLiteError, runner.InitAndPrepare());
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
 }
 
 // T input and output, U alpha: int8/int8 or int16/int8, as TFLM types them.
@@ -368,19 +378,26 @@ TEST(HeliaPreluRouteTest, Float32AlphaWideningOutputIsReference) {
   ExpectFloat32Matches(Shape{4, {1, 1, 5, 6}}, Shape{4, {3, 1, 1, 6}}, false);
 }
 
-// The reference's x >= 0 ? x : x * alpha bit for bit: NaN input gives NaN, a
-// NaN alpha reaches only negative inputs, -0 and +0 pass through with their
-// sign, -Inf * 0 is NaN, and positive subnormals pass through.
 // Eval writes the output through the input's type, so a narrower output
 // fails Prepare.
 TEST(HeliaPreluRouteTest, Float32Int8OutputRejectedAtPrepare) {
-  const float in[8] = {};
-  const float alpha[8] = {};
+  float in[8] = {};
+  float alpha[8] = {};
   int8_t out[8] = {};
-  EXPECT_EQ(kTfLiteError,
-            tflite::testing::PrepareWithInt8Output(in, alpha, out, 8));
+  tflite::testing::ExpectPrepareRejected(in, alpha, out, 8);
 }
 
+// The float32 kernels read alpha as float32, so an int8 alpha fails Prepare.
+TEST(HeliaPreluRouteTest, Float32Int8AlphaRejectedAtPrepare) {
+  float in[8] = {};
+  int8_t alpha[8] = {};
+  float out[8] = {};
+  tflite::testing::ExpectPrepareRejected(in, alpha, out, 8);
+}
+
+// The reference's x >= 0 ? x : x * alpha bit for bit: NaN input gives NaN, a
+// NaN alpha reaches only negative inputs, -0 and +0 pass through with their
+// sign, -Inf * 0 is NaN, and positive subnormals pass through.
 TEST(HeliaPreluRouteTest, Float32EdgeValues) {
   const float inf = std::numeric_limits<float>::infinity();
   const float nan = std::numeric_limits<float>::quiet_NaN();
@@ -456,11 +473,10 @@ TEST(HeliaPreluRouteTest, Float16PerChannelAlpha) {
 }
 
 TEST(HeliaPreluRouteTest, Float16Int8OutputRejectedAtPrepare) {
-  const float16_t in[8] = {};
-  const float16_t alpha[8] = {};
+  float16_t in[8] = {};
+  float16_t alpha[8] = {};
   int8_t out[8] = {};
-  EXPECT_EQ(kTfLiteError,
-            tflite::testing::PrepareWithInt8Output(in, alpha, out, 8));
+  tflite::testing::ExpectPrepareRejected(in, alpha, out, 8);
 }
 
 // An empty tensor is a no-op, as in float16 DIV and SQUARED_DIFFERENCE.
