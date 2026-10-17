@@ -364,10 +364,11 @@ TEST(HeliaStridedSliceShrinkTest, OutputLargerThanSliceFailsInvoke) {
   ExpectWrongOutputSizeFails<float>(kTfLiteFloat32, 9);
 }
 
-// A [65536, 65536] slice takes 2^32 elements, past what the saturating counts
-// can tell apart, so it fails even with a matching output. The dims are set
-// after the tensors are made, so nothing is allocated or read for them.
-TEST(HeliaStridedSliceShrinkTest, SlicePastInt32MaxFailsInvoke) {
+// A [65536, 65536] input holds 2^32 elements, past the int32_t offsets
+// heliaCORE addresses, so the slice fails before any copy even with a matching
+// output. The dims are set after the tensors are made, so nothing is
+// allocated or read for them.
+TEST(HeliaStridedSliceShrinkTest, InputPastInt32MaxFailsInvoke) {
   using tflite::testing::CreateTensor;
   using tflite::testing::IntArrayFromInts;
   static int8_t input[4] = {};
@@ -477,6 +478,40 @@ TEST(HeliaStridedSliceShrinkTest, AxisAbove2To30FailsInvoke) {
 #if HELIA_STRIDED_SLICE_SHRINK_LINK_WRAP
   EXPECT_EQ(0, g_leaf_calls[static_cast<int>(Leaf::kS8)]);
 #endif
+}
+
+// An int8 input sliced into an int32 output would read four bytes per input
+// element, so mismatched types fail.
+TEST(HeliaStridedSliceShrinkTest, TypeMismatchFailsInvoke) {
+  using tflite::testing::CreateTensor;
+  using tflite::testing::IntArrayFromInts;
+  static int8_t input[8] = {};
+  static int32_t output[8] = {};
+  const int32_t begin[] = {0};
+  const int32_t end[] = {8};
+  const int32_t strides[] = {1};
+  int dims[] = {1, 8};
+  int index_dims[] = {1, 1};
+  TfLiteTensor tensors[5] = {
+      CreateTensor(input, IntArrayFromInts(dims)),
+      CreateTensor(begin, IntArrayFromInts(index_dims)),
+      CreateTensor(end, IntArrayFromInts(index_dims)),
+      CreateTensor(strides, IntArrayFromInts(index_dims)),
+      CreateTensor(output, IntArrayFromInts(dims)),
+  };
+  for (int i = 1; i <= 3; ++i) {
+    tensors[i].allocation_type = kTfLiteMmapRo;
+  }
+  TfLiteStridedSliceParams params = {};
+  int inputs[] = {4, 0, 1, 2, 3};
+  int outputs[] = {1, 4};
+  const TFLMRegistration registration = tflite::Register_STRIDED_SLICE();
+  tflite::micro::KernelRunner runner(registration, tensors, 5,
+                                     IntArrayFromInts(inputs),
+                                     IntArrayFromInts(outputs), &params);
+  if (runner.InitAndPrepare() == kTfLiteOk) {
+    EXPECT_EQ(kTfLiteError, runner.Invoke());
+  }
 }
 
 TF_LITE_MICRO_TESTS_MAIN
