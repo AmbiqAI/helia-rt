@@ -18,6 +18,8 @@ limitations under the License.
 // int64, int16 and absent biases. GCC and ATfE links wrap
 // arm_transpose_conv_s16 and assert each invoke ran it once.
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 
@@ -79,8 +81,31 @@ struct Shape {
   Bias bias;
   int batch = 1;
   int input_zero_point = 0;
+  TfLiteFusedActivation activation = kTfLiteActNone;
   int output_zero_point = 0;
 };
+
+// TFLite's quantized bounds for a fused activation on an output with this
+// scale and zero point.
+void ActivationRange(TfLiteFusedActivation activation, float scale,
+                     int32_t zero_point, int32_t qmin, int32_t qmax,
+                     int32_t* act_min,
+                     int32_t* act_max) {
+  auto quantize = [&](float x) -> int32_t {
+    return zero_point + static_cast<int32_t>(std::round(x / scale));
+  };
+  *act_min = qmin;
+  *act_max = qmax;
+  if (activation == kTfLiteActRelu) {
+    *act_min = std::max<int32_t>(qmin, quantize(0.0f));
+  } else if (activation == kTfLiteActRelu6) {
+    *act_min = std::max<int32_t>(qmin, quantize(0.0f));
+    *act_max = std::min<int32_t>(qmax, quantize(6.0f));
+  } else if (activation == kTfLiteActReluN1To1) {
+    *act_min = std::max<int32_t>(qmin, quantize(-1.0f));
+    *act_max = std::min<int32_t>(qmax, quantize(1.0f));
+  }
+}
 
 constexpr int kMaxInput = 2 * 6 * 7 * 16;
 constexpr int kMaxFilter = 8 * 5 * 5 * 16;
@@ -196,7 +221,7 @@ void ExpectMatchesReference(const Shape& s) {
   params.padding = s.padding;
   params.stride_width = s.stride;
   params.stride_height = s.stride;
-  params.activation = kTfLiteActNone;
+  params.activation = s.activation;
 
   const bool has_bias = s.bias != Bias::kNone;
   int inputs_with_bias[] = {4, 0, 1, 2, 3};
@@ -231,8 +256,9 @@ void ExpectMatchesReference(const Shape& s) {
       PadSize(s.padding, s.in_h, out_h, s.kernel, s.stride);
   op_params.stride_width = s.stride;
   op_params.stride_height = s.stride;
-  op_params.quantized_activation_min = -32768;
-  op_params.quantized_activation_max = 32767;
+  ActivationRange(s.activation, output_scale, 0, -32768, 32767,
+                  &op_params.quantized_activation_min,
+                  &op_params.quantized_activation_max);
   const int32_t in_shape[] = {s.batch, s.in_h, s.in_w, s.in_c};
   const int32_t f_shape[] = {s.out_c, s.kernel, s.kernel, s.in_c};
   const int32_t b_shape[] = {s.out_c};
@@ -300,6 +326,22 @@ TEST(HeliaTransposeConvS16Test, BatchTwoSameStrideTwo) {
       Shape{4, 5, 3, 5, 3, 2, kTfLitePaddingSame, Bias::kInt64, 2});
 }
 
+// The fused activation clamps the output. see AmbiqAI/helia-rt#442
+TEST(HeliaTransposeConvS16Test, FusedRelu) {
+  ExpectMatchesReference(Shape{4, 5, 3, 5, 3, 2, kTfLitePaddingSame,
+                               Bias::kInt64, 1, 0, kTfLiteActRelu});
+}
+
+TEST(HeliaTransposeConvS16Test, FusedRelu6) {
+  ExpectMatchesReference(Shape{4, 5, 3, 5, 3, 2, kTfLitePaddingSame,
+                               Bias::kInt16, 1, 0, kTfLiteActRelu6});
+}
+
+TEST(HeliaTransposeConvS16Test, FusedReluN1To1) {
+  ExpectMatchesReference(Shape{4, 5, 3, 5, 3, 2, kTfLitePaddingSame,
+                               Bias::kNone, 1, 0, kTfLiteActReluN1To1});
+}
+
 TEST(HeliaTransposeConvS16Test, NonzeroZeroPointFailsPrepare) {
   ExpectMatchesReference(
       Shape{4, 5, 3, 5, 3, 2, kTfLitePaddingSame, Bias::kInt64, 1, 3});
@@ -307,7 +349,8 @@ TEST(HeliaTransposeConvS16Test, NonzeroZeroPointFailsPrepare) {
 
 TEST(HeliaTransposeConvS16Test, NonzeroOutputZeroPointFailsPrepare) {
   ExpectMatchesReference(
-      Shape{4, 5, 3, 5, 3, 2, kTfLitePaddingSame, Bias::kInt64, 1, 0, 3});
+      Shape{4, 5, 3, 5, 3, 2, kTfLitePaddingSame, Bias::kInt64, 1, 0,
+            kTfLiteActNone, 3});
 }
 
 TF_LITE_MICRO_TESTS_MAIN

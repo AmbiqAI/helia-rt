@@ -175,6 +175,11 @@ $(kernel_depthwise_s8_3x3_route_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_depthwise_conv_wrapper_s8
 endif
 
+# int8 TRANSPOSE_CONV under each fused activation against the reference
+# kernel. see AmbiqAI/helia-rt#442
+$(eval $(call microlite_test,kernel_transpose_conv_s8_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/transpose_conv_s8_test.cc))
+
 # 16x8 TRANSPOSE_CONV against the reference kernel over strides, paddings and
 # bias types. GCC and ATfE links wrap arm_transpose_conv_s16 to prove the route.
 $(eval $(call microlite_test,kernel_transpose_conv_s16_test,\
