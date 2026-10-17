@@ -221,6 +221,42 @@ $(kernel_transpose_conv_s16_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_transpose_conv_s16
 endif
 
+# SQUARED_DIFFERENCE, DIV and PRELU against the TFLM reference formulas, with
+# float NaN/Inf/signed-zero/subnormal edges. GCC and ATfE links wrap the
+# heliaCORE entries to prove each route. see AmbiqAI/helia-rt#433
+$(eval $(call microlite_test,kernel_squared_difference_route_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/squared_difference_route_test.cc))
+$(eval $(call microlite_test,kernel_div_route_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/div_route_test.cc))
+$(eval $(call microlite_test,kernel_prelu_route_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/prelu_route_test.cc))
+
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
+$(kernel_squared_difference_route_test_BINARY): CXXFLAGS += \
+  -DHELIA_SQDIFF_LINK_WRAP=1
+$(kernel_squared_difference_route_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_elementwise_squared_difference_s8 \
+  -Wl,--wrap=arm_elementwise_squared_difference_s16 \
+  -Wl,--wrap=arm_squared_difference_s8 \
+  -Wl,--wrap=arm_squared_difference_s16 \
+  -Wl,--wrap=arm_elementwise_squared_difference_f32 \
+  -Wl,--wrap=arm_elementwise_squared_difference_f16
+$(kernel_div_route_test_BINARY): CXXFLAGS += \
+  -DHELIA_DIV_LINK_WRAP=1
+$(kernel_div_route_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_elementwise_div_f32 \
+  -Wl,--wrap=arm_elementwise_div_broadcast_f32 \
+  -Wl,--wrap=arm_elementwise_div_f16 \
+  -Wl,--wrap=arm_elementwise_div_broadcast_f16
+$(kernel_prelu_route_test_BINARY): CXXFLAGS += \
+  -DHELIA_PRELU_LINK_WRAP=1
+$(kernel_prelu_route_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_prelu_s8 \
+  -Wl,--wrap=arm_prelu_s16 \
+  -Wl,--wrap=arm_prelu_f32 \
+  -Wl,--wrap=arm_prelu_f16
+endif
+
 # TRANSPOSE_CONV optional bias, and the int8 scratch-context contract on GCC and
 # ATfE links. see AmbiqAI/helia-rt#238
 $(eval $(call microlite_test,kernel_transpose_conv_optional_bias_test,\

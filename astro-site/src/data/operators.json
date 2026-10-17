@@ -142,6 +142,19 @@
     "notes": "Output is FP32. FP16 means weight-storage widening, not FP16 computation; it calls arm_dequantize_f16_bits_f32 on every target, works without ARM_NN_ENABLE_F16, and matches the reference widening bit for bit at reset FPSCR: a NaN keeps its sign and payload and comes back quiet, on the MVE path too. On cores with an FPU but no MVE float16 (for example cortex-m4+fp) the widening runs on the FPU, so with FPSCR.DN (default NaN) set every NaN becomes 0x7FC00000."
   },
   {
+    "name": "DIV",
+    "family": "Arithmetic",
+    "source": "div.cc",
+    "types": [
+      "int8",
+      "int32",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "FP32 and FP16 run CORE for identical shapes and rank <= 4 broadcasts; other FP32 shapes use Reference and FP16 is rejected. int8 and int32 use Reference. FP16 requires ARM_NN_ENABLE_F16; without it preparation fails."
+  },
+  {
     "name": "EQUAL",
     "family": "Comparison",
     "source": "comparisons.cc",
@@ -464,6 +477,19 @@
     "notes": "FP16 requires four-dimensional tensors and the float feature. Padding values and output shape must match."
   },
   {
+    "name": "PRELU",
+    "family": "Activation",
+    "source": "prelu.cc",
+    "types": [
+      "int8",
+      "int16",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "int8, FP32 and FP16 run CORE when the output has the input shape, alpha broadcasts into it and rank <= 4; other FP32/int8 shapes use Reference and FP16 is rejected, except an empty FP16 tensor, which is a no-op. int16 uses Reference (int8 alpha). The output type must match the input type, an FP32 input needs an FP32 alpha, and preparation fails unless the output is the broadcast shape of input and alpha with rank <= 4. FP16 requires ARM_NN_ENABLE_F16; without it preparation fails."
+  },
+  {
     "name": "QUANTIZE",
     "family": "Quantization",
     "source": "quantize_common.cc",
@@ -640,6 +666,20 @@
     ],
     "path": "Reference",
     "notes": "Reference implementation in the HELIA adapter source; Float32 input/output."
+  },
+  {
+    "name": "SQUARED_DIFFERENCE",
+    "family": "Arithmetic",
+    "source": "squared_difference.cc",
+    "types": [
+      "int8",
+      "int16",
+      "int32",
+      "float32",
+      "float16"
+    ],
+    "path": "Mixed",
+    "notes": "int8/int16 run CORE for identical shapes and rank <= 4 broadcasts. FP32 runs CORE for identical shapes and uses Reference for broadcasts; on MVE float builds (cortex-m55) FP32 uses Reference throughout, because the CORE Helium path flushes subnormal results (AmbiqAI/ns-cmsis-nn#877). The Reference keeps subnormal results on GCC builds; clang builds (ATfE, armclang) may vectorize its loop with Helium, which flushes them as well. FP16 runs CORE for identical shapes and rejects broadcasts. int32 uses Reference. FP16 requires ARM_NN_ENABLE_F16; without it preparation fails."
   },
   {
     "name": "SQUEEZE",
