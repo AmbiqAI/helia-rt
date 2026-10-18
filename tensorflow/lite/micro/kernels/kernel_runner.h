@@ -111,6 +111,9 @@ class KernelRunner {
   const TFLMRegistration registration_;
 
   SingleArenaBufferAllocator* allocator_;
+  // TODO(AmbiqAI/helia-rt#460): exhaustion sweep; drop when upstream has it.
+  TfLiteTensor* sweep_tensors_;
+  int sweep_tensors_size_;
   MockMicroGraph mock_micro_graph_;
   FakeMicroContext fake_micro_context_;
 };

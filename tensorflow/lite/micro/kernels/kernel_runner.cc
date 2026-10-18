@@ -19,6 +19,11 @@ limitations under the License.
 #include "tensorflow/lite/micro/micro_arena_constants.h"
 #include "tensorflow/lite/micro/micro_log.h"
 
+#if defined(HELIA_ALLOCATION_SWEEP)
+// TODO(AmbiqAI/helia-rt#460): exhaustion sweep; drop when upstream has it.
+#include "tensorflow/lite/micro/kernels/helia/helia_allocation_sweep.h"
+#endif
+
 namespace tflite {
 namespace micro {
 
@@ -46,6 +51,8 @@ KernelRunner::KernelRunner(const TFLMRegistration& registration,
     : registration_(registration),
       allocator_(SingleArenaBufferAllocator::Create(kKernelRunnerBuffer_,
                                                     kKernelRunnerBufferSize_)),
+      sweep_tensors_(tensors),
+      sweep_tensors_size_(tensors_size),
       mock_micro_graph_(allocator_),
       fake_micro_context_(tensors, allocator_, &mock_micro_graph_
 #ifdef USE_TFLM_COMPRESSION
@@ -77,6 +84,13 @@ bool KernelRunner::ValidateTempBufferDeallocated() {
 
 TfLiteStatus KernelRunner::InitAndPrepare(const char* init_data,
                                           size_t length) {
+#if defined(HELIA_ALLOCATION_SWEEP)
+  helia::SweepAllocationFailures(registration_, node_, sweep_tensors_,
+                                 sweep_tensors_size_, init_data, length);
+#else
+  (void)sweep_tensors_;
+  (void)sweep_tensors_size_;
+#endif
   if (registration_.init) {
     tflite::micro::ClearBufferApi(&context_);
     context_.AllocatePersistentBuffer = MicroContextAllocatePersistentBuffer;
