@@ -98,10 +98,13 @@ helia-specific shell entrypoints follow the naming pattern `*_helia.sh`:
 | `check_helia_cmsis_nn_status_checks_test.sh` | `helia_test.yml` |
 | `check_helia_workflow_secrets.sh` | `helia_test.yml` |
 | `check_helia_workflow_secrets_test.sh` | `helia_test.yml` |
+| `check_helia_release_versions.py` | `helia_test.yml`, `helia_release.yml` |
+| `check_helia_release_versions_test.py` | `helia_test.yml` |
 
 New helia CI scripts must follow the same `*_helia.sh` (or
-`<verb>_helia*.sh`) pattern. Avoid editing the upstream `test_*.sh`
-scripts unless the behavior change is *also* useful upstream.
+`<verb>_helia*.sh`, or `<verb>_helia*.py` for a Python check) pattern.
+Avoid editing the upstream `test_*.sh` scripts unless the behavior change
+is *also* useful upstream.
 
 ### 5. GitHub workflows (`.github/workflows/`)
 
@@ -129,18 +132,19 @@ helia-specific files:
 | `tensorflow/lite/micro/tools/make/targets/cortex_m_corstone_300_atfe.inc` | Externalized ATfE toolchain logic, included from `cortex_m_corstone_300_makefile.inc`. New target/toolchain combinations should follow the same `<target>_<toolchain>.inc` convention. |
 | `tensorflow/lite/micro/tools/make/arm_clang_download.sh`, `arm_toolchain_embedded_download.sh` | helia-managed toolchain downloaders invoked from the cortex_m_* target makefiles. |
 | `tensorflow/lite/micro/tools/make/ext_libs/ns_cmsis_nn_download.sh` | NS-CMSIS-NN downloader invoked from `helia.inc`. The `NS_CMSIS_NN_COMMIT` it consumes is exported from `helia.inc`. |
-| `tensorflow/lite/micro/tools/ci_build/{ns_local_build,package_helia_bundle,resolve_release_meta,release_asset_helpers,check_helia_kernel_runner_temporaries,check_helia_ci_image_pins,check_helia_ci_image_pins_test,check_helia_cmsis_nn_status_checks,check_helia_cmsis_nn_status_checks_test,check_helia_workflow_secrets,check_helia_workflow_secrets_test}.sh` | helia CI helpers. The `*_helia.sh` naming is preferred for new scripts. |
+| `tensorflow/lite/micro/tools/ci_build/{ns_local_build,package_helia_bundle,resolve_release_meta,release_asset_helpers,check_helia_kernel_runner_temporaries,check_helia_ci_image_pins,check_helia_ci_image_pins_test,check_helia_cmsis_nn_status_checks,check_helia_cmsis_nn_status_checks_test,check_helia_workflow_secrets,check_helia_workflow_secrets_test}.sh`, `check_helia_release_versions{,_test}.py` | helia CI helpers. The `*_helia.sh` naming is preferred for new scripts. |
 | `tensorflow/lite/micro/tools/github/arm_virtual_hardware/cortex_m_*_avh.yml` | Arm Virtual Hardware test configs consumed by `.github/workflows/cortex_m_virtual_hardware.yml`. |
 | `tensorflow/lite/micro/integration_tests/nnaed/` | helia integration tests vendored from the nnaed test generator. New helia-only integration tests go here, not under `integration_tests/seanet/` (upstream). |
 | `tensorflow/lite/micro/tools/ci_build/templates/zephyr_prebuilt/` | Zephyr module template assets used by `zephyr_static_export.sh`. |
 | `.devcontainer/` | helia-rt VS Code dev container definition. Upstream has none. |
 | `.github/stale.yml` | Probot-stale config (separate from `stale_handler.yml` which is upstream-owned). |
 | `nsx/` | heliaRT NSX module manifest (`nsx-module.yaml`, `CMakeLists.txt`) consumed by neuralSPOT and bumped by `release-please-config.json`. |
+| `nsx-source/` | `helia-rt-source` NSX module manifest (`nsx-module.yaml`) for consumers that compile the TFLM source tree with their own NSX wrapper; its version is bumped by `release-please-config.json`. |
 | `zephyr/` | Top-level Zephyr module (`CMakeLists.txt`, `Kconfig`, `module.yml`) so the heliaRT repo can be west-imported as a Zephyr module. Distinct from `tensorflow/lite/micro/tools/ci_build/templates/zephyr_prebuilt/`, which is the prebuilt-asset template. |
 | `zephyr_static_export.sh` | Top-level helper that drives the static Zephyr export flow. |
 | `pyproject.toml`, `uv.lock` | Python lint tooling managed with uv. Runtime Python utilities retain their own dependency manifests. |
 | `astro-site/` | Astro/Starlight documentation source, locked site dependencies and reference generation consumed by `.github/workflows/docs.yml`. |
-| `release-please-config.json`, `.release-please-manifest.json` | release-please config + state. The `extra-files` block bumps `tensorflow/lite/micro/helia_rt_version.h` and `nsx/nsx-module.yaml`. |
+| `release-please-config.json`, `.release-please-manifest.json` | release-please config + state. The `extra-files` block lists every file a release PR bumps, including `tensorflow/lite/micro/helia_rt_version.h` and both NSX module manifests. |
 | `ci/install_qemu.sh`, `ci/check_tflite_files.py`, `ci/issue_on_error.py` | helia-rt-only files in an upstream-owned directory; do not rename or move. `install_qemu.sh` is used by `.devcontainer/Dockerfile` and `issue_on_error.py` by `issue_on_error.yml`; `check_tflite_files.py` has no caller. |
 | `gen/`, `neuralspot/`, `data/`, `astro-site/` | helia-rt-only top-level directories (not present upstream). New helia-only directories at the repo root must be approved here before being added. |
 

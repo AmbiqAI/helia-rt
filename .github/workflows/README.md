@@ -41,7 +41,8 @@ Two rules follow from this and both matter:
 
 GitHub Actions does **not** allow the `${{ env.* }}` context inside
 `jobs.<job_id>.container.image`, so each workflow that uses `container:`
-declares a tiny `ci-image` setup job that emits the pinned tag as an output.
+declares a `ci-image` setup job that emits the pinned tag as an output (in
+`helia_test.yml` and `helia_release.yml` it also runs the fast source checks).
 Downstream jobs depend on it and resolve the image via
 `${{ needs.ci-image.outputs.image }}`:
 

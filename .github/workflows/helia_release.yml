@@ -70,7 +70,7 @@ concurrency:
 
 # The CI image is resolved by the `ci-image` setup job below and consumed via
 # `needs.ci-image.outputs.image`. `container.image` does not support the `env`
-# context, so a tiny setup job is the cleanest way to keep a single pin point.
+# context, so a setup job is the cleanest way to keep a single pin point.
 #
 # The image is pinned by DIGEST, not by tag. `:latest` is rebuilt by manual
 # dispatch of helia_build_docker_image.yml and is not a `needs:` of this
@@ -89,6 +89,22 @@ jobs:
     steps:
       - id: image
         run: echo "image=ghcr.io/ambiqai/helia-rt-ci@sha256:55372f29023cd1be1887af5761c8e6c18765b4e68ac28e02510d519e461692c9" >> "$GITHUB_OUTPUT"  # ghcr.io/ambiqai/helia-rt-ci:latest as of 2026-08-25
+
+      # Every build needs this job, so a release whose version or ns-cmsis-nn
+      # pin sites disagree stops before the matrix. Refs older than the check
+      # skip it. see AmbiqAI/helia-rt#402
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - name: Check release versions and the ns-cmsis-nn pin agree
+        run: |
+          check=tensorflow/lite/micro/tools/ci_build/check_helia_release_versions.py
+          if [[ -f "${check}" ]]; then
+            python3 "${check}" --remote
+          else
+            echo "::notice::${check} is not in this ref; skipping."
+          fi
 
   build:
     name: Build heliaRT (${{ matrix.arch }} • ${{ matrix.toolchain }} • ${{ matrix.build }})
