@@ -1067,4 +1067,42 @@ TEST(ReduceTest, MeanFloat4DKeepDimsOutputLayouts) {
   }
 }
 
+// TODO(AmbiqAI/helia-rt#460): short MEAN output; drop when upstream has it.
+// An output with fewer elements than the reduction keeps fails Invoke
+// without a write past it, as the reference accumulates in the output.
+TEST(ReduceTest, MeanFloat4DKeepDimsShortOutputFails) {
+  int input_shape[] = {4, 1, 2, 2, 4};
+  float input_data[16];
+  for (int i = 0; i < 16; ++i) {
+    input_data[i] = static_cast<float>(i);
+  }
+  int axis_shape[] = {1, 2};
+  const int32_t axis_data[] = {1, 2};
+  int output_shape[] = {4, 1, 1, 1, 1};
+  constexpr float kCanary = -123.0f;
+  float output_data[4] = {kCanary, kCanary, kCanary, kCanary};
+  TfLiteTensor tensors[] = {
+      tflite::testing::CreateTensor(
+          input_data, tflite::testing::IntArrayFromInts(input_shape)),
+      tflite::testing::CreateTensor(
+          axis_data, tflite::testing::IntArrayFromInts(axis_shape)),
+      tflite::testing::CreateTensor(
+          output_data, tflite::testing::IntArrayFromInts(output_shape)),
+  };
+  tensors[1].allocation_type = kTfLiteMmapRo;
+  TfLiteReducerParams params = {true};
+  int inputs_array_data[] = {2, 0, 1};
+  int outputs_array_data[] = {1, 2};
+  const TFLMRegistration registration = tflite::Register_MEAN();
+  tflite::micro::KernelRunner runner(
+      registration, tensors, 3,
+      tflite::testing::IntArrayFromInts(inputs_array_data),
+      tflite::testing::IntArrayFromInts(outputs_array_data), &params);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteError, runner.Invoke());
+  for (int i = 1; i < 4; ++i) {
+    EXPECT_EQ(kCanary, output_data[i]);
+  }
+}
+
 TF_LITE_MICRO_TESTS_MAIN

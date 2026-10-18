@@ -460,6 +460,12 @@ TEST(HeliaReduceOutputSizeTest, MeanFloat32KeepDimsOutputLayouts) {
                                input_dims, axis, 2, output_dims, 4, expected,
                                /*keep_dims=*/true));
   }
+  // A shorter output of the same layout fails without a write.
+  int short_dims[] = {4, 1, 1, 1, 1};
+  EXPECT_EQ(kTfLiteError,
+            RunReduce<float>(tflite::Register_MEAN(), kTfLiteFloat32,
+                             input_dims, axis, 2, short_dims, 0, nullptr,
+                             /*keep_dims=*/true));
 }
 
 // The special case takes a rank-4 output only. A rank-3 [1, 1, 1] output has

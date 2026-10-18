@@ -190,6 +190,34 @@ TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
   return kTfLiteOk;
 }
 
+// TODO(AmbiqAI/helia-rt#460): check output count; drop when upstream has it.
+// True when `output` holds exactly the input's elements on the axes the mean
+// keeps; the reference writes, and accumulates in, that many elements.
+bool OutputHoldsReducedCount(const TfLiteEvalTensor* input,
+                             const TfLiteEvalTensor* axis,
+                             const TfLiteEvalTensor* output, int num_axis) {
+  const int rank = input->dims->size;
+  const int32_t* axis_data = tflite::micro::GetTensorData<int32_t>(axis);
+  int64_t kept = 1;
+  for (int d = 0; d < rank; ++d) {
+    bool reduced = false;
+    for (int i = 0; i < num_axis; ++i) {
+      const int a = axis_data[i] < 0 ? axis_data[i] + rank : axis_data[i];
+      reduced = reduced || a == d;
+    }
+    if (!reduced) {
+      if (input->dims->data[d] < 0) {
+        return false;
+      }
+      kept *= input->dims->data[d];
+      if (kept > INT32_MAX) {
+        return false;
+      }
+    }
+  }
+  return kept == ElementCount(*output->dims);
+}
+
 }  // namespace
 
 TfLiteStatus PrepareMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
@@ -299,6 +327,9 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
       context->GetScratchBuffer(context, op_data->scratch_input_iter_idx));
   int* resolved_axis = static_cast<int*>(
       context->GetScratchBuffer(context, op_data->scratch_resolved_axis_idx));
+  TF_LITE_ENSURE_MSG(context,
+                     OutputHoldsReducedCount(input, axis, output, num_axis),
+                     "MEAN: the output size does not match the reduction.");
 
   switch (input->type) {
     case kTfLiteFloat32: {
