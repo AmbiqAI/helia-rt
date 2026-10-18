@@ -15,6 +15,8 @@ limitations under the License.
 
 #include "tensorflow/lite/micro/memory_planner/greedy_memory_planner.h"
 
+#include <climits>
+
 #include "tensorflow/lite/micro/micro_log.h"
 
 namespace tflite {
@@ -64,6 +66,8 @@ TfLiteStatus GreedyMemoryPlanner::Init(unsigned char* scratch_buffer,
   // Reset internal states
   buffer_count_ = 0;
   need_to_calculate_offsets_ = true;
+  // TODO(AmbiqAI/helia-rt#460): upstream sums offsets in int unchecked; drop when upstream has it.
+  planned_bytes_bound_ = 0;
 
   // Allocate the arrays we need within the scratch buffer arena.
   max_buffer_count_ = scratch_buffer_size / per_buffer_size();
@@ -95,6 +99,12 @@ TfLiteStatus GreedyMemoryPlanner::AddBuffer(int size, int first_time_used,
     MicroPrintf("Too many buffers (max is %d)", max_buffer_count_);
     return kTfLiteError;
   }
+  // TODO(AmbiqAI/helia-rt#460): upstream sums offsets in int unchecked; drop when upstream has it.
+  if (size < 0 || size > INT_MAX - planned_bytes_bound_) {
+    MicroPrintf("Buffer of %d bytes does not fit the memory plan", size);
+    return kTfLiteError;
+  }
+  planned_bytes_bound_ += size;
   BufferRequirements* current = &requirements_[buffer_count_];
   current->size = size;
   current->first_time_used = first_time_used;
@@ -108,8 +118,17 @@ TfLiteStatus GreedyMemoryPlanner::AddBuffer(int size, int first_time_used,
 TfLiteStatus GreedyMemoryPlanner::AddBuffer(int size, int first_time_used,
                                             int last_time_used,
                                             int offline_offset) {
+  // TODO(AmbiqAI/helia-rt#460): upstream sums offsets in int unchecked; drop when upstream has it.
+  if (offline_offset < 0 || size < 0 ||
+      offline_offset > INT_MAX - planned_bytes_bound_ - size) {
+    MicroPrintf("Offline buffer of %d bytes at %d does not fit the memory plan",
+                size, offline_offset);
+    return kTfLiteError;
+  }
+  planned_bytes_bound_ += offline_offset;
   BufferRequirements* current = &requirements_[buffer_count_];
   if (AddBuffer(size, first_time_used, last_time_used) != kTfLiteOk) {
+    planned_bytes_bound_ -= offline_offset;
     return kTfLiteError;
   }
   current->offline_offset = offline_offset;

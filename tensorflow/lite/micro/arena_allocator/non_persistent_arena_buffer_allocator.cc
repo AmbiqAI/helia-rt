@@ -32,8 +32,10 @@ NonPersistentArenaBufferAllocator::~NonPersistentArenaBufferAllocator() {}
 uint8_t* NonPersistentArenaBufferAllocator::AllocateTemp(size_t size,
                                                          size_t alignment) {
   uint8_t* const aligned_result = AlignPointerUp(next_temp_, alignment);
-  const size_t available_memory = buffer_tail_ - aligned_result;
-  if (available_memory < size) {
+  // TODO(AmbiqAI/helia-rt#460): upstream wraps when alignment moves past the tail; drop when upstream has it.
+  const size_t available_memory =
+      aligned_result > buffer_tail_ ? 0 : buffer_tail_ - aligned_result;
+  if (aligned_result > buffer_tail_ || available_memory < size) {
     MicroPrintf(
         "Failed to allocate temp memory. Requested: %u, "
         "available %u, missing: %u",
@@ -113,8 +115,11 @@ TfLiteStatus NonPersistentArenaBufferAllocator::ResizeBuffer(
     return kTfLiteError;
   }
 
-  const size_t available_memory = buffer_tail_ - expect_resizable_buf;
-  if (available_memory < size) {
+  // TODO(AmbiqAI/helia-rt#460): upstream wraps when alignment moves past the tail; drop when upstream has it.
+  const size_t available_memory = expect_resizable_buf > buffer_tail_
+                                      ? 0
+                                      : buffer_tail_ - expect_resizable_buf;
+  if (expect_resizable_buf > buffer_tail_ || available_memory < size) {
     MicroPrintf(
         "Failed to resize buffer. Requested: %u, available %u, missing: %u",
         size, available_memory, size - available_memory);
@@ -164,6 +169,10 @@ size_t NonPersistentArenaBufferAllocator::GetAvailableMemory(
     size_t alignment) const {
   uint8_t* const aligned_temp = AlignPointerUp(next_temp_, alignment);
   uint8_t* const aligned_tail = AlignPointerDown(buffer_tail_, alignment);
+  // TODO(AmbiqAI/helia-rt#460): upstream wraps when alignment moves past the tail; drop when upstream has it.
+  if (aligned_tail < aligned_temp) {
+    return 0;
+  }
   return aligned_tail - aligned_temp;
 }
 

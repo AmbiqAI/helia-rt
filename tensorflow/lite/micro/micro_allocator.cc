@@ -110,6 +110,11 @@ TfLiteStatus CreatePlan(MicroMemoryPlanner* planner,
   for (size_t i = 0; i < allocation_info_size; ++i) {
     const AllocationInfo* current = &allocation_info[i];
     if (current->needs_allocating) {
+      // TODO(AmbiqAI/helia-rt#460): upstream narrows buffer sizes to int unchecked; drop when upstream has it.
+      if (current->bytes > kMaxTensorBytes) {
+        MicroPrintf("Buffer of %u bytes is too large to plan", current->bytes);
+        return kTfLiteError;
+      }
       size_t aligned_bytes_required =
           AlignSizeUp(current->bytes, MicroArenaBufferAlignment());
       if (current->offline_offset == kOnlinePlannedBuffer) {
