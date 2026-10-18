@@ -352,30 +352,32 @@ jobs:
         # leg. see AmbiqAI/helia-rt#433
         # Elementwise shorter-output and int16 RSQRT/ABS quantization cases add
         # five cases on every leg. see AmbiqAI/helia-rt#450, AmbiqAI/helia-rt#381
+        # The elementwise Prepare temporary-release case adds one case on every
+        # leg. see AmbiqAI/helia-rt#450
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 176
-            min-cases: 1593
+            min-cases: 1594
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 176
-            min-cases: 1593
+            min-cases: 1594
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 175
-            min-cases: 1591
+            min-cases: 1592
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 176
-            min-cases: 1656
+            min-cases: 1657
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 175
-            min-cases: 1654
+            min-cases: 1655
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
