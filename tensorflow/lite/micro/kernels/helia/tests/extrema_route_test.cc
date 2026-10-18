@@ -38,6 +38,14 @@ limitations under the License.
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
+// A HELIA_ENABLE_F32=0 build has no float32 entries to wrap and runs
+// float32 on the reference.
+#if HELIA_EXTREMA_LINK_WRAP && ARM_NN_ENABLE_F32
+#define HELIA_EXTREMA_F32_WRAP 1
+#else
+#define HELIA_EXTREMA_F32_WRAP 0
+#endif
+
 namespace {
 
 enum class Leaf {
@@ -91,14 +99,16 @@ extern "C" {
     return __real_##NAME(input, input_dims, axis_dims, output, output_dims);   \
   }
 
+#if ARM_NN_ENABLE_F32
 HELIA_WRAP_ARG(arm_argmax_f32, float32_t, Leaf::kArgMaxF32)
 HELIA_WRAP_ARG(arm_argmin_f32, float32_t, Leaf::kArgMinF32)
-HELIA_WRAP_ARG(arm_argmax_s8, int8_t, Leaf::kArgMaxS8)
-HELIA_WRAP_ARG(arm_argmin_s8, int8_t, Leaf::kArgMinS8)
 HELIA_WRAP_REDUCE(arm_reduce_max_tflite_f32, float32_t,
                   Leaf::kReduceMaxTfliteF32)
 HELIA_WRAP_REDUCE(arm_reduce_min_tflite_f32, float32_t,
                   Leaf::kReduceMinTfliteF32)
+#endif
+HELIA_WRAP_ARG(arm_argmax_s8, int8_t, Leaf::kArgMaxS8)
+HELIA_WRAP_ARG(arm_argmin_s8, int8_t, Leaf::kArgMinS8)
 HELIA_WRAP_REDUCE(arm_reduce_max_s8, int8_t, Leaf::kReduceMaxS8)
 HELIA_WRAP_REDUCE(arm_reduce_max_s16, int16_t, Leaf::kReduceMaxS16)
 #if ARM_NN_ENABLE_F16
@@ -226,7 +236,10 @@ void ExpectArgMatchesReference(const Layer& l, TfLiteType type,
     memset(g_leaf_calls, 0, sizeof(g_leaf_calls));
     EXPECT_EQ(kTfLiteOk, RunArg(l, is_max, type, input, core));
 #if HELIA_EXTREMA_LINK_WRAP
-    EXPECT_EQ(1, g_leaf_calls[static_cast<int>(is_max ? max_leaf : min_leaf)]);
+    if (HELIA_EXTREMA_F32_WRAP || type != kTfLiteFloat32) {
+      EXPECT_EQ(1,
+                g_leaf_calls[static_cast<int>(is_max ? max_leaf : min_leaf)]);
+    }
 #else
     (void)max_leaf;
     (void)min_leaf;
@@ -309,7 +322,7 @@ int ReducedOutputCount(const Layer& l) {
 
 // Calls of the float32 _tflite entry for REDUCE_MAX (is_max) or REDUCE_MIN.
 void ExpectTfliteF32Calls(bool is_max, int calls) {
-#if HELIA_EXTREMA_LINK_WRAP
+#if HELIA_EXTREMA_F32_WRAP
   EXPECT_EQ(calls, g_leaf_calls[static_cast<int>(
                        is_max ? Leaf::kReduceMaxTfliteF32
                               : Leaf::kReduceMinTfliteF32)]);

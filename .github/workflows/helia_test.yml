@@ -359,34 +359,47 @@ jobs:
         # Elementwise bool and int16-quantized output-count, hostile-dims and
         # missing-zero-point cases add six cases on every leg.
         # see AmbiqAI/helia-rt#450
+        # Reduce and PRELU Prepare rejections and the MEAN keep_dims layouts add
+        # one binary and ten cases on every leg. see AmbiqAI/helia-rt#452,
+        # AmbiqAI/helia-rt#454
+        # MEAN/SUM entry-failure cases, the reference MEAN layouts and the MEAN
+        # output-rank case add one binary and six cases on every leg.
+        # see AmbiqAI/helia-rt#452, AmbiqAI/helia-rt#458
+        # The float32 fallback-shape cases and the reference STRIDED_SLICE
+        # INT32_MAX-stride case add one binary and five cases on every leg.
+        # see AmbiqAI/helia-rt#452
         # SPLIT, SQUEEZE, DIV and ADD malformed-model checks add one binary and
         # twenty-four cases on every leg. see AmbiqAI/helia-rt#451
+        # The reference MEAN short-output rejection adds one case on every leg.
+        # see AmbiqAI/helia-rt#452
+        # The reference MEAN empty-input cases add two cases on every leg.
+        # see AmbiqAI/helia-rt#452
         # Tensor byte-size, arena and planner overflow adds one binary and
         # twenty-six cases on every leg. see AmbiqAI/helia-rt#453
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 178
-            min-cases: 1652
+            min-binaries: 181
+            min-cases: 1676
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 178
-            min-cases: 1652
+            min-binaries: 181
+            min-cases: 1676
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 177
-            min-cases: 1650
+            min-binaries: 180
+            min-cases: 1674
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 178
-            min-cases: 1715
+            min-binaries: 181
+            min-cases: 1739
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 177
-            min-cases: 1713
+            min-binaries: 180
+            min-cases: 1737
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
@@ -517,3 +530,90 @@ jobs:
       - name: Show ccache stats
         if: always()
         run: ccache -s || true
+
+  # Every leg of the matrix above builds heliaCORE's float32 kernels in, so
+  # the float32 reference fallbacks that a CMake int8-only build takes never
+  # run there. This job builds the native host make tree with
+  # HELIA_ENABLE_F32=0 and runs the reduce tests and the float route tests
+  # that have float32 cases, so those cases check the reference routes.
+  # see AmbiqAI/helia-rt#452
+  helia_f32_off_host:
+    needs: ci-image
+    if: ${{ !inputs.armclang-m4-qualification }}
+    runs-on: ubuntu-latest-md
+    container:
+      image: ${{ needs.ci-image.outputs.image }}
+    timeout-minutes: 30
+    name: test-host-f32-off
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.trigger-sha || inputs.ref || github.sha }}
+
+      - name: Mark workspace as safe for Git
+        run: git config --global --add safe.directory "*"
+
+      # Same check as the matrix job: the value reaches `git checkout` in
+      # ext_libs/ns_cmsis_nn_download.sh.
+      - name: Validate ns-cmsis-nn ref
+        if: ${{ inputs.ns-cmsis-nn-ref != '' }}
+        env:
+          NS_CMSIS_NN_REF: ${{ inputs.ns-cmsis-nn-ref }}
+        run: |
+          case "${NS_CMSIS_NN_REF}" in
+            -*)
+              echo "::error ::ns-cmsis-nn-ref must not begin with '-'"
+              exit 1 ;;
+            *[!A-Za-z0-9._/-]*)
+              echo "::error ::ns-cmsis-nn-ref must match ^[A-Za-z0-9._/-]+$ (whole string)"
+              exit 1 ;;
+          esac
+          echo "ns-cmsis-nn ref accepted: ${NS_CMSIS_NN_REF}"
+
+      - name: Reduce and float route tests without ARM_NN_ENABLE_F32
+        env:
+          NS_CMSIS_NN_REF: ${{ inputs.ns-cmsis-nn-ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Export only an override: make treats an empty environment value
+          # as defined, which would suppress helia.inc's `?=` pin.
+          if [ -n "${NS_CMSIS_NN_REF}" ]; then
+            echo "==> ns-cmsis-nn pin OVERRIDDEN to ${NS_CMSIS_NN_REF}"
+            export NS_CMSIS_NN_COMMIT="${NS_CMSIS_NN_REF}"
+          fi
+          # Signed overflow is undefined, so whether an index that overflows
+          # faults depends on code generation; the sanitizer makes it fail.
+          ubsan="-fsanitize=signed-integer-overflow -fno-sanitize-recover=all"
+          make -f tensorflow/lite/micro/tools/make/Makefile \
+            OPTIMIZED_KERNEL_DIR=helia HELIA_ENABLE_F32=0 \
+            "CXX_TOOL=g++ ${ubsan}" "CC_TOOL=gcc ${ubsan}" \
+            BASE_GENDIR=gen-f32-off -j"$(nproc)" \
+            test_kernel_reduce_test \
+            test_kernel_reduce_output_size_test \
+            test_kernel_reduce_prepare_test \
+            test_kernel_reduce_status_test \
+            test_kernel_elementwise_unary_route_test \
+            test_kernel_extrema_route_test \
+            test_kernel_float32_fallback_shape_test \
+            test_kernel_float_activation_edge_test \
+            test_kernel_float_lstm_tail_lane_test \
+            test_kernel_gather_pair_test \
+            test_kernel_resize_nearest_neighbor_route_test \
+            test_kernel_strided_slice_route_test \
+            test_kernel_prelu_route_test \
+            test_kernel_squared_difference_route_test \
+            test_kernel_div_route_test \
+            test_kernel_transpose_conv_float_bias_test
+          # The knob must have left heliaCORE's float32 MEAN out, or the
+          # reduce tests above ran the heliaCORE route instead.
+          bin=gen-f32-off/linux_x86_64_default_helia_gcc/bin/kernel_reduce_output_size_test
+          if [ ! -f "${bin}" ]; then
+            echo "::error ::${bin} was not built"
+            exit 1
+          fi
+          symbols=$(nm "${bin}")
+          if grep -q arm_nn_mean_f32 <<<"${symbols}"; then
+            echo "::error ::${bin} links arm_nn_mean_f32 with HELIA_ENABLE_F32=0"
+            exit 1
+          fi

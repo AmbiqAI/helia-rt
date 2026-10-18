@@ -66,13 +66,13 @@ jobs:
 
   # Do not rename this job id. GitHub names the resulting check runs
   # "<caller job id> / <called job name>", so this id is the literal
-  # "helia-test / ..." prefix of the ten required status check contexts in the
-  # `main` branch ruleset. Renaming it makes `main` unmergeable until the
-  # ruleset is updated to match.
+  # "helia-test / ..." prefix of the required status check contexts in the
+  # `main` branch ruleset that come from helia_test.yml. Renaming it makes
+  # `main` unmergeable until the ruleset is updated to match.
   helia-test:
     # `labeled` is in this workflow's trigger list so that adding `ci:run_full`
     # can start the ci-run job below. Every *other* label would otherwise
-    # restart the ten-job matrix and buy nothing:
+    # restart the whole helia_test.yml run and buy nothing:
     #
     #   - release-please labels a merged release PR `autorelease: tagged` after
     #     cutting a release, which would re-run the whole matrix against a
@@ -89,7 +89,7 @@ jobs:
     # opened/synchronize run stay the latest result for their names.
     #
     # Skipping a draft is safe too: this job calls a reusable workflow, so a
-    # skip reports only "helia-test" and the ten required contexts stay pending.
+    # skip reports only "helia-test" and its required contexts stay pending.
     if: >-
       (github.event.action == 'labeled' &&
       github.event.label.name == 'ci:run_full') ||

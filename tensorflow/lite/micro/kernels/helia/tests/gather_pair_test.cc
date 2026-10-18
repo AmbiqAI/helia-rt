@@ -193,16 +193,21 @@ void ResetRoutes() {
 #endif
 }
 
+// A HELIA_ENABLE_F32=0 build has no float32 entries and runs float32 on the
+// reference.
 void ExpectCalls(Route route, int expected) {
 #if HELIA_GATHER_LINK_WRAP
-  EXPECT_EQ(expected, g_calls[static_cast<int>(route)]);
+  const bool f32 = route == Route::kGatherF32 || route == Route::kGatherNdF32;
+  if (ARM_NN_ENABLE_F32 || !f32) {
+    EXPECT_EQ(expected, g_calls[static_cast<int>(route)]);
+  }
 #else
   (void)route;
   (void)expected;
 #endif
 }
 
-#if HELIA_GATHER_LINK_WRAP
+#if HELIA_GATHER_LINK_WRAP && ARM_NN_ENABLE_F32
 void ForceError(Route route) { g_forced_error = route; }
 #endif
 
@@ -702,7 +707,7 @@ TEST(HeliaGatherPairTest, FloatErrorsAreAtomicAndPropagated) {
   ExpectBits(nd_sentinel, nd_output, 2);
   ExpectCalls(Route::kGatherNdF32, 1);
 
-#if HELIA_GATHER_LINK_WRAP
+#if HELIA_GATHER_LINK_WRAP && ARM_NN_ENABLE_F32
   ResetRoutes();
   ForceError(Route::kGatherF32);
   int32_t valid_indices[] = {0, 1};

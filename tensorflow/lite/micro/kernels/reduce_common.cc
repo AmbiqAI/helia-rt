@@ -190,6 +190,57 @@ TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
   return kTfLiteOk;
 }
 
+// TODO(AmbiqAI/helia-rt#460): check output count; drop when upstream has it.
+// True when `output` holds exactly the input's elements on the axes the mean
+// keeps; the reference writes, and accumulates in, that many elements.
+bool OutputHoldsReducedCount(const TfLiteEvalTensor* input,
+                             const TfLiteEvalTensor* axis,
+                             const TfLiteEvalTensor* output, int num_axis) {
+  const int rank = input->dims->size;
+  const int32_t* axis_data = tflite::micro::GetTensorData<int32_t>(axis);
+  int64_t kept = 1;
+  for (int d = 0; d < rank; ++d) {
+    bool reduced = false;
+    for (int i = 0; i < num_axis; ++i) {
+      const int a = axis_data[i] < 0 ? axis_data[i] + rank : axis_data[i];
+      reduced = reduced || a == d;
+    }
+    if (!reduced) {
+      if (input->dims->data[d] < 0) {
+        return false;
+      }
+      kept *= input->dims->data[d];
+      if (kept > INT32_MAX) {
+        return false;
+      }
+    }
+  }
+  return kept == ElementCount(*output->dims);
+}
+
+// TODO(AmbiqAI/helia-rt#460): empty MEAN input; drop when upstream has it.
+// The reference reduce loop reads one element before its first bounds check,
+// so an input with a zero extent writes T() into each output element instead,
+// the value the reference gives a reduction over nothing.
+bool HasZeroExtent(const TfLiteEvalTensor* input) {
+  for (int i = 0; i < input->dims->size; ++i) {
+    if (input->dims->data[i] == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+template <typename T>
+TfLiteStatus FillEmptyMean(TfLiteEvalTensor* output) {
+  T* data = tflite::micro::GetTensorData<T>(output);
+  const int count = ElementCount(*output->dims);
+  for (int i = 0; i < count; ++i) {
+    data[i] = T();
+  }
+  return kTfLiteOk;
+}
+
 }  // namespace
 
 TfLiteStatus PrepareMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
@@ -299,6 +350,22 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
       context->GetScratchBuffer(context, op_data->scratch_input_iter_idx));
   int* resolved_axis = static_cast<int*>(
       context->GetScratchBuffer(context, op_data->scratch_resolved_axis_idx));
+  TF_LITE_ENSURE_MSG(context,
+                     OutputHoldsReducedCount(input, axis, output, num_axis),
+                     "MEAN: the output size does not match the reduction.");
+  if (HasZeroExtent(input)) {
+    TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
+    switch (input->type) {
+      case kTfLiteFloat32:
+        return FillEmptyMean<float>(output);
+      case kTfLiteInt8:
+        return FillEmptyMean<int8_t>(output);
+      case kTfLiteInt16:
+        return FillEmptyMean<int16_t>(output);
+      default:
+        break;
+    }
+  }
 
   switch (input->type) {
     case kTfLiteFloat32: {
@@ -308,10 +375,15 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
 
       // Special case mean implementation exists for 4D mean across axes 1
       // and 2.
+      // TODO(AmbiqAI/helia-rt#460): [N,1,1,C] only; drop when upstream has it.
+      const TfLiteIntArray* out_dims = output->dims;
       bool special_case_4d_axes_1_and_2 =
           input->dims->size == 4 && op_params.axis_count == 2 &&
           ((op_params.axis[0] == 1 && op_params.axis[1] == 2) ||
-           (op_params.axis[0] == 2 && op_params.axis[1] == 1));
+           (op_params.axis[0] == 2 && op_params.axis[1] == 1)) &&
+          out_dims->size == 4 && out_dims->data[0] == input->dims->data[0] &&
+          out_dims->data[1] == 1 && out_dims->data[2] == 1 &&
+          out_dims->data[3] == input->dims->data[3];
 
       // Defer to specialized implementation for 4D Mean across axes 1 & 2.
       if (params->keep_dims && special_case_4d_axes_1_and_2) {
