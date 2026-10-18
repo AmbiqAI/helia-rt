@@ -21,6 +21,7 @@ limitations under the License.
 // see AmbiqAI/helia-rt#449
 
 #include "tensorflow/lite/micro/kernels/helia/tests/arena_sweep_models.h"
+#include "tensorflow/lite/micro/test_helpers.h"
 
 TEST(HeliaArenaExhaustionInjectionTest, KeywordModelPersistentDominated) {
   InjectAllocationFailures("keyword_scrambled", g_keyword_scrambled_model_data);
@@ -63,6 +64,14 @@ TEST(HeliaArenaExhaustionInjectionTest, ResourceVariablesModel) {
   InjectAllocationFailures("resource_variables",
                            g_resource_variables_model_data,
                            /*resource_variables=*/true);
+}
+
+// IF and WHILE run their subgraphs through the interpreter, not KernelRunner.
+TEST(HeliaArenaExhaustionInjectionTest, ControlFlowModels) {
+  InjectAllocationFailures("if_model",
+                           tflite::testing::GetSimpleModelWithSubgraphsAndIf());
+  InjectAllocationFailures(
+      "while_model", tflite::testing::GetSimpleModelWithSubgraphsAndWhile());
 }
 
 TF_LITE_MICRO_TESTS_MAIN

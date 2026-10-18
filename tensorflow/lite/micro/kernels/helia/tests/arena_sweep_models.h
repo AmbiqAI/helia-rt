@@ -118,6 +118,7 @@ inline TfLiteStatus AddModelOps(Resolver& r) {
   TF_LITE_ENSURE_STATUS(r.AddFilterBankSquareRoot());
   TF_LITE_ENSURE_STATUS(r.AddFullyConnected());
   TF_LITE_ENSURE_STATUS(r.AddIf());
+  TF_LITE_ENSURE_STATUS(r.AddLess());
   TF_LITE_ENSURE_STATUS(r.AddLogistic());
   TF_LITE_ENSURE_STATUS(r.AddMaximum());
   TF_LITE_ENSURE_STATUS(r.AddMaxPool2D());
@@ -312,12 +313,11 @@ inline int AllocateWithFailure(const tflite::Model* model,
 // a later smaller request still fits: AllocateTensors must return
 // kTfLiteError each time.
 inline void InjectAllocationFailures(const char* label,
-                                     const unsigned char* model_data,
+                                     const tflite::Model* model,
                                      bool resource_variables = false,
                                      bool alone_too = true) {
   Resolver resolver;
   ASSERT_EQ(AddModelOps(resolver), kTfLiteOk);
-  const tflite::Model* model = tflite::GetModel(model_data);
   // Large enough for the model, so only the injected failures fail.
   size_t arena_size = kArenaSize;
   {
@@ -350,6 +350,14 @@ inline void InjectAllocationFailures(const char* label,
   MicroPrintf("%s: failed each of %d arena allocations%s and with the rest",
               label, allocations, alone_too ? " alone" : "");
   EXPECT_EQ(unexpected, 0);
+}
+
+inline void InjectAllocationFailures(const char* label,
+                                     const unsigned char* model_data,
+                                     bool resource_variables = false,
+                                     bool alone_too = true) {
+  InjectAllocationFailures(label, tflite::GetModel(model_data),
+                           resource_variables, alone_too);
 }
 
 }  // namespace
