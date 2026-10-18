@@ -520,3 +520,14 @@ endif
 $(eval $(call microlite_test,kernel_reduce_output_size_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/reduce_output_size_test.cc))
 
+# Kernels that write into a persistent buffer fail when the arena cannot hold
+# it, the single-arena allocator stays inside the arena and off live temp
+# memory, and AllocateTensors fails cleanly at every arena size below the
+# requirement. see AmbiqAI/helia-rt#449
+$(eval $(call microlite_test,kernel_persistent_buffer_failure_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/persistent_buffer_failure_test.cc))
+$(eval $(call microlite_test,kernel_arena_size_sweep_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/arena_size_sweep_test.cc \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/testing/test_conv_model.cc,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/testing/test_conv_model.h,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/models/keyword_scrambled.tflite))
