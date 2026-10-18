@@ -382,32 +382,36 @@ jobs:
         # int16 comparison, 16x8 FC bias, PAD/TRANSPOSE int8, batched depthwise
         # and LSTM weight-type tests add five binaries and thirty-three cases on
         # every leg. see AmbiqAI/helia-rt#470
+        # Float32 SVDF without a bias adds one binary and two cases on every leg.
+        # see AmbiqAI/helia-rt#471
+        # TRANSPOSE run-time perm rejection adds three cases on every leg.
+        # see AmbiqAI/helia-rt#471
         # The float16 DEPTHWISE_CONV_2D _acc16 opt-in registration adds one case
         # on every leg and three on the cortex-m55 ones. see AmbiqAI/ns-cmsis-nn#830
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 190
-            min-cases: 1751
+            min-binaries: 191
+            min-cases: 1756
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 190
-            min-cases: 1751
+            min-binaries: 191
+            min-cases: 1756
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 189
-            min-cases: 1749
+            min-binaries: 190
+            min-cases: 1754
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 190
-            min-cases: 1816
+            min-binaries: 191
+            min-cases: 1821
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 189
-            min-cases: 1814
+            min-binaries: 190
+            min-cases: 1819
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
@@ -614,7 +618,9 @@ jobs:
             test_kernel_squared_difference_route_test \
             test_kernel_div_route_test \
             test_kernel_transpose_conv_float_bias_test \
-            test_kernel_lstm_weight_type_test
+            test_kernel_lstm_weight_type_test \
+            test_kernel_svdf_test \
+            test_kernel_model_support_checks_test
           # The knob must have left heliaCORE's float32 MEAN out, or the
           # reduce tests above ran the heliaCORE route instead.
           bin=gen-f32-off/linux_x86_64_default_helia_gcc/bin/kernel_reduce_output_size_test

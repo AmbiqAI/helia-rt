@@ -629,3 +629,8 @@ $(eval $(call microlite_test,kernel_lstm_weight_type_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/lstm_weight_type_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/testdata/lstm_test_data.cc,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/testdata/lstm_test_data.h))
+
+# A float32 SVDF without a bias runs without reading it, and TRANSPOSE rejects a
+# perm computed at run time. see AmbiqAI/helia-rt#471
+MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/model_support_checks_test.cc
