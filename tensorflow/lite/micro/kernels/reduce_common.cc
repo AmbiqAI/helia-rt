@@ -308,10 +308,15 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
 
       // Special case mean implementation exists for 4D mean across axes 1
       // and 2.
+      // TODO(AmbiqAI/helia-rt#460): [N,1,1,C] only; drop when upstream has it.
+      const TfLiteIntArray* out_dims = output->dims;
       bool special_case_4d_axes_1_and_2 =
           input->dims->size == 4 && op_params.axis_count == 2 &&
           ((op_params.axis[0] == 1 && op_params.axis[1] == 2) ||
-           (op_params.axis[0] == 2 && op_params.axis[1] == 1));
+           (op_params.axis[0] == 2 && op_params.axis[1] == 1)) &&
+          out_dims->size == 4 && out_dims->data[0] == input->dims->data[0] &&
+          out_dims->data[1] == 1 && out_dims->data[2] == 1 &&
+          out_dims->data[3] == input->dims->data[3];
 
       // Defer to specialized implementation for 4D Mean across axes 1 & 2.
       if (params->keep_dims && special_case_4d_axes_1_and_2) {

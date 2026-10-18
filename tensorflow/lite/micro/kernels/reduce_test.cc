@@ -1041,4 +1041,30 @@ TEST(ReduceTest, AllOpTestKeepDims) {
       expected_output_data, tflite::Register_REDUCE_ALL(), &params);
 }
 
+// TODO(AmbiqAI/helia-rt#460): MEAN [N,1,1,C] guard; drop when upstream has it.
+TEST(ReduceTest, MeanFloat4DKeepDimsOutputLayouts) {
+  int input_shape[] = {4, 1, 2, 2, 4};
+  float input_data[16];
+  for (int i = 0; i < 16; ++i) {
+    input_data[i] = static_cast<float>(i);
+  }
+  int axis_shape[] = {1, 2};
+  const int32_t axis_data[] = {1, 2};
+  const float golden[] = {6, 7, 8, 9};
+  int nhwc_shape[] = {4, 1, 1, 1, 4};
+  int batch_shape[] = {4, 4, 1, 1, 1};
+  int split_shape[] = {4, 2, 1, 1, 2};
+  int tall_shape[] = {4, 1, 2, 1, 2};
+  int rank3_shape[] = {3, 1, 1, 4};
+  int rank5_shape[] = {5, 1, 1, 1, 4, 1};
+  TfLiteReducerParams params = {true};
+  for (int* output_shape : {nhwc_shape, batch_shape, split_shape, tall_shape,
+                            rank3_shape, rank5_shape}) {
+    float output_data[4];
+    tflite::testing::TestReduceOp<float>(
+        input_shape, input_data, axis_shape, axis_data, output_shape,
+        output_data, golden, tflite::Register_MEAN(), &params);
+  }
+}
+
 TF_LITE_MICRO_TESTS_MAIN
