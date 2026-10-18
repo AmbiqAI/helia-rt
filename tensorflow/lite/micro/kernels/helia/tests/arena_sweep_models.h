@@ -16,9 +16,9 @@ limitations under the License.
 #ifndef TENSORFLOW_LITE_MICRO_KERNELS_HELIA_TESTS_ARENA_SWEEP_MODELS_H_
 #define TENSORFLOW_LITE_MICRO_KERNELS_HELIA_TESTS_ARENA_SWEEP_MODELS_H_
 
-// The models and the arena-size and allocation-failure sweeps shared by
-// arena_size_sweep_test.cc and arena_exhaustion_injection_test.cc. Include
-// from one translation unit per binary. see AmbiqAI/helia-rt#449
+// The models and the arena-size and allocation-failure sweeps shared by the
+// arena_size_sweep and arena_exhaustion_injection tests. Include from one
+// translation unit per binary. see AmbiqAI/helia-rt#449
 
 #include <cstddef>
 #include <cstdint>

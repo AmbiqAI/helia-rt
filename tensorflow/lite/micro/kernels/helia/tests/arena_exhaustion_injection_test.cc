@@ -17,7 +17,7 @@ limitations under the License.
 // AllocateTensors makes is failed in turn, together with every later one, as
 // an exhausted arena does, and alone: AllocateTensors must return
 // kTfLiteError each time without writing past the arena end. person_detect
-// and DTLN fail each allocation only with the rest, to keep the FVP run short.
+// and DTLN are in arena_exhaustion_injection_large_model_test.cc.
 // see AmbiqAI/helia-rt#449
 
 #include "tensorflow/lite/micro/kernels/helia/tests/arena_sweep_models.h"
@@ -33,17 +33,6 @@ TEST(HeliaArenaExhaustionInjectionTest, Keyword8BitModel) {
 
 TEST(HeliaArenaExhaustionInjectionTest, Int8ConvModelActivationDominated) {
   InjectAllocationFailures("test_conv_model", kTestConvModelData);
-}
-
-TEST(HeliaArenaExhaustionInjectionTest, PersonDetectModel) {
-  InjectAllocationFailures("person_detect", g_person_detect_model_data,
-                           /*resource_variables=*/false, /*alone_too=*/false);
-}
-
-TEST(HeliaArenaExhaustionInjectionTest, DtlnModel) {
-  InjectAllocationFailures("dtln_noise_suppression",
-                           g_dtln_noise_suppression_model_data,
-                           /*resource_variables=*/false, /*alone_too=*/false);
 }
 
 TEST(HeliaArenaExhaustionInjectionTest, HelloWorldModels) {

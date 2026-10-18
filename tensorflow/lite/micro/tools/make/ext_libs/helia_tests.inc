@@ -553,6 +553,12 @@ $(TENSORFLOW_ROOT)tensorflow/lite/micro/testing/test_conv_model.cc,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/testing/test_conv_model.h \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/arena_sweep_models.h,\
 $(ARENA_SWEEP_MODELS)))
+$(eval $(call microlite_test,kernel_arena_exhaustion_injection_large_model_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/arena_exhaustion_injection_large_model_test.cc \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/testing/test_conv_model.cc,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/testing/test_conv_model.h \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/arena_sweep_models.h,\
+$(ARENA_SWEEP_MODELS)))
 $(eval $(call microlite_test,kernel_arena_exhaustion_injection_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/arena_exhaustion_injection_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/testing/test_conv_model.cc,\
