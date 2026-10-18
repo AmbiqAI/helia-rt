@@ -19,7 +19,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/c/builtin_op_data.h"
 #include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/fully_connected.h"
-#include "tensorflow/lite/micro/kernels/helia/helia_allocation_sweep.h"
+#include "tensorflow/lite/micro/kernels/helia/tests/allocation_sweep.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"

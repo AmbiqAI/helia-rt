@@ -362,32 +362,32 @@ jobs:
         # SPLIT, SQUEEZE, DIV and ADD malformed-model checks add one binary and
         # twenty-four cases on every leg. see AmbiqAI/helia-rt#451
         # Persistent-buffer failure, arena-size sweep and allocation-failure
-        # injection tests add four binaries and 40 cases on every leg.
+        # injection tests add four binaries and 41 cases on every leg.
         # see AmbiqAI/helia-rt#449
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 181
-            min-cases: 1666
+            min-cases: 1667
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 181
-            min-cases: 1666
+            min-cases: 1667
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 180
-            min-cases: 1664
+            min-cases: 1665
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 181
-            min-cases: 1729
+            min-cases: 1730
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 180
-            min-cases: 1727
+            min-cases: 1728
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}

@@ -19,17 +19,14 @@ limitations under the License.
 #include "tensorflow/lite/micro/micro_arena_constants.h"
 #include "tensorflow/lite/micro/micro_log.h"
 
-#if defined(HELIA_ALLOCATION_SWEEP)
-// TODO(AmbiqAI/helia-rt#460): exhaustion sweep; drop when upstream has it.
-#include "tensorflow/lite/micro/kernels/helia/helia_allocation_sweep.h"
-#endif
-
 namespace tflite {
 namespace micro {
 
 // TODO(b/161841696): Consider moving away from global arena buffers:
 constexpr int KernelRunner::kKernelRunnerBufferSize_;
 uint8_t KernelRunner::kKernelRunnerBuffer_[];
+// TODO(AmbiqAI/helia-rt#460): exhaustion sweep; drop when upstream has it.
+KernelRunner::InitAndPrepareHook KernelRunner::init_and_prepare_hook = nullptr;
 
 void ClearBufferApi(TfLiteContext* context_) {
   context_->GetScratchBuffer = nullptr;
@@ -84,13 +81,11 @@ bool KernelRunner::ValidateTempBufferDeallocated() {
 
 TfLiteStatus KernelRunner::InitAndPrepare(const char* init_data,
                                           size_t length) {
-#if defined(HELIA_ALLOCATION_SWEEP)
-  helia::SweepAllocationFailures(registration_, node_, sweep_tensors_,
-                                 sweep_tensors_size_, init_data, length);
-#else
-  (void)sweep_tensors_;
-  (void)sweep_tensors_size_;
-#endif
+  // TODO(AmbiqAI/helia-rt#460): exhaustion sweep; drop when upstream has it.
+  if (init_and_prepare_hook != nullptr) {
+    init_and_prepare_hook(registration_, node_, sweep_tensors_,
+                          sweep_tensors_size_, init_data, length);
+  }
   if (registration_.init) {
     tflite::micro::ClearBufferApi(&context_);
     context_.AllocatePersistentBuffer = MicroContextAllocatePersistentBuffer;

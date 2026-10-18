@@ -1,7 +1,3 @@
-# Every KernelRunner test reruns Init and Prepare once per arena allocation
-# with that allocation failing. see AmbiqAI/helia-rt#449
-CXXFLAGS += -DHELIA_ALLOCATION_SWEEP
-
 # Helia-specific kernel test extensions. Loaded via the optional
 # `-include $(MAKEFILE_DIR)/ext_libs/$(OPTIMIZED_KERNEL_DIR)_tests.inc`
 # hook in tensorflow/lite/micro/kernels/Makefile.inc when

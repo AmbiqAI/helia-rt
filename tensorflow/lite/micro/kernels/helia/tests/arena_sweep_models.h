@@ -77,20 +77,25 @@ constexpr size_t kInjectionHeadroom = 8 * 1024;
 
 // The smallest arena at g_arena that holds the three objects
 // MicroInterpreter's constructor places in the arena tail without checking
-// that they fit, found the way the constructor allocates them; no smaller
-// arena is swept.
+// that they fit, found with the constructor's aligned tail arithmetic (and no
+// allocator, which would log every miss); no smaller arena is swept.
 inline size_t ConstructorFloor() {
-  for (size_t size = 0;; ++size) {
-    tflite::SingleArenaBufferAllocator tail(g_arena, size);
-    if (tail.AllocatePersistentBuffer(
-            sizeof(tflite::SingleArenaBufferAllocator),
-            alignof(tflite::SingleArenaBufferAllocator)) != nullptr &&
-        tail.AllocatePersistentBuffer(sizeof(tflite::GreedyMemoryPlanner),
-                                      alignof(tflite::GreedyMemoryPlanner)) !=
-            nullptr &&
-        tail.AllocatePersistentBuffer(sizeof(tflite::MicroAllocator),
-                                      alignof(tflite::MicroAllocator)) !=
-            nullptr) {
+  const size_t sizes[] = {sizeof(tflite::SingleArenaBufferAllocator),
+                          sizeof(tflite::GreedyMemoryPlanner),
+                          sizeof(tflite::MicroAllocator)};
+  const size_t alignments[] = {alignof(tflite::SingleArenaBufferAllocator),
+                               alignof(tflite::GreedyMemoryPlanner),
+                               alignof(tflite::MicroAllocator)};
+  const uintptr_t head = reinterpret_cast<uintptr_t>(g_arena);
+  for (size_t size = sizes[0] + sizes[1] + sizes[2];; ++size) {
+    uintptr_t tail = head + size;
+    bool fits = true;
+    for (int i = 0; i < 3 && fits; ++i) {
+      fits = tail - head >= sizes[i];
+      tail = (tail - sizes[i]) & ~(alignments[i] - 1);
+      fits = fits && tail >= head;
+    }
+    if (fits) {
       return size;
     }
   }

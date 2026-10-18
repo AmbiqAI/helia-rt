@@ -142,3 +142,10 @@ endif
 
 MICROLITE_CC_HDRS += \
   tensorflow/lite/micro/kernels/helia/helia_common.h
+
+# Test and example binaries only, never the library: makes every KernelRunner
+# test rerun its kernel's Init and Prepare with each arena allocation failing,
+# alone and with every later one, for the first 16 nodes per kernel and type
+# pair. see AmbiqAI/helia-rt#449
+MICROLITE_TEST_RUNTIME_SRCS += \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/allocation_sweep_runtime.cc

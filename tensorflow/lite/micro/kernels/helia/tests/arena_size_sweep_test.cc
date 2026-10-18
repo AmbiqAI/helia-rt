@@ -68,6 +68,46 @@ const tflite::Model* BuildVariableTensorModel(
   return tflite::GetModel(builder.GetBufferPointer());
 }
 
+// One ASSIGN_VARIABLE whose resource id is a constant int32 tensor, with no
+// VAR_HANDLE to fail first when the interpreter has no resource variables.
+const tflite::Model* BuildAssignVariableModel(
+    flatbuffers::FlatBufferBuilder& builder) {
+  using flatbuffers::Offset;
+  const int32_t resource_id[] = {0};
+  const Offset<tflite::Buffer> buffers[] = {
+      tflite::CreateBuffer(builder),
+      tflite::CreateBuffer(
+          builder,
+          builder.CreateVector(reinterpret_cast<const uint8_t*>(resource_id),
+                               sizeof(resource_id)))};
+  const int32_t shape[] = {1};
+  const Offset<tflite::Tensor> tensors[] = {
+      tflite::CreateTensor(builder, builder.CreateVector(shape, 1),
+                           tflite::TensorType_INT32, 1,
+                           builder.CreateString("id")),
+      tflite::CreateTensor(builder, builder.CreateVector(shape, 1),
+                           tflite::TensorType_FLOAT32, 0,
+                           builder.CreateString("value"))};
+  const int32_t operator_inputs[] = {0, 1};
+  const int32_t subgraph_inputs[] = {1};
+  const int32_t* no_outputs = nullptr;
+  const Offset<tflite::Operator> operators[] = {tflite::CreateOperator(
+      builder, 0, builder.CreateVector(operator_inputs, 2),
+      builder.CreateVector(no_outputs, 0))};
+  const Offset<tflite::OperatorCode> operator_codes[] = {
+      tflite::CreateOperatorCode(builder, 0, 0, 1,
+                                 tflite::BuiltinOperator_ASSIGN_VARIABLE)};
+  const Offset<tflite::SubGraph> subgraphs[] = {tflite::CreateSubGraph(
+      builder, builder.CreateVector(tensors, 2),
+      builder.CreateVector(subgraph_inputs, 1),
+      builder.CreateVector(no_outputs, 0), builder.CreateVector(operators, 1))};
+  builder.Finish(tflite::CreateModel(
+      builder, TFLITE_SCHEMA_VERSION, builder.CreateVector(operator_codes, 1),
+      builder.CreateVector(subgraphs, 1), builder.CreateString(""),
+      builder.CreateVector(buffers, 2)));
+  return tflite::GetModel(builder.GetBufferPointer());
+}
+
 }  // namespace
 
 TEST(HeliaArenaSizeSweepTest, KeywordModelPersistentDominated) {
@@ -104,6 +144,19 @@ TEST(HeliaArenaSizeSweepTest, VariableTensorLargerThanTailAddress) {
   tflite::MicroInterpreter interpreter(model, resolver, g_arena, kSize);
   EXPECT_EQ(interpreter.AllocateTensors(), kTfLiteError);
   EXPECT_TRUE(GuardIntact(kSize));
+}
+
+// A hostile model reaches ASSIGN_VARIABLE's resource lookup without
+// VAR_HANDLE; with no resource variables, Prepare must fail rather than use a
+// nullptr.
+TEST(HeliaArenaSizeSweepTest, AssignVariableWithoutResourceVariables) {
+  StaticAllocator flatbuffer_allocator;
+  flatbuffers::FlatBufferBuilder builder(1024, &flatbuffer_allocator);
+  const tflite::Model* model = BuildAssignVariableModel(builder);
+  tflite::MicroMutableOpResolver<1> resolver;
+  ASSERT_EQ(resolver.AddAssignVariable(), kTfLiteOk);
+  tflite::MicroInterpreter interpreter(model, resolver, g_arena, kArenaSize);
+  EXPECT_EQ(interpreter.AllocateTensors(), kTfLiteError);
 }
 
 TF_LITE_MICRO_TESTS_MAIN

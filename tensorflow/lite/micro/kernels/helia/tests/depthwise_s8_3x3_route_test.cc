@@ -30,7 +30,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/c/builtin_op_data.h"
 #include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/depthwise_conv.h"
-#include "tensorflow/lite/micro/kernels/helia/helia_allocation_sweep.h"
+#include "tensorflow/lite/micro/kernels/helia/tests/allocation_sweep.h"
 #include "tensorflow/lite/micro/kernels/internal/quantization_util.h"
 #include "tensorflow/lite/micro/kernels/internal/reference/integer_ops/depthwise_conv.h"
 #include "tensorflow/lite/micro/kernels/internal/types.h"
