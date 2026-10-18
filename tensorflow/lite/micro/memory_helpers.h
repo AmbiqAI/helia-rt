@@ -15,10 +15,12 @@ limitations under the License.
 #ifndef TENSORFLOW_LITE_MICRO_MEMORY_HELPERS_H_
 #define TENSORFLOW_LITE_MICRO_MEMORY_HELPERS_H_
 
+#include <climits>
 #include <cstddef>
 #include <cstdint>
 
 #include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/micro_arena_constants.h"
 #include "tensorflow/lite/schema/schema_generated.h"
 
 namespace tflite {
@@ -42,7 +44,28 @@ size_t AlignSizeUp(size_t count = 1) {
 // Returns size in bytes for a given TfLiteType.
 TfLiteStatus TfLiteTypeSizeOf(TfLiteType type, size_t* size);
 
+// TODO(AmbiqAI/helia-rt#460): upstream does not bound tensor sizes; drop when upstream has it.
+// The largest byte count BytesRequiredForTensor and TfLiteEvalTensorByteLength
+// accept. The memory planner holds buffer sizes in int after rounding them up
+// to MicroArenaBufferAlignment(), so a larger tensor cannot be planned.
+constexpr size_t kMaxTensorBytes = INT_MAX - (MicroArenaBufferAlignment() - 1);
+
+// Multiplies *size by factor in place. Returns kTfLiteError, leaving *size
+// unchanged, if factor is negative or the product exceeds limit. The tensor
+// sizing functions below pass kMaxTensorBytes for the element count and for
+// the byte count. An element count never exceeds its byte count, so it also
+// stays within the int that kernels hold it in.
+TfLiteStatus MultiplyTensorSize(size_t* size, int64_t factor, size_t limit);
+
 // How many bytes are needed to hold a tensor's contents.
+// TODO(AmbiqAI/helia-rt#460): upstream does not check the rest of a shape that holds a -1; drop when upstream has it.
+// A -1 dimension is one a kernel may resolve in Prepare (RESHAPE's stretch
+// dimension, EMBEDDING_LOOKUP's output rows). The other dimensions and the
+// element size are still checked, any other negative dimension fails, and
+// *bytes is the product of every dimension and the element size in size_t, as
+// upstream computes it, so kernels that read bytes before resolving the shape
+// behave as upstream.
+// The allocator re-sizes a TfLiteTensor once its dims are resolved.
 TfLiteStatus BytesRequiredForTensor(const tflite::Tensor& flatbuffer_tensor,
                                     size_t* bytes, size_t* type_size);
 

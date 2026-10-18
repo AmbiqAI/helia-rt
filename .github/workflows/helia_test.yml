@@ -374,30 +374,32 @@ jobs:
         # see AmbiqAI/helia-rt#452
         # The reference MEAN empty-input cases add two cases on every leg.
         # see AmbiqAI/helia-rt#452
+        # Tensor byte-size, arena and planner overflow adds one binary and
+        # twenty-six cases on every leg. see AmbiqAI/helia-rt#453
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 180
-            min-cases: 1650
+            min-binaries: 181
+            min-cases: 1676
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 180
-            min-cases: 1650
+            min-binaries: 181
+            min-cases: 1676
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 179
-            min-cases: 1648
+            min-binaries: 180
+            min-cases: 1674
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 180
-            min-cases: 1713
+            min-binaries: 181
+            min-cases: 1739
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 179
-            min-cases: 1711
+            min-binaries: 180
+            min-cases: 1737
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}

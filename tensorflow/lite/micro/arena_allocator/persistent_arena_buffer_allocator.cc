@@ -29,15 +29,19 @@ PersistentArenaBufferAllocator::~PersistentArenaBufferAllocator() {}
 
 uint8_t* PersistentArenaBufferAllocator::AllocatePersistentBuffer(
     size_t size, size_t alignment) {
+  // TODO(AmbiqAI/helia-rt#460): upstream wraps on a request above the tail address; drop when upstream has it.
+  const size_t available_memory = tail_temp_ - buffer_head_;
+  const bool fits = size <= available_memory;
   uint8_t* const aligned_result =
-      AlignPointerDown(tail_temp_ - size, alignment);
-  if (aligned_result < buffer_head_) {
+      fits ? AlignPointerDown(tail_temp_ - size, alignment) : nullptr;
+  if (!fits || aligned_result < buffer_head_) {
 #ifndef TF_LITE_STRIP_ERROR_STRINGS
-    const size_t missing_memory = buffer_head_ - aligned_result;
+    const size_t missing_memory =
+        fits ? buffer_head_ - aligned_result : size - available_memory;
     MicroPrintf(
         "Failed to allocate tail memory. Requested: %u, "
         "available %u, missing: %u",
-        size, size - missing_memory, missing_memory);
+        size, available_memory, missing_memory);
 #endif
     return nullptr;
   }

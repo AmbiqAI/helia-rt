@@ -522,6 +522,14 @@ endif
 $(eval $(call microlite_test,kernel_reduce_output_size_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/reduce_output_size_test.cc))
 
+# Tensor byte sizes fail on an overflowing element or byte count and on a
+# negative dimension other than a -1 a kernel resolves in Prepare, and
+# AllocateTensors fails with them; the two-arena allocators and the memory
+# planners refuse requests and plans that pass their bounds.
+# see AmbiqAI/helia-rt#453
+$(eval $(call microlite_test,kernel_tensor_byte_length_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/tensor_byte_length_test.cc))
+
 # MEAN, SUM, REDUCE_MIN/MAX and REDUCE_ALL Prepare reject a missing input, axis
 # or output, the wrong input count or a non-int32 axis, and release every
 # temporary. see AmbiqAI/helia-rt#454
