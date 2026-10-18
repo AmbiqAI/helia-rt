@@ -18,8 +18,9 @@ limitations under the License.
 // or byte count above kMaxTensorBytes, the largest the memory planner can hold
 // once rounded up to the arena alignment. The failure must stop
 // AllocateTensors before any kernel Prepare and must reach
-// CopyOpInputsToOpOutputs. The arena allocators and memory planners must
-// refuse a request or plan that does not fit, rather than wrap.
+// CopyOpInputsToOpOutputs. The persistent and non-persistent arena allocators
+// must refuse a request that does not fit, and the memory planners a plan
+// whose offset + size passes INT_MAX, rather than wrap.
 // see AmbiqAI/helia-rt#453
 
 #include <climits>
@@ -436,12 +437,6 @@ TEST(TensorByteLengthTest, CopyOpInputsToOpOutputsFailsOnSizeOverflow) {
   EXPECT_EQ(1, output_data[0]);
 }
 
-TEST(TensorByteLengthTest, AllocateTensorsFailsOnPlanAboveIntMax) {
-  // Two live 1.2e9-byte tensors: each fits, their offsets do not.
-  EXPECT_EQ(kTfLiteError,
-            AllocateNoOp(TensorType_INT8, {1200000000}, false, {1200000000}));
-}
-
 TEST(TensorByteLengthTest, AllocateTensorsFailsOnOversizedScratchRequest) {
   EXPECT_EQ(kTfLiteError, AllocateWithScratch(tflite::kMaxTensorBytes + 1));
   // Rounding this up for the planner would wrap to a small size.
@@ -475,25 +470,66 @@ TEST(TensorByteLengthTest, NonPersistentArenaAllocatorStaysInsideArena) {
   }
 }
 
+// Room for the 3000 buffers of the largest plan below.
+alignas(16) uint8_t planner_scratch[3000 * 40];
+
 TEST(TensorByteLengthTest, GreedyPlannerRefusesPlanAboveIntMax) {
-  alignas(16) static uint8_t scratch[1024];
   tflite::GreedyMemoryPlanner planner;
-  ASSERT_EQ(kTfLiteOk, planner.Init(scratch, sizeof(scratch)));
+  int offset = 0;
+  // Two live 1.2e9-byte buffers: each fits, the second one's end does not.
+  ASSERT_EQ(kTfLiteOk, planner.Init(planner_scratch, sizeof(planner_scratch)));
   EXPECT_EQ(kTfLiteOk, planner.AddBuffer(1200000000, 0, 1));
-  EXPECT_EQ(kTfLiteError, planner.AddBuffer(1200000000, 0, 1));
+  EXPECT_EQ(kTfLiteOk, planner.AddBuffer(1200000000, 0, 1));
+  EXPECT_EQ(kTfLiteError, planner.GetOffsetForBuffer(1, &offset));
+  EXPECT_EQ(SIZE_MAX, planner.GetMaximumMemorySize());
   EXPECT_EQ(kTfLiteError, planner.AddBuffer(-1, 0, 1));
 
-  ASSERT_EQ(kTfLiteOk, planner.Init(scratch, sizeof(scratch)));
+  // A plan ending exactly at INT_MAX is fine; one more live byte is not.
+  ASSERT_EQ(kTfLiteOk, planner.Init(planner_scratch, sizeof(planner_scratch)));
+  EXPECT_EQ(kTfLiteOk, planner.AddBuffer(INT_MAX - 32, 0, 1));
+  EXPECT_EQ(kTfLiteOk, planner.AddBuffer(32, 0, 1));
+  EXPECT_EQ(static_cast<size_t>(INT_MAX), planner.GetMaximumMemorySize());
+  EXPECT_EQ(kTfLiteOk, planner.AddBuffer(1, 0, 1));
+  EXPECT_EQ(kTfLiteError, planner.GetOffsetForBuffer(0, &offset));
+
+  // Offline buffers are checked by their own offset + size.
+  ASSERT_EQ(kTfLiteOk, planner.Init(planner_scratch, sizeof(planner_scratch)));
   EXPECT_EQ(kTfLiteError, planner.AddBuffer(16, 0, 1, INT_MAX - 8));
   EXPECT_EQ(kTfLiteError, planner.AddBuffer(16, 0, 1, -2));
-  EXPECT_EQ(kTfLiteOk, planner.AddBuffer(16, 0, 1, 1024));
+  EXPECT_EQ(kTfLiteOk, planner.AddBuffer(32, 0, 1, INT_MAX - 32));
+  EXPECT_EQ(static_cast<size_t>(INT_MAX), planner.GetMaximumMemorySize());
+}
 
-  // Sizes summing to exactly INT_MAX still plan.
-  ASSERT_EQ(kTfLiteOk, planner.Init(scratch, sizeof(scratch)));
-  EXPECT_EQ(kTfLiteOk, planner.AddBuffer(INT_MAX - 32, 0, 1));
-  EXPECT_EQ(kTfLiteOk, planner.AddBuffer(32, 2, 3));
-  EXPECT_EQ(kTfLiteError, planner.AddBuffer(1, 4, 5));
-  EXPECT_EQ(static_cast<size_t>(INT_MAX - 32), planner.GetMaximumMemorySize());
+TEST(TensorByteLengthTest, GreedyPlannerPlansLargeValidModels) {
+  ASSERT_GE(sizeof(planner_scratch),
+            3000 * tflite::GreedyMemoryPlanner::per_buffer_size());
+  tflite::GreedyMemoryPlanner planner;
+  int offset = 0;
+  // 300 offline 64 KiB buffers spread across a 16 MiB arena.
+  ASSERT_EQ(kTfLiteOk, planner.Init(planner_scratch, sizeof(planner_scratch)));
+  for (int i = 0; i < 300; ++i) {
+    ASSERT_EQ(kTfLiteOk, planner.AddBuffer(65536, i, i, (i % 256) * 65536));
+  }
+  EXPECT_EQ(static_cast<size_t>(16 << 20), planner.GetMaximumMemorySize());
+  EXPECT_EQ(kTfLiteOk, planner.GetOffsetForBuffer(299, &offset));
+  EXPECT_EQ(43 * 65536, offset);
+
+  // A chain of 600 4 MiB buffers, each live for two steps, peaking at 8 MiB.
+  ASSERT_EQ(kTfLiteOk, planner.Init(planner_scratch, sizeof(planner_scratch)));
+  for (int i = 0; i < 600; ++i) {
+    ASSERT_EQ(kTfLiteOk, planner.AddBuffer(4 << 20, i, i + 1));
+  }
+  EXPECT_EQ(static_cast<size_t>(8 << 20), planner.GetMaximumMemorySize());
+  EXPECT_EQ(kTfLiteOk, planner.GetOffsetForBuffer(599, &offset));
+
+  // 3000 offline 1 KiB buffers packed into the first 3000 KiB.
+  ASSERT_EQ(kTfLiteOk, planner.Init(planner_scratch, sizeof(planner_scratch)));
+  for (int i = 0; i < 3000; ++i) {
+    ASSERT_EQ(kTfLiteOk, planner.AddBuffer(1024, i, i, i * 1024));
+  }
+  EXPECT_EQ(static_cast<size_t>(3000 * 1024), planner.GetMaximumMemorySize());
+  EXPECT_EQ(kTfLiteOk, planner.GetOffsetForBuffer(2999, &offset));
+  EXPECT_EQ(2999 * 1024, offset);
 }
 
 TEST(TensorByteLengthTest, LinearPlannerRefusesPlanAboveIntMax) {
