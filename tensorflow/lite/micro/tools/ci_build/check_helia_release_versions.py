@@ -28,7 +28,7 @@ Rules:
   * Every extra-files entry is {"type": "generic", "path": ...} for a file
     that exists and has a version-scope marked line or block. A marked line
     holds exactly one version, a block line at most one, each block at least
-    one, and every one is the manifest version.
+    one and its start line none, and every one is the manifest version.
   * Every tracked file that carries a release-please marker, and every
     nsx-module.yaml, is an extra-files entry.
   * The ns-cmsis-nn tag and commit in ext_libs/helia.inc match the copies in
@@ -46,6 +46,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 # The marker regexes and VERSION_RE are release-please's own
@@ -53,15 +54,18 @@ from pathlib import Path
 # globally. Each pattern is split so this file carries no marker itself.
 MARKER = "x-release-please-" + "version"
 SCOPES = "major|minor|patch|version-date|version|date"
-INLINE_RE = re.compile("x-release-please-" + f"(?P<scope>{SCOPES})")
-BLOCK_START_RE = re.compile("x-release-please-start-" + f"(?P<scope>{SCOPES})")
+INLINE_RE = re.compile("x-release-please-" + f"(?P<scope>{SCOPES})", re.A)
+BLOCK_START_RE = re.compile(
+  "x-release-please-start-" + f"(?P<scope>{SCOPES})", re.A
+)
 BLOCK_END_RE = re.compile("x-release-please-" + "end")
 ANY_MARKER_RE = re.compile(
   ("x-release-please-" + f"(?:start-)?(?:{SCOPES})").encode()
 )
 VERSION_RE = re.compile(
   r"(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)"
-  r"(-(?P<preRelease>[\w.]+))?(\+(?P<build>[-\w.]+))?"
+  r"(-(?P<preRelease>[\w.]+))?(\+(?P<build>[-\w.]+))?",
+  re.A,
 )
 
 # Outside a git checkout, the tree scan skips VCS state, fetched third-party
@@ -124,25 +128,30 @@ PIN_SITES = (
 )
 
 
-def remote_tag_commit(tag):
+def remote_tag_commit(tag, attempts=3):
   """Returns the commit `tag` names in AmbiqAI/ns-cmsis-nn, or None."""
-  try:
-    out = subprocess.run(
-      [
-        "git",
-        "ls-remote",
-        NS_CMSIS_NN_URL,
-        f"refs/tags/{tag}",
-        f"refs/tags/{tag}^{{}}",
-      ],
-      check=True,
-      capture_output=True,
-      text=True,
-      timeout=60,
-    ).stdout
-  except (OSError, subprocess.SubprocessError):
-    return None
-  refs = dict(reversed(line.split("\t", 1)) for line in out.splitlines())
+  command = [
+    "git",
+    "ls-remote",
+    NS_CMSIS_NN_URL,
+    f"refs/tags/{tag}",
+    f"refs/tags/{tag}^{{}}",
+  ]
+  for attempt in range(attempts):
+    try:
+      out = subprocess.run(
+        command, check=True, capture_output=True, text=True, timeout=60
+      ).stdout
+      break
+    except (OSError, subprocess.SubprocessError):
+      if attempt + 1 == attempts:
+        return None
+      time.sleep(5 * (attempt + 1))
+  refs = {}
+  for line in out.splitlines():
+    sha, _, ref = line.partition("\t")
+    if re.fullmatch(r"[0-9a-f]{40}", sha) and ref:
+      refs[ref] = sha
   # An annotated tag lists its peeled commit as <ref>^{}.
   return refs.get(f"refs/tags/{tag}^{{}}") or refs.get(f"refs/tags/{tag}")
 
@@ -157,7 +166,8 @@ class Checker:
 
   def read(self, rel):
     try:
-      return (self.root / rel).read_text(encoding="utf-8")
+      # Bytes, so a lone \r stays inside its line as release-please sees it.
+      return (self.root / rel).read_bytes().decode("utf-8")
     except (OSError, UnicodeDecodeError) as e:
       self.error(f"{rel}: cannot read ({e})")
       return None
@@ -241,6 +251,11 @@ class Checker:
         if start:
           if start.group("scope") != "version":
             self.error(f"{rel}:{number}: unsupported marker scope")
+          if VERSION_RE.search(line):
+            self.error(
+              f"{rel}:{number}: version on a block-start line, which "
+              "release-please never rewrites"
+            )
           block_start = number
     if block_start is not None:
       self.error(f"{rel}:{block_start}: version block is never closed")

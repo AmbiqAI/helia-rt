@@ -53,7 +53,7 @@ NSX = "nsx/nsx-module.yaml"
 NSX_SOURCE = "nsx-source/nsx-module.yaml"
 
 # release-please src/updaters/generic.ts, version scope only.
-RP_VERSION = re.compile(r"(\d+)\.(\d+)\.(\d+)(-([\w.]+))?(\+([-\w.]+))?")
+RP_VERSION = re.compile(r"(\d+)\.(\d+)\.(\d+)(-([\w.]+))?(\+([-\w.]+))?", re.A)
 RP_INLINE = re.compile("x-release-please-" + "version")
 RP_START = re.compile("x-release-please-start-" + "version")
 RP_END = re.compile("x-release-please-" + "end")
@@ -129,7 +129,8 @@ class ReleaseVersionsTest(unittest.TestCase):
     self.write(MANIFEST, json.dumps({".": new}))
     for rel in extra_files(self.root):
       path = self.root / rel.lstrip("/")
-      path.write_text(release_please_bump(path.read_text(), new))
+      text = path.read_bytes().decode()
+      path.write_bytes(release_please_bump(text, new).encode())
 
   def run_check(self, *args):
     out, err = io.StringIO(), io.StringIO()
@@ -244,6 +245,58 @@ class ReleaseVersionsTest(unittest.TestCase):
       entries + [{"type": "generic", "path": "docs/block.md"}]
     )
     self.assert_inconsistent("docs/block.md:1: version block holds no version")
+
+  def add_listed(self, rel, text):
+    self.write(rel, text)
+    entries = json.loads((self.root / CONFIG).read_text())["packages"]["."][
+      "extra-files"
+    ]
+    self.set_extra_files(entries + [{"type": "generic", "path": rel}])
+
+  def test_version_on_block_start_line(self):
+    start, close = (
+      "x-release-please-start-" + "version",
+      "x-release-please-" + "end",
+    )
+    self.add_listed(
+      "docs/b.md",
+      f"VERSION {self.version} # {start}\nv{self.version}\n# {close}\n",
+    )
+    self.assert_inconsistent("docs/b.md:1: version on a block-start line")
+
+  def test_stale_version_on_block_end_line(self):
+    # release-please rewrites the end line too.
+    start, close = (
+      "x-release-please-start-" + "version",
+      "x-release-please-" + "end",
+    )
+    self.add_listed(
+      "docs/b.md", f"# {start}\nv{self.version}\n1.17.0 # {close}\n"
+    )
+    self.assert_inconsistent("docs/b.md:3: version 1.17.0")
+
+  def test_inline_marker_inside_a_block_needs_a_version(self):
+    start, close = (
+      "x-release-please-start-" + "version",
+      "x-release-please-" + "end",
+    )
+    self.add_listed(
+      "docs/b.md",
+      f"# {start}\nv{self.version}\nlatest # {check.MARKER}\n# {close}\n",
+    )
+    self.assert_inconsistent("docs/b.md:3: marked line holds no version")
+
+  def test_lone_carriage_return_stays_in_the_line(self):
+    # release-please splits only on \r?\n, so this is one line with two
+    # versions, and it would bump 1.0.0.
+    self.add_listed(
+      "docs/b.md", f"old v1.0.0\rhelia-rt-v{self.version} # {check.MARKER}\n"
+    )
+    self.assert_inconsistent("2 versions on one line")
+
+  def test_non_ascii_manifest_version(self):
+    self.write(MANIFEST, json.dumps({".": "\uff12.\uff11.\uff10"}))
+    self.assert_inconsistent("expected exactly")
 
   def test_marker_removed_from_listed_file(self):
     self.edit(NSX_SOURCE, r" # " + check.MARKER, "")
@@ -377,6 +430,25 @@ class ReleaseVersionsTest(unittest.TestCase):
     )
     with mock.patch.object(check.subprocess, "run", return_value=lightweight):
       self.assertEqual("c" * 40, check.remote_tag_commit(self.tag))
+    garbage = subprocess.CompletedProcess([], 0, stdout="warning: no tab\n")
+    with mock.patch.object(check.subprocess, "run", return_value=garbage):
+      self.assertIsNone(check.remote_tag_commit(self.tag))
+
+  def test_remote_lookup_retries(self):
+    done = subprocess.CompletedProcess(
+      [], 0, stdout=f"{'d' * 40}\trefs/tags/{self.tag}\n"
+    )
+    failure = subprocess.CalledProcessError(128, "git")
+    with (
+      mock.patch.object(check.time, "sleep"),
+      mock.patch.object(check.subprocess, "run", side_effect=[failure, done]),
+    ):
+      self.assertEqual("d" * 40, check.remote_tag_commit(self.tag))
+    with (
+      mock.patch.object(check.time, "sleep"),
+      mock.patch.object(check.subprocess, "run", side_effect=[failure] * 3),
+    ):
+      self.assertIsNone(check.remote_tag_commit(self.tag))
 
 
 if __name__ == "__main__":
