@@ -32,10 +32,11 @@ limitations under the License.
 //   failed: those buffers are never optional, so the kernel went on without
 //   one (a temp tensor may be an optional input, so its failure is not
 //   checked this way);
-// - on a Cortex-M target, where address 0 is mapped memory and a write
-//   through nullptr does not fault, changes the first kLowMemoryBytes bytes
-//   of the address space;
-// - on a host build, crashes, as a nullptr use does there.
+// - on a bare-metal M-profile target, where address 0 is mapped memory and
+//   a write through nullptr does not fault, changes the first kLowMemoryBytes
+//   bytes of the address space;
+// - on a hosted build, including 32-bit Arm Linux, crashes, as a nullptr use
+//   does there.
 // see AmbiqAI/helia-rt#449
 
 #include <cstddef>
@@ -228,7 +229,7 @@ inline bool CountSweep(const TFLMRegistration& registration,
 // start of an array lands there.
 constexpr size_t kLowMemoryBytes = 4096;
 
-#if defined(__arm__)
+#if defined(__ARM_ARCH_PROFILE) && __ARM_ARCH_PROFILE == 'M'
 // The address is laundered so the compiler cannot treat the reads as nullptr
 // dereferences.
 inline volatile uint8_t* LowMemory() {
@@ -274,13 +275,13 @@ inline void SweepAllocationFailures(const TFLMRegistration& registration,
   if (allocations > kMaxSweptAllocations) {
     allocations = kMaxSweptAllocations;
   }
-#if defined(__arm__)
+#if defined(__ARM_ARCH_PROFILE) && __ARM_ARCH_PROFILE == 'M'
   static uint8_t low_memory[kLowMemoryBytes];
 #endif
   bool defective = false;
   for (int index = 0; index < allocations; ++index) {
     for (int fail_later = 0; fail_later < 2; ++fail_later) {
-#if defined(__arm__)
+#if defined(__ARM_ARCH_PROFILE) && __ARM_ARCH_PROFILE == 'M'
       SaveLowMemory(low_memory);
 #endif
       const AllocationRun run =
@@ -288,7 +289,7 @@ inline void SweepAllocationFailures(const TFLMRegistration& registration,
                                    length, index, fail_later != 0);
       std::memcpy(tensors, saved, sizeof(TfLiteTensor) * tensors_size);
       const char* defect = nullptr;
-#if defined(__arm__)
+#if defined(__ARM_ARCH_PROFILE) && __ARM_ARCH_PROFILE == 'M'
       if (LowMemoryWritten(low_memory)) {
         defect = "wrote through nullptr";
       }
