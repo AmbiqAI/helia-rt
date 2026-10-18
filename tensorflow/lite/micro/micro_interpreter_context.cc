@@ -57,9 +57,9 @@ void* MicroInterpreterContext::AllocatePersistentBuffer(size_t bytes) {
   TFLITE_DCHECK(state_ == InterpreterState::kPrepare ||
                 state_ == InterpreterState::kInit);
   void* buffer = allocator_.AllocatePersistentBuffer(bytes);
-  // TODO(AmbiqAI/helia-rt#460): upstream ignores a kernel's failed persistent allocation; drop when upstream has it.
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
   if (buffer == nullptr) {
-    graph_.SetPersistentBufferAllocationFailed();
+    graph_.SetArenaAllocationFailed();
   }
   return buffer;
 }
@@ -79,19 +79,33 @@ void* MicroInterpreterContext::GetScratchBuffer(int buffer_idx) {
 
 TfLiteTensor* MicroInterpreterContext::AllocateTempTfLiteTensor(
     int tensor_idx) {
-  return allocator_.AllocateTempTfLiteTensor(model_, graph_.GetAllocations(),
-                                             tensor_idx,
-                                             graph_.GetCurrentSubgraphIndex());
+  TfLiteTensor* tensor = allocator_.AllocateTempTfLiteTensor(
+      model_, graph_.GetAllocations(), tensor_idx,
+      graph_.GetCurrentSubgraphIndex());
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  if (tensor == nullptr) {
+    graph_.SetArenaAllocationFailed();
+  }
+  return tensor;
 }
 
 void MicroInterpreterContext::DeallocateTempTfLiteTensor(TfLiteTensor* tensor) {
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  if (tensor == nullptr) {
+    return;
+  }
   return allocator_.DeallocateTempTfLiteTensor(tensor);
 }
 
 uint8_t* MicroInterpreterContext::AllocateTempBuffer(size_t size,
                                                      size_t alignment) {
   TFLITE_DCHECK(state_ == InterpreterState::kPrepare);
-  return allocator_.AllocateTempBuffer(size, alignment);
+  uint8_t* buffer = allocator_.AllocateTempBuffer(size, alignment);
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  if (buffer == nullptr) {
+    graph_.SetArenaAllocationFailed();
+  }
+  return buffer;
 }
 
 void MicroInterpreterContext::DeallocateTempBuffer(uint8_t* buffer) {

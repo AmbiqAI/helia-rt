@@ -639,6 +639,11 @@ SubgraphAllocations* MicroAllocator::StartModelAllocation(const Model* model) {
       persistent_buffer_allocator_->AllocatePersistentBuffer(
           sizeof(MicroBuiltinDataAllocator),
           alignof(MicroBuiltinDataAllocator));
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  if (data_allocator_buffer == nullptr) {
+    MicroPrintf("Failed to allocate memory for the builtin data allocator.");
+    return nullptr;
+  }
   builtin_data_allocator_ = new (data_allocator_buffer)
       MicroBuiltinDataAllocator(persistent_buffer_allocator_);
 
@@ -789,7 +794,7 @@ TfLiteStatus MicroAllocator::AllocateNodeAndRegistrations(
       MicroPrintf("Failed to allocate memory for node_and_registrations.");
       return kTfLiteError;
     }
-    // TODO(AmbiqAI/helia-rt#460): upstream frees nodes a failed AllocateTensors never set up; drop when upstream has it.
+    // TODO(AmbiqAI/helia-rt#460): zero unset nodes; drop when upstream has it.
     memset(output, 0, sizeof(NodeAndRegistration) * operators_size);
     subgraph_allocations[subgraph_idx].node_and_registrations = output;
   }
@@ -1229,6 +1234,11 @@ TfLiteStatus MicroAllocator::AllocateScratchBufferHandles(
       persistent_buffer_allocator_->AllocatePersistentBuffer(
           sizeof(ScratchBufferHandle) * handle_count,
           alignof(ScratchBufferHandle)));
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  if (*scratch_buffer_handles == nullptr) {
+    MicroPrintf("Failed to allocate memory for scratch buffer handles.");
+    return kTfLiteError;
+  }
 
   return kTfLiteOk;
 }

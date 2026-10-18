@@ -125,10 +125,9 @@ TfLiteStatus MicroInterpreterGraph::InitSubgraphs() {
         node->user_data =
             registration->init(context_, init_data, init_data_size);
       }
-      // TODO(AmbiqAI/helia-rt#460): upstream ignores a kernel's failed persistent allocation; drop when upstream has it.
-      if (persistent_buffer_allocation_failed_) {
-        MicroPrintf("Node %s (number %u) failed to allocate a persistent "
-                    "buffer in Init",
+      // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+      if (arena_allocation_failed_) {
+        MicroPrintf("Node %s (number %u) ran out of arena memory in Init",
                     OpNameFromRegistration(registration),
                     current_operator_index_);
         return kTfLiteError;
@@ -169,10 +168,9 @@ TfLiteStatus MicroInterpreterGraph::PrepareSubgraphs() {
         GetMicroContext(context_)->ResetDecompressionMemoryAllocations();
 #endif  // USE_TFLM_COMPRESSION
       }
-      // TODO(AmbiqAI/helia-rt#460): upstream ignores a kernel's failed persistent allocation; drop when upstream has it.
-      if (persistent_buffer_allocation_failed_) {
-        MicroPrintf("Node %s (number %u) failed to allocate a persistent "
-                    "buffer in Prepare",
+      // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+      if (arena_allocation_failed_) {
+        MicroPrintf("Node %s (number %u) ran out of arena memory in Prepare",
                     OpNameFromRegistration(registration),
                     current_operator_index_);
         return kTfLiteError;
@@ -189,8 +187,9 @@ TfLiteStatus MicroInterpreterGraph::PrepareSubgraphs() {
         return kTfLiteError;
       }
 
-      allocator_->FinishPrepareNodeAllocations(
-          /*node_id=*/current_operator_index_);
+      // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+      TF_LITE_ENSURE_STATUS(allocator_->FinishPrepareNodeAllocations(
+          /*node_id=*/current_operator_index_));
     }
   }
   current_subgraph_index_ = previous_subgraph_idx;
