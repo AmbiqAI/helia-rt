@@ -218,6 +218,29 @@ bool OutputHoldsReducedCount(const TfLiteEvalTensor* input,
   return kept == ElementCount(*output->dims);
 }
 
+// TODO(AmbiqAI/helia-rt#460): empty MEAN input; drop when upstream has it.
+// The reference reduce loop reads one element before its first bounds check,
+// so an input with a zero extent writes T() into each output element instead,
+// the value the reference gives a reduction over nothing.
+bool HasZeroExtent(const TfLiteEvalTensor* input) {
+  for (int i = 0; i < input->dims->size; ++i) {
+    if (input->dims->data[i] == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+template <typename T>
+TfLiteStatus FillEmptyMean(TfLiteEvalTensor* output) {
+  T* data = tflite::micro::GetTensorData<T>(output);
+  const int count = ElementCount(*output->dims);
+  for (int i = 0; i < count; ++i) {
+    data[i] = T();
+  }
+  return kTfLiteOk;
+}
+
 }  // namespace
 
 TfLiteStatus PrepareMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
@@ -330,6 +353,19 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
   TF_LITE_ENSURE_MSG(context,
                      OutputHoldsReducedCount(input, axis, output, num_axis),
                      "MEAN: the output size does not match the reduction.");
+  if (HasZeroExtent(input)) {
+    TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
+    switch (input->type) {
+      case kTfLiteFloat32:
+        return FillEmptyMean<float>(output);
+      case kTfLiteInt8:
+        return FillEmptyMean<int8_t>(output);
+      case kTfLiteInt16:
+        return FillEmptyMean<int16_t>(output);
+      default:
+        break;
+    }
+  }
 
   switch (input->type) {
     case kTfLiteFloat32: {

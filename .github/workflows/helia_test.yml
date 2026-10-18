@@ -372,30 +372,32 @@ jobs:
         # twenty-four cases on every leg. see AmbiqAI/helia-rt#451
         # The reference MEAN short-output rejection adds one case on every leg.
         # see AmbiqAI/helia-rt#452
+        # The reference MEAN empty-input cases add two cases on every leg.
+        # see AmbiqAI/helia-rt#452
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 180
-            min-cases: 1648
+            min-cases: 1650
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 180
-            min-cases: 1648
+            min-cases: 1650
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 179
-            min-cases: 1646
+            min-cases: 1648
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 180
-            min-cases: 1711
+            min-cases: 1713
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 179
-            min-cases: 1709
+            min-cases: 1711
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}

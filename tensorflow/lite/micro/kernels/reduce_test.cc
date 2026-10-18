@@ -1105,4 +1105,60 @@ TEST(ReduceTest, MeanFloat4DKeepDimsShortOutputFails) {
   }
 }
 
+namespace tflite {
+namespace testing {
+namespace {
+
+// TODO(AmbiqAI/helia-rt#460): empty MEAN input; drop when upstream has it.
+// Runs MEAN over axes {1, 2} with keep_dims on an empty `input_shape` into
+// `output_shape`. The input buffer holds a sentinel the kernel must not read,
+// and every output element past `written` holds a canary it must not write.
+void ExpectEmptyMeanInput(int* input_shape, int* output_shape, int written) {
+  constexpr float kSentinel = 7.0f;
+  constexpr float kCanary = -123.0f;
+  float input_data[4] = {kSentinel, kSentinel, kSentinel, kSentinel};
+  int axis_shape[] = {1, 2};
+  const int32_t axis_data[] = {1, 2};
+  float output_data[4] = {kCanary, kCanary, kCanary, kCanary};
+  TfLiteTensor tensors[] = {
+      CreateTensor(input_data, IntArrayFromInts(input_shape)),
+      CreateTensor(axis_data, IntArrayFromInts(axis_shape)),
+      CreateTensor(output_data, IntArrayFromInts(output_shape)),
+  };
+  tensors[1].allocation_type = kTfLiteMmapRo;
+  TfLiteReducerParams params = {true};
+  int inputs_array_data[] = {2, 0, 1};
+  int outputs_array_data[] = {1, 2};
+  const TFLMRegistration registration = Register_MEAN();
+  micro::KernelRunner runner(registration, tensors, 3,
+                             IntArrayFromInts(inputs_array_data),
+                             IntArrayFromInts(outputs_array_data), &params);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  for (int i = 0; i < written; ++i) {
+    EXPECT_EQ(0.0f, output_data[i]);
+  }
+  for (int i = written; i < 4; ++i) {
+    EXPECT_EQ(kCanary, output_data[i]);
+  }
+}
+
+}  // namespace
+}  // namespace testing
+}  // namespace tflite
+
+// An empty kept axis gives an empty output: nothing is written.
+TEST(ReduceTest, MeanFloat4DKeepDimsEmptyKeptAxisWritesNothing) {
+  int input_shape[] = {4, 1, 2, 2, 0};
+  int output_shape[] = {4, 0, 1, 1, 1};
+  tflite::testing::ExpectEmptyMeanInput(input_shape, output_shape, 0);
+}
+
+// An empty reduced axis gives the start value, 0, in every output element.
+TEST(ReduceTest, MeanFloat4DKeepDimsEmptyReducedAxisWritesZeros) {
+  int input_shape[] = {4, 1, 0, 2, 4};
+  int output_shape[] = {4, 4, 1, 1, 1};
+  tflite::testing::ExpectEmptyMeanInput(input_shape, output_shape, 4);
+}
+
 TF_LITE_MICRO_TESTS_MAIN
