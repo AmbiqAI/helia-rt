@@ -95,8 +95,16 @@ INCLUDES += \
 # $(...) expansion in the compile recipes).
 CCFLAGS  += -DCMSIS_NN
 CXXFLAGS += -DCMSIS_NN
-CCFLAGS  += -DARM_NN_ENABLE_F32=1
-CXXFLAGS += -DARM_NN_ENABLE_F32=1
+
+# HELIA_ENABLE_F32=0 leaves heliaCORE's float32 kernels out, as an int8-only
+# CMake build does, so the float32 ops take their reference fallbacks. Give
+# such a build its own BASE_GENDIR: the gen directory name does not record it.
+HELIA_ENABLE_F32 ?= 1
+ifeq (,$(filter 0 1,$(HELIA_ENABLE_F32)))
+  $(error HELIA_ENABLE_F32 must be 0 or 1, got '$(HELIA_ENABLE_F32)')
+endif
+CCFLAGS  += -DARM_NN_ENABLE_F32=$(HELIA_ENABLE_F32)
+CXXFLAGS += -DARM_NN_ENABLE_F32=$(HELIA_ENABLE_F32)
 
 # The fp16 API requires ARMv8.1-M MVEF toolchain support. Keep it disabled for
 # other targets because heliaCore rejects ARM_NN_ENABLE_F16 without float16_t.

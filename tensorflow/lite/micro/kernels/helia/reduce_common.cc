@@ -211,6 +211,7 @@ void ResolveAxis(const int* axis_data, int axis_count,
 // to 4; a higher rank, or an axis outside the input rank, has no such spelling.
 // A scalar input ignores its axes, as the reference's axis resolution does.
 // see AmbiqAI/ns-cmsis-nn#428
+#if ARM_NN_ENABLE_F32 || ARM_NN_ENABLE_F16
 bool HeliaFloatReduceSupported(const TfLiteEvalTensor* input,
                                const int32_t* axis_data, int axis_count) {
   const int input_rank = input->dims->size;
@@ -231,6 +232,7 @@ bool HeliaFloatReduceSupported(const TfLiteEvalTensor* input,
   }
   return true;
 }
+#endif
 
 // Float16 reductions are optimized-only (TFLM has no float16 reference) and
 // heliaCORE takes 4-D NHWC dims, so reject the rest at Prepare. A non-constant
