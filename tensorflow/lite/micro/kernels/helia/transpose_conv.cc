@@ -671,12 +671,17 @@ TfLiteStatus EvalFloat(TfLiteContext* context, TfLiteNode* node,
   RuntimeShape input_shape = tflite::micro::GetTensorShape(input);
   RuntimeShape filter_shape = tflite::micro::GetTensorShape(filter);
   RuntimeShape output_shape = tflite::micro::GetTensorShape(output);
-  cmsis_nn_dims input_dims{input_shape.Dims(0), input_shape.Dims(1),
-                           input_shape.Dims(2), input_shape.Dims(3)};
-  cmsis_nn_dims filter_dims{filter_shape.Dims(0), filter_shape.Dims(1),
-                            filter_shape.Dims(2), filter_shape.Dims(3)};
-  cmsis_nn_dims output_dims{output_shape.Dims(0), output_shape.Dims(1),
-                            output_shape.Dims(2), output_shape.Dims(3)};
+  // Read only by the heliaCORE float entries, which a build without
+  // ARM_NN_ENABLE_F32 and ARM_NN_ENABLE_F16 leaves out.
+  [[maybe_unused]] cmsis_nn_dims input_dims{
+      input_shape.Dims(0), input_shape.Dims(1), input_shape.Dims(2),
+      input_shape.Dims(3)};
+  [[maybe_unused]] cmsis_nn_dims filter_dims{
+      filter_shape.Dims(0), filter_shape.Dims(1), filter_shape.Dims(2),
+      filter_shape.Dims(3)};
+  [[maybe_unused]] cmsis_nn_dims output_dims{
+      output_shape.Dims(0), output_shape.Dims(1), output_shape.Dims(2),
+      output_shape.Dims(3)};
   float activation_min;
   float activation_max;
   CalculateActivationRange(builtin.activation, &activation_min, &activation_max);

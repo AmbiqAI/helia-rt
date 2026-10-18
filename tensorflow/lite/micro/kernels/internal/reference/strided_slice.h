@@ -189,7 +189,8 @@ inline void StridedSlice(const tflite::micro::StridedSliceParams& op_params,
   const int stop_4 = strided_slice::StridedSliceEndForAxis(
       params_copy, input_shape, 4, start_4);
 
-  auto lc = [&](int end, int stride, int index) {
+  // TODO(AmbiqAI/helia-rt#460): 64-bit loop offsets; drop when upstream has it.
+  auto lc = [&](int end, int stride, int64_t index) {
     if (stride < 0) {
       return index > end;
     } else {
@@ -204,33 +205,34 @@ inline void StridedSlice(const tflite::micro::StridedSliceParams& op_params,
   const int* stride = reinterpret_cast<const int*>(params_copy.strides);
   const bool inner_stride_is_1 = params_copy.strides[4] == 1;
 
-  for (int offset_0 = start_0; lc(stop_0, stride[0], offset_0);
+  for (int64_t offset_0 = start_0; lc(stop_0, stride[0], offset_0);
        offset_0 += stride[0]) {
-    for (int offset_1 = start_1; lc(stop_1, stride[1], offset_1);
+    for (int64_t offset_1 = start_1; lc(stop_1, stride[1], offset_1);
          offset_1 += stride[1]) {
-      for (int offset_2 = start_2; lc(stop_2, stride[2], offset_2);
+      for (int64_t offset_2 = start_2; lc(stop_2, stride[2], offset_2);
            offset_2 += stride[2]) {
-        for (int offset_3 = start_3; lc(stop_3, stride[3], offset_3);
+        for (int64_t offset_3 = start_3; lc(stop_3, stride[3], offset_3);
              offset_3 += stride[3]) {
           // When the stride is 1, the inner loop is equivalent to the
           // optimized slice inner loop. Otherwise, it is identical to the
           // strided_slice reference implementation inner loop.
           if (inner_stride_is_1) {
             const int len = stop_4 - start_4;
-            int index = start_4 + offset_3 * shape[4] +
-                        offset_2 * shape[3] * shape[4] +
-                        offset_1 * shape[2] * shape[3] * shape[4] +
-                        offset_0 * shape[1] * shape[2] * shape[3] * shape[4];
+            const int index = static_cast<int>(
+                start_4 + offset_3 * shape[4] + offset_2 * shape[3] * shape[4] +
+                offset_1 * shape[2] * shape[3] * shape[4] +
+                offset_0 * shape[1] * shape[2] * shape[3] * shape[4]);
             if (len > 0) {
               writer->WriteN(index, len);
             }
           } else {
-            for (int offset_4 = start_4; lc(stop_4, stride[4], offset_4);
+            for (int64_t offset_4 = start_4; lc(stop_4, stride[4], offset_4);
                  offset_4 += stride[4]) {
-              int index = offset_4 + offset_3 * shape[4] +
-                          offset_2 * shape[3] * shape[4] +
-                          offset_1 * shape[2] * shape[3] * shape[4] +
-                          offset_0 * shape[1] * shape[2] * shape[3] * shape[4];
+              const int index = static_cast<int>(
+                  offset_4 + offset_3 * shape[4] +
+                  offset_2 * shape[3] * shape[4] +
+                  offset_1 * shape[2] * shape[3] * shape[4] +
+                  offset_0 * shape[1] * shape[2] * shape[3] * shape[4]);
               writer->Write(index);
             }
           }

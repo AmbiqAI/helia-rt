@@ -58,7 +58,9 @@ extern "C" {
                          output_dims);                                        \
   }
 
+#if ARM_NN_ENABLE_F32
 HELIA_WRAP_SLICE(arm_strided_slice_f32, float32_t, Leaf::kF32)
+#endif
 HELIA_WRAP_SLICE(arm_strided_slice_s8, int8_t, Leaf::kS8)
 HELIA_WRAP_SLICE(arm_strided_slice_s16, int16_t, Leaf::kS16)
 HELIA_WRAP_SLICE(arm_strided_slice_s32, int32_t, Leaf::kS32)
@@ -161,6 +163,13 @@ void FillInput(T* input, int count) {
 }
 
 template <>
+void FillInput<bool>(bool* input, int count) {
+  for (int i = 0; i < count; ++i) {
+    input[i] = i % 3 == 0;
+  }
+}
+
+template <>
 void FillInput<float>(float* input, int count) {
   for (int i = 0; i < count; ++i) {
     input[i] = 0.25f * static_cast<float>(i) - 7.0f;
@@ -240,7 +249,9 @@ void ExpectMatchesReference(const Slice& s, TfLiteType type, Leaf leaf,
   EXPECT_EQ(kTfLiteOk, runner.Invoke());
 #if HELIA_STRIDED_SLICE_LINK_WRAP
   for (int i = 0; i < static_cast<int>(Leaf::kCount); ++i) {
-    const bool expect_call = i == static_cast<int>(leaf) && visits_any;
+    // A HELIA_ENABLE_F32=0 build runs float32 on the reference.
+    const bool expect_call = i == static_cast<int>(leaf) && visits_any &&
+                             (ARM_NN_ENABLE_F32 || leaf != Leaf::kF32);
     EXPECT_EQ(expect_call ? 1 : 0, g_leaf_calls[i]);
   }
 #else
@@ -267,6 +278,8 @@ void ExpectAllTypesMatch(const Slice& s, int only = -1) {
   ExpectMatchesReference<int8_t>(s, kTfLiteInt8, Leaf::kS8, only);
   ExpectMatchesReference<int16_t>(s, kTfLiteInt16, Leaf::kS16, only);
   ExpectMatchesReference<int32_t>(s, kTfLiteInt32, Leaf::kS32, only);
+  // bool has no heliaCORE entry.
+  ExpectMatchesReference<bool>(s, kTfLiteBool, Leaf::kCount, only);
 #if ARM_NN_ENABLE_F16
   ExpectMatchesReference<uint16_t>(s, kTfLiteFloat16, Leaf::kF16, only);
 #endif
@@ -324,8 +337,8 @@ TEST(HeliaStridedSliceRouteTest, ExtremeStridesTakeOneElement) {
                             0, 0, 0});
 }
 
-// begin + stride passes INT32_MAX: the single element is input[1]. The
-// reference overflows here, so the case names the element it expects.
+// begin + stride passes INT32_MAX: the single element is input[1]. The case
+// names the element it expects.
 TEST(HeliaStridedSliceRouteTest, ExtremeStrideFromNonzeroBegin) {
   ExpectAllTypesMatch(
       Slice{1, {4}, {1}, {4}, {std::numeric_limits<int32_t>::max()}, 0, 0, 0},

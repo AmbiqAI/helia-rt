@@ -21,6 +21,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/c/builtin_op_data.h"
 #include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/hard_swish.h"
+#include "tensorflow/lite/micro/kernels/helia/helia_element_count.h"
 #include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/internal/common.h"
 #include "tensorflow/lite/micro/kernels/internal/quantization_util.h"
@@ -165,19 +166,25 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
       return kTfLiteError;
     }
     case kTfLiteFloat32: {
+      // heliaCORE and the reference both write as many elements as they read.
+      TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
+      int32_t count;
+      TF_LITE_ENSURE_OK(context,
+                        HeliaCheckedMatchingElementCount(context, input->dims,
+                                                         output->dims, &count));
+      if (count == 0) {
+        break;
+      }
 #if ARM_NN_ENABLE_F32
-      if (arm_hard_swish_f32(
-              tflite::micro::GetTensorData<float>(input),
-              tflite::micro::GetTensorData<float>(output),
-              tflite::micro::GetTensorShape(output).FlatSize()) ==
-          ARM_CMSIS_NN_SUCCESS) {
+      if (arm_hard_swish_f32(tflite::micro::GetTensorData<float>(input),
+                             tflite::micro::GetTensorData<float>(output),
+                             count) == ARM_CMSIS_NN_SUCCESS) {
         break;
       }
 #endif
+      const RuntimeShape flat_shape(1, &count);
       tflite::micro::reference_ops::HardSwish<float>(
-          tflite::micro::GetTensorShape(input),
-          tflite::micro::GetTensorData<float>(input),
-          tflite::micro::GetTensorShape(output),
+          flat_shape, tflite::micro::GetTensorData<float>(input), flat_shape,
           tflite::micro::GetTensorData<float>(output));
     } break;
     case kTfLiteInt16: {

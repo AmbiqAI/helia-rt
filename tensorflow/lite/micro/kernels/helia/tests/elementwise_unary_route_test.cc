@@ -75,10 +75,12 @@ int Calls(Entry entry) { return g_calls[static_cast<int>(entry)]; }
     return __real_##name(input, output, n);                                 \
   }
 
+#if ARM_NN_ENABLE_F32
 HELIA_UNARY_WRAP(arm_nn_abs_f32, float32_t, Entry::kAbsF32)
 HELIA_UNARY_WRAP(arm_nn_sqrt_f32, float32_t, Entry::kSqrtF32)
 HELIA_UNARY_WRAP(arm_rsqrt_f32, float32_t, Entry::kRsqrtF32)
 HELIA_UNARY_WRAP(arm_nn_neg_f32, float32_t, Entry::kNegF32)
+#endif
 #if ARM_NN_ENABLE_F16
 HELIA_UNARY_WRAP(arm_nn_abs_f16, float16_t, Entry::kAbsF16)
 HELIA_UNARY_WRAP(arm_nn_neg_f16, float16_t, Entry::kNegF16)
@@ -116,7 +118,13 @@ constexpr bool kWrapped = true;
 constexpr bool kWrapped = false;
 #endif
 
-// Every helia make build enables the float32 API; float16 only on M55.
+// A HELIA_ENABLE_F32=0 build has no float32 API and runs float32 on the
+// reference; float16 is on M55 only.
+#if ARM_NN_ENABLE_F32
+constexpr bool kF32 = true;
+#else
+constexpr bool kF32 = false;
+#endif
 #if ARM_NN_ENABLE_F16
 constexpr bool kF16 = true;
 #else
@@ -200,8 +208,15 @@ TfLiteStatus RunUnary(const TFLMRegistration& registration, T* input,
   return runner.Invoke();
 }
 
+// Whether this build links and wraps `entry`.
+bool Wrapped(Entry entry) {
+  const bool f32 = entry == Entry::kAbsF32 || entry == Entry::kSqrtF32 ||
+                   entry == Entry::kRsqrtF32 || entry == Entry::kNegF32;
+  return kWrapped && (kF32 || !f32);
+}
+
 void ExpectCalls(Entry entry, int expected) {
-  if (kWrapped) {
+  if (Wrapped(entry)) {
     EXPECT_EQ(expected, Calls(entry));
   }
 }
@@ -270,6 +285,7 @@ void ExpectSqrtFamilyMatchesReference(const TFLMRegistration& registration,
   EXPECT_EQ(0, nan_class_mismatches);
 }
 
+#if ARM_NN_ENABLE_F32
 // CHARACTERIZATION of the heliaCORE NaN patterns for SQRT and RSQRT: a
 // negative input or -Inf gives the positive quiet NaN 0x7FC00000, and a NaN
 // input keeps its sign and payload with the quiet bit set. The reference
@@ -305,6 +321,7 @@ void ExpectSqrtFamilyNanPatterns(const TFLMRegistration& registration,
     EXPECT_EQ(expected[i], Bits(output[i]));
   }
 }
+#endif
 
 // TFLite's quantized ABS: |x - zp_in|, requantized when the scales differ,
 // plus zp_out, clamped to the type range.
@@ -495,7 +512,7 @@ void ExpectShrunkOutputFailsInvoke(const TFLMRegistration& registration,
 
 void ExpectFailingEntryFailsInvoke(const TFLMRegistration& registration,
                                    Entry entry, TfLiteType type) {
-  if (!kWrapped || (!kF16 && type == kTfLiteFloat16)) {
+  if (!Wrapped(entry) || (!kF16 && type == kTfLiteFloat16)) {
     return;
   }
   uint8_t input[8 * sizeof(float)] = {};
@@ -566,6 +583,8 @@ TEST(HeliaElementwiseUnaryRouteTest, RsqrtFloat32MatchesReference) {
                                    ReferenceRsqrt);
 }
 
+// The pinned patterns are heliaCORE's; the reference gives the FPU's.
+#if ARM_NN_ENABLE_F32
 TEST(HeliaElementwiseUnaryRouteTest, SqrtFloat32NanPatternsCharacterized) {
   ExpectSqrtFamilyNanPatterns(tflite::Register_SQRT(), Entry::kSqrtF32,
                               ReferenceSqrt, "SQRT");
@@ -575,6 +594,7 @@ TEST(HeliaElementwiseUnaryRouteTest, RsqrtFloat32NanPatternsCharacterized) {
   ExpectSqrtFamilyNanPatterns(tflite::Register_RSQRT(), Entry::kRsqrtF32,
                               ReferenceRsqrt, "RSQRT");
 }
+#endif
 
 TEST(HeliaElementwiseUnaryRouteTest, AbsInt8SameScaleMatchesReference) {
   ExpectAbsInt8(0.5f, 5, 0.5f, -7);
