@@ -102,13 +102,12 @@ TfLiteStatus NegEval(TfLiteContext* context, TfLiteNode* node) {
       TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
       int32_t count;
       TF_LITE_ENSURE_OK(context,
-                        HeliaCheckedMatchingElementCount(
-                            context, input->dims, output->dims, &count));
+                        HeliaCheckedMatchingElementCount(context, input->dims,
+                                                         output->dims, &count));
       const RuntimeShape flat_shape(1, &count);
-      reference_ops::Negate(flat_shape,
-                            tflite::micro::GetTensorData<float>(input),
-                            flat_shape,
-                            tflite::micro::GetTensorData<float>(output));
+      reference_ops::Negate(
+          flat_shape, tflite::micro::GetTensorData<float>(input), flat_shape,
+          tflite::micro::GetTensorData<float>(output));
       break;
     }
 #endif

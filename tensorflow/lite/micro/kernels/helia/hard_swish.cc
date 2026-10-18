@@ -169,9 +169,9 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
       // heliaCORE and the reference both write as many elements as they read.
       TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
       int32_t count;
-      TF_LITE_ENSURE_OK(context, HeliaCheckedMatchingElementCount(
-                                     context, input->dims, output->dims,
-                                     &count));
+      TF_LITE_ENSURE_OK(context,
+                        HeliaCheckedMatchingElementCount(context, input->dims,
+                                                         output->dims, &count));
       if (count == 0) {
         break;
       }
