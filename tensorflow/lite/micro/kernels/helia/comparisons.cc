@@ -14,6 +14,7 @@ limitations under the License.
 ==============================================================================*/
 #include "tensorflow/lite/micro/kernels/internal/reference/comparisons.h"
 
+#include <algorithm>
 #include <type_traits>
 
 #include "Include/arm_nnfunctions.h"
@@ -791,7 +792,31 @@ TfLiteStatus ComparisonsPrepare(TfLiteContext* context, TfLiteNode* node) {
       micro_context->AllocateTempInputTensor(node, kInputTensor2);
   TF_LITE_ENSURE(context, input2 != nullptr);
 
-  if (input1->type == kTfLiteInt8 || input1->type == kTfLiteInt16) {
+  if (input1->type == kTfLiteInt16) {
+    // Rescale relative to the larger scale: an absolute rescale collapses
+    // neighbouring values at int16 scales. Equal scales and zero points
+    // compare exactly. (q - zero_point) << left_shift must fit int32.
+    if (!(input1->params.scale > 0.0f && input2->params.scale > 0.0f)) {
+      MicroPrintf("Comparison: int16 input scales must be positive.");
+      micro_context->DeallocateTempTfLiteTensor(input1);
+      micro_context->DeallocateTempTfLiteTensor(input2);
+      return kTfLiteError;
+    }
+    const double twice_max_scale =
+        2.0 * std::max(static_cast<double>(input1->params.scale),
+                       static_cast<double>(input2->params.scale));
+    QuantizeMultiplierSmallerThanOneExp(
+        static_cast<double>(input1->params.scale) / twice_max_scale,
+        &data->params.input1_multiplier, &data->params.input1_shift);
+    QuantizeMultiplierSmallerThanOneExp(
+        static_cast<double>(input2->params.scale) / twice_max_scale,
+        &data->params.input2_multiplier, &data->params.input2_shift);
+    data->params.input1_offset = -input1->params.zero_point;
+    data->params.input2_offset = -input2->params.zero_point;
+    data->params.left_shift =
+        input1->params.zero_point == 0 && input2->params.zero_point == 0 ? 15
+                                                                         : 14;
+  } else if (input1->type == kTfLiteInt8) {
     auto input1_offset = -input1->params.zero_point;
     auto input2_offset = -input2->params.zero_point;
     const int kLeftShift = 8;
