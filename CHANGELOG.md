@@ -1,5 +1,69 @@
 # Changelog
 
+## [2.2.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v2.1.1...helia-rt-v2.2.0) (2026-10-18)
+
+
+### Features
+
+* **helia:** opt-in float16-lane registration for float16 DEPTHWISE_CONV_2D ([a1cc97a](https://github.com/AmbiqAI/helia-rt/commit/a1cc97ad096f9b84831f23f3c079a2148937e060))
+
+
+### Bug Fixes
+
+* cap tensor byte sizes at what the planner holds and size tensors before Prepare ([ac35c0e](https://github.com/AmbiqAI/helia-rt/commit/ac35c0e705d86763caf892b0229cf3db41c2c75e))
+* check greedy plan offsets where they are computed, not as a running sum ([72feb71](https://github.com/AmbiqAI/helia-rt/commit/72feb71a7d398f464a5dfa231ab56a339801b1ef))
+* check the arena allocations of the upstream kernels the helia build runs ([c54b727](https://github.com/AmbiqAI/helia-rt/commit/c54b7276178c9bb2f631b0dcd7da0f67844adbaa))
+* drop three local patches the mutation run showed are redundant ([05a1c81](https://github.com/AmbiqAI/helia-rt/commit/05a1c819bd3de50f803cf87e9ace2b6469673666))
+* fail AllocateTensors cleanly when the arena runs out ([a26506c](https://github.com/AmbiqAI/helia-rt/commit/a26506c34dd6004e79d41398c98b1d4f790c95c9))
+* fail AllocateTensors on any failed arena allocation in the framework ([25571e7](https://github.com/AmbiqAI/helia-rt/commit/25571e7b96d3416fead9f5366b06912cda2458d8))
+* fail tensor byte sizes that overflow instead of wrapping ([3fccbf5](https://github.com/AmbiqAI/helia-rt/commit/3fccbf5322551361fea33100966300e2d3f4edd0)), closes [#453](https://github.com/AmbiqAI/helia-rt/issues/453)
+* handle an empty input before the reference MEAN dispatch ([466b5ad](https://github.com/AmbiqAI/helia-rt/commit/466b5ada144c56411a49258f1e6a576530174c7b))
+* **helia:** bound DIV rank and shapes, and check int8 DIV divisors ([49407b6](https://github.com/AmbiqAI/helia-rt/commit/49407b6d6ef99c9c6c59b829babd82a1c24b9cc9)), closes [#451](https://github.com/AmbiqAI/helia-rt/issues/451)
+* **helia:** bound the SQUEEZE output rank check ([a6a4566](https://github.com/AmbiqAI/helia-rt/commit/a6a45661aa438ca72dec4690ff9fec0448c04dc7)), closes [#451](https://github.com/AmbiqAI/helia-rt/issues/451)
+* **helia:** check ADD int8 zero points and release Prepare temporaries ([ca7c296](https://github.com/AmbiqAI/helia-rt/commit/ca7c296063925ec7950f792cfde41c9408212dd9)), closes [#451](https://github.com/AmbiqAI/helia-rt/issues/451)
+* **helia:** check HARD_SWISH and FULLY_CONNECTED float32 output shapes ([11cb43e](https://github.com/AmbiqAI/helia-rt/commit/11cb43ed5373d7ec1ec3aac20623b776a817ce04))
+* **helia:** check reduce and PRELU Prepare tensors and release temporaries ([62a0b30](https://github.com/AmbiqAI/helia-rt/commit/62a0b30c1a91f9d06f75e318a08c128b261811cc))
+* **helia:** check temp tensors in Prepare and support bias-less integer SVDF ([ee44731](https://github.com/AmbiqAI/helia-rt/commit/ee4473125f17be1acc006c613c0b25c9b6191015)), closes [#449](https://github.com/AmbiqAI/helia-rt/issues/449)
+* **helia:** check the NEG float32 reference output count ([b926e33](https://github.com/AmbiqAI/helia-rt/commit/b926e33314b42dd33343ec15a21ba060f1b86609))
+* **helia:** check the output count in the unary elementwise loops ([aee44b3](https://github.com/AmbiqAI/helia-rt/commit/aee44b3ad085c4b8de7c52c32305e8ea3c50e057)), closes [#450](https://github.com/AmbiqAI/helia-rt/issues/450)
+* **helia:** check the SPLIT axis and outputs in Prepare for every type ([7b85d61](https://github.com/AmbiqAI/helia-rt/commit/7b85d61a5707541a52986661a2769701cee8aeff)), closes [#451](https://github.com/AmbiqAI/helia-rt/issues/451)
+* **helia:** compare int16 values relative to the larger input scale ([f500d11](https://github.com/AmbiqAI/helia-rt/commit/f500d11dc0f9f6a716a69bbc1648b5a907e5ed33))
+* **helia:** define Register_PAD_INT8 and Register_TRANSPOSE_INT8 ([44f63eb](https://github.com/AmbiqAI/helia-rt/commit/44f63eb5847d1a0b344f34b36b5cc63be9aba2d3))
+* **helia:** fail float MEAN and SUM when their heliaCORE entry fails ([a287c43](https://github.com/AmbiqAI/helia-rt/commit/a287c43c0f0ac6279cebd2873d63fd3a432bd8b1))
+* **helia:** fail Prepare when a persistent buffer does not fit ([a6c4ae7](https://github.com/AmbiqAI/helia-rt/commit/a6c4ae7969144aed50a45776899ba3e17a9eb0f6)), closes [#449](https://github.com/AmbiqAI/helia-rt/issues/449)
+* **helia:** harden the reference elementwise checks from the [#462](https://github.com/AmbiqAI/helia-rt/issues/462) review ([8030726](https://github.com/AmbiqAI/helia-rt/commit/8030726d6c7b8241df47d77cf3f745de0a21413b))
+* **helia:** keep int8 DIV free of the headroom-31 steps ([5455b53](https://github.com/AmbiqAI/helia-rt/commit/5455b53ed81d6bdf414fdd3d4922a32d9733c075)), closes [#451](https://github.com/AmbiqAI/helia-rt/issues/451)
+* **helia:** keep the allocation sweep out of the library and make it fail on the FVP ([28b0f21](https://github.com/AmbiqAI/helia-rt/commit/28b0f21b49032b48515784f9c825513c67edffd4))
+* **helia:** keep the float16-lane depthwise symbol out of FP16-free probes ([51756a8](https://github.com/AmbiqAI/helia-rt/commit/51756a8b1d3800df5eb1b00caf953f340debb83a))
+* **helia:** log MEAN and SUM heliaCORE failures ([39d80bd](https://github.com/AmbiqAI/helia-rt/commit/39d80bd9f7530352e2388730389bb6f09b0e4722))
+* **helia:** probe low memory in the allocation sweep only on bare-metal M-profile ([6312c5e](https://github.com/AmbiqAI/helia-rt/commit/6312c5e7d5093bbd94eaa8ef13ed2a4210a88ae2))
+* **helia:** reference only the selected float16 depthwise entry and document the opt-in ([cfb7d11](https://github.com/AmbiqAI/helia-rt/commit/cfb7d115757a6d2d31150022e2c595404591ee02))
+* **helia:** reject a TRANSPOSE perm that is not constant ([ce3ab11](https://github.com/AmbiqAI/helia-rt/commit/ce3ab110db35ba94a9ca6982ea630f2f3703dbd0))
+* **helia:** reject a zero int32 DIV divisor ([1b3d6a1](https://github.com/AmbiqAI/helia-rt/commit/1b3d6a19465b312c9a6e4777142c559acf48443c)), closes [#451](https://github.com/AmbiqAI/helia-rt/issues/451)
+* **helia:** reject ADD scales that abort the multiplier quantizer ([97863ab](https://github.com/AmbiqAI/helia-rt/commit/97863abfb990b48d5feb14aa9604eca9ddb46f53)), closes [#451](https://github.com/AmbiqAI/helia-rt/issues/451)
+* **helia:** reject ADD tensors above rank 6 in Prepare ([f5e0ef4](https://github.com/AmbiqAI/helia-rt/commit/f5e0ef4f01b4d3c2c14601e40d644965e6ae7315)), closes [#451](https://github.com/AmbiqAI/helia-rt/issues/451)
+* **helia:** reject an unquantized int16 RSQRT at Prepare ([e998fd7](https://github.com/AmbiqAI/helia-rt/commit/e998fd79158cfd42af9f889ea5eaa89147989684)), closes [#381](https://github.com/AmbiqAI/helia-rt/issues/381)
+* **helia:** reject INT32_MIN / -1 in int32 DIV ([9938c3e](https://github.com/AmbiqAI/helia-rt/commit/9938c3e7229faf34bedf8a144967ee96e8fe7a8e)), closes [#451](https://github.com/AmbiqAI/helia-rt/issues/451)
+* **helia:** reject unquantized int8/int16 ADD tensors in Prepare ([fa9211d](https://github.com/AmbiqAI/helia-rt/commit/fa9211dbd641ad81424c3144fc2cb81da9262d36)), closes [#451](https://github.com/AmbiqAI/helia-rt/issues/451)
+* **helia:** release GenericPrepare's temporaries on every rejection ([6a3c2bf](https://github.com/AmbiqAI/helia-rt/commit/6a3c2bf8de1a5065584aae85b34aae0318b768bb))
+* **helia:** release PrepareAbsRsqrt's temporaries on every rejection ([26e4cb6](https://github.com/AmbiqAI/helia-rt/commit/26e4cb6afd8bc0f29986693f67ac5c5043a649e0))
+* **helia:** require DIV and ADD outputs to be the input broadcast, and fix int8 DIV small quotients ([c8c2835](https://github.com/AmbiqAI/helia-rt/commit/c8c2835cc0e7a659cd0293905a54dfacfcce79e1)), closes [#451](https://github.com/AmbiqAI/helia-rt/issues/451)
+* **helia:** require the DIV int32 output to be the input broadcast ([4e3434e](https://github.com/AmbiqAI/helia-rt/commit/4e3434e7717e200ab9e9491baab67af8a00d1938)), closes [#451](https://github.com/AmbiqAI/helia-rt/issues/451)
+* **helia:** run 16x8 FULLY_CONNECTED with an int32 bias on the reference ([dcd4853](https://github.com/AmbiqAI/helia-rt/commit/dcd4853e1b2d280cc0a1c3cfe1d4e80297d30237))
+* **helia:** run a float32 SVDF that has no bias without reading through null ([d891b46](https://github.com/AmbiqAI/helia-rt/commit/d891b463eb31b728366b94fca8305e361d8823d0))
+* **helia:** run int8-weight LSTM and batched depthwise in debug builds ([71d1809](https://github.com/AmbiqAI/helia-rt/commit/71d1809983360cddd1a3090f6939eb4a0dddc254))
+* **helia:** run unquantized int16 comparisons and bound int16 Prepare ([fd8c5db](https://github.com/AmbiqAI/helia-rt/commit/fd8c5db1707ce4c923106e7f494c13debee5f134))
+* **helia:** take the MEAN 4-D special case only for an [N, 1, 1, C] output ([6e7438c](https://github.com/AmbiqAI/helia-rt/commit/6e7438cd555011462e0a936e39a8c3dd18341ce5))
+* keep two-arena allocations and memory plans inside their int and arena bounds ([68d69b6](https://github.com/AmbiqAI/helia-rt/commit/68d69b6e645ea9a489e9590a56d3013ca9cad1f6))
+* keep upstream's byte count for -1 shapes and re-size tensors once resolved ([1cb42f7](https://github.com/AmbiqAI/helia-rt/commit/1cb42f7ba0652218b3a8131d9371c352a3e0118a))
+* leave RESHAPE's -1 stretch dimension for Prepare to resolve ([45bebd7](https://github.com/AmbiqAI/helia-rt/commit/45bebd71ba451ae9ad12ea78626406ffc8684d1c))
+* refuse a resource variable sized from an unresolved shape ([48153d2](https://github.com/AmbiqAI/helia-rt/commit/48153d2b9072925832de1020034e07d8b9e3ca45))
+* reject a reference MEAN output whose count is not the reduced count ([6bcb711](https://github.com/AmbiqAI/helia-rt/commit/6bcb711a5c37586d06bb294fd9751e4f5f1fa3ab))
+* release RESHAPE's temporaries when refusing a zero-product stretch ([b181e43](https://github.com/AmbiqAI/helia-rt/commit/b181e43f378c10cd64845e83b377e6f0c89618cf))
+* **release:** stop shipping the source-build NSX module in the bundle ([167a733](https://github.com/AmbiqAI/helia-rt/commit/167a7332e717bfb1dd18be531f8832cb8237dd9f))
+* STRIDED_SLICE with a stride near INT32_MAX no longer overflows ([b4dfccd](https://github.com/AmbiqAI/helia-rt/commit/b4dfccd8ba8264ef7f77fefdde9677a21919c904))
+* take the reference MEAN 4-D special case only for an [N, 1, 1, C] output ([14d6efc](https://github.com/AmbiqAI/helia-rt/commit/14d6efc0c989300283de086768b13f4bfc4df274))
+
 ## [2.1.1](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v2.1.0...helia-rt-v2.1.1) (2026-10-18)
 
 
