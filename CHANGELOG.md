@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.1](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v2.1.0...helia-rt-v2.1.1) (2026-10-18)
+
+
+### Bug Fixes
+
+* **nsx:** keep helia-rt-source on the release version, and check every version and pin site in CI ([f5295ea](https://github.com/AmbiqAI/helia-rt/commit/f5295ea7e3412e51dfa17849ceb60301d0058df7))
+* **nsx:** keep the helia-rt-source module version in step with releases ([7baae4b](https://github.com/AmbiqAI/helia-rt/commit/7baae4b8e898678385ba85fe82d5fc40890f0261)), closes [#445](https://github.com/AmbiqAI/helia-rt/issues/445)
+
 ## [2.1.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v2.0.0...helia-rt-v2.1.0) (2026-10-17)
 
 
