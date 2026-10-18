@@ -485,6 +485,14 @@ TfLiteStatus PrepareAdd(TfLiteContext* context, TfLiteNode* node) {
     TF_LITE_ENSURE_EQ(context, input2->params.zero_point, 0);
     TF_LITE_ENSURE_EQ(context, output->params.zero_point, 0);
   }
+  if (input1->type == kTfLiteInt8 || input1->type == kTfLiteInt16) {
+    TF_LITE_ENSURE_MSG(
+        context,
+        input1->quantization.type != kTfLiteNoQuantization &&
+            input2->quantization.type != kTfLiteNoQuantization &&
+            output->quantization.type != kTfLiteNoQuantization,
+        "ADD int8/int16 requires quantized input1, input2 and output.");
+  }
 
   OpData* data = static_cast<OpData*>(node->user_data);
   auto* params = reinterpret_cast<TfLiteAddParams*>(node->builtin_data);
