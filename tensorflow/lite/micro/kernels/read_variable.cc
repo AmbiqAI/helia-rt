@@ -43,7 +43,8 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TfLiteTensor* input_resource_id_tensor =
       micro_context->AllocateTempInputTensor(node, kInputVariableId);
 
-  TFLITE_DCHECK(input_resource_id_tensor != nullptr);
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  TF_LITE_ENSURE(context, input_resource_id_tensor != nullptr);
   TFLITE_DCHECK(input_resource_id_tensor->type == kTfLiteResource);
   TFLITE_DCHECK(NumElements(input_resource_id_tensor) == 1);
 

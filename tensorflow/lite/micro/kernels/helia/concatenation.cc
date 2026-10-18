@@ -307,10 +307,12 @@ TfLiteStatus ConcatenationPrepare(TfLiteContext* context, TfLiteNode* node) {
       float* input_scales =
           reinterpret_cast<float*>(context->AllocatePersistentBuffer(
               context, node->inputs->size * sizeof(float)));
+      TF_LITE_ENSURE(context, input_scales != nullptr);
 
       int32_t* input_zero_points =
           reinterpret_cast<int32_t*>(context->AllocatePersistentBuffer(
               context, node->inputs->size * sizeof(int32_t)));
+      TF_LITE_ENSURE(context, input_zero_points != nullptr);
 
       // Allocate persistent scale and zeropoint buffers.
       // Store input scale and zero point values in OpParams:

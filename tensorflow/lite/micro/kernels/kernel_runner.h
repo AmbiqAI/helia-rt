@@ -97,6 +97,15 @@ class KernelRunner {
   // Returns a pointer to the internal FakeMicroContext.
   FakeMicroContext* GetFakeMicroContext() { return &fake_micro_context_; }
 
+  // TODO(AmbiqAI/helia-rt#460): exhaustion sweep; drop when upstream has it.
+  // When set, InitAndPrepare calls it first with the node and its tensors.
+  // Only test-runtime code sets it; it is null in a library.
+  using InitAndPrepareHook = void (*)(const TFLMRegistration& registration,
+                                      const TfLiteNode& node,
+                                      TfLiteTensor* tensors, int tensors_size,
+                                      const char* init_data, size_t length);
+  static InitAndPrepareHook init_and_prepare_hook;
+
   // Returns true if all temp buffer in tests are deallocated.
   // TODO(b/209453859): move this function to private after deallocation checks
   // are enabled for all kernel tests.
@@ -111,6 +120,9 @@ class KernelRunner {
   const TFLMRegistration registration_;
 
   SingleArenaBufferAllocator* allocator_;
+  // TODO(AmbiqAI/helia-rt#460): exhaustion sweep; drop when upstream has it.
+  TfLiteTensor* sweep_tensors_;
+  int sweep_tensors_size_;
   MockMicroGraph mock_micro_graph_;
   FakeMicroContext fake_micro_context_;
 };

@@ -20,9 +20,19 @@ limitations under the License.
 #include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/conv.h"
 #include "tensorflow/lite/micro/kernels/depthwise_conv.h"
+#include "tensorflow/lite/micro/kernels/helia/tests/allocation_sweep.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
+
+namespace {
+
+// The link wraps count the heliaCORE calls Prepare makes, which the
+// allocation sweep would repeat.
+[[maybe_unused]] const bool kAllocationSweepOff =
+    (tflite::micro::helia::AllocationSweepEnabled() = false, true);
+
+}  // namespace
 
 namespace {
 

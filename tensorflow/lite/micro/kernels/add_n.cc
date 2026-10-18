@@ -90,6 +90,8 @@ TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteNode* node) {
   } else if (output->type == kTfLiteInt8) {
     node->user_data =
         context->AllocatePersistentBuffer(context, sizeof(OpData));
+    // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+    TF_LITE_ENSURE(context, node->user_data != nullptr);
     OpData* data = static_cast<OpData*>(node->user_data);
 
     // Allocate scratch buffer space for pointer to each tensor's data
