@@ -16,23 +16,26 @@
 """Checks that every release version and ns-cmsis-nn pin site agrees.
 
 release-please bumps only the files listed in release-please-config.json
-`extra-files`, and only on lines carrying its version marker. A versioned
-file missing from that list, or a list entry whose marked line holds another
-version, ships stale. The ns-cmsis-nn tag and commit are written by hand in
-several files, and nothing bumps them together.
+`extra-files`, and in each only the first version on a marked line or on a
+line inside a marked block. A versioned file missing from that list, or a
+marked line whose first version is not the release, ships stale. The
+ns-cmsis-nn tag and commit are written by hand in several files, and nothing
+bumps them together.
 see AmbiqAI/helia-rt#445, AmbiqAI/helia-rt#402
 
 Rules:
-  * .release-please-manifest.json holds one package, ".", at X.Y.Z.
-  * Every extra-files entry is a generic file that exists and has at least
-    one marked line or start/end block, each holding an X.Y.Z. Every X.Y.Z
-    there is the manifest version: release-please rewrites them all.
-  * Every tracked file that carries a marker, and every nsx-module.yaml, is
-    an extra-files entry.
+  * .release-please-manifest.json holds one package, ".", at a version.
+  * Every extra-files entry is {"type": "generic", "path": ...} for a file
+    that exists and has a version-scope marked line or block. A marked line
+    holds exactly one version, a block line at most one, each block at least
+    one, and every one is the manifest version.
+  * Every tracked file that carries a release-please marker, and every
+    nsx-module.yaml, is an extra-files entry.
   * The ns-cmsis-nn tag and commit in ext_libs/helia.inc match the copies in
-    PIN_SITES, each of which appears exactly once in its file.
+    PIN_SITES, each of which appears exactly once in its file. With --remote,
+    the tag must also resolve to the commit in AmbiqAI/ns-cmsis-nn.
 
-Usage: check_helia_release_versions.py [repo-root]
+Usage: check_helia_release_versions.py [--remote] [repo-root]
   repo-root defaults to the repository root inferred from this file.
 
 Exit codes: 0 consistent, 1 inconsistent, 2 usage error.
@@ -45,14 +48,21 @@ import subprocess
 import sys
 from pathlib import Path
 
-# Split so this file does not carry the marker itself.
+# The marker regexes and VERSION_RE are release-please's own
+# (src/updaters/generic.ts); it applies VERSION_RE once per line, not
+# globally. Each pattern is split so this file carries no marker itself.
 MARKER = "x-release-please-" + "version"
-BLOCK_START = "x-release-please-start-" + "version"
-BLOCK_END = "x-release-please-" + "end"
-
-# An X.Y.Z not inside a longer dotted number, so 2.1.0 in helia-rt.2.1.0.pack
-# counts and 1.2.3.4 does not.
-SEMVER = re.compile(r"(?<!\d)(?<!\d\.)(\d+\.\d+\.\d+)(?!\d|\.\d)")
+SCOPES = "major|minor|patch|version-date|version|date"
+INLINE_RE = re.compile("x-release-please-" + f"(?P<scope>{SCOPES})")
+BLOCK_START_RE = re.compile("x-release-please-start-" + f"(?P<scope>{SCOPES})")
+BLOCK_END_RE = re.compile("x-release-please-" + "end")
+ANY_MARKER_RE = re.compile(
+  ("x-release-please-" + f"(?:start-)?(?:{SCOPES})").encode()
+)
+VERSION_RE = re.compile(
+  r"(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)"
+  r"(-(?P<preRelease>[\w.]+))?(\+(?P<build>[-\w.]+))?"
+)
 
 # Outside a git checkout, the tree scan skips VCS state, fetched third-party
 # code and build or tool output, none of which release-please edits.
@@ -67,6 +77,7 @@ SKIP_DIRS = {
   ".astro",
 }
 
+NS_CMSIS_NN_URL = "https://github.com/AmbiqAI/ns-cmsis-nn"
 HELIA_INC = "tensorflow/lite/micro/tools/make/ext_libs/helia.inc"
 PIN_TAG = re.compile(
   r"^# Tracks AmbiqAI/ns-cmsis-nn tag (v\d+\.\d+\.\d+)\.", re.M
@@ -105,7 +116,35 @@ PIN_SITES = (
     r"^- name: ns-cmsis-nn\n(?:  .*\n)*?  revision: (\S+)$",
     "tag",
   ),
+  (
+    "tensorflow/lite/micro/kernels/helia/README.md",
+    r"provided by the pinned\n`AmbiqAI/ns-cmsis-nn` (v\d+\.\d+\.\d+) release",
+    "tag",
+  ),
 )
+
+
+def remote_tag_commit(tag):
+  """Returns the commit `tag` names in AmbiqAI/ns-cmsis-nn, or None."""
+  try:
+    out = subprocess.run(
+      [
+        "git",
+        "ls-remote",
+        NS_CMSIS_NN_URL,
+        f"refs/tags/{tag}",
+        f"refs/tags/{tag}^{{}}",
+      ],
+      check=True,
+      capture_output=True,
+      text=True,
+      timeout=60,
+    ).stdout
+  except (OSError, subprocess.SubprocessError):
+    return None
+  refs = dict(reversed(line.split("\t", 1)) for line in out.splitlines())
+  # An annotated tag lists its peeled commit as <ref>^{}.
+  return refs.get(f"refs/tags/{tag}^{{}}") or refs.get(f"refs/tags/{tag}")
 
 
 class Checker:
@@ -136,10 +175,10 @@ class Checker:
       not isinstance(manifest, dict)
       or list(manifest) != ["."]
       or not isinstance(manifest["."], str)
-      or not re.fullmatch(r"\d+\.\d+\.\d+", manifest["."])
+      or not VERSION_RE.fullmatch(manifest["."])
     ):
       self.error(
-        ".release-please-manifest.json: expected exactly {\".\": \"X.Y.Z\"}"
+        '.release-please-manifest.json: expected exactly {".": "<version>"}'
       )
       return None
     return manifest["."]
@@ -149,50 +188,62 @@ class Checker:
     if text is None:
       return None
     try:
-      config = json.loads(text)
-      entries = config["packages"]["."]["extra-files"]
+      entries = json.loads(text)["packages"]["."]["extra-files"]
     except (json.JSONDecodeError, KeyError, TypeError) as e:
       self.error(
-        f"release-please-config.json: no packages.\".\".extra-files ({e})"
+        f'release-please-config.json: no packages.".".extra-files ({e!r})'
       )
+      return None
+    if not isinstance(entries, list):
+      self.error("release-please-config.json: extra-files is not a list")
       return None
     paths = []
     for entry in entries:
-      if isinstance(entry, str):
-        paths.append(entry)
-      elif (
-        isinstance(entry, dict)
-        and entry.get("type") == "generic"
-        and isinstance(entry.get("path"), str)
-        and set(entry) <= {"type", "path"}
+      path = entry.get("path") if isinstance(entry, dict) else None
+      # A leading / is the repository root; the package is ".", so the same.
+      rel = path.lstrip("/") if isinstance(path, str) else ""
+      if (
+        not isinstance(entry, dict)
+        or set(entry) != {"type", "path"}
+        or entry["type"] != "generic"
+        or not rel
+        or ".." in Path(rel).parts
       ):
-        paths.append(entry["path"])
-      else:
         self.error(
           "release-please-config.json: extra-files entry "
-          f"{json.dumps(entry)} is not a generic file; this check "
-          "reads only marker lines"
+          f'{json.dumps(entry)} is not {{"type": "generic", "path": ...}} '
+          "for a repository file; this check models only that updater"
         )
+        continue
+      paths.append(rel)
     return paths
 
-  def marked_units(self, rel, text):
-    """Yields (first line number, lines) for each unit release-please rewrites:
-    a line carrying the marker, or the lines of a start/end block."""
-    block = None
-    for number, line in enumerate(text.splitlines(), 1):
-      if BLOCK_START in line:
-        if block is not None:
+  def marked_lines(self, rel, text):
+    """Yields (line number, line, kind) for each line release-please
+    rewrites, kind "inline" or "block", and (number, None, "end") after each
+    block. Mirrors Generic.updateContent."""
+    block_start = None
+    for number, line in enumerate(re.split(r"\r?\n", text), 1):
+      inline = INLINE_RE.search(line)
+      if inline:
+        if inline.group("scope") != "version":
+          self.error(f"{rel}:{number}: unsupported marker scope")
+        yield number, line, "inline"
+      elif block_start is not None:
+        if BLOCK_START_RE.search(line):
           self.error(f"{rel}:{number}: version block opened inside another")
-        block = (number + 1, [])
-      elif block is not None and BLOCK_END in line:
-        yield block
-        block = None
-      elif block is not None:
-        block[1].append(line)
-      elif MARKER in line:
-        yield number, [line]
-    if block is not None:
-      self.error(f"{rel}:{block[0] - 1}: version block is never closed")
+        yield number, line, "block"
+        if BLOCK_END_RE.search(line):
+          yield block_start, None, "end"
+          block_start = None
+      else:
+        start = BLOCK_START_RE.search(line)
+        if start:
+          if start.group("scope") != "version":
+            self.error(f"{rel}:{number}: unsupported marker scope")
+          block_start = number
+    if block_start is not None:
+      self.error(f"{rel}:{block_start}: version block is never closed")
 
   def check_extra_file(self, rel, version):
     if not (self.root / rel).is_file():
@@ -201,28 +252,38 @@ class Checker:
     text = self.read(rel)
     if text is None:
       return
-    units = list(self.marked_units(rel, text))
-    if not units:
+    units = 0
+    block_versions = 0
+    for number, line, kind in self.marked_lines(rel, text):
+      if kind == "end":
+        units += 1
+        if block_versions == 0:
+          self.error(f"{rel}:{number}: version block holds no version")
+        block_versions = 0
+        continue
+      found = [m.group(0) for m in VERSION_RE.finditer(line)]
+      if kind == "inline":
+        units += 1
+        if not found:
+          self.error(f"{rel}:{number}: marked line holds no version")
+      else:
+        block_versions += len(found)
+      if len(found) > 1:
+        self.error(
+          f"{rel}:{number}: {len(found)} versions on one line; "
+          "release-please rewrites only the first"
+        )
+      for value in found:
+        if value != version:
+          self.error(
+            f"{rel}:{number}: version {value} where release-please "
+            f"writes the release; the manifest is at {version}"
+          )
+    if units == 0:
       self.error(
         f"{rel}: listed in extra-files but has no {MARKER} line or "
         "block, so release-please never bumps it"
       )
-    for number, lines in units:
-      found = [
-        (number + i, v)
-        for i, line in enumerate(lines)
-        for v in SEMVER.findall(line)
-      ]
-      if not found:
-        self.error(
-          f"{rel}:{number}: marked line or block holds no X.Y.Z version"
-        )
-      for at, value in found:
-        if value != version:
-          self.error(
-            f"{rel}:{at}: version {value} where release-please "
-            f"writes the release; the manifest is at {version}"
-          )
 
   def tree_files(self):
     """Yields repository-relative paths: the tracked files of a git checkout,
@@ -233,7 +294,7 @@ class Checker:
         check=True,
         capture_output=True,
       ).stdout
-      yield from (p.decode() for p in listed.split(b"\0") if p)
+      yield from (os.fsdecode(p) for p in listed.split(b"\0") if p)
       return
     for dirpath, dirnames, filenames in os.walk(self.root):
       dirnames[:] = [
@@ -252,7 +313,7 @@ class Checker:
         data = (self.root / rel).read_bytes()
       except OSError:
         continue
-      if MARKER.encode() in data or BLOCK_START.encode() in data:
+      if ANY_MARKER_RE.search(data):
         marked.add(rel)
     return marked, modules
 
@@ -266,8 +327,8 @@ class Checker:
     marked, modules = self.scan_tree()
     for rel in sorted(marked - set(listed)):
       self.error(
-        f"{rel}: carries {MARKER} but is not in extra-files, so "
-        "release-please never bumps it"
+        f"{rel}: carries a release-please marker but is not in extra-files, "
+        "so release-please never bumps it"
       )
     for rel in sorted(modules - set(listed)):
       self.error(
@@ -288,7 +349,7 @@ class Checker:
       return None
     return matches[0]
 
-  def check_ns_cmsis_nn_pin(self):
+  def check_ns_cmsis_nn_pin(self, remote):
     inc = self.read(HELIA_INC)
     if inc is None:
       return
@@ -308,20 +369,33 @@ class Checker:
         self.error(
           f"{rel}: ns-cmsis-nn {kind} {value}; {HELIA_INC} pins {pin[kind]}"
         )
+    if remote:
+      resolved = remote_tag_commit(pin["tag"])
+      if resolved is None:
+        self.error(f"could not resolve {pin['tag']} in {NS_CMSIS_NN_URL}")
+      elif resolved != pin["commit"]:
+        self.error(
+          f"{HELIA_INC}: {pin['tag']} is {resolved} in {NS_CMSIS_NN_URL}, "
+          f"but the pinned commit is {pin['commit']}"
+        )
     if len(self.errors) == before:
       print(
         f"check_helia_release_versions: {len(PIN_SITES)} ns-cmsis-nn "
         f"pin sites at {pin['tag']} ({pin['commit'][:12]})"
+        + (", tag resolved upstream" if remote else "")
       )
 
 
 def main(argv):
-  if len(argv) > 2:
-    print(f"usage: {Path(argv[0]).name} [repo-root]", file=sys.stderr)
+  args = argv[1:]
+  remote = "--remote" in args
+  args = [a for a in args if a != "--remote"]
+  if len(args) > 1 or any(a.startswith("-") for a in args):
+    print(
+      f"usage: {Path(argv[0]).name} [--remote] [repo-root]", file=sys.stderr
+    )
     return 2
-  root = (
-    Path(argv[1]) if len(argv) == 2 else Path(__file__).resolve().parents[5]
-  )
+  root = Path(args[0]) if args else Path(__file__).resolve().parents[5]
   if not (root / ".release-please-manifest.json").is_file():
     print(
       f"error: '{root}' has no .release-please-manifest.json", file=sys.stderr
@@ -329,7 +403,7 @@ def main(argv):
     return 2
   checker = Checker(root)
   checker.check_release_version()
-  checker.check_ns_cmsis_nn_pin()
+  checker.check_ns_cmsis_nn_pin(remote)
   for message in checker.errors:
     print(f"error: {message}", file=sys.stderr)
   return 1 if checker.errors else 0

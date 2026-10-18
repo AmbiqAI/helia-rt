@@ -119,11 +119,11 @@ jobs:
           ./tensorflow/lite/micro/tools/ci_build/check_helia_workflow_secrets_test.sh
 
       # release-please bumps only listed, marked files, and the ns-cmsis-nn
-      # tag and commit are copied by hand. see AmbiqAI/helia-rt#445,
-      # AmbiqAI/helia-rt#402
+      # tag and commit are copied by hand; --remote resolves the tag upstream.
+      # see AmbiqAI/helia-rt#445, AmbiqAI/helia-rt#402
       - name: Check release versions and the ns-cmsis-nn pin agree
         run: |
-          python3 ./tensorflow/lite/micro/tools/ci_build/check_helia_release_versions.py
+          python3 ./tensorflow/lite/micro/tools/ci_build/check_helia_release_versions.py --remote
           python3 ./tensorflow/lite/micro/tools/ci_build/check_helia_release_versions_test.py
 
   armclang_m4_qualification:
