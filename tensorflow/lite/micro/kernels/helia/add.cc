@@ -510,6 +510,12 @@ TfLiteStatus PrepareAdd(TfLiteContext* context, TfLiteNode* node) {
       micro_context->AllocateTempOutputTensor(node, kOutputTensor);
   ScopedTempTensor output_guard(micro_context, output);
   TF_LITE_ENSURE(context, output != nullptr);
+  // RuntimeShape holds at most kMaxSmallSize dims and copies without a bound.
+  TF_LITE_ENSURE_MSG(context,
+                     NumDimensions(input1) <= RuntimeShape::kMaxSmallSize &&
+                         NumDimensions(input2) <= RuntimeShape::kMaxSmallSize &&
+                         NumDimensions(output) <= RuntimeShape::kMaxSmallSize,
+                     "ADD supports tensors of rank 6 or less.");
 
   TF_LITE_ENSURE_EQ(context, input1->type, output->type);
   TF_LITE_ENSURE_MSG(
