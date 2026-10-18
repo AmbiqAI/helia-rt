@@ -25,6 +25,8 @@ namespace micro {
 // TODO(b/161841696): Consider moving away from global arena buffers:
 constexpr int KernelRunner::kKernelRunnerBufferSize_;
 uint8_t KernelRunner::kKernelRunnerBuffer_[];
+// TODO(AmbiqAI/helia-rt#460): exhaustion sweep; drop when upstream has it.
+KernelRunner::InitAndPrepareHook KernelRunner::init_and_prepare_hook = nullptr;
 
 void ClearBufferApi(TfLiteContext* context_) {
   context_->GetScratchBuffer = nullptr;
@@ -46,6 +48,8 @@ KernelRunner::KernelRunner(const TFLMRegistration& registration,
     : registration_(registration),
       allocator_(SingleArenaBufferAllocator::Create(kKernelRunnerBuffer_,
                                                     kKernelRunnerBufferSize_)),
+      sweep_tensors_(tensors),
+      sweep_tensors_size_(tensors_size),
       mock_micro_graph_(allocator_),
       fake_micro_context_(tensors, allocator_, &mock_micro_graph_
 #ifdef USE_TFLM_COMPRESSION
@@ -77,6 +81,11 @@ bool KernelRunner::ValidateTempBufferDeallocated() {
 
 TfLiteStatus KernelRunner::InitAndPrepare(const char* init_data,
                                           size_t length) {
+  // TODO(AmbiqAI/helia-rt#460): exhaustion sweep; drop when upstream has it.
+  if (init_and_prepare_hook != nullptr) {
+    init_and_prepare_hook(registration_, node_, sweep_tensors_,
+                          sweep_tensors_size_, init_data, length);
+  }
   if (registration_.init) {
     tflite::micro::ClearBufferApi(&context_);
     context_.AllocatePersistentBuffer = MicroContextAllocatePersistentBuffer;

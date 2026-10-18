@@ -61,6 +61,8 @@ TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteNode* node) {
   if (input->type == kTfLiteInt8) {
     node->user_data =
         context->AllocatePersistentBuffer(context, sizeof(LogSoftmaxOpData));
+    // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+    TF_LITE_ENSURE(context, node->user_data != nullptr);
     auto data = static_cast<LogSoftmaxOpData*>(node->user_data);
 
     // quantization datum

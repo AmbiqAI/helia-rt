@@ -39,6 +39,10 @@ TfLiteStatus BroadcastArgsPrepare(TfLiteContext* context, TfLiteNode* node) {
       micro_context->AllocateTempInputTensor(node, kShape2Tensor);
   TfLiteTensor* output =
       micro_context->AllocateTempOutputTensor(node, kOutputTensor);
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  TF_LITE_ENSURE(context, shape1 != nullptr);
+  TF_LITE_ENSURE(context, shape2 != nullptr);
+  TF_LITE_ENSURE(context, output != nullptr);
 
   TF_LITE_ENSURE(context,
                  shape1->type == kTfLiteInt32 || shape1->type == kTfLiteInt64);

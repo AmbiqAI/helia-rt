@@ -41,7 +41,8 @@ struct StridedSliceContext {
         node, kStridedSliceStridesTensor);
     output = micro_context->AllocateTempOutputTensor(node,
                                                      kStridedSliceOutputTensor);
-    dims = NumDimensions(input);
+    // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+    dims = input != nullptr ? NumDimensions(input) : 0;
   }
   ~StridedSliceContext() {
     micro_context->DeallocateTempTfLiteTensor(input);
@@ -49,6 +50,11 @@ struct StridedSliceContext {
     micro_context->DeallocateTempTfLiteTensor(end);
     micro_context->DeallocateTempTfLiteTensor(strides);
     micro_context->DeallocateTempTfLiteTensor(output);
+  }
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  bool AllAllocated() const {
+    return input != nullptr && begin != nullptr && end != nullptr &&
+           strides != nullptr && output != nullptr;
   }
   const TfLiteStridedSliceParams* params;
   MicroContext* micro_context;
@@ -138,6 +144,8 @@ TfLiteStatus StridedSlicePrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, NumInputs(node), 4);
   TF_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
   StridedSliceContext op_context(context, node);
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  TF_LITE_ENSURE(context, op_context.AllAllocated());
   TF_LITE_ENSURE_MSG(context, op_context.dims <= kMaxDim,
                      "input dim should not exceed 4");
   TF_LITE_ENSURE_MSG(context, IsConstantTensor(op_context.begin),

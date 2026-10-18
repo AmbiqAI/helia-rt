@@ -73,6 +73,9 @@ TfLiteStatus LstmTensors::ValidateTensorStatus(TfLiteContext* context) const {
                     internal_tensors_[kLstmInputTensor]->type);
 
   // weight tensors (1-9, see lstm_shared for index definition)
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  TF_LITE_ENSURE(context,
+                 internal_tensors_[kLstmInputToForgetWeightsTensor] != nullptr);
   const auto weight_type =
       internal_tensors_[kLstmInputToForgetWeightsTensor]->type;
   for (size_t i = 1; i < 9; i++) {
@@ -81,6 +84,9 @@ TfLiteStatus LstmTensors::ValidateTensorStatus(TfLiteContext* context) const {
   }
 
   // bias tensors (12-15, see lstm_shared for index definition)
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  TF_LITE_ENSURE(context,
+                 internal_tensors_[kLstmForgetGateBiasTensor] != nullptr);
   const auto bias_type = internal_tensors_[kLstmForgetGateBiasTensor]->type;
   for (size_t i = 12; i < 16; i++) {
     TF_LITE_ENSURE(context, internal_tensors_[i] != nullptr);

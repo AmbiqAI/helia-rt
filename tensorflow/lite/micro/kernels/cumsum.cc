@@ -54,6 +54,8 @@ TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteNode* node) {
       micro_context->AllocateTempInputTensor(node, kInputTensor);
   TfLiteTensor* axis =
       micro_context->AllocateTempInputTensor(node, kAxisTensor);
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  TF_LITE_ENSURE(context, input != nullptr && axis != nullptr);
 
   TF_LITE_ENSURE(context,
                  input->type == kTfLiteFloat32 || input->type == kTfLiteInt8);
@@ -65,6 +67,7 @@ TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteNode* node) {
 
   TfLiteTensor* output =
       micro_context->AllocateTempOutputTensor(node, kOutputTensor);
+  TF_LITE_ENSURE(context, output != nullptr);
 
   TF_LITE_ENSURE_EQ(context, input->type, output->type);
   TF_LITE_ENSURE(context, HaveSameShapes(input, output));
@@ -72,6 +75,8 @@ TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteNode* node) {
   if (output->type == kTfLiteInt8) {
     node->user_data =
         context->AllocatePersistentBuffer(context, sizeof(OpData));
+    // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+    TF_LITE_ENSURE(context, node->user_data != nullptr);
     OpData* data = static_cast<OpData*>(node->user_data);
 
     // 8bit -> 8bit general quantized path, with general rescalings

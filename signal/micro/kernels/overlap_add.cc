@@ -106,12 +106,14 @@ TfLiteStatus OverlapAddPrepare(TfLiteContext* context, TfLiteNode* node) {
       input_shape.FlatSize() / (params->frame_size * params->n_frames);
   params->state_buffers = static_cast<T**>(context->AllocatePersistentBuffer(
       context, params->outer_dims * sizeof(T*)));
-  TF_LITE_ENSURE(context, params != nullptr);
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  TF_LITE_ENSURE(context, params->state_buffers != nullptr);
 
   for (int i = 0; i < params->outer_dims; i++) {
     params->state_buffers[i] =
         static_cast<T*>(context->AllocatePersistentBuffer(
             context, params->frame_size * sizeof(T)));
+    TF_LITE_ENSURE(context, params->state_buffers[i] != nullptr);
   }
   OverlapAddResetState(params);
 

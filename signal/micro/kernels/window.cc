@@ -47,6 +47,10 @@ void* WindowInit(TfLiteContext* context, const char* buffer, size_t length) {
   auto* params =
       static_cast<TFLMSignalWindowParams*>(context->AllocatePersistentBuffer(
           context, sizeof(TFLMSignalWindowParams)));
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  if (params == nullptr) {
+    return nullptr;
+  }
 
   tflite::FlexbufferWrapper fbw(buffer_t, length);
   params->shift = fbw.ElementAsInt32(kShiftIndex);

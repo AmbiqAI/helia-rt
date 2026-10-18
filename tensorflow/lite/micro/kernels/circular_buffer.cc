@@ -53,6 +53,10 @@ void* CircularBufferInit(TfLiteContext* context, const char* buffer,
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
   OpDataCircularBuffer* op_data = static_cast<OpDataCircularBuffer*>(
       context->AllocatePersistentBuffer(context, sizeof(OpDataCircularBuffer)));
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  if (op_data == nullptr) {
+    return nullptr;
+  }
 
   if (buffer != nullptr && length > 0) {
     const uint8_t* buffer_t = reinterpret_cast<const uint8_t*>(buffer);
