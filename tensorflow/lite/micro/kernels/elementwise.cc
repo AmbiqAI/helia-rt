@@ -118,21 +118,17 @@ TfLiteStatus GenericPrepare(TfLiteContext* context, TfLiteNode* node) {
 
 typedef bool (*IsSupportedType)(TfLiteType);
 // helia: named and called, as in GenericPrepare. see AmbiqAI/helia-rt#376
+// TODO(AmbiqAI/helia-rt#460): upstream's early returns in PrepareAbsRsqrt
+// leak the temporaries, so the checks moved here; drop when upstream has it.
 template <IsSupportedType is_supported_type, const int op_nameid>
-TfLiteStatus PrepareAbsRsqrt(TfLiteContext* context, TfLiteNode* node) {
-  MicroContext* micro_context = GetMicroContext(context);
-  TF_LITE_ENSURE_EQ(context, NumInputs(node), 1);
-  TF_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
-  TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
-  TF_LITE_ENSURE(context, input != nullptr);
-  TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
-  TF_LITE_ENSURE(context, output != nullptr);
+TfLiteStatus ValidateAndPopulateAbsRsqrt(TfLiteContext* context,
+                                         TfLiteNode* node,
+                                         const TfLiteTensor* input,
+                                         const TfLiteTensor* output) {
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
   if (!is_supported_type(input->type)) {
     MicroPrintf("Input data type %s (%d) is not supported.",
                 TfLiteTypeGetName(input->type), input->type);
-    micro_context->DeallocateTempTfLiteTensor(input);
-    micro_context->DeallocateTempTfLiteTensor(output);
     return kTfLiteError;
   }
   // TODO(AmbiqAI/helia-rt#460): upstream admits an unquantized int16 RSQRT,
@@ -140,8 +136,6 @@ TfLiteStatus PrepareAbsRsqrt(TfLiteContext* context, TfLiteNode* node) {
   if (op_nameid == kRsrqtNameId && input->type == kTfLiteInt16 &&
       input->quantization.type != kTfLiteAffineQuantization) {
     MicroPrintf("RSQRT int16 requires affine quantization.");
-    micro_context->DeallocateTempTfLiteTensor(input);
-    micro_context->DeallocateTempTfLiteTensor(output);
     return kTfLiteError;
   }
 
@@ -190,9 +184,27 @@ TfLiteStatus PrepareAbsRsqrt(TfLiteContext* context, TfLiteNode* node) {
                                &op_data->shift);
     }
   }
+  return kTfLiteOk;
+}
+
+template <IsSupportedType is_supported_type, const int op_nameid>
+TfLiteStatus PrepareAbsRsqrt(TfLiteContext* context, TfLiteNode* node) {
+  MicroContext* micro_context = GetMicroContext(context);
+  TF_LITE_ENSURE_EQ(context, NumInputs(node), 1);
+  TF_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
+  TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
+  TF_LITE_ENSURE(context, input != nullptr);
+  TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
+  if (output == nullptr) {
+    micro_context->DeallocateTempTfLiteTensor(input);
+    return kTfLiteError;
+  }
+  const TfLiteStatus status =
+      ValidateAndPopulateAbsRsqrt<is_supported_type, op_nameid>(context, node,
+                                                                input, output);
   micro_context->DeallocateTempTfLiteTensor(input);
   micro_context->DeallocateTempTfLiteTensor(output);
-  return kTfLiteOk;
+  return status;
 }
 
 template <typename T>

@@ -503,9 +503,13 @@ TEST(ElementwiseTest, AbsInt16UnquantizedShorterOutputFails) {
                                     /*quantized=*/false);
 }
 
-// TODO(AmbiqAI/helia-rt#460): upstream GenericPrepare returns on a type
-// mismatch without releasing its temporaries; drop when upstream has it.
-TEST(ElementwiseTest, SinRejectsMismatchedOutputTypeAndReleasesTemps) {
+// TODO(AmbiqAI/helia-rt#460): upstream's Prepare functions return on a
+// rejection without releasing the temporaries; drop when upstream has it.
+namespace {
+// A float32 input with an int32 output must fail Prepare with every
+// temporary released.
+void ExpectMismatchedOutputTypeReleasesTemps(
+    const TFLMRegistration& registration) {
   int shape[] = {1, 2};
   float input[2] = {};
   int32_t output[2] = {};
@@ -519,12 +523,28 @@ TEST(ElementwiseTest, SinRejectsMismatchedOutputTypeAndReleasesTemps) {
   };
   int inputs[] = {1, 0};
   int outputs[] = {1, 1};
-  const TFLMRegistration registration = tflite::Register_SIN();
   tflite::micro::KernelRunner runner(
       registration, tensors, 2, tflite::testing::IntArrayFromInts(inputs),
       tflite::testing::IntArrayFromInts(outputs), /*builtin_data=*/nullptr);
   EXPECT_EQ(kTfLiteError, runner.InitAndPrepare());
   EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
+}
+}  // namespace
+
+TEST(ElementwiseTest, SinRejectsMismatchedOutputTypeAndReleasesTemps) {
+  const TFLMRegistration registration = tflite::Register_SIN();
+  ExpectMismatchedOutputTypeReleasesTemps(registration);
+}
+
+TEST(ElementwiseTest, RsqrtRejectsMismatchedOutputTypeAndReleasesTemps) {
+  const TFLMRegistration registration = tflite::Register_RSQRT();
+  ExpectMismatchedOutputTypeReleasesTemps(registration);
+}
+
+// The quantization checks: PrepareWithType also checks the temporaries.
+TEST(ElementwiseTest, AbsRejectsUnquantizedInt8AtPrepare) {
+  EXPECT_EQ(kTfLiteError,
+            PrepareWithType<int8_t>(tflite::Register_ABS(), kTfLiteInt8));
 }
 
 TF_LITE_MICRO_TESTS_MAIN
