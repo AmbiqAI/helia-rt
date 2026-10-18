@@ -520,3 +520,7 @@ endif
 $(eval $(call microlite_test,kernel_reduce_output_size_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/reduce_output_size_test.cc))
 
+# SPLIT, SQUEEZE, DIV and ADD reject a malformed model or a zero int32 divisor
+# with kTfLiteError. see AmbiqAI/helia-rt#451
+MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/malformed_model_checks_test.cc
