@@ -191,6 +191,24 @@ INonPersistentBufferAllocator* CreateNonPersistentArenaAllocator(
   return non_persistent_buffer_allocator;
 }
 
+// TODO(AmbiqAI/helia-rt#460): upstream keeps the flatbuffer byte count after a kernel resolves the dims; drop when upstream has it.
+// Re-sizes a TfLiteTensor from the eval tensor dims it adopts. A shape that
+// still holds a negative dimension keeps its flatbuffer byte count.
+void SizeFromAdoptedDims(const TfLiteEvalTensor& eval_tensor,
+                         TfLiteTensor* tensor) {
+  if (eval_tensor.dims != nullptr) {
+    for (int i = 0; i < eval_tensor.dims->size; ++i) {
+      if (eval_tensor.dims->data[i] < 0) {
+        return;
+      }
+    }
+  }
+  size_t bytes;
+  if (TfLiteEvalTensorByteLength(&eval_tensor, &bytes) == kTfLiteOk) {
+    tensor->bytes = bytes;
+  }
+}
+
 }  // namespace
 
 namespace internal {
@@ -836,6 +854,9 @@ TfLiteTensor* MicroAllocator::AllocatePersistentTfLiteTensor(
     // TfLiteTensor dims.
     tensor->dims =
         subgraph_allocations[subgraph_index].tensors[tensor_index].dims;
+    // TODO(AmbiqAI/helia-rt#460): upstream keeps the flatbuffer byte count after a kernel resolves the dims; drop when upstream has it.
+    SizeFromAdoptedDims(
+        subgraph_allocations[subgraph_index].tensors[tensor_index], tensor);
   }
   return tensor;
 }
@@ -904,6 +925,9 @@ TfLiteTensor* MicroAllocator::AllocateTempTfLiteTensor(
     // TfLiteTensor dims.
     tensor->dims =
         subgraph_allocations[subgraph_index].tensors[tensor_index].dims;
+    // TODO(AmbiqAI/helia-rt#460): upstream keeps the flatbuffer byte count after a kernel resolves the dims; drop when upstream has it.
+    SizeFromAdoptedDims(
+        subgraph_allocations[subgraph_index].tensors[tensor_index], tensor);
   }
   return tensor;
 }

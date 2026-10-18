@@ -125,14 +125,14 @@ TfLiteStatus BytesRequiredForTensor(const tflite::Tensor& flatbuffer_tensor,
                                     size_t* bytes, size_t* type_size) {
   // TODO(AmbiqAI/helia-rt#460): upstream multiplies the shape without an overflow check; drop when upstream has it.
   size_t element_count = 1;
-  bool unresolved = false;
+  int unresolved_dims = 0;
   // If flatbuffer_tensor.shape == nullptr, then flatbuffer_tensor is a scalar
   // so has 1 element.
   if (flatbuffer_tensor.shape() != nullptr) {
     for (size_t n = 0; n < flatbuffer_tensor.shape()->size(); ++n) {
       const int32_t dim = flatbuffer_tensor.shape()->Get(n);
       if (dim == -1) {
-        unresolved = true;
+        ++unresolved_dims;
         continue;
       }
       TF_LITE_ENSURE_STATUS(
@@ -146,7 +146,8 @@ TfLiteStatus BytesRequiredForTensor(const tflite::Tensor& flatbuffer_tensor,
   TF_LITE_ENSURE_STATUS(TfLiteTypeSizeOf(tf_lite_type, type_size));
   TF_LITE_ENSURE_STATUS(
       MultiplyTensorSize(&element_count, *type_size, kMaxTensorBytes));
-  *bytes = unresolved ? 0 : element_count;
+  // Upstream's count for a -1 shape: the product of every dimension, wrapped.
+  *bytes = unresolved_dims % 2 != 0 ? size_t{0} - element_count : element_count;
   return kTfLiteOk;
 }
 

@@ -64,6 +64,8 @@ TfLiteStatus ReshapeOutput(TfLiteContext* context, TfLiteNode* node) {
     }
   }
   if (stretch_dim != -1) {
+    // TODO(AmbiqAI/helia-rt#460): upstream divides by a zero product of the other dimensions; drop when upstream has it.
+    TF_LITE_ENSURE(context, num_output_elements != 0);
     TfLiteEvalTensor* output_eval =
         tflite::micro::GetEvalOutput(context, node, kReshapeOutputTensor);
     TF_LITE_ENSURE_STATUS(tflite::micro::CreateWritableTensorDimsWithCopy(

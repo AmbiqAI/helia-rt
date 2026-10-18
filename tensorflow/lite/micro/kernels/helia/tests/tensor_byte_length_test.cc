@@ -14,14 +14,15 @@ limitations under the License.
 ==============================================================================*/
 
 // Tensor byte sizes come from model shapes, so BytesRequiredForTensor and
-// TfLiteEvalTensorByteLength must fail on a negative dimension or an element
-// or byte count above kMaxTensorBytes, the largest the memory planner can hold
-// once rounded up to the arena alignment. The failure must stop
-// AllocateTensors before any kernel Prepare and must reach
-// CopyOpInputsToOpOutputs. The persistent and non-persistent arena allocators
-// must refuse a request that does not fit, and the memory planners a plan
-// whose offset + size passes INT_MAX, rather than wrap.
-// see AmbiqAI/helia-rt#453
+// TfLiteEvalTensorByteLength must fail on an element or byte count above
+// kMaxTensorBytes, the largest the memory planner can hold once rounded up to
+// the arena alignment, and on a negative dimension other than a -1 a kernel
+// resolves in Prepare. The failure must stop AllocateTensors before any kernel
+// Prepare and must reach CopyOpInputsToOpOutputs. A resolved -1 must leave the
+// tensor sized by its resolved shape. The persistent and non-persistent arena
+// allocators must refuse a request that does not fit, and the memory planners a
+// plan whose offset + size passes INT_MAX, rather than wrap. see
+// AmbiqAI/helia-rt#453
 
 #include <climits>
 #include <cstddef>
@@ -36,8 +37,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/memory_helpers.h"
 #include "tensorflow/lite/micro/memory_planner/greedy_memory_planner.h"
 #include "tensorflow/lite/micro/memory_planner/linear_memory_planner.h"
+#include "tensorflow/lite/micro/micro_allocator.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
+#include "tensorflow/lite/micro/micro_resource_variable.h"
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 #include "tensorflow/lite/schema/schema_generated.h"
@@ -151,22 +154,103 @@ const tflite::Model* ScratchModel() {
       {}, {0}, {}, {0}, {tflite::CreateBuffer(builder)});
 }
 
-// RESHAPE of an [8] float32 input to a [2, 1, -1] output.
-const tflite::Model* ReshapeStretchModel() {
+// RESHAPE of an [8] float32 input to `output_shape`.
+const tflite::Model* ReshapeStretchModel(
+    const std::initializer_list<int32_t>& output_shape) {
   flatbuffer_storage.Reset();
   flatbuffers::FlatBufferBuilder builder(1024, &flatbuffer_storage);
   const int32_t input_shape[] = {8};
-  const int32_t output_shape[] = {2, 1, -1};
   return FinishModel(
       builder,
       tflite::CreateOperatorCode(builder, 0, 0, 1,
                                  tflite::BuiltinOperator_RESHAPE),
       {tflite::CreateTensor(builder, builder.CreateVector(input_shape, 1),
                             TensorType_FLOAT32, 0, builder.CreateString("in")),
-       tflite::CreateTensor(builder, builder.CreateVector(output_shape, 3),
+       tflite::CreateTensor(
+           builder,
+           builder.CreateVector(output_shape.begin(), output_shape.size()),
+           TensorType_FLOAT32, 0, builder.CreateString("out"))},
+      {0}, {1}, {0}, {1}, {tflite::CreateBuffer(builder)});
+}
+
+// EMBEDDING_LOOKUP of [3] int32 ids into [5, 2] float32 values, to a [-1, 2]
+// output.
+const tflite::Model* EmbeddingLookupStretchModel() {
+  flatbuffer_storage.Reset();
+  flatbuffers::FlatBufferBuilder builder(1024, &flatbuffer_storage);
+  const int32_t ids_shape[] = {3};
+  const int32_t value_shape[] = {5, 2};
+  const int32_t output_shape[] = {-1, 2};
+  return FinishModel(
+      builder,
+      tflite::CreateOperatorCode(builder, 0, 0, 1,
+                                 tflite::BuiltinOperator_EMBEDDING_LOOKUP),
+      {tflite::CreateTensor(builder, builder.CreateVector(ids_shape, 1),
+                            TensorType_INT32, 0, builder.CreateString("ids")),
+       tflite::CreateTensor(builder, builder.CreateVector(value_shape, 2),
+                            TensorType_FLOAT32, 0, builder.CreateString("v")),
+       tflite::CreateTensor(builder, builder.CreateVector(output_shape, 2),
                             TensorType_FLOAT32, 0,
                             builder.CreateString("out"))},
-      {0}, {1}, {0}, {1}, {tflite::CreateBuffer(builder)});
+      {0, 1}, {2}, {0, 1}, {2}, {tflite::CreateBuffer(builder)});
+}
+
+// READ_VARIABLE into the [2, 1, 4] output, then RESHAPE of the [8] input to
+// [2, 1, -1] and ASSIGN_VARIABLE of it, so each Invoke reads what the
+// previous one assigned.
+const tflite::Model* ReshapeIntoVariableModel() {
+  using tflite::BuiltinOperator;
+  flatbuffer_storage.Reset();
+  flatbuffers::FlatBufferBuilder builder(2048, &flatbuffer_storage);
+  const BuiltinOperator op_codes[] = {
+      tflite::BuiltinOperator_VAR_HANDLE, tflite::BuiltinOperator_READ_VARIABLE,
+      tflite::BuiltinOperator_RESHAPE, tflite::BuiltinOperator_ASSIGN_VARIABLE};
+  Offset<tflite::OperatorCode> codes[4];
+  for (int i = 0; i < 4; ++i) {
+    codes[i] = tflite::CreateOperatorCode(builder, 0, 0, 1, op_codes[i]);
+  }
+  const int32_t input_shape[] = {8};
+  const int32_t stretch_shape[] = {2, 1, -1};
+  const int32_t output_shape[] = {2, 1, 4};
+  const Offset<tflite::Tensor> tensors[] = {
+      tflite::CreateTensor(builder, builder.CreateVector(input_shape, 1),
+                           TensorType_FLOAT32, 0, builder.CreateString("in")),
+      tflite::CreateTensor(builder, builder.CreateVector<int32_t>({}),
+                           tflite::TensorType_RESOURCE, 0,
+                           builder.CreateString("handle")),
+      tflite::CreateTensor(builder, builder.CreateVector(stretch_shape, 3),
+                           TensorType_FLOAT32, 0,
+                           builder.CreateString("reshaped")),
+      tflite::CreateTensor(builder, builder.CreateVector(output_shape, 3),
+                           TensorType_FLOAT32, 0, builder.CreateString("out")),
+  };
+  const Offset<void> var_handle_options =
+      tflite::CreateVarHandleOptions(builder, builder.CreateString("c"),
+                                     builder.CreateString("v"))
+          .Union();
+  const Offset<tflite::Operator> ops[] = {
+      tflite::CreateOperator(builder, 0, builder.CreateVector<int32_t>({}),
+                             builder.CreateVector<int32_t>({1}),
+                             tflite::BuiltinOptions_VarHandleOptions,
+                             var_handle_options),
+      tflite::CreateOperator(builder, 1, builder.CreateVector<int32_t>({1}),
+                             builder.CreateVector<int32_t>({3})),
+      tflite::CreateOperator(builder, 2, builder.CreateVector<int32_t>({0}),
+                             builder.CreateVector<int32_t>({2})),
+      tflite::CreateOperator(builder, 3, builder.CreateVector<int32_t>({1, 2}),
+                             builder.CreateVector<int32_t>({})),
+  };
+  const Offset<tflite::SubGraph> subgraph = tflite::CreateSubGraph(
+      builder, builder.CreateVector(tensors, 4),
+      builder.CreateVector<int32_t>({0}), builder.CreateVector<int32_t>({3}),
+      builder.CreateVector(ops, 4), builder.CreateString("main"));
+  const Offset<tflite::Buffer> buffers[] = {tflite::CreateBuffer(builder)};
+  tflite::FinishModelBuffer(
+      builder, tflite::CreateModel(builder, 3, builder.CreateVector(codes, 4),
+                                   builder.CreateVector(&subgraph, 1),
+                                   builder.CreateString("m"),
+                                   builder.CreateVector(buffers, 1)));
+  return tflite::GetModel(builder.GetBufferPointer());
 }
 
 // MEAN over axis 1 of a [rows, columns] int8 input.
@@ -306,12 +390,13 @@ TEST(TensorByteLengthTest, FlatbufferNegativeDimensionFails) {
   EXPECT_EQ(kTfLiteError, FlatbufferBytes(TensorType_INT8, {0, -2}, &bytes));
 }
 
-// A -1 dimension is left for the tensor's kernel to resolve in Prepare, but
-// the rest of the shape is still checked.
+// A -1 dimension is left for a kernel to resolve in Prepare, but the rest of
+// the shape is still checked. The byte count stays the wrapped product
+// upstream reports, which EMBEDDING_LOOKUP's Prepare compares against.
 TEST(TensorByteLengthTest, FlatbufferStretchDimensionIsUnresolved) {
   size_t bytes = 1;
   EXPECT_EQ(kTfLiteOk, FlatbufferBytes(TensorType_FLOAT32, {2, 1, -1}, &bytes));
-  EXPECT_EQ(static_cast<size_t>(0), bytes);
+  EXPECT_EQ(size_t{0} - 8, bytes);
   EXPECT_EQ(kTfLiteError,
             FlatbufferBytes(TensorType_INT8, {65536, 65536, -1}, &bytes));
   EXPECT_EQ(kTfLiteError,
@@ -456,13 +541,14 @@ TEST(TensorByteLengthTest, AllocateTensorsFailsBeforeKernelPrepare) {
 TEST(TensorByteLengthTest, AllocateTensorsResolvesReshapeStretchDimension) {
   tflite::MicroMutableOpResolver<1> op_resolver;
   ASSERT_EQ(kTfLiteOk, op_resolver.AddReshape());
-  tflite::MicroInterpreter interpreter(ReshapeStretchModel(), op_resolver,
-                                       arena, kArenaSize);
+  tflite::MicroInterpreter interpreter(ReshapeStretchModel({2, 1, -1}),
+                                       op_resolver, arena, kArenaSize);
   ASSERT_EQ(kTfLiteOk, interpreter.AllocateTensors());
   TfLiteTensor* input = interpreter.input(0);
   TfLiteTensor* output = interpreter.output(0);
   ASSERT_NE(nullptr, input);
   ASSERT_NE(nullptr, output);
+  EXPECT_EQ(static_cast<size_t>(32), output->bytes);
   for (int i = 0; i < 8; ++i) {
     input->data.f[i] = static_cast<float>(i + 1);
   }
@@ -473,6 +559,75 @@ TEST(TensorByteLengthTest, AllocateTensorsResolvesReshapeStretchDimension) {
   EXPECT_EQ(4, output->dims->data[2]);
   for (int i = 0; i < 8; ++i) {
     EXPECT_FLOAT_EQ(static_cast<float>(i + 1), output->data.f[i]);
+  }
+}
+
+// The other output dimensions multiply to 0, so no stretch size exists.
+TEST(TensorByteLengthTest, AllocateTensorsRejectsReshapeZeroStretch) {
+  tflite::MicroMutableOpResolver<1> op_resolver;
+  ASSERT_EQ(kTfLiteOk, op_resolver.AddReshape());
+  tflite::MicroInterpreter interpreter(ReshapeStretchModel({0, -1}),
+                                       op_resolver, arena, kArenaSize);
+  EXPECT_EQ(kTfLiteError, interpreter.AllocateTensors());
+}
+
+// The variable takes its size from the resolved RESHAPE output, so the value
+// assigned in one Invoke is read back in the next.
+TEST(TensorByteLengthTest, ReshapeStretchOutputSizesResourceVariable) {
+  tflite::MicroMutableOpResolver<4> op_resolver;
+  ASSERT_EQ(kTfLiteOk, op_resolver.AddVarHandle());
+  ASSERT_EQ(kTfLiteOk, op_resolver.AddReadVariable());
+  ASSERT_EQ(kTfLiteOk, op_resolver.AddReshape());
+  ASSERT_EQ(kTfLiteOk, op_resolver.AddAssignVariable());
+  alignas(16) static uint8_t variable_arena[4096];
+  tflite::MicroResourceVariables* variables =
+      tflite::MicroResourceVariables::Create(
+          tflite::MicroAllocator::Create(variable_arena,
+                                         sizeof(variable_arena)),
+          1);
+  ASSERT_NE(nullptr, variables);
+  tflite::MicroInterpreter interpreter(ReshapeIntoVariableModel(), op_resolver,
+                                       arena, kArenaSize, variables);
+  ASSERT_EQ(kTfLiteOk, interpreter.AllocateTensors());
+  TfLiteTensor* input = interpreter.input(0);
+  TfLiteTensor* output = interpreter.output(0);
+  for (int i = 0; i < 8; ++i) {
+    input->data.f[i] = static_cast<float>(i + 1);
+  }
+  ASSERT_EQ(kTfLiteOk, interpreter.Invoke());
+  for (int i = 0; i < 8; ++i) {
+    input->data.f[i] = static_cast<float>(100 + i);
+  }
+  ASSERT_EQ(kTfLiteOk, interpreter.Invoke());
+  for (int i = 0; i < 8; ++i) {
+    EXPECT_FLOAT_EQ(static_cast<float>(i + 1), output->data.f[i]);
+  }
+}
+
+// EMBEDDING_LOOKUP sets its output rows in Prepare, after checking the
+// flatbuffer byte count, and the output is then sized by the resolved shape.
+TEST(TensorByteLengthTest, AllocateTensorsResolvesEmbeddingLookupOutput) {
+  tflite::MicroMutableOpResolver<1> op_resolver;
+  ASSERT_EQ(kTfLiteOk, op_resolver.AddEmbeddingLookup());
+  tflite::MicroInterpreter interpreter(EmbeddingLookupStretchModel(),
+                                       op_resolver, arena, kArenaSize);
+  ASSERT_EQ(kTfLiteOk, interpreter.AllocateTensors());
+  TfLiteTensor* output = interpreter.output(0);
+  EXPECT_EQ(static_cast<size_t>(24), output->bytes);
+  const int32_t ids[] = {4, 0, 2};
+  for (int i = 0; i < 3; ++i) {
+    interpreter.input(0)->data.i32[i] = ids[i];
+  }
+  for (int i = 0; i < 10; ++i) {
+    interpreter.input(1)->data.f[i] = static_cast<float>(i);
+  }
+  ASSERT_EQ(kTfLiteOk, interpreter.Invoke());
+  ASSERT_EQ(2, output->dims->size);
+  EXPECT_EQ(3, output->dims->data[0]);
+  EXPECT_EQ(2, output->dims->data[1]);
+  const float expected[] = {8, 9, 0, 1, 4, 5};
+  for (int i = 0; i < 6; ++i) {
+    EXPECT_FLOAT_EQ(expected[i], output->data.f[i]);
   }
 }
 
