@@ -16,6 +16,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/kernels/internal/reference/add.h"
 
 #include <cmath>
+#include <limits>
 
 #include "Include/arm_nnfunctions.h"
 
@@ -76,6 +77,27 @@ bool IsQ31MultiplierBelowOne(double multiplier) {
 bool IsPositiveFiniteScale(float scale) {
   return std::isfinite(scale) && scale > 0.f;
 }
+
+bool IsInt8ZeroPoint(int32_t zero_point) {
+  return zero_point >= std::numeric_limits<int8_t>::min() &&
+         zero_point <= std::numeric_limits<int8_t>::max();
+}
+
+// Releases a Prepare temporary on every return.
+class ScopedTempTensor {
+ public:
+  ScopedTempTensor(MicroContext* context, TfLiteTensor* tensor)
+      : context_(context), tensor_(tensor) {}
+  ~ScopedTempTensor() {
+    if (tensor_ != nullptr) {
+      context_->DeallocateTempTfLiteTensor(tensor_);
+    }
+  }
+
+ private:
+  MicroContext* context_;
+  TfLiteTensor* tensor_;
+};
 
 TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteAddParams* params,
                              const TfLiteTensor* input1,
@@ -478,12 +500,15 @@ TfLiteStatus PrepareAdd(TfLiteContext* context, TfLiteNode* node) {
 
   TfLiteTensor* input1 =
       micro_context->AllocateTempInputTensor(node, kInputTensor1);
+  ScopedTempTensor input1_guard(micro_context, input1);
   TF_LITE_ENSURE(context, input1 != nullptr);
   TfLiteTensor* input2 =
       micro_context->AllocateTempInputTensor(node, kInputTensor2);
+  ScopedTempTensor input2_guard(micro_context, input2);
   TF_LITE_ENSURE(context, input2 != nullptr);
   TfLiteTensor* output =
       micro_context->AllocateTempOutputTensor(node, kOutputTensor);
+  ScopedTempTensor output_guard(micro_context, output);
   TF_LITE_ENSURE(context, output != nullptr);
 
   TF_LITE_ENSURE_EQ(context, input1->type, output->type);
@@ -501,6 +526,13 @@ TfLiteStatus PrepareAdd(TfLiteContext* context, TfLiteNode* node) {
     TF_LITE_ENSURE_EQ(context, input1->params.zero_point, 0);
     TF_LITE_ENSURE_EQ(context, input2->params.zero_point, 0);
     TF_LITE_ENSURE_EQ(context, output->params.zero_point, 0);
+  }
+  if (input1->type == kTfLiteInt8) {
+    TF_LITE_ENSURE_MSG(context,
+                       IsInt8ZeroPoint(input1->params.zero_point) &&
+                           IsInt8ZeroPoint(input2->params.zero_point) &&
+                           IsInt8ZeroPoint(output->params.zero_point),
+                       "ADD int8 zero points must be in [-128, 127].");
   }
   if (input1->type == kTfLiteInt8 || input1->type == kTfLiteInt16) {
     TF_LITE_ENSURE_MSG(
@@ -537,10 +569,6 @@ TfLiteStatus PrepareAdd(TfLiteContext* context, TfLiteNode* node) {
     TF_LITE_ENSURE_EQ(context, input2->quantization.type,
                       kTfLiteNoQuantization);
   }
-
-  micro_context->DeallocateTempTfLiteTensor(input1);
-  micro_context->DeallocateTempTfLiteTensor(input2);
-  micro_context->DeallocateTempTfLiteTensor(output);
 
   return kTfLiteOk;
 }
