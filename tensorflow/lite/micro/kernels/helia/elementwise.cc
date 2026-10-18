@@ -367,6 +367,8 @@ TfLiteStatus RsqrtPrepare(TfLiteContext* context, TfLiteNode* node) {
   return status;
 }
 
+// The fallback loops write as many elements as they read, so, as for
+// EvalHeliaUnary, the output must hold the input's element count.
 template <typename T>
 inline TfLiteStatus EvalImplQuantized(
     TfLiteContext* context, TfLiteNode* node,
@@ -376,10 +378,13 @@ inline TfLiteStatus EvalImplQuantized(
   const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
   TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, expected_type);
-  const size_t num_elements = ElementCount(*input->dims);
+  int32_t num_elements;
+  TF_LITE_ENSURE_OK(
+      context, HeliaCheckedMatchingElementCount(context, input->dims,
+                                                output->dims, &num_elements));
   const T* in_data = tflite::micro::GetTensorData<T>(input);
   T* out_data = tflite::micro::GetTensorData<T>(output);
-  for (size_t i = 0; i < num_elements; ++i) {
+  for (int32_t i = 0; i < num_elements; ++i) {
     if (validate_input_func) {
       TF_LITE_ENSURE_OK(context,
                         validate_input_func(context, node, in_data[i]));
@@ -401,10 +406,13 @@ inline TfLiteStatus EvalImpl(TfLiteContext* context, TfLiteNode* node,
   const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
   TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, expected_type);
-  const size_t num_elements = ElementCount(*input->dims);
+  int32_t num_elements;
+  TF_LITE_ENSURE_OK(
+      context, HeliaCheckedMatchingElementCount(context, input->dims,
+                                                output->dims, &num_elements));
   const T* in_data = tflite::micro::GetTensorData<T>(input);
   T* out_data = tflite::micro::GetTensorData<T>(output);
-  for (size_t i = 0; i < num_elements; ++i) {
+  for (int32_t i = 0; i < num_elements; ++i) {
     if (validate_input_func) {
       TF_LITE_ENSURE_OK(context, validate_input_func(in_data[i]));
     }

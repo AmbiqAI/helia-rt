@@ -192,6 +192,10 @@ inline TfLiteStatus EvalImplQuantized(
   const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
   TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, expected_type);
+  // TODO(AmbiqAI/helia-rt#460): upstream writes the input's count without
+  // checking the output's; drop when upstream has it.
+  TF_LITE_ENSURE_EQ(context, ElementCount(*output->dims),
+                    ElementCount(*input->dims));
   const size_t num_elements = ElementCount(*input->dims);
   const T* in_data = tflite::micro::GetTensorData<T>(input);
   T* out_data = tflite::micro::GetTensorData<T>(output);
@@ -217,6 +221,10 @@ inline TfLiteStatus EvalImpl(TfLiteContext* context, TfLiteNode* node,
   const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
   TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, expected_type);
+  // TODO(AmbiqAI/helia-rt#460): upstream writes the input's count without
+  // checking the output's; drop when upstream has it.
+  TF_LITE_ENSURE_EQ(context, ElementCount(*output->dims),
+                    ElementCount(*input->dims));
   const size_t num_elements = ElementCount(*input->dims);
   const T* in_data = tflite::micro::GetTensorData<T>(input);
   T* out_data = tflite::micro::GetTensorData<T>(output);

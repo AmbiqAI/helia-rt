@@ -436,4 +436,71 @@ TEST(ElementwiseTest, AbsAcceptsUnquantizedInt16AtPrepare) {
             PrepareWithType<int16_t>(tflite::Register_ABS(), kTfLiteInt16));
 }
 
+// TODO(AmbiqAI/helia-rt#460): upstream's unary loops write the input's count
+// into a smaller output; drop when upstream has it.
+namespace {
+// A 4-element input against a 2-element output must fail Prepare or Invoke
+// and leave the bytes past the output untouched.
+template <typename T>
+void ExpectShorterOutputFails(const TFLMRegistration& registration,
+                              TfLiteType type, bool quantized) {
+  int input_shape[] = {2, 1, 4};
+  int output_shape[] = {2, 1, 2};
+  T input[4] = {static_cast<T>(1), static_cast<T>(2), static_cast<T>(3),
+                static_cast<T>(4)};
+  T output[4];
+  uint8_t* output_bytes = reinterpret_cast<uint8_t*>(output);
+  for (size_t i = 0; i < sizeof(output); ++i) {
+    output_bytes[i] = 0x5A;
+  }
+  TfLiteTensor tensors[] = {
+      tflite::testing::CreateTensor(
+          input, tflite::testing::IntArrayFromInts(input_shape), false, type),
+      tflite::testing::CreateTensor(
+          output, tflite::testing::IntArrayFromInts(output_shape), false, type),
+  };
+  float scales[] = {1, 1.0f};
+  int zero_points[] = {1, 0};
+  TfLiteAffineQuantization quant = {
+      tflite::testing::FloatArrayFromFloats(scales),
+      tflite::testing::IntArrayFromInts(zero_points), 0};
+  if (quantized) {
+    for (TfLiteTensor& tensor : tensors) {
+      tensor.params = {1.0f, 0};
+      tensor.quantization = {kTfLiteAffineQuantization, &quant};
+    }
+  }
+  int inputs[] = {1, 0};
+  int outputs[] = {1, 1};
+  tflite::micro::KernelRunner runner(
+      registration, tensors, 2, tflite::testing::IntArrayFromInts(inputs),
+      tflite::testing::IntArrayFromInts(outputs), /*builtin_data=*/nullptr);
+  TfLiteStatus status = runner.InitAndPrepare();
+  if (status == kTfLiteOk) {
+    status = runner.Invoke();
+  }
+  EXPECT_EQ(kTfLiteError, status);
+  int overwrites = 0;
+  for (size_t i = 2 * sizeof(T); i < sizeof(output); ++i) {
+    overwrites += output_bytes[i] != 0x5A;
+  }
+  EXPECT_EQ(0, overwrites);
+}
+}  // namespace
+
+TEST(ElementwiseTest, SinFloat32ShorterOutputFails) {
+  ExpectShorterOutputFails<float>(tflite::Register_SIN(), kTfLiteFloat32,
+                                  /*quantized=*/false);
+}
+
+TEST(ElementwiseTest, RsqrtInt8ShorterOutputFails) {
+  ExpectShorterOutputFails<int8_t>(tflite::Register_RSQRT(), kTfLiteInt8,
+                                   /*quantized=*/true);
+}
+
+TEST(ElementwiseTest, AbsInt16UnquantizedShorterOutputFails) {
+  ExpectShorterOutputFails<int16_t>(tflite::Register_ABS(), kTfLiteInt16,
+                                    /*quantized=*/false);
+}
+
 TF_LITE_MICRO_TESTS_MAIN
