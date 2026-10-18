@@ -303,7 +303,8 @@ void EvalFloatSvdfReference(
   const float* weights_time_ptr =
       tflite::micro::GetTensorData<float>(weights_time);
   // TODO(#1751): account for optional bias tensor
-  const float* bias_ptr = tflite::micro::GetTensorData<float>(bias);
+  // TODO(AmbiqAI/helia-rt#460): upstream reads an absent optional bias through nullptr; drop when upstream has it.
+  const float* bias_ptr = tflite::micro::GetOptionalTensorData<float>(bias);
   const float* input_ptr = tflite::micro::GetTensorData<float>(input);
 
   float* state_ptr = tflite::micro::GetTensorData<float>(activation_state);

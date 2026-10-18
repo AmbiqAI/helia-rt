@@ -570,3 +570,7 @@ $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float32_fallback_sha
 # their Prepare temporaries. see AmbiqAI/helia-rt#451
 MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/malformed_model_checks_test.cc
+
+# Valid models that leave an optional input absent run without reading it.
+MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/model_support_checks_test.cc
