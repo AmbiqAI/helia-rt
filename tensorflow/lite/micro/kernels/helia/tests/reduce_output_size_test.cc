@@ -48,7 +48,7 @@ template <typename T>
 TfLiteStatus RunReduce(const TFLMRegistration& registration, TfLiteType type,
                        int* input_dims, const int32_t* axis, int axis_count,
                        int* output_dims, int written,
-                       const T* expected = nullptr) {
+                       const T* expected = nullptr, bool keep_dims = false) {
   static T input[kCapacity * 4];
   static T output[kCapacity];
   for (int i = 0; i < kCapacity * 4; ++i) {
@@ -70,6 +70,7 @@ TfLiteStatus RunReduce(const TFLMRegistration& registration, TfLiteType type,
   tensors[1] = CreateTensor(axis, IntArrayFromInts(axis_dims));
   tensors[1].allocation_type = kTfLiteMmapRo;
   TfLiteReducerParams params = {};
+  params.keep_dims = keep_dims;
   int inputs[] = {2, 0, 1};
   int outputs[] = {1, 2};
   micro::KernelRunner runner(registration, tensors, 3, IntArrayFromInts(inputs),
@@ -434,6 +435,31 @@ TEST(HeliaReduceOutputSizeTest, EmptyReducedAxisStillSucceeds) {
   EXPECT_EQ(kTfLiteOk,
             RunReduce<float>(tflite::Register_REDUCE_MAX(), kTfLiteFloat32,
                              input_dims, axis, 1, output_dims, 6, lowest));
+}
+
+// The float32 reference special case for 4-D MEAN over axes {1, 2} with
+// keep_dims indexes the input by the output's batch and depth, so only an
+// output of exactly [N, 1, 1, C] may take it; another output of the reduced
+// count takes the generic reference. Only a HELIA_ENABLE_F32=0 build reaches
+// those routes; heliaCORE's float32 MEAN must write the same values.
+TEST(HeliaReduceOutputSizeTest, MeanFloat32KeepDimsOutputLayouts) {
+  const int32_t axis[] = {1, 2};
+  int input_dims[] = {4, 1, 2, 2, 4};
+  // Input element i is i % 5 + 1; each output is the mean of its channel.
+  const float expected[4] = {3.25f, 3.0f, 2.75f, 2.5f};
+  int nhwc_dims[] = {4, 1, 1, 1, 4};
+  int batch_dims[] = {4, 4, 1, 1, 1};
+  int split_dims[] = {4, 2, 1, 1, 2};
+  int tall_dims[] = {4, 1, 2, 1, 2};
+  int rank3_dims[] = {3, 1, 1, 4};
+  int rank5_dims[] = {5, 1, 1, 1, 1, 4};
+  for (int* output_dims : {nhwc_dims, batch_dims, split_dims, tall_dims,
+                           rank3_dims, rank5_dims}) {
+    EXPECT_EQ(kTfLiteOk,
+              RunReduce<float>(tflite::Register_MEAN(), kTfLiteFloat32,
+                               input_dims, axis, 2, output_dims, 4, expected,
+                               /*keep_dims=*/true));
+  }
 }
 
 TF_LITE_MICRO_TESTS_MAIN

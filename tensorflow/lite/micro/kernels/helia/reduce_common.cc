@@ -743,11 +743,18 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
                   &op_params);
 
       // Special case mean implementation exists for 4D mean across axes 1
-      // and 2.
+      // and 2. It indexes the input by the output's batch and depth, so it
+      // needs an output of exactly [N, 1, 1, C]; another output of the same
+      // count takes the generic Mean, which indexes by the input.
+      const TfLiteIntArray* in_dims = input->dims;
+      const TfLiteIntArray* out_dims = output->dims;
       bool special_case_4d_axes_1_and_2 =
-          input->dims->size == 4 && op_params.axis_count == 2 &&
+          in_dims->size == 4 && op_params.axis_count == 2 &&
           ((op_params.axis[0] == 1 && op_params.axis[1] == 2) ||
-           (op_params.axis[0] == 2 && op_params.axis[1] == 1));
+           (op_params.axis[0] == 2 && op_params.axis[1] == 1)) &&
+          out_dims->size == 4 && out_dims->data[0] == in_dims->data[0] &&
+          out_dims->data[1] == 1 && out_dims->data[2] == 1 &&
+          out_dims->data[3] == in_dims->data[3];
 
       // Defer to specialized implementation for 4D Mean across axes 1 & 2.
       if (params->keep_dims && special_case_4d_axes_1_and_2) {
