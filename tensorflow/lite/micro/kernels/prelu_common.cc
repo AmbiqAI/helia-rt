@@ -79,17 +79,14 @@ void BroadcastPrelu4DSlowFloat(const RuntimeShape& unextended_input1_shape,
   }
 }
 
-TfLiteStatus PreluPrepare(TfLiteContext* context, TfLiteNode* node) {
-  TFLITE_DCHECK(node->user_data != nullptr);
-  PreluParams* params = static_cast<PreluParams*>(node->user_data);
-
-  MicroContext* micro_context = GetMicroContext(context);
-
-  TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
+// TODO(AmbiqAI/helia-rt#460): upstream keeps the temporaries on a reject; drop when upstream has it.
+static TfLiteStatus PreluPrepareTensors(TfLiteContext* context,
+                                        const TfLiteTensor* input,
+                                        const TfLiteTensor* alpha,
+                                        TfLiteTensor* output,
+                                        PreluParams* params) {
   TF_LITE_ENSURE(context, input != nullptr);
-  TfLiteTensor* alpha = micro_context->AllocateTempInputTensor(node, 1);
   TF_LITE_ENSURE(context, alpha != nullptr);
-  TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
   TF_LITE_ENSURE(context, output != nullptr);
 
   TF_LITE_ENSURE_OK(context,
@@ -99,11 +96,32 @@ TfLiteStatus PreluPrepare(TfLiteContext* context, TfLiteNode* node) {
     // Make sure alpha type is Int8 when Output is Int16
     TF_LITE_ENSURE(context, alpha->type == kTfLiteInt8);
   }
-
-  micro_context->DeallocateTempTfLiteTensor(input);
-  micro_context->DeallocateTempTfLiteTensor(alpha);
-  micro_context->DeallocateTempTfLiteTensor(output);
   return kTfLiteOk;
+}
+
+TfLiteStatus PreluPrepare(TfLiteContext* context, TfLiteNode* node) {
+  TFLITE_DCHECK(node->user_data != nullptr);
+  PreluParams* params = static_cast<PreluParams*>(node->user_data);
+
+  MicroContext* micro_context = GetMicroContext(context);
+
+  TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
+  TfLiteTensor* alpha = micro_context->AllocateTempInputTensor(node, 1);
+  TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
+
+  const TfLiteStatus status =
+      PreluPrepareTensors(context, input, alpha, output, params);
+
+  if (input != nullptr) {
+    micro_context->DeallocateTempTfLiteTensor(input);
+  }
+  if (alpha != nullptr) {
+    micro_context->DeallocateTempTfLiteTensor(alpha);
+  }
+  if (output != nullptr) {
+    micro_context->DeallocateTempTfLiteTensor(output);
+  }
+  return status;
 }
 
 }  // namespace micro

@@ -520,3 +520,8 @@ endif
 $(eval $(call microlite_test,kernel_reduce_output_size_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/reduce_output_size_test.cc))
 
+# MEAN, SUM, REDUCE_MIN/MAX and REDUCE_ALL Prepare reject a missing input, axis
+# or output, the wrong input count or a non-int32 axis, and release every
+# temporary. see AmbiqAI/helia-rt#454
+$(eval $(call microlite_test,kernel_reduce_prepare_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/reduce_prepare_test.cc))

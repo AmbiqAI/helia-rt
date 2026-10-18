@@ -158,6 +158,22 @@ static void PopulateCmsisParams(const TfLiteEvalTensor* input_t,
 
 namespace {
 
+// Releases a Prepare temporary on every return.
+class ScopedTempTensor {
+ public:
+  ScopedTempTensor(MicroContext* context, TfLiteTensor* tensor)
+      : context_(context), tensor_(tensor) {}
+  ~ScopedTempTensor() {
+    if (tensor_ != nullptr) {
+      context_->DeallocateTempTfLiteTensor(tensor_);
+    }
+  }
+
+ private:
+  MicroContext* context_;
+  TfLiteTensor* tensor_;
+};
+
 TfLiteStatus PrepareSimple(TfLiteContext* context, TfLiteNode* node,
                            int32_t* multiplier, int* shift) {
   MicroContext* micro_context = GetMicroContext(context);
@@ -166,6 +182,7 @@ TfLiteStatus PrepareSimple(TfLiteContext* context, TfLiteNode* node,
   // [0] = Input
   // [1] = Axis
   TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
+  ScopedTempTensor input_guard(micro_context, input);
 
   // Outputs Tensor (dtype depends on quantization):
   // [0] = Output
@@ -173,21 +190,23 @@ TfLiteStatus PrepareSimple(TfLiteContext* context, TfLiteNode* node,
   // Validate number of inputs and outputs
   TF_LITE_ENSURE_EQ(context, node->inputs->size, 2);
   TF_LITE_ENSURE_EQ(context, node->outputs->size, 1);
+  TF_LITE_ENSURE(context, input != nullptr);
 
   // Validate axis type
   TfLiteTensor* axis = micro_context->AllocateTempInputTensor(node, 1);
+  ScopedTempTensor axis_guard(micro_context, axis);
   TF_LITE_ENSURE(context, axis != nullptr);
   TF_LITE_ENSURE_TYPES_EQ(context, axis->type, kTfLiteInt32);
 
+  TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
+  ScopedTempTensor output_guard(micro_context, output);
+  TF_LITE_ENSURE(context, output != nullptr);
+
   if (input->type == kTfLiteInt8) {
-    TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
     const double real_multiplier = static_cast<double>(input->params.scale) /
                                    static_cast<double>(output->params.scale);
     QuantizeMultiplier(real_multiplier, multiplier, shift);
-    micro_context->DeallocateTempTfLiteTensor(output);
   }
-  micro_context->DeallocateTempTfLiteTensor(axis);
-  micro_context->DeallocateTempTfLiteTensor(input);
   return kTfLiteOk;
 }
 
@@ -609,16 +628,18 @@ TfLiteStatus PrepareMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
 
   MicroContext* micro_context = GetMicroContext(context);
   TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
+  ScopedTempTensor input_guard(micro_context, input);
+  TF_LITE_ENSURE(context, input != nullptr);
   TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
+  ScopedTempTensor output_guard(micro_context, output);
+  TF_LITE_ENSURE(context, output != nullptr);
   TfLiteTensor* axis = micro_context->AllocateTempInputTensor(node, 1);
+  ScopedTempTensor axis_guard(micro_context, axis);
+  TF_LITE_ENSURE(context, axis != nullptr);
 
-  if (input->type == kTfLiteFloat16 &&
-      PrepareFloat16Reduce(context, input, axis, "REDUCE_MAX/REDUCE_MIN") !=
-          kTfLiteOk) {
-    micro_context->DeallocateTempTfLiteTensor(input);
-    micro_context->DeallocateTempTfLiteTensor(output);
-    micro_context->DeallocateTempTfLiteTensor(axis);
-    return kTfLiteError;
+  if (input->type == kTfLiteFloat16) {
+    TF_LITE_ENSURE_OK(context, PrepareFloat16Reduce(context, input, axis,
+                                                    "REDUCE_MAX/REDUCE_MIN"));
   }
 
   op_data->input_zp = input->params.zero_point;
@@ -627,32 +648,35 @@ TfLiteStatus PrepareMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
   op_data->output_scale = output->params.scale;
   op_data->num_output_elements = NumElements(output);
 
-  context->RequestScratchBufferInArena(context, sizeof(int) * input->dims->size,
-                                       &op_data->scratch_input_iter_idx);
-  context->RequestScratchBufferInArena(
+  TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
+      context, sizeof(int) * input->dims->size,
+      &op_data->scratch_input_iter_idx));
+  TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
       context, sizeof(int) * static_cast<int>(ElementCount(*axis->dims)),
-      &op_data->scratch_resolved_axis_idx);
-
-  micro_context->DeallocateTempTfLiteTensor(input);
-  micro_context->DeallocateTempTfLiteTensor(output);
-  micro_context->DeallocateTempTfLiteTensor(axis);
+      &op_data->scratch_resolved_axis_idx));
   return kTfLiteOk;
 }
 
 TfLiteStatus PrepareMeanOrSumHelper(TfLiteContext* context, TfLiteNode* node,
                                     OpDataReduce* op_data) {
+  TF_LITE_ENSURE_OK(
+      context,
+      PrepareSimple(context, node, &(op_data->multiplier), &(op_data->shift)));
+
   MicroContext* micro_context = GetMicroContext(context);
   TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
+  ScopedTempTensor input_guard(micro_context, input);
+  TF_LITE_ENSURE(context, input != nullptr);
   TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
+  ScopedTempTensor output_guard(micro_context, output);
+  TF_LITE_ENSURE(context, output != nullptr);
   TfLiteTensor* axis = micro_context->AllocateTempInputTensor(node, 1);
+  ScopedTempTensor axis_guard(micro_context, axis);
+  TF_LITE_ENSURE(context, axis != nullptr);
 
-  if (input->type == kTfLiteFloat16 &&
-      PrepareFloat16Reduce(context, input, axis, "MEAN/REDUCE_SUM") !=
-          kTfLiteOk) {
-    micro_context->DeallocateTempTfLiteTensor(input);
-    micro_context->DeallocateTempTfLiteTensor(output);
-    micro_context->DeallocateTempTfLiteTensor(axis);
-    return kTfLiteError;
+  if (input->type == kTfLiteFloat16) {
+    TF_LITE_ENSURE_OK(context, PrepareFloat16Reduce(context, input, axis,
+                                                    "MEAN/REDUCE_SUM"));
   }
 
   if (input->type == kTfLiteInt8 || input->type == kTfLiteInt16) {
@@ -665,21 +689,16 @@ TfLiteStatus PrepareMeanOrSumHelper(TfLiteContext* context, TfLiteNode* node,
   op_data->num_axis = NumElements(axis);
 
   if (input->type == kTfLiteInt8 || input->type == kTfLiteInt16) {
-    context->RequestScratchBufferInArena(context, output_size * sizeof(int32_t),
-                                         &op_data->scratch_accumulator_idx);
+    TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
+        context, output_size * sizeof(int32_t),
+        &op_data->scratch_accumulator_idx));
     op_data->input_zp = input->params.zero_point;
     op_data->input_scale = input->params.scale;
     op_data->output_zp = output->params.zero_point;
     op_data->output_scale = output->params.scale;
   }
 
-  TF_LITE_ENSURE_OK(
-      context,
-      PrepareSimple(context, node, &(op_data->multiplier), &(op_data->shift)));
   // TODO(b/144955155): Support uint8_t(b/144955155) and int8_t(b/144955018)
-  micro_context->DeallocateTempTfLiteTensor(input);
-  micro_context->DeallocateTempTfLiteTensor(output);
-  micro_context->DeallocateTempTfLiteTensor(axis);
   return kTfLiteOk;
 }
 
@@ -1033,8 +1052,14 @@ TfLiteStatus PrepareAllHelper(TfLiteContext* context, TfLiteNode* node,
                               OpDataReduce* op_data) {
   MicroContext* micro_context = GetMicroContext(context);
   TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
+  ScopedTempTensor input_guard(micro_context, input);
+  TF_LITE_ENSURE(context, input != nullptr);
   TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
+  ScopedTempTensor output_guard(micro_context, output);
+  TF_LITE_ENSURE(context, output != nullptr);
   TfLiteTensor* axis = micro_context->AllocateTempInputTensor(node, 1);
+  ScopedTempTensor axis_guard(micro_context, axis);
+  TF_LITE_ENSURE(context, axis != nullptr);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, kTfLiteBool);
 
   TF_LITE_ENSURE_OK(context, PrepareSimple(context, node, &op_data->multiplier,
@@ -1045,15 +1070,12 @@ TfLiteStatus PrepareAllHelper(TfLiteContext* context, TfLiteNode* node,
   op_data->output_zp = output->params.zero_point;
   op_data->output_scale = output->params.scale;
   op_data->num_output_elements = NumElements(output);
-  context->RequestScratchBufferInArena(context, sizeof(int) * input->dims->size,
-                                       &op_data->scratch_input_iter_idx);
-  context->RequestScratchBufferInArena(
+  TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
+      context, sizeof(int) * input->dims->size,
+      &op_data->scratch_input_iter_idx));
+  TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
       context, sizeof(int) * static_cast<int>(ElementCount(*axis->dims)),
-      &op_data->scratch_resolved_axis_idx);
-
-  micro_context->DeallocateTempTfLiteTensor(input);
-  micro_context->DeallocateTempTfLiteTensor(output);
-  micro_context->DeallocateTempTfLiteTensor(axis);
+      &op_data->scratch_resolved_axis_idx));
   return kTfLiteOk;
 }
 
