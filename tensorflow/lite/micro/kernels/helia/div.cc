@@ -339,6 +339,15 @@ TfLiteStatus DivEval(TfLiteContext* context, TfLiteNode* node) {
   } else if (output->type == kTfLiteFloat16) {
     return EvalDivFloat16(params, data, input1, input2, output);
   } else if (output->type == kTfLiteInt32) {
+    const int32_t* denominator_data =
+        tflite::micro::GetTensorData<int32_t>(input2);
+    const int num_elements = tflite::micro::GetTensorShape(input2).FlatSize();
+    for (int i = 0; i < num_elements; ++i) {
+      if (denominator_data[i] == 0) {
+        MicroPrintf("DIV: int32 divisor element %d is zero.", i);
+        return kTfLiteError;
+      }
+    }
     EvalDiv<int32_t>(context, node, params, data, input1, input2, output);
   } else if (output->type == kTfLiteInt8) {
     TF_LITE_ENSURE_OK(context, EvalQuantized(context, node, params, data,
