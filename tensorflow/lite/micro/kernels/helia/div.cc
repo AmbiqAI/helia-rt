@@ -15,6 +15,9 @@ limitations under the License.
 
 #include "tensorflow/lite/micro/kernels/internal/reference/div.h"
 
+#include <algorithm>
+#include <limits>
+
 #include "Include/arm_nnfunctions.h"
 #include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/helia/helia_broadcast.h"
@@ -313,6 +316,96 @@ TfLiteStatus EvalQuantized(TfLiteContext* context, TfLiteNode* node,
   return kTfLiteOk;
 }
 
+// Rejects the first output element whose operands are INT32_MIN and -1,
+// walking input1 and input2 in the broadcast order the reference uses.
+TfLiteStatus CheckInt32DivOverflow(const TfLiteEvalTensor* input1,
+                                   const TfLiteEvalTensor* input2,
+                                   const TfLiteEvalTensor* output) {
+  constexpr int32_t kMin = std::numeric_limits<int32_t>::min();
+  const int32_t* numerator_data = tflite::micro::GetTensorData<int32_t>(input1);
+  const int32_t* denominator_data =
+      tflite::micro::GetTensorData<int32_t>(input2);
+  const RuntimeShape shape1 = tflite::micro::GetTensorShape(input1);
+  const RuntimeShape shape2 = tflite::micro::GetTensorShape(input2);
+  if (shape1 == shape2) {
+    const int num_elements = shape1.FlatSize();
+    for (int i = 0; i < num_elements; ++i) {
+      if (numerator_data[i] == kMin && denominator_data[i] == -1) {
+        MicroPrintf("DIV: int32 element %d is INT32_MIN / -1, which overflows.",
+                    i);
+        return kTfLiteError;
+      }
+    }
+    return kTfLiteOk;
+  }
+  const RuntimeShape output_shape = tflite::micro::GetTensorShape(output);
+  const int rank =
+      std::max(output_shape.DimensionsCount(),
+               std::max(shape1.DimensionsCount(), shape2.DimensionsCount()));
+  if (rank > RuntimeShape::kMaxSmallSize) {
+    MicroPrintf("DIV: int32 rank %d is above %d.", rank,
+                RuntimeShape::kMaxSmallSize);
+    return kTfLiteError;
+  }
+  const RuntimeShape extended1 = RuntimeShape::ExtendedShape(rank, shape1);
+  const RuntimeShape extended2 = RuntimeShape::ExtendedShape(rank, shape2);
+  const RuntimeShape extended_output =
+      RuntimeShape::ExtendedShape(rank, output_shape);
+  for (int d = 0; d < rank; ++d) {
+    const int extent = extended_output.Dims(d);
+    if (extent < 0 || (extended1.Dims(d) != 1 && extended1.Dims(d) != extent) ||
+        (extended2.Dims(d) != 1 && extended2.Dims(d) != extent)) {
+      MicroPrintf("DIV: int32 input shapes do not broadcast to the output.");
+      return kTfLiteError;
+    }
+  }
+  const int num_elements = extended_output.FlatSize();
+  for (int i = 0; i < num_elements; ++i) {
+    int remainder = i;
+    int offset1 = 0;
+    int offset2 = 0;
+    int stride1 = 1;
+    int stride2 = 1;
+    for (int d = rank - 1; d >= 0; --d) {
+      const int extent = extended_output.Dims(d);
+      const int coordinate = remainder % extent;
+      remainder /= extent;
+      if (extended1.Dims(d) != 1) offset1 += coordinate * stride1;
+      if (extended2.Dims(d) != 1) offset2 += coordinate * stride2;
+      stride1 *= extended1.Dims(d);
+      stride2 *= extended2.Dims(d);
+    }
+    if (numerator_data[offset1] == kMin && denominator_data[offset2] == -1) {
+      MicroPrintf("DIV: int32 element %d is INT32_MIN / -1, which overflows.",
+                  i);
+      return kTfLiteError;
+    }
+  }
+  return kTfLiteOk;
+}
+
+// An int32 divide by zero or INT32_MIN / -1 is undefined behaviour, and both
+// operands can be runtime data.
+TfLiteStatus CheckInt32Divisors(const TfLiteEvalTensor* input1,
+                                const TfLiteEvalTensor* input2,
+                                const TfLiteEvalTensor* output) {
+  const int32_t* denominator_data =
+      tflite::micro::GetTensorData<int32_t>(input2);
+  const int num_elements = tflite::micro::GetTensorShape(input2).FlatSize();
+  bool has_minus_one = false;
+  for (int i = 0; i < num_elements; ++i) {
+    if (denominator_data[i] == 0) {
+      MicroPrintf("DIV: int32 divisor element %d is zero.", i);
+      return kTfLiteError;
+    }
+    has_minus_one = has_minus_one || denominator_data[i] == -1;
+  }
+  if (!has_minus_one) {
+    return kTfLiteOk;
+  }
+  return CheckInt32DivOverflow(input1, input2, output);
+}
+
 TfLiteStatus DivEval(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->builtin_data != nullptr);
   auto* params = static_cast<TfLiteDivParams*>(node->builtin_data);
@@ -339,15 +432,7 @@ TfLiteStatus DivEval(TfLiteContext* context, TfLiteNode* node) {
   } else if (output->type == kTfLiteFloat16) {
     return EvalDivFloat16(params, data, input1, input2, output);
   } else if (output->type == kTfLiteInt32) {
-    const int32_t* denominator_data =
-        tflite::micro::GetTensorData<int32_t>(input2);
-    const int num_elements = tflite::micro::GetTensorShape(input2).FlatSize();
-    for (int i = 0; i < num_elements; ++i) {
-      if (denominator_data[i] == 0) {
-        MicroPrintf("DIV: int32 divisor element %d is zero.", i);
-        return kTfLiteError;
-      }
-    }
+    TF_LITE_ENSURE_OK(context, CheckInt32Divisors(input1, input2, output));
     EvalDiv<int32_t>(context, node, params, data, input1, input2, output);
   } else if (output->type == kTfLiteInt8) {
     TF_LITE_ENSURE_OK(context, EvalQuantized(context, node, params, data,
