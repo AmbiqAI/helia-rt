@@ -361,30 +361,32 @@ jobs:
         # see AmbiqAI/helia-rt#450
         # SPLIT, SQUEEZE, DIV and ADD malformed-model checks add one binary and
         # twenty-four cases on every leg. see AmbiqAI/helia-rt#451
+        # The float16 DEPTHWISE_CONV_2D _acc16 opt-in registration adds one case
+        # on every leg and three on the cortex-m55 ones. see AmbiqAI/ns-cmsis-nn#830
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 177
-            min-cases: 1626
+            min-cases: 1627
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 177
-            min-cases: 1626
+            min-cases: 1627
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 176
-            min-cases: 1624
+            min-cases: 1625
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 177
-            min-cases: 1689
+            min-cases: 1692
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 176
-            min-cases: 1687
+            min-cases: 1690
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
