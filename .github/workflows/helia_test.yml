@@ -380,32 +380,32 @@ jobs:
         # injection tests add four binaries and forty-one cases on every leg.
         # see AmbiqAI/helia-rt#449
         # int16 comparison, 16x8 FC bias, PAD/TRANSPOSE int8, batched depthwise
-        # and LSTM weight-type tests add five binaries and twenty-nine cases on
+        # and LSTM weight-type tests add five binaries and thirty-three cases on
         # every leg. see AmbiqAI/helia-rt#470
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 190
-            min-cases: 1746
+            min-cases: 1750
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 190
-            min-cases: 1746
+            min-cases: 1750
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 189
-            min-cases: 1744
+            min-cases: 1748
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 190
-            min-cases: 1809
+            min-cases: 1813
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 189
-            min-cases: 1807
+            min-cases: 1811
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
