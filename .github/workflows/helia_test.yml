@@ -217,23 +217,14 @@ jobs:
         # floor that drifts down on its own is the failure mode this exists
         # to catch.
         #
-        # Observed on run 34078955826 (head bf334f81, 2026-09-07), which
-        # supersedes run 34067908404 (head 941a11a9, 2026-09-06); the job IDs
-        # are in the PR description. The three binaries added here --
-        # kernel_float_hard_swish_test, kernel_float_reduce_test and
-        # kernel_float_elementwise_broadcast_test -- account for the rise over
-        # that earlier run, and for the cortex-m55 gcc leg carrying more than
-        # the others: it is the only leg where ARM_NN_ENABLE_F16 compiles
-        # their float16 cases in.
-        # Both profiles of a given arch+toolchain reported identical numbers,
-        # which is why one entry covers SPEED and SIZE. `min-binaries` counts
+        # One entry covers SPEED and SIZE, so both profiles must run the same
+        # cases. The cortex-m55 legs run more cases than the others because
+        # only they compile ARM_NN_ENABLE_F16 cases in. `min-binaries` counts
         # every binary that ran, including the one framework-less binary
         # (hello_world_test) that reports no case count.
         #
-        # cortex-m55 + atfe: one binary and two cases fewer than gcc, the same
-        # flatbuffer_utils_test filter as cortex-m4+fp. Observed on the same
-        # run 34078955826, after the scalar float16 tanh fix in ns-cmsis-nn
-        # 7.32.0 ended the hangs. see AmbiqAI/helia-rt#239
+        # The atfe legs filter flatbuffer_utils_test, so they run one binary
+        # and two cases fewer than gcc. see AmbiqAI/helia-rt#239
         # Data-movement adds one binary, four cases without F16 and eight with it. see AmbiqAI/helia-rt#280
         # SPLIT_V tests. see AmbiqAI/helia-rt#283
         # GATHER/GATHER_ND adds one binary, ten cases without F16 and twelve with it. see AmbiqAI/helia-rt#286
