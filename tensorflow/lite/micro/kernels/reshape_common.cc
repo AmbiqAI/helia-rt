@@ -22,6 +22,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/kernels/op_macros.h"
 #include "tensorflow/lite/micro/kernels/reshape.h"
 #include "tensorflow/lite/micro/memory_helpers.h"
+#include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 
 namespace tflite {
@@ -65,7 +66,12 @@ TfLiteStatus ReshapeOutput(TfLiteContext* context, TfLiteNode* node) {
   }
   if (stretch_dim != -1) {
     // TODO(AmbiqAI/helia-rt#460): upstream divides by a zero product of the other dimensions; drop when upstream has it.
-    TF_LITE_ENSURE(context, num_output_elements != 0);
+    if (num_output_elements == 0) {
+      MicroPrintf("RESHAPE cannot infer a -1 when the other dimensions are 0");
+      micro_context->DeallocateTempTfLiteTensor(input);
+      micro_context->DeallocateTempTfLiteTensor(output);
+      return kTfLiteError;
+    }
     TfLiteEvalTensor* output_eval =
         tflite::micro::GetEvalOutput(context, node, kReshapeOutputTensor);
     TF_LITE_ENSURE_STATUS(tflite::micro::CreateWritableTensorDimsWithCopy(

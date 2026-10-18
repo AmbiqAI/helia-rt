@@ -33,7 +33,9 @@ limitations under the License.
 #include "tensorflow/lite/micro/arena_allocator/non_persistent_arena_buffer_allocator.h"
 #include "tensorflow/lite/micro/arena_allocator/persistent_arena_buffer_allocator.h"
 #include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/kernels/kernel_runner.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/kernels/micro_ops.h"
 #include "tensorflow/lite/micro/memory_helpers.h"
 #include "tensorflow/lite/micro/memory_planner/greedy_memory_planner.h"
 #include "tensorflow/lite/micro/memory_planner/linear_memory_planner.h"
@@ -638,6 +640,28 @@ TEST(TensorByteLengthTest, AllocateTensorsRejectsReshapeZeroStretch) {
   *ccr = saved_ccr;
 #endif
   EXPECT_EQ(kTfLiteError, status);
+}
+
+// The zero-stretch rejection releases RESHAPE's temporary tensors.
+TEST(TensorByteLengthTest, ReshapeZeroStretchReleasesTemporaries) {
+  int input_dims[] = {1, 8};
+  int output_dims[] = {2, 0, -1};
+  float input_data[8] = {};
+  float output_data[8] = {};
+  TfLiteTensor tensors[] = {
+      tflite::testing::CreateTensor(
+          input_data, tflite::testing::IntArrayFromInts(input_dims)),
+      tflite::testing::CreateTensor(
+          output_data, tflite::testing::IntArrayFromInts(output_dims)),
+  };
+  int inputs[] = {1, 0};
+  int outputs[] = {1, 1};
+  const TFLMRegistration registration = tflite::Register_RESHAPE();
+  tflite::micro::KernelRunner runner(
+      registration, tensors, 2, tflite::testing::IntArrayFromInts(inputs),
+      tflite::testing::IntArrayFromInts(outputs), /*builtin_data=*/nullptr);
+  EXPECT_EQ(kTfLiteError, runner.InitAndPrepare());
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
 }
 
 // A -1 that no kernel resolves is refused once Prepare has run.
