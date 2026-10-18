@@ -166,6 +166,9 @@ TfLiteStatus CmsisNnPrepareSvdf(TfLiteContext* context, TfLiteNode* node) {
 
     // TODO(b/162018098): Use TF_LITE_ENSURE_NEAR when it is ready.
     // TODO(#1751): account for optional bias tensor
+    // Integer Eval reads the bias unconditionally, and a nullptr here is also
+    // what a temp allocation in a full arena returns.
+    TF_LITE_ENSURE(context, bias != nullptr);
     TF_LITE_ENSURE(
         context,
         std::abs(static_cast<double>(bias->params.scale) -
@@ -284,7 +287,9 @@ TfLiteStatus CmsisNnPrepareSvdf(TfLiteContext* context, TfLiteNode* node) {
   micro_context->DeallocateTempTfLiteTensor(activation_state);
   micro_context->DeallocateTempTfLiteTensor(output);
   // TODO(#1751): account for optional bias tensor
-  micro_context->DeallocateTempTfLiteTensor(bias);
+  if (bias != nullptr) {
+    micro_context->DeallocateTempTfLiteTensor(bias);
+  }
   return kTfLiteOk;
 }
 

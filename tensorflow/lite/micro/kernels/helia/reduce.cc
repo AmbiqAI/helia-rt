@@ -33,15 +33,20 @@ namespace {
 void* InitReduce(TfLiteContext* context, const char* buffer, size_t length) {
   void* op_data =
       context->AllocatePersistentBuffer(context, sizeof(OpDataReduce));
+  if (op_data == nullptr) {
+    return nullptr;
+  }
   return new (op_data) OpDataReduce();
 }
 
 TfLiteStatus PrepareMinMax(TfLiteContext* context, TfLiteNode* node) {
+  TF_LITE_ENSURE(context, node->user_data != nullptr);
   return PrepareMinMaxHelper(context, node,
                              static_cast<OpDataReduce*>(node->user_data));
 }
 
 TfLiteStatus PrepareMeanOrSum(TfLiteContext* context, TfLiteNode* node) {
+  TF_LITE_ENSURE(context, node->user_data != nullptr);
   return PrepareMeanOrSumHelper(context, node,
                                 static_cast<OpDataReduce*>(node->user_data));
 }
@@ -68,6 +73,7 @@ TfLiteStatus EvalSum(TfLiteContext* context, TfLiteNode* node) {
 
 // Reduce-all (boolean reduction) ported from upstream tflm reduce.cc.
 TfLiteStatus PrepareAll(TfLiteContext* context, TfLiteNode* node) {
+  TF_LITE_ENSURE(context, node->user_data != nullptr);
   return PrepareAllHelper(context, node,
                           static_cast<OpDataReduce*>(node->user_data));
 }

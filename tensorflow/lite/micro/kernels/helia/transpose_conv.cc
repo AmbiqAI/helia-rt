@@ -14,7 +14,10 @@ limitations under the License.
 ==============================================================================*/
 #include "tensorflow/lite/micro/kernels/transpose_conv.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <type_traits>
+
 #include "Include/arm_nnfunctions.h"
 #include "tensorflow/lite/micro/c/builtin_op_data.h"
 #include "tensorflow/lite/micro/c/common.h"
@@ -281,13 +284,18 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
 
   // Dynamically allocate per-channel quantization parameters.
   const int num_channels = filter->dims->data[kConvQuantizedDimension];
+  // The byte count wraps a 32-bit size_t from 2^30 channels.
+  TF_LITE_ENSURE(context,
+                 num_channels > 0 && static_cast<size_t>(num_channels) <=
+                                         SIZE_MAX / sizeof(int32_t));
   data->per_channel_output_multiplier =
       static_cast<int32_t*>(context->AllocatePersistentBuffer(
           context, num_channels * sizeof(int32_t)));
+  TF_LITE_ENSURE(context, data->per_channel_output_multiplier != nullptr);
   data->per_channel_output_shift =
       static_cast<int32_t*>(context->AllocatePersistentBuffer(
           context, num_channels * sizeof(int32_t)));
-
+  TF_LITE_ENSURE(context, data->per_channel_output_shift != nullptr);
 
   if (input->type == kTfLiteInt8) {
     TFLITE_DCHECK(context->RequestScratchBufferInArena != nullptr);
@@ -336,6 +344,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
         if (weight_sum_length > 0 && filter_data != nullptr){ 
           data->weight_sum_buf = static_cast<int32_t*>(
                 context->AllocatePersistentBuffer(context, weight_sum_length));
+          TF_LITE_ENSURE(context, data->weight_sum_buf != nullptr);
 
           const int32_t* bias_data = GetTensorData<const int32_t>(bias);
 
