@@ -86,6 +86,18 @@ Keep the RT release paired with its documented kernel dependency. The Make sourc
 
 These boundaries are recorded in the adapter changes and [RT changelog](https://github.com/AmbiqAI/helia-rt/blob/main/CHANGELOG.md). They do not replace the release's full dependency requirement.
 
+## FP16 depthwise accumulation
+
+`Register_DEPTHWISE_CONV_2D()` runs FP16 layers on heliaCORE's default `arm_depthwise_conv_wrapper_f16`. From the heliaCORE release with [AmbiqAI/ns-cmsis-nn#830](https://github.com/AmbiqAI/ns-cmsis-nn/issues/830) that entry accumulates every tap in FP32 on MVE; earlier releases fold FP16 partial sums into FP32 only past 32 taps, so a 3x3 or 5x5 layer accumulates in FP16 there. To trade accuracy for speed, register the float16-lane entry instead:
+
+```cpp
+#include "tensorflow/lite/micro/kernels/helia/depthwise_conv_helia.h"
+
+op_resolver.AddDepthwiseConv2D(tflite::Register_DEPTHWISE_CONV_2D_FLOAT16_ACC16());
+```
+
+It takes every type the default registration does and changes only FP16 layers, with the same scratch. It exists in the HELIA backend only: the reference and CMSIS-NN backends and their packs do not define it, so an application that calls it links only against helia builds. Target latency of the two entries is not yet measured.
+
 ## Unsupported configurations and numeric behavior
 
 Many FP32 adapters retain a reference path when optimized support is disabled or rejects a shape. Many FP16 arithmetic adapters have no reference fallback and return `kTfLiteError`. A known type or shape restriction can fail `AllocateTensors()`; execution-dependent failures can reach `Invoke()`. Check both.

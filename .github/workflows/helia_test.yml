@@ -383,30 +383,32 @@ jobs:
         # see AmbiqAI/helia-rt#471
         # TRANSPOSE run-time perm rejection adds three cases on every leg.
         # see AmbiqAI/helia-rt#471
+        # The float16 DEPTHWISE_CONV_2D _acc16 opt-in registration adds one case
+        # on every leg and three on the cortex-m55 ones. see AmbiqAI/ns-cmsis-nn#830
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 186
-            min-cases: 1722
+            min-cases: 1723
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 186
-            min-cases: 1722
+            min-cases: 1723
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 185
-            min-cases: 1720
+            min-cases: 1721
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 186
-            min-cases: 1785
+            min-cases: 1788
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 185
-            min-cases: 1783
+            min-cases: 1786
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
