@@ -699,12 +699,14 @@ constexpr int8_t kMinimumExpected[] = {1, -2, -1, -3};
 // Runs one registration on valid operands and checks the output and that the
 // CORE entry point ran once; with the link wrap it then fails that entry point
 // and expects Invoke to report it. An output shape the operands do not
-// broadcast to is rejected by CORE itself, so Invoke must fail without the
-// wrap too. An empty output has nothing to compute and must not reach CORE,
-// which rejects zero-size dims.
+// broadcast to is rejected at Prepare when `mismatched_prepare` is
+// kTfLiteError (ADD, see AmbiqAI/helia-rt#451), and otherwise by CORE itself,
+// so Invoke must fail without the wrap too. An empty output has nothing to
+// compute and must not reach CORE, which rejects zero-size dims.
 template <typename T>
 void ExpectElementwise(const TFLMRegistration& registration, void* params,
-                       CoreEntry entry, const int8_t* expected8) {
+                       CoreEntry entry, const int8_t* expected8,
+                       TfLiteStatus mismatched_prepare = kTfLiteOk) {
   T input1[4];
   T input2[4];
   T expected[4];
@@ -741,8 +743,10 @@ void ExpectElementwise(const TFLMRegistration& registration, void* params,
   T short_output[4] = {};
   const Status mismatched = RunElementwise(
       registration, input1, input2, short_output, short_output_dims, params);
-  EXPECT_EQ(kTfLiteOk, mismatched.prepare);
-  EXPECT_EQ(kTfLiteError, mismatched.invoke);
+  EXPECT_EQ(mismatched_prepare, mismatched.prepare);
+  if (mismatched.prepare == kTfLiteOk) {
+    EXPECT_EQ(kTfLiteError, mismatched.invoke);
+  }
 
   // One operand empty, the other broadcast from one element, so the guard
   // must read the output rather than either input.
@@ -770,8 +774,9 @@ void ExpectElementwise(const TFLMRegistration& registration, void* params,
     EXPECT_EQ(kTfLiteOk, empty.invoke);
   }
 #if HELIA_STATUS_CONTEXT_LINK_WRAP
-  // The mismatched run reached CORE; the empty runs did not.
-  EXPECT_EQ(1, g_link.core_calls[entry]);
+  // The mismatched run reached CORE if it passed Prepare; the empty runs did
+  // not.
+  EXPECT_EQ(mismatched_prepare == kTfLiteOk ? 1 : 0, g_link.core_calls[entry]);
 #endif
 }
 
@@ -1035,17 +1040,17 @@ TEST(HeliaStatusContextTest, AveragePoolInt16Context) {
 TEST(HeliaStatusContextTest, AddInt8Status) {
   TfLiteAddParams params = {kTfLiteActNone, false};
   ExpectElementwise<int8_t>(tflite::Register_ADD(), &params, kAddS8,
-                            kAddExpected);
+                            kAddExpected, kTfLiteError);
   ExpectElementwise<int8_t>(tflite::Register_ADD_INT8(), &params, kAddS8,
-                            kAddExpected);
+                            kAddExpected, kTfLiteError);
 }
 
 TEST(HeliaStatusContextTest, AddInt16Status) {
   TfLiteAddParams params = {kTfLiteActNone, false};
   ExpectElementwise<int16_t>(tflite::Register_ADD(), &params, kAddS16,
-                             kAddExpected);
+                             kAddExpected, kTfLiteError);
   ExpectElementwise<int16_t>(tflite::Register_ADD_INT16(), &params, kAddS16,
-                             kAddExpected);
+                             kAddExpected, kTfLiteError);
 }
 
 TEST(HeliaStatusContextTest, SubInt8Status) {

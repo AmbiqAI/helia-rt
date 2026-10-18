@@ -168,7 +168,6 @@ TfLiteStatus SplitPrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_MSG(context, constant_axis,
                      "Non constant axis tensor not supported");
   const auto* input = micro::GetEvalInput(context, node, kInputTensor);
-  if (!IsHeliaDataMovementFloat(input->type)) return kTfLiteOk;
   TF_LITE_ENSURE_OK(context, CheckHeliaDataMovementType(context, input->type));
   auto* data = static_cast<HeliaDataMovementData*>(node->user_data);
   TF_LITE_ENSURE(context, data != nullptr);
@@ -202,6 +201,7 @@ TfLiteStatus SplitPrepare(TfLiteContext* context, TfLiteNode* node) {
                        d == data->axis ? piece : input->dims->data[d]);
     }
   }
+  if (!IsHeliaDataMovementFloat(input->type)) return kTfLiteOk;
 #if ARM_NN_ENABLE_F32 || ARM_NN_ENABLE_F16
   TF_LITE_ENSURE_OK(context, HeliaDataMovementShape(context, input->dims, data));
   if (data->elements != 0) {
@@ -218,10 +218,9 @@ TfLiteStatus SplitPrepare(TfLiteContext* context, TfLiteNode* node) {
 }
 
 TfLiteStatus SplitEval(TfLiteContext* context, TfLiteNode* node) {
-  const TfLiteEvalTensor* axis_t = tflite::micro::GetEvalInput(context, node, kAxisTensor);
   const TfLiteEvalTensor* input  = tflite::micro::GetEvalInput(context, node, kInputTensor);
-
-  int axis_value = tflite::micro::GetTensorData<int32_t>(axis_t)[0];
+  const auto* data = static_cast<const HeliaDataMovementData*>(node->user_data);
+  const int axis_value = data->axis;
 
   switch (input->type) {
     case kTfLiteInt8: {
@@ -234,7 +233,6 @@ TfLiteStatus SplitEval(TfLiteContext* context, TfLiteNode* node) {
       return SplitImplRef<int16_t>(context, node, input, axis_value);
     }
     case kTfLiteFloat32: {
-      const auto* data = static_cast<const HeliaDataMovementData*>(node->user_data);
       if (data->elements == 0) return kTfLiteOk;
 #if ARM_NN_ENABLE_F32
       auto** outputs = static_cast<float**>(
@@ -253,7 +251,6 @@ TfLiteStatus SplitEval(TfLiteContext* context, TfLiteNode* node) {
 #endif
     }
     case kTfLiteFloat16: {
-      const auto* data = static_cast<const HeliaDataMovementData*>(node->user_data);
       if (data->elements == 0) return kTfLiteOk;
 #if ARM_NN_ENABLE_F16
       auto** outputs = static_cast<float16_t**>(

@@ -15,6 +15,10 @@ limitations under the License.
 
 #include "tensorflow/lite/micro/kernels/internal/reference/div.h"
 
+#include <algorithm>
+#include <cmath>
+#include <limits>
+
 #include "Include/arm_nnfunctions.h"
 #include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/helia/helia_broadcast.h"
@@ -64,6 +68,12 @@ class ScopedTempTensor {
   TfLiteTensor* tensor_;
 };
 
+bool IsValidInt8Quantization(const TfLiteTensor* tensor) {
+  return std::isfinite(tensor->params.scale) && tensor->params.scale > 0.f &&
+         tensor->params.zero_point >= std::numeric_limits<int8_t>::min() &&
+         tensor->params.zero_point <= std::numeric_limits<int8_t>::max();
+}
+
 TfLiteStatus CalculateOpDataDiv(TfLiteContext* context, TfLiteTensor* input1,
                                 TfLiteTensor* input2, TfLiteTensor* output,
                                 TfLiteDivParams* params, OpDataDiv* data) {
@@ -71,13 +81,26 @@ TfLiteStatus CalculateOpDataDiv(TfLiteContext* context, TfLiteTensor* input1,
   TF_LITE_ENSURE_TYPES_EQ(context, input1->type, output->type);
 
   if (output->type == kTfLiteInt8) {
+    TF_LITE_ENSURE_MSG(context,
+                       IsValidInt8Quantization(input1) &&
+                           IsValidInt8Quantization(input2) &&
+                           IsValidInt8Quantization(output),
+                       "DIV int8 requires finite scales above zero and int8 "
+                       "zero points.");
     TF_LITE_ENSURE_STATUS(CalculateActivationRangeQuantized(
         context, params->activation, output, &data->output_activation_min,
         &data->output_activation_max));
     const double real_multiplier = static_cast<double>(
         input1->params.scale / (input2->params.scale * output->params.scale));
+    TF_LITE_ENSURE_MSG(context, std::isfinite(real_multiplier),
+                       "DIV int8 scales give a non-finite multiplier.");
     QuantizeMultiplier(real_multiplier, &data->output_multiplier,
                        &data->output_shift);
+    // The reference right-shifts by output_shift - recip_shift - headroom, with
+    // recip_shift >= 0 and a headroom of at least 23 for an int8 difference in
+    // [-255, 255], so a larger output_shift is a negative shift.
+    TF_LITE_ENSURE_MSG(context, data->output_shift <= 23,
+                       "DIV int8 scales give a multiplier above 2^23.");
     data->input1_zero_point = input1->params.zero_point;
     data->input2_zero_point = input2->params.zero_point;
     data->output_zero_point = output->params.zero_point;
@@ -108,6 +131,17 @@ TfLiteStatus DivPrepare(TfLiteContext* context, TfLiteNode* node) {
       micro_context->AllocateTempOutputTensor(node, kOutputTensor);
   ScopedTempTensor output_guard(micro_context, output);
   TF_LITE_ENSURE(context, output != nullptr);
+  // RuntimeShape holds at most kMaxSmallSize dims and copies without a bound.
+  TF_LITE_ENSURE_MSG(context,
+                     NumDimensions(input1) <= RuntimeShape::kMaxSmallSize &&
+                         NumDimensions(input2) <= RuntimeShape::kMaxSmallSize &&
+                         NumDimensions(output) <= RuntimeShape::kMaxSmallSize,
+                     "DIV supports tensors of rank 6 or less.");
+  TF_LITE_ENSURE_MSG(context,
+                     HeliaShapesBroadcastToOutput(GetTensorShape(input1),
+                                                  GetTensorShape(input2),
+                                                  GetTensorShape(output)),
+                     "DIV input shapes do not broadcast to the output.");
 
   OpDataDiv* data = static_cast<OpDataDiv*>(node->user_data);
   auto* params = reinterpret_cast<TfLiteDivParams*>(node->builtin_data);
@@ -277,16 +311,21 @@ TfLiteStatus EvalQuantized(TfLiteContext* context, TfLiteNode* node,
                            TfLiteEvalTensor* output) {
   tflite::micro::ArithmeticParams op_params = {};
 
-#define TF_LITE_DIV(type, opname, dtype)                         \
-  type::opname(op_params, tflite::micro::GetTensorShape(input1), \
-               tflite::micro::GetTensorData<dtype>(input1),      \
-               tflite::micro::GetTensorShape(input2),            \
-               tflite::micro::GetTensorData<dtype>(input2),      \
-               tflite::micro::GetTensorShape(output),            \
-               tflite::micro::GetTensorData<dtype>(output))
-
   if (input1->type == kTfLiteInt8 && input2->type == kTfLiteInt8 &&
       output->type == kTfLiteInt8) {
+    if (tflite::micro::GetTensorShape(output).FlatSize() == 0) {
+      return kTfLiteOk;
+    }
+    // The reference reciprocal of a zero divisor shifts by 32.
+    const int8_t* denominator_data =
+        tflite::micro::GetTensorData<int8_t>(input2);
+    const int num_elements = tflite::micro::GetTensorShape(input2).FlatSize();
+    for (int i = 0; i < num_elements; ++i) {
+      if (denominator_data[i] == data->input2_zero_point) {
+        MicroPrintf("DIV: int8 divisor element %d equals its zero point.", i);
+        return kTfLiteError;
+      }
+    }
     SetActivationParams(data->output_activation_min,
                         data->output_activation_max, &op_params);
     op_params.input1_offset = -data->input1_zero_point;
@@ -295,22 +334,138 @@ TfLiteStatus EvalQuantized(TfLiteContext* context, TfLiteNode* node,
     op_params.output_multiplier = data->output_multiplier;
     op_params.output_shift = data->output_shift;
 
-    bool requires_broadcast = reference_ops::ProcessBroadcastShapes(
+    // The reference int8 element without its undefined steps. A zero or -1
+    // dividend has 31 bits of headroom: the reference then forms -1 * 2^31 in
+    // int32, and the single-rounding helper takes a shift of at most 30. A zero
+    // dividend gives a zero quotient, and for -1 the high half of
+    // -2^31 * input2_inv is exactly -input2_inv. A total right shift above 31
+    // (a small dividend over a large divisor) yields 0: the scaled quotient is
+    // below 2^31 in magnitude, so that shift rounds to 0, where the reference
+    // asserts or is undefined under NDEBUG. Prepare bounds output_shift so the
+    // shift is never negative.
+    auto op = [&op_params](int8_t a, int8_t b) {
+      int32_t input1_val = op_params.input1_offset + a;
+      int32_t input2_val = op_params.input2_offset + b;
+      if (input2_val < 0) {
+        input1_val = -input1_val;
+        input2_val = -input2_val;
+      }
+      int32_t quotient = 0;
+      if (input1_val != 0) {
+        int recip_shift;
+        const int32_t input2_inv = GetReciprocal(input2_val, 31, &recip_shift);
+        const int headroom = CountLeadingSignBits(input1_val);
+        const int32_t unscaled_quotient =
+            input1_val == -1 ? -input2_inv
+                             : MultiplyByQuantizedMultiplierGreaterThanOne(
+                                   input1_val, input2_inv, headroom);
+        const int total_shift = op_params.output_shift - recip_shift - headroom;
+        if (total_shift >= -31) {
+          quotient = MultiplyByQuantizedMultiplierSmallerThanOneExp(
+              unscaled_quotient, op_params.output_multiplier, total_shift);
+        }
+      }
+      const int32_t result =
+          std::min(op_params.quantized_activation_max,
+                   std::max(op_params.quantized_activation_min,
+                            op_params.output_offset + quotient));
+      return static_cast<int8_t>(result);
+    };
+    reference_ops::BroadcastBinaryOpSimple(
         tflite::micro::GetTensorShape(input1),
-        tflite::micro::GetTensorShape(input2), &op_params);
-
-    if (requires_broadcast) {
-      TF_LITE_DIV(reference_ops, BroadcastDivSlow, int8_t);
-    } else {
-      TF_LITE_DIV(reference_ops, Div, int8_t);
-    }
-#undef TF_LITE_DIV
+        tflite::micro::GetTensorData<int8_t>(input1),
+        tflite::micro::GetTensorShape(input2),
+        tflite::micro::GetTensorData<int8_t>(input2),
+        tflite::micro::GetTensorShape(output),
+        tflite::micro::GetTensorData<int8_t>(output), op);
   } else {
     MicroPrintf("Unsupported combination of input and output types in DIV.");
     return kTfLiteError;
   }
 
   return kTfLiteOk;
+}
+
+// Rejects the first output element whose operands are INT32_MIN and -1,
+// walking input1 and input2 in the broadcast order the reference uses. Prepare
+// bounded the rank and checked that the output is the broadcast of the inputs,
+// so same-shape inputs have the output's element count.
+TfLiteStatus CheckInt32DivOverflow(const TfLiteEvalTensor* input1,
+                                   const TfLiteEvalTensor* input2,
+                                   const TfLiteEvalTensor* output) {
+  constexpr int32_t kMin = std::numeric_limits<int32_t>::min();
+  const int32_t* numerator_data = tflite::micro::GetTensorData<int32_t>(input1);
+  const int32_t* denominator_data =
+      tflite::micro::GetTensorData<int32_t>(input2);
+  const RuntimeShape shape1 = tflite::micro::GetTensorShape(input1);
+  const RuntimeShape shape2 = tflite::micro::GetTensorShape(input2);
+  if (shape1 == shape2) {
+    const int num_elements = shape1.FlatSize();
+    for (int i = 0; i < num_elements; ++i) {
+      if (numerator_data[i] == kMin && denominator_data[i] == -1) {
+        MicroPrintf("DIV: int32 element %d is INT32_MIN / -1, which overflows.",
+                    i);
+        return kTfLiteError;
+      }
+    }
+    return kTfLiteOk;
+  }
+  const RuntimeShape output_shape = tflite::micro::GetTensorShape(output);
+  const int rank =
+      std::max(output_shape.DimensionsCount(),
+               std::max(shape1.DimensionsCount(), shape2.DimensionsCount()));
+  const RuntimeShape extended1 = RuntimeShape::ExtendedShape(rank, shape1);
+  const RuntimeShape extended2 = RuntimeShape::ExtendedShape(rank, shape2);
+  const RuntimeShape extended_output =
+      RuntimeShape::ExtendedShape(rank, output_shape);
+  const int num_elements = extended_output.FlatSize();
+  for (int i = 0; i < num_elements; ++i) {
+    int remainder = i;
+    int offset1 = 0;
+    int offset2 = 0;
+    int stride1 = 1;
+    int stride2 = 1;
+    for (int d = rank - 1; d >= 0; --d) {
+      const int extent = extended_output.Dims(d);
+      const int coordinate = remainder % extent;
+      remainder /= extent;
+      if (extended1.Dims(d) != 1) offset1 += coordinate * stride1;
+      if (extended2.Dims(d) != 1) offset2 += coordinate * stride2;
+      stride1 *= extended1.Dims(d);
+      stride2 *= extended2.Dims(d);
+    }
+    if (numerator_data[offset1] == kMin && denominator_data[offset2] == -1) {
+      MicroPrintf("DIV: int32 element %d is INT32_MIN / -1, which overflows.",
+                  i);
+      return kTfLiteError;
+    }
+  }
+  return kTfLiteOk;
+}
+
+// An int32 divide by zero or INT32_MIN / -1 is undefined behaviour, and both
+// operands can be runtime data.
+TfLiteStatus CheckInt32Divisors(const TfLiteEvalTensor* input1,
+                                const TfLiteEvalTensor* input2,
+                                const TfLiteEvalTensor* output) {
+  if (tflite::micro::GetTensorShape(output).FlatSize() == 0) {
+    return kTfLiteOk;
+  }
+  const int32_t* denominator_data =
+      tflite::micro::GetTensorData<int32_t>(input2);
+  const int num_elements = tflite::micro::GetTensorShape(input2).FlatSize();
+  bool has_minus_one = false;
+  for (int i = 0; i < num_elements; ++i) {
+    if (denominator_data[i] == 0) {
+      MicroPrintf("DIV: int32 divisor element %d is zero.", i);
+      return kTfLiteError;
+    }
+    has_minus_one = has_minus_one || denominator_data[i] == -1;
+  }
+  if (!has_minus_one) {
+    return kTfLiteOk;
+  }
+  return CheckInt32DivOverflow(input1, input2, output);
 }
 
 TfLiteStatus DivEval(TfLiteContext* context, TfLiteNode* node) {
@@ -339,6 +494,7 @@ TfLiteStatus DivEval(TfLiteContext* context, TfLiteNode* node) {
   } else if (output->type == kTfLiteFloat16) {
     return EvalDivFloat16(params, data, input1, input2, output);
   } else if (output->type == kTfLiteInt32) {
+    TF_LITE_ENSURE_OK(context, CheckInt32Divisors(input1, input2, output));
     EvalDiv<int32_t>(context, node, params, data, input1, input2, output);
   } else if (output->type == kTfLiteInt8) {
     TF_LITE_ENSURE_OK(context, EvalQuantized(context, node, params, data,

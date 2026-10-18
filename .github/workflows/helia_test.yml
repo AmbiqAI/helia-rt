@@ -368,30 +368,32 @@ jobs:
         # The float32 fallback-shape cases and the reference STRIDED_SLICE
         # INT32_MAX-stride case add one binary and five cases on every leg.
         # see AmbiqAI/helia-rt#452
+        # SPLIT, SQUEEZE, DIV and ADD malformed-model checks add one binary and
+        # twenty-four cases on every leg. see AmbiqAI/helia-rt#451
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 179
-            min-cases: 1623
+            min-binaries: 180
+            min-cases: 1647
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 179
-            min-cases: 1623
+            min-binaries: 180
+            min-cases: 1647
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 178
-            min-cases: 1621
+            min-binaries: 179
+            min-cases: 1645
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 179
-            min-cases: 1686
+            min-binaries: 180
+            min-cases: 1710
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 178
-            min-cases: 1684
+            min-binaries: 179
+            min-cases: 1708
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
