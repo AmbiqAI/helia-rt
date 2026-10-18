@@ -69,7 +69,8 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   tflite::MicroContext* micro_context = tflite::GetMicroContext(context);
   TfLiteTensor* input_value =
       micro_context->AllocateTempInputTensor(node, kInputValue);
-  TFLITE_DCHECK(input_value != nullptr);
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  TF_LITE_ENSURE(context, input_value != nullptr);
 
   MicroGraph& graph_info = micro_context->graph();
 
@@ -79,6 +80,8 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   // will be valid during Eval time. In case it wasn't valid, this will
   // still be caught during Invoke. More info in b/277231654.
   if (input_resource_id_tensor->data.i32 != nullptr) {
+    // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+    TF_LITE_ENSURE(context, resources != nullptr);
     TF_LITE_ENSURE_OK(context,
                       resources->Allocate(input_resource_id_tensor->data.i32[0],
                                           context, input_value));

@@ -83,6 +83,10 @@ TfLiteStatus BroadcastToPrepare(TfLiteContext* context, TfLiteNode* node) {
       micro_context->AllocateTempInputTensor(node, kShapeTensor);
   TfLiteTensor* output =
       micro_context->AllocateTempOutputTensor(node, kOutputTensor);
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  TF_LITE_ENSURE(context, input != nullptr);
+  TF_LITE_ENSURE(context, shape != nullptr);
+  TF_LITE_ENSURE(context, output != nullptr);
 
   TF_LITE_ENSURE_MSG(context, (NumDimensions(input) <= kMaxDims),
                      "BroadcastTo only supports 1-5D tensor.");

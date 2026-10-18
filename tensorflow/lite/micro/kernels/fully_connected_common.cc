@@ -113,6 +113,9 @@ TfLiteStatus CalculateOpDataFullyConnected(
     data->per_channel_output_shift =
         static_cast<int32_t*>(context->AllocatePersistentBuffer(
             context, per_channel_quantization_size * sizeof(int32_t)));
+    // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+    TF_LITE_ENSURE(context, data->per_channel_output_multiplier != nullptr);
+    TF_LITE_ENSURE(context, data->per_channel_output_shift != nullptr);
 
     // Populate multiplier and shift using affine quantization.
     const float input_scale = input->params.scale;

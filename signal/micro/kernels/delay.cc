@@ -89,6 +89,9 @@ TfLiteStatus DelayPrepare(TfLiteContext* context, TfLiteNode* node) {
   params->circular_buffers = static_cast<tflm_signal::CircularBuffer**>(
       context->AllocatePersistentBuffer(
           context, params->outer_dims * sizeof(tflm_signal::CircularBuffer*)));
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  TF_LITE_ENSURE(context, params->state_buffers != nullptr);
+  TF_LITE_ENSURE(context, params->circular_buffers != nullptr);
 
   for (int i = 0; i < params->outer_dims; i++) {
     size_t capacity = params->frame_size + params->delay_length;
@@ -97,6 +100,7 @@ TfLiteStatus DelayPrepare(TfLiteContext* context, TfLiteNode* node) {
     params->state_buffers[i] =
         static_cast<int8_t*>(context->AllocatePersistentBuffer(
             context, state_size * sizeof(int8_t)));
+    TF_LITE_ENSURE(context, params->state_buffers[i] != nullptr);
     params->circular_buffers[i] = tflm_signal::CircularBufferInit(
         capacity, params->state_buffers[i], state_size);
     tflm_signal::CircularBufferWriteZeros(params->circular_buffers[i],
