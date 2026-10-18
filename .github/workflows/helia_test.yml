@@ -574,8 +574,12 @@ jobs:
             echo "==> ns-cmsis-nn pin OVERRIDDEN to ${NS_CMSIS_NN_REF}"
             export NS_CMSIS_NN_COMMIT="${NS_CMSIS_NN_REF}"
           fi
+          # Signed overflow is undefined, so whether an index that overflows
+          # faults depends on code generation; the sanitizer makes it fail.
+          ubsan="-fsanitize=signed-integer-overflow -fno-sanitize-recover=all"
           make -f tensorflow/lite/micro/tools/make/Makefile \
             OPTIMIZED_KERNEL_DIR=helia HELIA_ENABLE_F32=0 \
+            "CXX_TOOL=g++ ${ubsan}" "CC_TOOL=gcc ${ubsan}" \
             BASE_GENDIR=gen-f32-off -j"$(nproc)" \
             test_kernel_reduce_test \
             test_kernel_reduce_output_size_test \
