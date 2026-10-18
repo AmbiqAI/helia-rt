@@ -65,10 +65,12 @@ $(eval $(call microlite_test,kernel_float_lstm_tail_lane_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_lstm_tail_lane_test.cc))
 
 ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
+ifeq ($(strip $(HELIA_ENABLE_F32)),1)
 $(kernel_float_lstm_tail_lane_test_BINARY): CXXFLAGS += \
   -DHELIA_LSTM_F32_LINK_WRAP=1
 $(kernel_float_lstm_tail_lane_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_lstm_unidirectional_f32
+endif
 endif
 
 # heliaCORE float routing tests; each compares the kernel against the TFLM

@@ -58,7 +58,9 @@ extern "C" {
                          output_dims);                                        \
   }
 
+#if ARM_NN_ENABLE_F32
 HELIA_WRAP_SLICE(arm_strided_slice_f32, float32_t, Leaf::kF32)
+#endif
 HELIA_WRAP_SLICE(arm_strided_slice_s8, int8_t, Leaf::kS8)
 HELIA_WRAP_SLICE(arm_strided_slice_s16, int16_t, Leaf::kS16)
 HELIA_WRAP_SLICE(arm_strided_slice_s32, int32_t, Leaf::kS32)
@@ -240,7 +242,9 @@ void ExpectMatchesReference(const Slice& s, TfLiteType type, Leaf leaf,
   EXPECT_EQ(kTfLiteOk, runner.Invoke());
 #if HELIA_STRIDED_SLICE_LINK_WRAP
   for (int i = 0; i < static_cast<int>(Leaf::kCount); ++i) {
-    const bool expect_call = i == static_cast<int>(leaf) && visits_any;
+    // A HELIA_ENABLE_F32=0 build runs float32 on the reference.
+    const bool expect_call = i == static_cast<int>(leaf) && visits_any &&
+                             (ARM_NN_ENABLE_F32 || leaf != Leaf::kF32);
     EXPECT_EQ(expect_call ? 1 : 0, g_leaf_calls[i]);
   }
 #else

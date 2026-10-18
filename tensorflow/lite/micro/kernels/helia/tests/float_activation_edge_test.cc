@@ -123,6 +123,7 @@ constexpr float kSaturationFloor = 0.99f;
 constexpr float kSaturationCeilF32 = 1.0000005f;  // ~8 float32 ULP
 constexpr float kLogisticFloorF32 = -2e-7f;       // ~3 float32 ULP below 0
 
+#if ARM_NN_ENABLE_F32 || ARM_NN_ENABLE_F16
 void ExpectLogisticNanCharacterized(float observed, const char* label) {
   MicroPrintf("%s: logistic(NaN) observed = %f", label,
               static_cast<double>(observed));
@@ -133,6 +134,7 @@ void ExpectLogisticNanCharacterized(float observed, const char* label) {
   EXPECT_GE(observed, kSaturationFloor);
   EXPECT_LE(observed, kSaturationCeilF32);
 }
+#endif
 
 // Large-input band. Only sign and saturation are asserted here.
 constexpr int kLargeCount = 8;
