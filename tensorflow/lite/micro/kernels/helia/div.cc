@@ -334,12 +334,15 @@ TfLiteStatus EvalQuantized(TfLiteContext* context, TfLiteNode* node,
     op_params.output_multiplier = data->output_multiplier;
     op_params.output_shift = data->output_shift;
 
-    // The reference int8 element, except that a total right shift above 31
-    // yields a zero quotient: the reference shifts by that much there (a zero
-    // or small dividend over a large divisor), which gemmlowp asserts on and
-    // which is undefined under NDEBUG. The scaled quotient is below 2^31 in
-    // magnitude, so the exact result of such a shift rounds to 0. Prepare
-    // bounds output_shift so the shift is never negative.
+    // The reference int8 element without its undefined steps. A zero or -1
+    // dividend has 31 bits of headroom: the reference then forms -1 * 2^31 in
+    // int32, and the single-rounding helper takes a shift of at most 30. A zero
+    // dividend gives a zero quotient, and for -1 the high half of
+    // -2^31 * input2_inv is exactly -input2_inv. A total right shift above 31
+    // (a small dividend over a large divisor) yields 0: the scaled quotient is
+    // below 2^31 in magnitude, so that shift rounds to 0, where the reference
+    // asserts or is undefined under NDEBUG. Prepare bounds output_shift so the
+    // shift is never negative.
     auto op = [&op_params](int8_t a, int8_t b) {
       int32_t input1_val = op_params.input1_offset + a;
       int32_t input2_val = op_params.input2_offset + b;
@@ -347,18 +350,21 @@ TfLiteStatus EvalQuantized(TfLiteContext* context, TfLiteNode* node,
         input1_val = -input1_val;
         input2_val = -input2_val;
       }
-      int recip_shift;
-      const int32_t input2_inv = GetReciprocal(input2_val, 31, &recip_shift);
-      const int headroom = CountLeadingSignBits(input1_val);
-      const int32_t unscaled_quotient =
-          MultiplyByQuantizedMultiplierGreaterThanOne(input1_val, input2_inv,
-                                                      headroom);
-      const int total_shift = op_params.output_shift - recip_shift - headroom;
-      const int32_t quotient =
-          total_shift < -31 ? 0
-                            : MultiplyByQuantizedMultiplierSmallerThanOneExp(
-                                  unscaled_quotient,
-                                  op_params.output_multiplier, total_shift);
+      int32_t quotient = 0;
+      if (input1_val != 0) {
+        int recip_shift;
+        const int32_t input2_inv = GetReciprocal(input2_val, 31, &recip_shift);
+        const int headroom = CountLeadingSignBits(input1_val);
+        const int32_t unscaled_quotient =
+            input1_val == -1 ? -input2_inv
+                             : MultiplyByQuantizedMultiplierGreaterThanOne(
+                                   input1_val, input2_inv, headroom);
+        const int total_shift = op_params.output_shift - recip_shift - headroom;
+        if (total_shift >= -31) {
+          quotient = MultiplyByQuantizedMultiplierSmallerThanOneExp(
+              unscaled_quotient, op_params.output_multiplier, total_shift);
+        }
+      }
       const int32_t result =
           std::min(op_params.quantized_activation_max,
                    std::max(op_params.quantized_activation_min,

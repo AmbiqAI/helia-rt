@@ -724,12 +724,19 @@ TEST(HeliaMalformedModelTest, DivInt8SmallQuotients) {
   const int8_t unit_quotient[4] = {0, 0, 0, 33};
   ExpectDivInt8Quotients(1.f, unit_dividend, unit_divisor, unit_quotient);
   // A dividend scale of 1.98 puts each of these at a right shift of exactly 31,
-  // where the quotient (0.74, 0.40, 0.50 and 0.87 before rounding) can still
+  // where the quotient (0.74, 0.40, 0.495 and 0.87 before rounding) can still
   // round to 1.
   const int8_t dividend[4] = {3, 3, 1, 7};
   const int8_t divisor[4] = {8, 15, 4, 16};
   const int8_t quotient[4] = {1, 0, 0, 1};
   ExpectDivInt8Quotients(1.98f, dividend, divisor, quotient);
+  // A zero or -1 dividend has 31 bits of headroom, which the reference cannot
+  // shift by without overflowing int32.
+  const int8_t headroom_dividend[4] = {-1, 0, -1, -1};
+  const int8_t headroom_divisor[4] = {1, 1, -1, 127};
+  const int8_t headroom_quotient[4] = {-1, 0, 1, 0};
+  ExpectDivInt8Quotients(1.f, headroom_dividend, headroom_divisor,
+                         headroom_quotient);
 }
 
 TEST(HeliaMalformedModelTest, DivInt8NearestQuotientsForEveryDividend) {
