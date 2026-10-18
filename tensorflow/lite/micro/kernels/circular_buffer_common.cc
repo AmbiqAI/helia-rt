@@ -45,8 +45,6 @@ TfLiteStatus CircularBufferPrepare(TfLiteContext* context, TfLiteNode* node) {
       micro_context->AllocateTempInputTensor(node, kCircularBufferInputTensor);
   TfLiteTensor* output = micro_context->AllocateTempOutputTensor(
       node, kCircularBufferOutputTensor);
-  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
-  TF_LITE_ENSURE(context, input != nullptr && output != nullptr);
 
   TFLITE_DCHECK(node->user_data != nullptr);
   OpDataCircularBuffer* op_data =

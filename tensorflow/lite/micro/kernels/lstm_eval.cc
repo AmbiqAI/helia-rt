@@ -44,10 +44,7 @@ LstmTensors::~LstmTensors() {
       micro_context_->DeallocateTempTfLiteTensor(internal_tensors_[i]);
     }
   }
-  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
-  if (output_tensor_ != nullptr) {
-    micro_context_->DeallocateTempTfLiteTensor(output_tensor_);
-  }
+  micro_context_->DeallocateTempTfLiteTensor(output_tensor_);
 }
 
 // Verify the LSTM internal tensor properties (e.g., type checks)
