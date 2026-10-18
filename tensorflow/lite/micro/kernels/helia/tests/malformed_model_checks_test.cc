@@ -202,18 +202,22 @@ TfLiteStatus InvokeDivInt32(const int32_t* dividend, int* dividend_dims,
   return status;
 }
 
-// Divides {10, 10, 10, 10} (scale 0.5, zero point 0) of `dims` by an int8
-// `divisor` of `divisor_dims` (`dims` when null) into an output of `dims`. On
-// an error the output must be unwritten.
+// Divides four `dividend_value`s (`dividend_scale`, zero point 0) of `dims` by
+// an int8 `divisor` of `divisor_dims` (`dims` when null) into an output of
+// `dims`. On an error the output must be unwritten.
 TfLiteStatus InvokeDivInt8(float divisor_scale, int divisor_zero_point,
                            float output_scale, int output_zero_point,
                            const int8_t* divisor, int* dims,
-                           int* divisor_dims = nullptr) {
+                           int* divisor_dims = nullptr,
+                           float dividend_scale = 0.5f,
+                           int8_t dividend_value = 10) {
   constexpr int8_t kSentinel = 0x5a;
-  const int8_t dividend[4] = {10, 10, 10, 10};
+  const int8_t dividend[4] = {dividend_value, dividend_value, dividend_value,
+                              dividend_value};
   int8_t output[4] = {kSentinel, kSentinel, kSentinel, kSentinel};
   TfLiteTensor tensors[] = {
-      CreateQuantizedTensor(dividend, IntArrayFromInts(dims), 0.5f, 0),
+      CreateQuantizedTensor(dividend, IntArrayFromInts(dims), dividend_scale,
+                            0),
       CreateQuantizedTensor(
           divisor,
           IntArrayFromInts(divisor_dims != nullptr ? divisor_dims : dims),
@@ -237,8 +241,9 @@ TfLiteStatus InvokeDivInt8(float divisor_scale, int divisor_zero_point,
   return status;
 }
 
-// Prepares a DIV of `type` whose three tensors share `dims`.
-TfLiteStatus PrepareDiv(TfLiteType type, int* dims) {
+// Prepares a two-input op of `type` whose three tensors share `dims`.
+TfLiteStatus PrepareBinary(const TFLMRegistration& registration, void* params,
+                           TfLiteType type, int* dims) {
   int32_t input1[4] = {1, 1, 1, 1};
   int32_t input2[4] = {1, 1, 1, 1};
   int32_t output[4] = {};
@@ -247,16 +252,27 @@ TfLiteStatus PrepareDiv(TfLiteType type, int* dims) {
       CreateTensor(input2, IntArrayFromInts(dims), false, type),
       CreateTensor(output, IntArrayFromInts(dims), false, type),
   };
-  TfLiteDivParams params = {};
-  params.activation = kTfLiteActNone;
   int inputs[] = {2, 0, 1};
   int outputs[] = {1, 2};
-  const TFLMRegistration registration = tflite::Register_DIV();
   micro::KernelRunner runner(registration, tensors, 3, IntArrayFromInts(inputs),
-                             IntArrayFromInts(outputs), &params);
+                             IntArrayFromInts(outputs), params);
   const TfLiteStatus status = runner.InitAndPrepare();
   EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
   return status;
+}
+
+TfLiteStatus PrepareDiv(TfLiteType type, int* dims) {
+  TfLiteDivParams params = {};
+  params.activation = kTfLiteActNone;
+  const TFLMRegistration registration = tflite::Register_DIV();
+  return PrepareBinary(registration, &params, type, dims);
+}
+
+TfLiteStatus PrepareAddRank(TfLiteType type, int* dims) {
+  TfLiteAddParams params = {};
+  params.activation = kTfLiteActNone;
+  const TFLMRegistration registration = tflite::Register_ADD();
+  return PrepareBinary(registration, &params, type, dims);
 }
 
 // Prepares an ADD of type T with the given scales and zero points (input1,
@@ -481,6 +497,19 @@ TEST(HeliaMalformedModelTest, DivInt32RejectsUnbroadcastableShapes) {
                                          nullptr, kTfLiteError));
 }
 
+TEST(HeliaMalformedModelTest, DivInt32RejectsOutputLargerThanBroadcast) {
+  using tflite::testing::InvokeDivInt32;
+  const int32_t dividend[4] = {4, 4, 4, 4};
+  const int32_t divisor[4] = {2, 2, 2, 2};
+  int row[] = {2, 1, 4};
+  int two_rows[] = {2, 2, 4};
+  EXPECT_EQ(kTfLiteError, InvokeDivInt32(dividend, row, divisor, row, two_rows,
+                                         nullptr, kTfLiteError));
+  int one[] = {2, 1, 1};
+  EXPECT_EQ(kTfLiteError, InvokeDivInt32(dividend, one, divisor, one, row,
+                                         nullptr, kTfLiteError));
+}
+
 TEST(HeliaMalformedModelTest, DivRejectsRankAboveSix) {
   using tflite::testing::PrepareDiv;
   int rank7[] = {7, 1, 1, 1, 1, 1, 1, 4};
@@ -522,12 +551,36 @@ TEST(HeliaMalformedModelTest, DivInt8RejectsBadQuantization) {
   EXPECT_EQ(kTfLiteOk, InvokeDivInt8(0.5f, 0, 1.f, 0, divisor, dims));
 }
 
+TEST(HeliaMalformedModelTest, DivInt8RejectsMultiplierAboveTwoPow23) {
+  using tflite::testing::InvokeDivInt8;
+  int dims[] = {1, 4};
+  const int8_t ones[4] = {1, 1, 1, 1};
+  // 1 / (1/128 * 1e-6) is about 2^27: 127 / 1 would right-shift by -3.
+  EXPECT_EQ(kTfLiteError, InvokeDivInt8(1.f / 128.f, 0, 1e-6f, 0, ones, dims,
+                                        nullptr, 1.f, 127));
+  // A multiplier of exactly 2^23 has shift 24; just below it has shift 23.
+  const float at_limit = std::ldexp(1.f, -23);
+  EXPECT_EQ(kTfLiteError,
+            InvokeDivInt8(1.f, 0, at_limit, 0, ones, dims, nullptr, 1.f, 127));
+  EXPECT_EQ(kTfLiteOk, InvokeDivInt8(1.f, 0, at_limit * 1.01f, 0, ones, dims,
+                                     nullptr, 1.f, 127));
+}
+
 TEST(HeliaMalformedModelTest, DivInt8RejectsZeroDivisor) {
   using tflite::testing::InvokeDivInt8;
   const int8_t last_at_zero_point[4] = {1, 2, 4, 3};
   int dims[] = {1, 4};
   EXPECT_EQ(kTfLiteError,
             InvokeDivInt8(0.5f, 3, 1.f, 0, last_at_zero_point, dims));
+}
+
+TEST(HeliaMalformedModelTest, AddRejectsRankAboveSix) {
+  using tflite::testing::PrepareAddRank;
+  int rank7[] = {7, 1, 1, 1, 1, 1, 1, 4};
+  EXPECT_EQ(kTfLiteError, PrepareAddRank(kTfLiteInt32, rank7));
+  EXPECT_EQ(kTfLiteError, PrepareAddRank(kTfLiteFloat32, rank7));
+  int rank6[] = {6, 1, 1, 1, 1, 1, 4};
+  EXPECT_EQ(kTfLiteOk, PrepareAddRank(kTfLiteInt32, rank6));
 }
 
 TEST(HeliaMalformedModelTest, AddRejectsOutOfRangeZeroPoints) {

@@ -351,31 +351,31 @@ jobs:
         # Nearest-neighbour empty-input-extent rejection adds one case on every
         # leg. see AmbiqAI/helia-rt#433
         # SPLIT, SQUEEZE, DIV and ADD malformed-model checks add one binary and
-        # sixteen cases on every leg. see AmbiqAI/helia-rt#451
+        # nineteen cases on every leg. see AmbiqAI/helia-rt#451
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 177
-            min-cases: 1604
+            min-cases: 1607
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 177
-            min-cases: 1604
+            min-cases: 1607
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 176
-            min-cases: 1602
+            min-cases: 1605
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 177
-            min-cases: 1667
+            min-cases: 1670
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 176
-            min-cases: 1665
+            min-cases: 1668
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
