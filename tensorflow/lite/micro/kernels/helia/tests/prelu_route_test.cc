@@ -228,20 +228,25 @@ TfLiteTensor PreluTensor(T* data, TfLiteIntArray* dims) {
 }
 
 // Prepare must reject a T input, U alpha and V output, and release its
-// temporaries.
+// temporaries. `inputs` and `outputs`, when set, replace the node's slot
+// lists into tensors {input, alpha, output}; -1 marks a missing tensor.
 template <typename T, typename U, typename V>
-void ExpectPrepareRejected(T* in, U* alpha, V* out, int count) {
+void ExpectPrepareRejected(T* in, U* alpha, V* out, int count,
+                           int* inputs = nullptr, int* outputs = nullptr) {
   int dims[] = {1, count};
   TfLiteTensor tensors[3] = {
       PreluTensor(in, IntArrayFromInts(dims)),
       PreluTensor(alpha, IntArrayFromInts(dims)),
       PreluTensor(out, IntArrayFromInts(dims)),
   };
-  int inputs[] = {2, 0, 1};
-  int outputs[] = {1, 2};
+  int default_inputs[] = {2, 0, 1};
+  int default_outputs[] = {1, 2};
   const TFLMRegistration registration = Register_PRELU();
-  micro::KernelRunner runner(registration, tensors, 3, IntArrayFromInts(inputs),
-                             IntArrayFromInts(outputs), nullptr);
+  micro::KernelRunner runner(
+      registration, tensors, 3,
+      IntArrayFromInts(inputs != nullptr ? inputs : default_inputs),
+      IntArrayFromInts(outputs != nullptr ? outputs : default_outputs),
+      nullptr);
   EXPECT_EQ(kTfLiteError, runner.InitAndPrepare());
   EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
 }
@@ -413,6 +418,27 @@ TEST(HeliaPreluRouteTest, Float32Int8AlphaRejectedAtPrepare) {
   int8_t alpha[8] = {};
   float out[8] = {};
   tflite::testing::ExpectPrepareRejected(in, alpha, out, 8);
+}
+
+// TFLM's int16 PRELU takes an int8 alpha, so an int16 alpha fails Prepare.
+TEST(HeliaPreluRouteTest, Int16Int16AlphaRejectedAtPrepare) {
+  int16_t in[8] = {};
+  int16_t alpha[8] = {};
+  int16_t out[8] = {};
+  tflite::testing::ExpectPrepareRejected(in, alpha, out, 8);
+}
+
+TEST(HeliaPreluRouteTest, MissingTensorRejectedAtPrepare) {
+  int8_t in[8] = {};
+  int8_t alpha[8] = {};
+  int8_t out[8] = {};
+  int no_input[] = {2, -1, 1};
+  tflite::testing::ExpectPrepareRejected(in, alpha, out, 8, no_input);
+  int no_alpha[] = {2, 0, -1};
+  tflite::testing::ExpectPrepareRejected(in, alpha, out, 8, no_alpha);
+  int no_output[] = {1, -1};
+  tflite::testing::ExpectPrepareRejected(in, alpha, out, 8,
+                                         static_cast<int*>(nullptr), no_output);
 }
 
 // The reference walks the output shape, so an output larger than the

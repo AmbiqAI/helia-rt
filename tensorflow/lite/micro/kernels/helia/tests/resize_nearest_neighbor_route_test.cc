@@ -164,12 +164,15 @@ void ExpectMatchesReference(TfLiteType type, Entry entry, const Shape& s,
   g_ctx_buf = false;
   EXPECT_EQ(kTfLiteOk, runner.Invoke());
 #if HELIA_RESIZE_NN_LINK_WRAP
-  for (int e = 0; e < static_cast<int>(Entry::kCount); ++e) {
-    EXPECT_EQ(e == static_cast<int>(entry) ? 1 : 0, g_entry_calls[e]);
+  // A HELIA_ENABLE_F32=0 build runs float32 on the reference.
+  if (ARM_NN_ENABLE_F32 || entry != Entry::kF32) {
+    for (int e = 0; e < static_cast<int>(Entry::kCount); ++e) {
+      EXPECT_EQ(e == static_cast<int>(entry) ? 1 : 0, g_entry_calls[e]);
+    }
+    EXPECT_EQ(static_cast<int32_t>((s.out_h + s.out_w) * sizeof(int32_t)),
+              g_ctx_size);
+    EXPECT_TRUE(g_ctx_buf);
   }
-  EXPECT_EQ(static_cast<int32_t>((s.out_h + s.out_w) * sizeof(int32_t)),
-            g_ctx_size);
-  EXPECT_TRUE(g_ctx_buf);
 #else
   (void)entry;
 #endif

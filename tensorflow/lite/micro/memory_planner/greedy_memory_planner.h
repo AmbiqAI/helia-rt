@@ -162,6 +162,12 @@ class GreedyMemoryPlanner : public MicroMemoryPlanner {
   // Whether buffers have been added since the last plan was calculated.
   bool need_to_calculate_offsets_;
 
+  // TODO(AmbiqAI/helia-rt#460): upstream adds offsets and sizes in int unchecked; drop when upstream has it.
+  // Whether the last plan placed a buffer whose offset + size passes INT_MAX.
+  // Such a plan is refused: GetOffsetForBuffer fails and
+  // GetMaximumMemorySize returns SIZE_MAX.
+  bool plan_overflowed_ = false;
+
   TF_LITE_REMOVE_VIRTUAL_DELETE
 };
 

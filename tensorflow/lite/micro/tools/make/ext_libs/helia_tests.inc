@@ -65,10 +65,12 @@ $(eval $(call microlite_test,kernel_float_lstm_tail_lane_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float_lstm_tail_lane_test.cc))
 
 ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
+ifeq ($(strip $(HELIA_ENABLE_F32)),1)
 $(kernel_float_lstm_tail_lane_test_BINARY): CXXFLAGS += \
   -DHELIA_LSTM_F32_LINK_WRAP=1
 $(kernel_float_lstm_tail_lane_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_lstm_unidirectional_f32
+endif
 endif
 
 # heliaCORE float routing tests; each compares the kernel against the TFLM
@@ -520,6 +522,49 @@ endif
 # exactly the reduced elements. see AmbiqAI/helia-rt#433
 $(eval $(call microlite_test,kernel_reduce_output_size_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/reduce_output_size_test.cc))
+
+# Tensor byte sizes fail on an overflowing element or byte count and on a
+# negative dimension other than a -1 a kernel resolves in Prepare, and
+# AllocateTensors fails with them; the two-arena allocators and the memory
+# planners refuse requests and plans that pass their bounds.
+# see AmbiqAI/helia-rt#453
+$(eval $(call microlite_test,kernel_tensor_byte_length_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/tensor_byte_length_test.cc))
+
+# MEAN, SUM, REDUCE_MIN/MAX and REDUCE_ALL Prepare reject a missing input, axis
+# or output, the wrong input count or a non-int32 axis, and release every
+# temporary. see AmbiqAI/helia-rt#454
+$(eval $(call microlite_test,kernel_reduce_prepare_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/reduce_prepare_test.cc))
+
+# MEAN and SUM fail Invoke when their heliaCORE entry fails, for int8, int16,
+# float32 and float16. GCC and ATfE links wrap the entries to make each fail.
+# see AmbiqAI/helia-rt#458
+$(eval $(call microlite_test,kernel_reduce_status_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/reduce_status_test.cc))
+
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
+$(kernel_reduce_status_test_BINARY): CXXFLAGS += \
+  -DHELIA_REDUCE_STATUS_LINK_WRAP=1
+$(kernel_reduce_status_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_mean_s8 \
+  -Wl,--wrap=arm_mean_s16
+ifeq ($(strip $(HELIA_ENABLE_F32)),1)
+$(kernel_reduce_status_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_nn_mean_f32 \
+  -Wl,--wrap=arm_reduce_sum_f32
+endif
+ifneq (,$(filter cortex-m55,$(TARGET_ARCH)))
+$(kernel_reduce_status_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_nn_mean_f16 \
+  -Wl,--wrap=arm_reduce_sum_f16
+endif
+endif
+
+# float32 HARD_SWISH and FULLY_CONNECTED fail Invoke on a mismatched output on
+# both the heliaCORE and the reference route. see AmbiqAI/helia-rt#452
+$(eval $(call microlite_test,kernel_float32_fallback_shape_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float32_fallback_shape_test.cc))
 
 # SPLIT, SQUEEZE, DIV and ADD return kTfLiteError for a malformed axis, shape,
 # rank or quantization, a zero divisor or int32 INT32_MIN / -1, and release
