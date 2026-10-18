@@ -362,30 +362,33 @@ jobs:
         # Reduce and PRELU Prepare rejections and the MEAN keep_dims layouts add
         # one binary and ten cases on every leg. see AmbiqAI/helia-rt#452,
         # AmbiqAI/helia-rt#454
+        # MEAN/SUM entry-failure cases, the reference MEAN layouts and the MEAN
+        # output-rank case add one binary and six cases on every leg.
+        # see AmbiqAI/helia-rt#452, AmbiqAI/helia-rt#458
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 177
-            min-cases: 1612
+            min-binaries: 178
+            min-cases: 1618
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 177
-            min-cases: 1612
+            min-binaries: 178
+            min-cases: 1618
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 176
-            min-cases: 1610
+            min-binaries: 177
+            min-cases: 1616
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 177
-            min-cases: 1675
+            min-binaries: 178
+            min-cases: 1681
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 176
-            min-cases: 1673
+            min-binaries: 177
+            min-cases: 1679
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
@@ -516,3 +519,48 @@ jobs:
       - name: Show ccache stats
         if: always()
         run: ccache -s || true
+
+  # Every FVP leg above builds heliaCORE's float32 kernels in, so the float32
+  # reference fallbacks a CMake int8-only build takes never run there. A
+  # native host build with HELIA_ENABLE_F32=0 runs the reduce tests on those
+  # routes, and the float route tests with their float32 checks on the
+  # reference. see AmbiqAI/helia-rt#452
+  helia_f32_off_host:
+    needs: ci-image
+    if: ${{ !inputs.armclang-m4-qualification }}
+    runs-on: ubuntu-latest-md
+    container:
+      image: ${{ needs.ci-image.outputs.image }}
+    timeout-minutes: 30
+    name: test-host-f32-off
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.trigger-sha || inputs.ref || github.sha }}
+
+      - name: Mark workspace as safe for Git
+        run: git config --global --add safe.directory "*"
+
+      - name: Reduce and float-API tests without ARM_NN_ENABLE_F32
+        run: |
+          set -e
+          make -f tensorflow/lite/micro/tools/make/Makefile \
+            OPTIMIZED_KERNEL_DIR=helia HELIA_ENABLE_F32=0 \
+            BASE_GENDIR=gen-f32-off -j"$(nproc)" \
+            test_kernel_reduce_test \
+            test_kernel_reduce_output_size_test \
+            test_kernel_reduce_prepare_test \
+            test_kernel_reduce_status_test \
+            test_kernel_extrema_route_test \
+            test_kernel_float_activation_edge_test \
+            test_kernel_float_context_test \
+            test_kernel_float_lstm_tail_lane_test \
+            test_kernel_gather_pair_test \
+            test_kernel_resize_nearest_neighbor_route_test
+          # The knob must have left heliaCORE's float32 MEAN out, or the
+          # reduce tests above ran the heliaCORE route instead.
+          bin=gen-f32-off/linux_x86_64_default_helia_gcc/bin/kernel_reduce_output_size_test
+          if nm "${bin}" | grep -q arm_nn_mean_f32; then
+            echo "::error ::${bin} links arm_nn_mean_f32 with HELIA_ENABLE_F32=0"
+            exit 1
+          fi
