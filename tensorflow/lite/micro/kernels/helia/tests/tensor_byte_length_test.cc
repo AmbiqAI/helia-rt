@@ -154,23 +154,68 @@ const tflite::Model* ScratchModel() {
       {}, {0}, {}, {0}, {tflite::CreateBuffer(builder)});
 }
 
-// RESHAPE of an [8] float32 input to `output_shape`.
+// RESHAPE of an `input_shape` float32 input to `output_shape`.
 const tflite::Model* ReshapeStretchModel(
-    const std::initializer_list<int32_t>& output_shape) {
+    const std::initializer_list<int32_t>& output_shape,
+    const std::initializer_list<int32_t>& input_shape = {8}) {
   flatbuffer_storage.Reset();
   flatbuffers::FlatBufferBuilder builder(1024, &flatbuffer_storage);
-  const int32_t input_shape[] = {8};
   return FinishModel(
       builder,
       tflite::CreateOperatorCode(builder, 0, 0, 1,
                                  tflite::BuiltinOperator_RESHAPE),
-      {tflite::CreateTensor(builder, builder.CreateVector(input_shape, 1),
-                            TensorType_FLOAT32, 0, builder.CreateString("in")),
+      {tflite::CreateTensor(
+           builder,
+           builder.CreateVector(input_shape.begin(), input_shape.size()),
+           TensorType_FLOAT32, 0, builder.CreateString("in")),
        tflite::CreateTensor(
            builder,
            builder.CreateVector(output_shape.begin(), output_shape.size()),
            TensorType_FLOAT32, 0, builder.CreateString("out"))},
       {0}, {1}, {0}, {1}, {tflite::CreateBuffer(builder)});
+}
+
+// ASSIGN_VARIABLE of a [2, 1, -1] float32 graph input, which no kernel
+// resolves.
+const tflite::Model* AssignUnresolvedVariableModel() {
+  flatbuffer_storage.Reset();
+  flatbuffers::FlatBufferBuilder builder(1024, &flatbuffer_storage);
+  const Offset<tflite::OperatorCode> codes[] = {
+      tflite::CreateOperatorCode(builder, 0, 0, 1,
+                                 tflite::BuiltinOperator_VAR_HANDLE),
+      tflite::CreateOperatorCode(builder, 0, 0, 1,
+                                 tflite::BuiltinOperator_ASSIGN_VARIABLE)};
+  const int32_t value_shape[] = {2, 1, -1};
+  const Offset<tflite::Tensor> tensors[] = {
+      tflite::CreateTensor(builder, builder.CreateVector(value_shape, 3),
+                           TensorType_FLOAT32, 0, builder.CreateString("in")),
+      tflite::CreateTensor(builder, builder.CreateVector<int32_t>({}),
+                           tflite::TensorType_RESOURCE, 0,
+                           builder.CreateString("handle")),
+  };
+  const Offset<void> var_handle_options =
+      tflite::CreateVarHandleOptions(builder, builder.CreateString("c"),
+                                     builder.CreateString("v"))
+          .Union();
+  const Offset<tflite::Operator> ops[] = {
+      tflite::CreateOperator(builder, 0, builder.CreateVector<int32_t>({}),
+                             builder.CreateVector<int32_t>({1}),
+                             tflite::BuiltinOptions_VarHandleOptions,
+                             var_handle_options),
+      tflite::CreateOperator(builder, 1, builder.CreateVector<int32_t>({1, 0}),
+                             builder.CreateVector<int32_t>({})),
+  };
+  const Offset<tflite::SubGraph> subgraph = tflite::CreateSubGraph(
+      builder, builder.CreateVector(tensors, 2),
+      builder.CreateVector<int32_t>({0}), builder.CreateVector<int32_t>({}),
+      builder.CreateVector(ops, 2), builder.CreateString("main"));
+  const Offset<tflite::Buffer> buffers[] = {tflite::CreateBuffer(builder)};
+  tflite::FinishModelBuffer(
+      builder, tflite::CreateModel(builder, 3, builder.CreateVector(codes, 2),
+                                   builder.CreateVector(&subgraph, 1),
+                                   builder.CreateString("m"),
+                                   builder.CreateVector(buffers, 1)));
+  return tflite::GetModel(builder.GetBufferPointer());
 }
 
 // EMBEDDING_LOOKUP of [3] int32 ids into [5, 2] float32 values, to a [-1, 2]
@@ -397,6 +442,11 @@ TEST(TensorByteLengthTest, FlatbufferStretchDimensionIsUnresolved) {
   size_t bytes = 1;
   EXPECT_EQ(kTfLiteOk, FlatbufferBytes(TensorType_FLOAT32, {2, 1, -1}, &bytes));
   EXPECT_EQ(size_t{0} - 8, bytes);
+  // Two -1 dimensions multiply to a positive count, as in upstream's int
+  // product.
+  EXPECT_EQ(kTfLiteOk,
+            FlatbufferBytes(TensorType_FLOAT32, {2, -1, -1}, &bytes));
+  EXPECT_EQ(static_cast<size_t>(8), bytes);
   EXPECT_EQ(kTfLiteError,
             FlatbufferBytes(TensorType_INT8, {65536, 65536, -1}, &bytes));
   EXPECT_EQ(kTfLiteError,
@@ -562,12 +612,55 @@ TEST(TensorByteLengthTest, AllocateTensorsResolvesReshapeStretchDimension) {
   }
 }
 
-// The other output dimensions multiply to 0, so no stretch size exists.
+// The other output dimensions multiply to 0, so no stretch size exists. On a
+// Cortex-M core with a hardware divider the division by zero returns 0 unless
+// CCR.DIV_0_TRP is set, so the case sets it to fault if RESHAPE divides.
 TEST(TensorByteLengthTest, AllocateTensorsRejectsReshapeZeroStretch) {
+#if defined(__ARM_ARCH_PROFILE) && __ARM_ARCH_PROFILE == 'M' && \
+    defined(__ARM_FEATURE_IDIV)
+  volatile uint32_t* const ccr =
+      reinterpret_cast<volatile uint32_t*>(0xE000ED14);
+  const uint32_t saved_ccr = *ccr;
+  *ccr = saved_ccr | (1u << 4);  // DIV_0_TRP
+#endif
   tflite::MicroMutableOpResolver<1> op_resolver;
-  ASSERT_EQ(kTfLiteOk, op_resolver.AddReshape());
-  tflite::MicroInterpreter interpreter(ReshapeStretchModel({0, -1}),
-                                       op_resolver, arena, kArenaSize);
+  TfLiteStatus status = op_resolver.AddReshape();
+  if (status == kTfLiteOk) {
+    tflite::MicroInterpreter eight(ReshapeStretchModel({0, -1}), op_resolver,
+                                   arena, kArenaSize);
+    EXPECT_EQ(kTfLiteError, eight.AllocateTensors());
+    tflite::MicroInterpreter empty(ReshapeStretchModel({0, -1}, {0}),
+                                   op_resolver, arena, kArenaSize);
+    status = empty.AllocateTensors();
+  }
+#if defined(__ARM_ARCH_PROFILE) && __ARM_ARCH_PROFILE == 'M' && \
+    defined(__ARM_FEATURE_IDIV)
+  *ccr = saved_ccr;
+#endif
+  EXPECT_EQ(kTfLiteError, status);
+}
+
+// A -1 that no kernel resolves is refused once Prepare has run.
+TEST(TensorByteLengthTest, AllocateTensorsRejectsUnresolvedDimension) {
+  EXPECT_EQ(kTfLiteError, AllocateNoOp(TensorType_FLOAT32, {2, -1}));
+}
+
+// The value's byte count is upstream's wrapped count, so the variable must not
+// be sized from it.
+TEST(TensorByteLengthTest, AssignVariableRejectsUnresolvedValue) {
+  tflite::MicroMutableOpResolver<2> op_resolver;
+  ASSERT_EQ(kTfLiteOk, op_resolver.AddVarHandle());
+  ASSERT_EQ(kTfLiteOk, op_resolver.AddAssignVariable());
+  alignas(16) static uint8_t variable_arena[4096];
+  tflite::MicroResourceVariables* variables =
+      tflite::MicroResourceVariables::Create(
+          tflite::MicroAllocator::Create(variable_arena,
+                                         sizeof(variable_arena)),
+          1);
+  ASSERT_NE(nullptr, variables);
+  tflite::MicroInterpreter interpreter(AssignUnresolvedVariableModel(),
+                                       op_resolver, arena, kArenaSize,
+                                       variables);
   EXPECT_EQ(kTfLiteError, interpreter.AllocateTensors());
 }
 

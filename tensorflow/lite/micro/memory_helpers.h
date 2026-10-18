@@ -62,8 +62,9 @@ TfLiteStatus MultiplyTensorSize(size_t* size, int64_t factor, size_t limit);
 // A -1 dimension is one a kernel may resolve in Prepare (RESHAPE's stretch
 // dimension, EMBEDDING_LOOKUP's output rows). The other dimensions and the
 // element size are still checked, any other negative dimension fails, and
-// *bytes is the product of every dimension in size_t, as upstream computes it,
-// so kernels that read bytes before resolving the shape behave as upstream.
+// *bytes is the product of every dimension and the element size in size_t, as
+// upstream computes it, so kernels that read bytes before resolving the shape
+// behave as upstream.
 // The allocator re-sizes a TfLiteTensor once its dims are resolved.
 TfLiteStatus BytesRequiredForTensor(const tflite::Tensor& flatbuffer_tensor,
                                     size_t* bytes, size_t* type_size);
