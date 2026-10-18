@@ -423,4 +423,17 @@ TEST(ElementwiseTest, LogicalNotRejectsFloat32AtPrepare) {
                               tflite::Register_LOGICAL_NOT(), kTfLiteFloat32));
 }
 
+// TODO(AmbiqAI/helia-rt#460): upstream RSQRT admits an unquantized int16
+// input that Eval cannot run; drop when upstream has it.
+TEST(ElementwiseTest, RsqrtRejectsUnquantizedInt16AtPrepare) {
+  EXPECT_EQ(kTfLiteError,
+            PrepareWithType<int16_t>(tflite::Register_RSQRT(), kTfLiteInt16));
+}
+
+// Unquantized int16 ABS has its own path and stays accepted.
+TEST(ElementwiseTest, AbsAcceptsUnquantizedInt16AtPrepare) {
+  EXPECT_EQ(kTfLiteOk,
+            PrepareWithType<int16_t>(tflite::Register_ABS(), kTfLiteInt16));
+}
+
 TF_LITE_MICRO_TESTS_MAIN

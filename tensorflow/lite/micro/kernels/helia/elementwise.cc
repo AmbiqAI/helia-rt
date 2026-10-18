@@ -312,9 +312,8 @@ TfLiteStatus ValidateAndPopulateRsqrtData(TfLiteContext* context,
   TF_LITE_ENSURE(context, op_data != nullptr);
   op_data->input_type = input->type;
 
-  if (input->type == kTfLiteInt8 ||
-      (input->type == kTfLiteInt16 &&
-       input->quantization.type != kTfLiteNoQuantization)) {
+  // RsqrtEval has no unquantized int16 path, so int16 must be quantized too.
+  if (input->type == kTfLiteInt8 || input->type == kTfLiteInt16) {
     TF_LITE_ENSURE_EQ(context, input->quantization.type,
                       kTfLiteAffineQuantization);
     TF_LITE_ENSURE_EQ(context, output->quantization.type,

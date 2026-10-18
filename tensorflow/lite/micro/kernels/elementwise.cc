@@ -123,6 +123,15 @@ TfLiteStatus PrepareAbsRsqrt(TfLiteContext* context, TfLiteNode* node) {
     micro_context->DeallocateTempTfLiteTensor(output);
     return kTfLiteError;
   }
+  // TODO(AmbiqAI/helia-rt#460): upstream admits an unquantized int16 RSQRT,
+  // which RsqrtEval cannot run; drop when upstream has it.
+  if (op_nameid == kRsrqtNameId && input->type == kTfLiteInt16 &&
+      input->quantization.type != kTfLiteAffineQuantization) {
+    MicroPrintf("RSQRT int16 requires affine quantization.");
+    micro_context->DeallocateTempTfLiteTensor(input);
+    micro_context->DeallocateTempTfLiteTensor(output);
+    return kTfLiteError;
+  }
 
   auto* op_data = static_cast<OpDataAbsRsqrt*>(node->user_data);
   op_data->input_type = input->type;
