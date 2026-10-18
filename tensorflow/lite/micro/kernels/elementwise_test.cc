@@ -423,8 +423,7 @@ TEST(ElementwiseTest, LogicalNotRejectsFloat32AtPrepare) {
                               tflite::Register_LOGICAL_NOT(), kTfLiteFloat32));
 }
 
-// TODO(AmbiqAI/helia-rt#460): upstream RSQRT admits an unquantized int16
-// input that Eval cannot run; drop when upstream has it.
+// TODO(AmbiqAI/helia-rt#460): upstream RSQRT admits unquantized int16; drop when upstream has it.
 TEST(ElementwiseTest, RsqrtRejectsUnquantizedInt16AtPrepare) {
   EXPECT_EQ(kTfLiteError,
             PrepareWithType<int16_t>(tflite::Register_RSQRT(), kTfLiteInt16));
@@ -436,8 +435,7 @@ TEST(ElementwiseTest, AbsAcceptsUnquantizedInt16AtPrepare) {
             PrepareWithType<int16_t>(tflite::Register_ABS(), kTfLiteInt16));
 }
 
-// TODO(AmbiqAI/helia-rt#460): upstream's unary loops write the input's count
-// into a smaller output; drop when upstream has it.
+// TODO(AmbiqAI/helia-rt#460): upstream unary loops skip the output count check; drop when upstream has it.
 namespace {
 // A 4-element input against a 2-element output must fail Prepare or Invoke
 // and leave the bytes past the output untouched.
@@ -503,8 +501,80 @@ TEST(ElementwiseTest, AbsInt16UnquantizedShorterOutputFails) {
                                     /*quantized=*/false);
 }
 
-// TODO(AmbiqAI/helia-rt#460): upstream's Prepare functions return on a
-// rejection without releasing the temporaries; drop when upstream has it.
+TEST(ElementwiseTest, LogicalNotShorterOutputFails) {
+  ExpectShorterOutputFails<bool>(tflite::Register_LOGICAL_NOT(), kTfLiteBool,
+                                 /*quantized=*/false);
+}
+
+TEST(ElementwiseTest, RsqrtInt16ShorterOutputFails) {
+  ExpectShorterOutputFails<int16_t>(tflite::Register_RSQRT(), kTfLiteInt16,
+                                    /*quantized=*/true);
+}
+
+TEST(ElementwiseTest, AbsInt16QuantizedShorterOutputFails) {
+  ExpectShorterOutputFails<int16_t>(tflite::Register_ABS(), kTfLiteInt16,
+                                    /*quantized=*/true);
+}
+
+// TODO(AmbiqAI/helia-rt#460): upstream's count accepts negative and wrapping dims; drop when upstream has it.
+namespace {
+// SIN over hostile dims must fail without writing the 4-element output. The
+// tensors are built with valid dims so that no helper computes the hostile
+// count; the hostile dims are swapped in afterwards.
+void ExpectHostileDimsFail(int* input_dims, int* output_dims) {
+  int shape[] = {2, 1, 4};
+  float input[4] = {1.0f, 2.0f, 3.0f, 4.0f};
+  float output[4];
+  uint8_t* output_bytes = reinterpret_cast<uint8_t*>(output);
+  for (size_t i = 0; i < sizeof(output); ++i) {
+    output_bytes[i] = 0x5A;
+  }
+  TfLiteTensor tensors[] = {
+      tflite::testing::CreateTensor(input,
+                                    tflite::testing::IntArrayFromInts(shape)),
+      tflite::testing::CreateTensor(output,
+                                    tflite::testing::IntArrayFromInts(shape)),
+  };
+  tensors[0].dims = tflite::testing::IntArrayFromInts(input_dims);
+  tensors[1].dims = tflite::testing::IntArrayFromInts(output_dims);
+  int inputs[] = {1, 0};
+  int outputs[] = {1, 1};
+  const TFLMRegistration registration = tflite::Register_SIN();
+  tflite::micro::KernelRunner runner(
+      registration, tensors, 2, tflite::testing::IntArrayFromInts(inputs),
+      tflite::testing::IntArrayFromInts(outputs), /*builtin_data=*/nullptr);
+  TfLiteStatus status = runner.InitAndPrepare();
+  if (status == kTfLiteOk) {
+    status = runner.Invoke();
+  }
+  EXPECT_EQ(kTfLiteError, status);
+  int overwrites = 0;
+  for (size_t i = 0; i < sizeof(output); ++i) {
+    overwrites += output_bytes[i] != 0x5A;
+  }
+  EXPECT_EQ(0, overwrites);
+}
+}  // namespace
+
+// 4 * 1073741825 wraps a 32-bit int to 4, the input's count.
+TEST(ElementwiseTest, SinWrappingOutputCountFails) {
+  int input_dims[] = {2, 1, 4};
+  int output_dims[] = {2, 4, 1073741825};
+  ExpectHostileDimsFail(input_dims, output_dims);
+}
+
+// Both counts are -4 in each pair, so a signed comparison sees them as equal.
+// The second pair has no product that an overflow check would catch.
+TEST(ElementwiseTest, SinNegativeExtentFails) {
+  int input_dims[] = {2, -1, 4};
+  int output_dims[] = {1, -4};
+  ExpectHostileDimsFail(input_dims, output_dims);
+  int single_input_dims[] = {1, -4};
+  int single_output_dims[] = {1, -4};
+  ExpectHostileDimsFail(single_input_dims, single_output_dims);
+}
+
+// TODO(AmbiqAI/helia-rt#460): upstream Prepare leaks temporaries on rejection; drop when upstream has it.
 namespace {
 // A float32 input with an int32 output must fail Prepare with every
 // temporary released.
@@ -545,6 +615,54 @@ TEST(ElementwiseTest, RsqrtRejectsMismatchedOutputTypeAndReleasesTemps) {
 TEST(ElementwiseTest, AbsRejectsUnquantizedInt8AtPrepare) {
   EXPECT_EQ(kTfLiteError,
             PrepareWithType<int8_t>(tflite::Register_ABS(), kTfLiteInt8));
+}
+
+// TODO(AmbiqAI/helia-rt#460): upstream reads zero_point->size without a null check; drop when upstream has it.
+namespace {
+// Quantized int8 ABS whose input or output has no zero-point array must fail
+// Prepare with every temporary released.
+void ExpectMissingZeroPointFails(bool input_missing) {
+  int shape[] = {1, 2};
+  int8_t input[2] = {};
+  int8_t output[2] = {};
+  TfLiteTensor tensors[] = {
+      tflite::testing::CreateTensor(
+          input, tflite::testing::IntArrayFromInts(shape), false, kTfLiteInt8),
+      tflite::testing::CreateTensor(
+          output, tflite::testing::IntArrayFromInts(shape), false, kTfLiteInt8),
+  };
+  // FloatArrayFromFloats rewrites its argument, so each array is used once.
+  float scales[] = {1, 1.0f};
+  float scales_without_zero_point[] = {1, 1.0f};
+  int zero_points[] = {1, 0};
+  TfLiteAffineQuantization with_zero_point = {
+      tflite::testing::FloatArrayFromFloats(scales),
+      tflite::testing::IntArrayFromInts(zero_points), 0};
+  TfLiteAffineQuantization without_zero_point = {
+      tflite::testing::FloatArrayFromFloats(scales_without_zero_point), nullptr,
+      0};
+  tensors[0].params = {1.0f, 0};
+  tensors[1].params = {1.0f, 0};
+  tensors[0].quantization = {
+      kTfLiteAffineQuantization,
+      input_missing ? &without_zero_point : &with_zero_point};
+  tensors[1].quantization = {
+      kTfLiteAffineQuantization,
+      input_missing ? &with_zero_point : &without_zero_point};
+  int inputs[] = {1, 0};
+  int outputs[] = {1, 1};
+  const TFLMRegistration registration = tflite::Register_ABS();
+  tflite::micro::KernelRunner runner(
+      registration, tensors, 2, tflite::testing::IntArrayFromInts(inputs),
+      tflite::testing::IntArrayFromInts(outputs), /*builtin_data=*/nullptr);
+  EXPECT_EQ(kTfLiteError, runner.InitAndPrepare());
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
+}
+}  // namespace
+
+TEST(ElementwiseTest, AbsRejectsMissingZeroPointAtPrepare) {
+  ExpectMissingZeroPointFails(/*input_missing=*/true);
+  ExpectMissingZeroPointFails(/*input_missing=*/false);
 }
 
 TF_LITE_MICRO_TESTS_MAIN
