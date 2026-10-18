@@ -3,7 +3,7 @@ schema_version: 1
 module:
   name: helia-rt-source
   type: tooling
-  version: "1.17.0"
+  version: "2.1.0" # x-release-please-version
 
 support:
   ambiqsuite: true
