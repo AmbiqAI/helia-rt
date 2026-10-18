@@ -471,9 +471,9 @@ jobs:
           CCACHE_COMPRESSLEVEL: "6"
           CCACHE_MAXSIZE: "2G"
           NS_CMSIS_NN_REF: ${{ inputs.ns-cmsis-nn-ref }}
-          # Empty on any leg with no floors in the matrix `include:` above
-          # (today: cortex-m55 + atfe). test_helia.sh treats an empty value as
-          # "no floor" and still fails the leg on a zero tally.
+          # Empty on any leg with no floors in the matrix `include:` above.
+          # test_helia.sh treats an empty value as "no floor" and still fails
+          # the leg on a zero tally.
           HELIA_MIN_TEST_BINARIES: ${{ matrix.min-binaries }}
           HELIA_MIN_EXECUTED_CASES: ${{ matrix.min-cases }}
         run: |

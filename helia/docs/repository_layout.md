@@ -136,11 +136,12 @@ helia-specific files:
 | `.devcontainer/` | helia-rt VS Code dev container definition. Upstream has none. |
 | `.github/stale.yml` | Probot-stale config (separate from `stale_handler.yml` which is upstream-owned). |
 | `nsx/` | heliaRT NSX module manifest (`nsx-module.yaml`, `CMakeLists.txt`) consumed by neuralSPOT and bumped by `release-please-config.json`. |
+| `nsx-source/` | `helia-rt-source` NSX module manifest (`nsx-module.yaml`) for consumers that compile the TFLM source tree with their own NSX wrapper; its version is bumped by `release-please-config.json`. |
 | `zephyr/` | Top-level Zephyr module (`CMakeLists.txt`, `Kconfig`, `module.yml`) so the heliaRT repo can be west-imported as a Zephyr module. Distinct from `tensorflow/lite/micro/tools/ci_build/templates/zephyr_prebuilt/`, which is the prebuilt-asset template. |
 | `zephyr_static_export.sh` | Top-level helper that drives the static Zephyr export flow. |
 | `pyproject.toml`, `uv.lock` | Python lint tooling managed with uv. Runtime Python utilities retain their own dependency manifests. |
 | `astro-site/` | Astro/Starlight documentation source, locked site dependencies and reference generation consumed by `.github/workflows/docs.yml`. |
-| `release-please-config.json`, `.release-please-manifest.json` | release-please config + state. The `extra-files` block bumps `tensorflow/lite/micro/helia_rt_version.h` and `nsx/nsx-module.yaml`. |
+| `release-please-config.json`, `.release-please-manifest.json` | release-please config + state. The `extra-files` block lists every file a release PR bumps, including `tensorflow/lite/micro/helia_rt_version.h` and both NSX module manifests. |
 | `ci/install_qemu.sh`, `ci/check_tflite_files.py`, `ci/issue_on_error.py` | helia-rt-only files in an upstream-owned directory; do not rename or move. `install_qemu.sh` is used by `.devcontainer/Dockerfile` and `issue_on_error.py` by `issue_on_error.yml`; `check_tflite_files.py` has no caller. |
 | `gen/`, `neuralspot/`, `data/`, `astro-site/` | helia-rt-only top-level directories (not present upstream). New helia-only directories at the repo root must be approved here before being added. |
 
