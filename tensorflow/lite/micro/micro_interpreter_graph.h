@@ -102,6 +102,13 @@ class MicroInterpreterGraph : public MicroGraph {
   // Get the resource variables for this TFLM graph.
   MicroResourceVariables* GetResourceVariables() { return resource_variables_; }
 
+  // TODO(AmbiqAI/helia-rt#460): upstream ignores a kernel's failed persistent allocation; drop when upstream has it.
+  // Records that a kernel's persistent buffer request failed. InitSubgraphs
+  // and PrepareSubgraphs then fail after the operator that made it.
+  void SetPersistentBufferAllocationFailed() {
+    persistent_buffer_allocation_failed_ = true;
+  }
+
  private:
   TfLiteStatus ResetTensorData(const tflite::Tensor* tensor,
                                TfLiteEvalTensor* eval_tensor);
@@ -116,6 +123,8 @@ class MicroInterpreterGraph : public MicroGraph {
   const flatbuffers::Vector<flatbuffers::Offset<SubGraph>>* subgraphs_ =
       nullptr;  // Initialized as nullptr to prevent any possible issues
                 // related to accessing uninitialized memory.
+  // TODO(AmbiqAI/helia-rt#460): upstream ignores a kernel's failed persistent allocation; drop when upstream has it.
+  bool persistent_buffer_allocation_failed_ = false;
 
   TF_LITE_REMOVE_VIRTUAL_DELETE
 };

@@ -125,6 +125,14 @@ TfLiteStatus MicroInterpreterGraph::InitSubgraphs() {
         node->user_data =
             registration->init(context_, init_data, init_data_size);
       }
+      // TODO(AmbiqAI/helia-rt#460): upstream ignores a kernel's failed persistent allocation; drop when upstream has it.
+      if (persistent_buffer_allocation_failed_) {
+        MicroPrintf("Node %s (number %u) failed to allocate a persistent "
+                    "buffer in Init",
+                    OpNameFromRegistration(registration),
+                    current_operator_index_);
+        return kTfLiteError;
+      }
     }
   }
   current_subgraph_index_ = previous_subgraph_idx;
@@ -160,6 +168,14 @@ TfLiteStatus MicroInterpreterGraph::PrepareSubgraphs() {
 #ifdef USE_TFLM_COMPRESSION
         GetMicroContext(context_)->ResetDecompressionMemoryAllocations();
 #endif  // USE_TFLM_COMPRESSION
+      }
+      // TODO(AmbiqAI/helia-rt#460): upstream ignores a kernel's failed persistent allocation; drop when upstream has it.
+      if (persistent_buffer_allocation_failed_) {
+        MicroPrintf("Node %s (number %u) failed to allocate a persistent "
+                    "buffer in Prepare",
+                    OpNameFromRegistration(registration),
+                    current_operator_index_);
+        return kTfLiteError;
       }
 
       const int dynamic_tensor_index = CheckDynamicTensors(

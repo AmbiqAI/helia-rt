@@ -17,6 +17,7 @@ limitations under the License.
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 
 #include "flatbuffers/flatbuffers.h"  // from @flatbuffers
 #include "tensorflow/lite/micro/arena_allocator/non_persistent_arena_buffer_allocator.h"
@@ -788,6 +789,8 @@ TfLiteStatus MicroAllocator::AllocateNodeAndRegistrations(
       MicroPrintf("Failed to allocate memory for node_and_registrations.");
       return kTfLiteError;
     }
+    // TODO(AmbiqAI/helia-rt#460): upstream frees nodes a failed AllocateTensors never set up; drop when upstream has it.
+    memset(output, 0, sizeof(NodeAndRegistration) * operators_size);
     subgraph_allocations[subgraph_idx].node_and_registrations = output;
   }
   return kTfLiteOk;

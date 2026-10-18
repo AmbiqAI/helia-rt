@@ -56,7 +56,12 @@ MicroInterpreterContext::~MicroInterpreterContext() {}
 void* MicroInterpreterContext::AllocatePersistentBuffer(size_t bytes) {
   TFLITE_DCHECK(state_ == InterpreterState::kPrepare ||
                 state_ == InterpreterState::kInit);
-  return allocator_.AllocatePersistentBuffer(bytes);
+  void* buffer = allocator_.AllocatePersistentBuffer(bytes);
+  // TODO(AmbiqAI/helia-rt#460): upstream ignores a kernel's failed persistent allocation; drop when upstream has it.
+  if (buffer == nullptr) {
+    graph_.SetPersistentBufferAllocationFailed();
+  }
+  return buffer;
 }
 
 TfLiteStatus MicroInterpreterContext::RequestScratchBufferInArena(

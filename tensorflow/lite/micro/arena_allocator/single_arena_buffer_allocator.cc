@@ -107,14 +107,19 @@ TfLiteStatus SingleArenaBufferAllocator::ResizeBuffer(uint8_t* resizable_buf,
 
 uint8_t* SingleArenaBufferAllocator::AllocatePersistentBuffer(
     size_t size, size_t alignment) {
-  uint8_t* const aligned_result = AlignPointerDown(tail_ - size, alignment);
-  if (aligned_result < head_) {
+  // TODO(AmbiqAI/helia-rt#460): upstream wraps on a request above the tail address and lets the tail grow over live temp allocations; drop when upstream has it.
+  const size_t available_memory = tail_ - temp_;
+  const bool fits = size <= available_memory;
+  uint8_t* const aligned_result =
+      fits ? AlignPointerDown(tail_ - size, alignment) : nullptr;
+  if (!fits || aligned_result < temp_) {
 #ifndef TF_LITE_STRIP_ERROR_STRINGS
-    const size_t missing_memory = head_ - aligned_result;
+    const size_t missing_memory =
+        fits ? temp_ - aligned_result : size - available_memory;
     MicroPrintf(
         "Failed to allocate tail memory. Requested: %u, "
         "available %u, missing: %u",
-        size, size - missing_memory, missing_memory);
+        size, available_memory, missing_memory);
 #endif
     return nullptr;
   }
@@ -125,8 +130,10 @@ uint8_t* SingleArenaBufferAllocator::AllocatePersistentBuffer(
 uint8_t* SingleArenaBufferAllocator::AllocateTemp(size_t size,
                                                   size_t alignment) {
   uint8_t* const aligned_result = AlignPointerUp(temp_, alignment);
-  const size_t available_memory = tail_ - aligned_result;
-  if (available_memory < size) {
+  // TODO(AmbiqAI/helia-rt#460): upstream wraps when alignment moves temp_ past tail_; drop when upstream has it.
+  const size_t available_memory =
+      aligned_result > tail_ ? 0 : tail_ - aligned_result;
+  if (aligned_result > tail_ || available_memory < size) {
     MicroPrintf(
         "Failed to allocate temp memory. Requested: %u, "
         "available %u, missing: %u",
@@ -181,6 +188,10 @@ size_t SingleArenaBufferAllocator::GetPersistentUsedBytes() const {
 size_t SingleArenaBufferAllocator::GetAvailableMemory(size_t alignment) const {
   uint8_t* const aligned_temp = AlignPointerUp(temp_, alignment);
   uint8_t* const aligned_tail = AlignPointerDown(tail_, alignment);
+  // TODO(AmbiqAI/helia-rt#460): upstream wraps when alignment moves temp_ past tail_; drop when upstream has it.
+  if (aligned_tail < aligned_temp) {
+    return 0;
+  }
   return aligned_tail - aligned_temp;
 }
 
