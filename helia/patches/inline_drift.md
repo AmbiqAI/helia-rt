@@ -651,6 +651,10 @@ leave reference, direct CMake, Bazel and source consumers unfixed.
   temporaries, int16 RSQRT must be quantized, missing zero points are
   rejected, and the fallback loops require an output count equal to the
   input's, computed without overflow.
+- **Float32 SVDF without a bias (AmbiqAI/helia-rt#471).**
+  `kernels/svdf_common.cc`: `EvalFloatSvdfReference` reads the optional bias
+  with `GetOptionalTensorData`, so float32 SVDF without a bias runs in builds
+  with heliaCORE's float32 kernels off.
 - **Reduce, PRELU and STRIDED_SLICE (AmbiqAI/helia-rt#463).**
   `kernels/reduce_common.cc` (the MEAN `[N,1,1,C]` special case, an output
   count that matches the reduction, and an empty input),
