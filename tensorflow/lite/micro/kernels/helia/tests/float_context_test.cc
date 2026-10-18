@@ -327,6 +327,58 @@ void RunDepthwise(
   ExpectContext(route, entry == Route::kCount ? route : entry);
 }
 
+#if ARM_NN_ENABLE_F16
+// 1x6x6x8 ones, a 6x6 filter of ones and bias 2048, VALID: 36 unit taps on
+// 2048, where a float16 ulp is 2. Float16 lanes lose every tap and give 2048
+// (0x6800); the default entry folds into or accumulates in float32 and does
+// not. Distinguishes the entries without link wraps. see
+// AmbiqAI/ns-cmsis-nn#830
+uint16_t RunDepthwiseFloat16Bias2048(const TFLMRegistration& registration) {
+  int input_dims[] = {4, 1, 6, 6, 8};
+  int filter_dims[] = {4, 1, 6, 6, 8};
+  int bias_dims[] = {1, 8};
+  int output_dims[] = {4, 1, 1, 1, 8};
+  uint16_t input[288];
+  uint16_t filter[288];
+  uint16_t bias[8];
+  uint16_t output[8] = {};
+  for (uint16_t& v : input) v = 0x3c00;
+  for (uint16_t& v : filter) v = 0x3c00;
+  for (uint16_t& v : bias) v = 0x6800;
+  TfLiteTensor tensors[] = {
+      tflite::testing::CreateTensor(
+          input, tflite::testing::IntArrayFromInts(input_dims), false,
+          kTfLiteFloat16),
+      tflite::testing::CreateTensor(
+          filter, tflite::testing::IntArrayFromInts(filter_dims), false,
+          kTfLiteFloat16),
+      tflite::testing::CreateTensor(
+          bias, tflite::testing::IntArrayFromInts(bias_dims), false,
+          kTfLiteFloat16),
+      tflite::testing::CreateTensor(
+          output, tflite::testing::IntArrayFromInts(output_dims), false,
+          kTfLiteFloat16),
+  };
+  int inputs[] = {3, 0, 1, 2};
+  int outputs[] = {1, 3};
+  TfLiteDepthwiseConvParams params = {};
+  params.padding = kTfLitePaddingValid;
+  params.stride_width = 1;
+  params.stride_height = 1;
+  params.depth_multiplier = 1;
+  params.dilation_width_factor = 1;
+  params.dilation_height_factor = 1;
+  params.activation = kTfLiteActNone;
+  tflite::micro::KernelRunner runner(
+      registration, tensors, 4, tflite::testing::IntArrayFromInts(inputs),
+      tflite::testing::IntArrayFromInts(outputs), &params);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  for (const uint16_t v : output) EXPECT_EQ(output[0], v);
+  return output[0];
+}
+#endif
+
 // [1,2,3] x [1,3,4]: every output is 3.
 template <typename T>
 void RunBatchMatmul(Route route) {
@@ -402,6 +454,18 @@ TEST(HeliaFloatContextTest, DepthwiseFloat16UsesPrepareSize) {
 
 TEST(HeliaFloatContextTest, DepthwiseFloat16Batch2SizesWithBatch) {
   RunDepthwise<uint16_t>(Route::kDepthwiseF16, 2);
+}
+
+// The opt-in registration's output is the float16-lane entry's, the default
+// one's is not, on every toolchain. see AmbiqAI/ns-cmsis-nn#830
+TEST(HeliaFloatContextTest,
+     DepthwiseFloat16Acc16RegistrationKeepsFloat16Lanes) {
+  ResetState();
+  EXPECT_EQ(0x6800, RunDepthwiseFloat16Bias2048(
+                        tflite::Register_DEPTHWISE_CONV_2D_FLOAT16_ACC16()));
+  ResetState();
+  EXPECT_NE(0x6800,
+            RunDepthwiseFloat16Bias2048(tflite::Register_DEPTHWISE_CONV_2D()));
 }
 
 // The opt-in registration sizes as the default one and calls the float16-lane

@@ -119,7 +119,7 @@ harvest_pairs() {
   # Emits "<symbol><TAB><file>" per call site. awk splits on the FIRST colon
   # only (repo paths carry no colon), then strips the trailing "(" and any
   # leading space off the matched token.
-  grep -rHoE '\barm_[a-z0-9_]+_f(16|32)[[:space:]]*\(' \
+  grep -rHoE '\barm_[a-z0-9_]+_f(16|32)(_acc16)?[[:space:]]*\(' \
        --include='*.cc' --include='*.h' --include='*.c' \
        "${KERNELS_DIR}" \
     | awk -F: '{ file=$1; sym=$2; sub(/[[:space:]]*\(.*/, "", sym); print sym "\t" file }' \
