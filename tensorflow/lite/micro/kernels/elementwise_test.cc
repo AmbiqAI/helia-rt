@@ -503,4 +503,28 @@ TEST(ElementwiseTest, AbsInt16UnquantizedShorterOutputFails) {
                                     /*quantized=*/false);
 }
 
+// TODO(AmbiqAI/helia-rt#460): upstream GenericPrepare returns on a type
+// mismatch without releasing its temporaries; drop when upstream has it.
+TEST(ElementwiseTest, SinRejectsMismatchedOutputTypeAndReleasesTemps) {
+  int shape[] = {1, 2};
+  float input[2] = {};
+  int32_t output[2] = {};
+  TfLiteTensor tensors[] = {
+      tflite::testing::CreateTensor(input,
+                                    tflite::testing::IntArrayFromInts(shape),
+                                    false, kTfLiteFloat32),
+      tflite::testing::CreateTensor(output,
+                                    tflite::testing::IntArrayFromInts(shape),
+                                    false, kTfLiteInt32),
+  };
+  int inputs[] = {1, 0};
+  int outputs[] = {1, 1};
+  const TFLMRegistration registration = tflite::Register_SIN();
+  tflite::micro::KernelRunner runner(
+      registration, tensors, 2, tflite::testing::IntArrayFromInts(inputs),
+      tflite::testing::IntArrayFromInts(outputs), /*builtin_data=*/nullptr);
+  EXPECT_EQ(kTfLiteError, runner.InitAndPrepare());
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
+}
+
 TF_LITE_MICRO_TESTS_MAIN

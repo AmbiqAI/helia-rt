@@ -146,6 +146,19 @@ inline void SetRsqrtOutputMultiplier(const float input_scale,
 
 typedef bool (*IsSupportedType)(TfLiteType);
 template <IsSupportedType is_supported_type>
+TfLiteStatus ValidateGenericTensors(TfLiteContext* context,
+                                    const TfLiteTensor* input,
+                                    const TfLiteTensor* output) {
+  TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
+  if (!is_supported_type(input->type)) {
+    MicroPrintf("Input data type %s (%d) is not supported.",
+                TfLiteTypeGetName(input->type), input->type);
+    return kTfLiteError;
+  }
+  return kTfLiteOk;
+}
+
+template <IsSupportedType is_supported_type>
 TfLiteStatus GenericPrepare(TfLiteContext* context, TfLiteNode* node) {
   MicroContext* micro_context = GetMicroContext(context);
   TF_LITE_ENSURE_EQ(context, NumInputs(node), 1);
@@ -155,19 +168,15 @@ TfLiteStatus GenericPrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE(context, input != nullptr);
   TfLiteTensor* output =
       micro_context->AllocateTempOutputTensor(node, kElementwiseOutputTensor);
-  TF_LITE_ENSURE(context, output != nullptr);
-  TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
-  if (!is_supported_type(input->type)) {
-    MicroPrintf("Input data type %s (%d) is not supported.",
-                TfLiteTypeGetName(input->type), input->type);
+  if (output == nullptr) {
     micro_context->DeallocateTempTfLiteTensor(input);
-    micro_context->DeallocateTempTfLiteTensor(output);
     return kTfLiteError;
   }
-
+  const TfLiteStatus status =
+      ValidateGenericTensors<is_supported_type>(context, input, output);
   micro_context->DeallocateTempTfLiteTensor(input);
   micro_context->DeallocateTempTfLiteTensor(output);
-  return kTfLiteOk;
+  return status;
 }
 
 TfLiteStatus ValidateSqrtTensors(TfLiteContext* context,

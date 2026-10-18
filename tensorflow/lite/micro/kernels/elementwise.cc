@@ -89,8 +89,20 @@ TfLiteStatus GenericPrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE(context, input != nullptr);
   TfLiteTensor* output =
       micro_context->AllocateTempOutputTensor(node, kElementwiseOutputTensor);
-  TF_LITE_ENSURE(context, output != nullptr);
-  TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
+  // TODO(AmbiqAI/helia-rt#460): upstream returns here without releasing the
+  // temporaries; drop when upstream has it.
+  if (output == nullptr) {
+    micro_context->DeallocateTempTfLiteTensor(input);
+    return kTfLiteError;
+  }
+  if (input->type != output->type) {
+    MicroPrintf("Output data type %s (%d) does not match input type %s (%d).",
+                TfLiteTypeGetName(output->type), output->type,
+                TfLiteTypeGetName(input->type), input->type);
+    micro_context->DeallocateTempTfLiteTensor(input);
+    micro_context->DeallocateTempTfLiteTensor(output);
+    return kTfLiteError;
+  }
   if (!is_supported_type(input->type)) {
     MicroPrintf("Input data type %s (%d) is not supported.",
                 TfLiteTypeGetName(input->type), input->type);
