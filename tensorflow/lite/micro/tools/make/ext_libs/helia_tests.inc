@@ -614,6 +614,22 @@ $(ARENA_SWEEP_MODELS)))
 MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/malformed_model_checks_test.cc
 
+# int16 comparisons at 16x8 scales, 16x8 FULLY_CONNECTED bias types, the
+# PAD/TRANSPOSE int8 registrations and batched int8 DEPTHWISE_CONV_2D, against
+# the reference. see AmbiqAI/helia-rt#470
+MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/comparisons_int16_test.cc \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/fully_connected_s16_bias_test.cc \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/int8_registration_test.cc \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/depthwise_batch_test.cc
+
+# UNIDIRECTIONAL_SEQUENCE_LSTM weight types: the int8 and int16 registrations
+# on int8 weights, and hybrid models rejected. see AmbiqAI/helia-rt#470
+$(eval $(call microlite_test,kernel_lstm_weight_type_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/lstm_weight_type_test.cc \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/testdata/lstm_test_data.cc,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/testdata/lstm_test_data.h))
+
 # A float32 SVDF without a bias runs without reading it, and TRANSPOSE rejects a
 # perm computed at run time. see AmbiqAI/helia-rt#471
 MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \

@@ -14,6 +14,9 @@ limitations under the License.
 ==============================================================================*/
 #include "tensorflow/lite/micro/kernels/internal/reference/comparisons.h"
 
+#include <algorithm>
+#include <cmath>
+#include <limits>
 #include <type_traits>
 
 #include "Include/arm_nnfunctions.h"
@@ -791,7 +794,47 @@ TfLiteStatus ComparisonsPrepare(TfLiteContext* context, TfLiteNode* node) {
       micro_context->AllocateTempInputTensor(node, kInputTensor2);
   TF_LITE_ENSURE(context, input2 != nullptr);
 
-  if (input1->type == kTfLiteInt8 || input1->type == kTfLiteInt16) {
+  if (input1->type == kTfLiteInt16) {
+    // Rescale relative to the larger scale: an absolute rescale collapses
+    // neighbouring values at int16 scales. Equal scales and zero points, and
+    // unquantized int16 (scale 0, zero point 0 on both), compare exactly.
+    // (q - zero_point) << left_shift must fit int32, which bounds the zero
+    // points to the int16 range.
+    const float scale1 = input1->params.scale;
+    const float scale2 = input2->params.scale;
+    const int32_t zero_point1 = input1->params.zero_point;
+    const int32_t zero_point2 = input2->params.zero_point;
+    const bool unquantized = scale1 == 0.0f && scale2 == 0.0f &&
+                             zero_point1 == 0 && zero_point2 == 0;
+    const bool scales_valid =
+        unquantized || (std::isfinite(scale1) && std::isfinite(scale2) &&
+                        scale1 > 0.0f && scale2 > 0.0f);
+    const auto in_int16 = [](int32_t zero_point) {
+      return zero_point >= std::numeric_limits<int16_t>::min() &&
+             zero_point <= std::numeric_limits<int16_t>::max();
+    };
+    if (!scales_valid || !in_int16(zero_point1) || !in_int16(zero_point2)) {
+      MicroPrintf(
+          "Comparison: int16 inputs need finite positive scales (or both "
+          "unquantized) and zero points in the int16 range.");
+      micro_context->DeallocateTempTfLiteTensor(input1);
+      micro_context->DeallocateTempTfLiteTensor(input2);
+      return kTfLiteError;
+    }
+    // Unquantized inputs take the equal-scale parameters.
+    const double real_scale1 = unquantized ? 1.0 : static_cast<double>(scale1);
+    const double real_scale2 = unquantized ? 1.0 : static_cast<double>(scale2);
+    const double twice_max_scale = 2.0 * std::max(real_scale1, real_scale2);
+    QuantizeMultiplierSmallerThanOneExp(real_scale1 / twice_max_scale,
+                                        &data->params.input1_multiplier,
+                                        &data->params.input1_shift);
+    QuantizeMultiplierSmallerThanOneExp(real_scale2 / twice_max_scale,
+                                        &data->params.input2_multiplier,
+                                        &data->params.input2_shift);
+    data->params.input1_offset = -zero_point1;
+    data->params.input2_offset = -zero_point2;
+    data->params.left_shift = zero_point1 == 0 && zero_point2 == 0 ? 15 : 14;
+  } else if (input1->type == kTfLiteInt8) {
     auto input1_offset = -input1->params.zero_point;
     auto input2_offset = -input2->params.zero_point;
     const int kLeftShift = 8;
