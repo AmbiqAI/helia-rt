@@ -381,30 +381,32 @@ jobs:
         # see AmbiqAI/helia-rt#449
         # Float32 SVDF without a bias adds one binary and two cases on every leg.
         # see AmbiqAI/helia-rt#471
+        # TRANSPOSE run-time perm rejection adds three cases on every leg.
+        # see AmbiqAI/helia-rt#471
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 186
-            min-cases: 1719
+            min-cases: 1722
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 186
-            min-cases: 1719
+            min-cases: 1722
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 185
-            min-cases: 1717
+            min-cases: 1720
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 186
-            min-cases: 1782
+            min-cases: 1785
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 185
-            min-cases: 1780
+            min-cases: 1783
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}

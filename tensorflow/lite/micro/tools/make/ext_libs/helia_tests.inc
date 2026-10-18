@@ -613,6 +613,7 @@ $(ARENA_SWEEP_MODELS)))
 MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/malformed_model_checks_test.cc
 
-# Valid models that leave an optional input absent run without reading it.
+# A float32 SVDF without a bias runs without reading it, and TRANSPOSE rejects a
+# perm computed at run time. see AmbiqAI/helia-rt#471
 MICROLITE_KERNEL_SIMPLE_TEST_SRCS += \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/model_support_checks_test.cc

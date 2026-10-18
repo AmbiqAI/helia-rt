@@ -14,9 +14,11 @@ limitations under the License.
 ==============================================================================*/
 
 // Valid models the helia kernels must run, or reject with kTfLiteError, without
-// reading through an absent optional input. A float32 SVDF without a bias runs
-// heliaCORE's arm_svdf_f32 when ARM_NN_ENABLE_F32 is on and the shared
-// reference SVDF when it is off.
+// reading an input that is absent or not yet planned. A float32 SVDF without a
+// bias runs heliaCORE's arm_svdf_f32 when ARM_NN_ENABLE_F32 is on and the
+// shared reference SVDF when it is off. TRANSPOSE rejects a perm computed at
+// run time, as upstream does: Prepare reads perm, whose data is not planned
+// until after Prepare.
 
 #include <cstdint>
 
@@ -82,6 +84,34 @@ struct SvdfFloat {
 // weights then give units {6, -1} and {4, 2}.
 constexpr float kSvdfNoBiasGolden[4] = {6, -1, 4, 2};
 
+// Transposes a 2x3 int8 input by {1, 0}, with the perm tensor read-only
+// (constant) or arena-backed, and its data present or still unplanned.
+TfLiteStatus PrepareTranspose(TfLiteAllocationType perm_allocation,
+                              bool perm_planned) {
+  int input_shape[] = {2, 2, 3};
+  int perm_shape[] = {1, 2};
+  int output_shape[] = {2, 3, 2};
+  int8_t input[6] = {1, 2, 3, 4, 5, 6};
+  int32_t perm[2] = {1, 0};
+  int8_t output[6] = {};
+  TfLiteTensor tensors[] = {
+      CreateTensor(input, IntArrayFromInts(input_shape)),
+      CreateTensor(perm, IntArrayFromInts(perm_shape)),
+      CreateTensor(output, IntArrayFromInts(output_shape)),
+  };
+  tensors[1].allocation_type = perm_allocation;
+  if (!perm_planned) {
+    tensors[1].data.data = nullptr;
+  }
+  int inputs_array_data[] = {2, 0, 1};
+  int outputs_array_data[] = {1, 2};
+  const TFLMRegistration registration = Register_TRANSPOSE();
+  micro::KernelRunner runner(registration, tensors, 3,
+                             IntArrayFromInts(inputs_array_data),
+                             IntArrayFromInts(outputs_array_data), nullptr);
+  return runner.InitAndPrepare();
+}
+
 }  // namespace
 }  // namespace testing
 }  // namespace tflite
@@ -105,6 +135,26 @@ TEST(HeliaModelSupportChecksTest, SvdfFloat32WithBiasAddsBias) {
     EXPECT_EQ(svdf.output[i],
               tflite::testing::kSvdfNoBiasGolden[i] + bias[i % 2]);
   }
+}
+
+TEST(HeliaModelSupportChecksTest, TransposeConstantPermPrepares) {
+  EXPECT_EQ(tflite::testing::PrepareTranspose(kTfLiteMmapRo,
+                                              /*perm_planned=*/true),
+            kTfLiteOk);
+}
+
+TEST(HeliaModelSupportChecksTest, TransposeUnplannedRuntimePermFails) {
+  EXPECT_EQ(tflite::testing::PrepareTranspose(kTfLiteArenaRw,
+                                              /*perm_planned=*/false),
+            kTfLiteError);
+}
+
+// Eval does not range-check perm, so a run-time perm is rejected even when
+// its values happen to be valid at Prepare.
+TEST(HeliaModelSupportChecksTest, TransposeRuntimePermFails) {
+  EXPECT_EQ(tflite::testing::PrepareTranspose(kTfLiteArenaRw,
+                                              /*perm_planned=*/true),
+            kTfLiteError);
 }
 
 TF_LITE_MICRO_TESTS_MAIN
