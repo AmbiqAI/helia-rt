@@ -13,10 +13,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-// SPLIT, SQUEEZE, DIV and ADD return kTfLiteError on a malformed model, a zero
-// divisor or int32 INT32_MIN / -1, instead of indexing out of bounds, hitting
-// undefined integer division or reaching TFLITE_ABORT, and release their
-// Prepare temporaries when they do.
+// SPLIT and SQUEEZE reject a malformed axis, output rank or output shape. DIV
+// and ADD reject a rank above 6, an output that is not the broadcast of the
+// inputs (every type), and malformed int8/int16 quantization; DIV rejects a
+// zero divisor and int32 INT32_MIN / -1 at Invoke. Each returns kTfLiteError
+// and releases its Prepare temporaries instead of indexing out of bounds,
+// hitting undefined integer arithmetic or reaching TFLITE_ABORT. Valid int8
+// DIV quotients too small for the reference shifts, and quantized ADD with a
+// rank-5 or rank-6 output, compute the right result.
 // see AmbiqAI/helia-rt#451
 
 #include <cmath>
@@ -273,6 +277,133 @@ TfLiteStatus PrepareAddRank(TfLiteType type, int* dims) {
   params.activation = kTfLiteActNone;
   const TFLMRegistration registration = tflite::Register_ADD();
   return PrepareBinary(registration, &params, type, dims);
+}
+
+// Prepares a two-input op of `type` with the given shapes. int8 and int16
+// tensors carry valid quantization.
+TfLiteStatus PrepareShapes(const TFLMRegistration& registration, void* params,
+                           TfLiteType type, int* dims1, int* dims2,
+                           int* output_dims) {
+  int32_t input1[8] = {};
+  int32_t input2[8] = {};
+  int32_t output[8] = {};
+  TfLiteTensor tensors[] = {
+      CreateTensor(input1, IntArrayFromInts(dims1), false, type),
+      CreateTensor(input2, IntArrayFromInts(dims2), false, type),
+      CreateTensor(output, IntArrayFromInts(output_dims), false, type),
+  };
+  if (type == kTfLiteInt8 || type == kTfLiteInt16) {
+    for (int i = 0; i < 3; ++i) {
+      tensors[i].quantization = {kTfLiteAffineQuantization, nullptr};
+      tensors[i].params = {i == 2 ? 1.f : 0.5f, 0};
+    }
+  }
+  int inputs[] = {2, 0, 1};
+  int outputs[] = {1, 2};
+  micro::KernelRunner runner(registration, tensors, 3, IntArrayFromInts(inputs),
+                             IntArrayFromInts(outputs), params);
+  const TfLiteStatus status = runner.InitAndPrepare();
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
+  return status;
+}
+
+// For `type`: equal inputs into a larger output, a one-element input2 into an
+// output larger than input1, and an input2 extent that is neither 1 nor
+// input1's are rejected; a valid broadcast is not.
+void ExpectOutputMustBeBroadcast(const TFLMRegistration& registration,
+                                 void* params, TfLiteType type) {
+  int row[] = {2, 1, 4};
+  int one[] = {2, 1, 1};
+  int two_rows[] = {2, 2, 4};
+  int long_row[] = {2, 1, 8};
+  EXPECT_EQ(kTfLiteError,
+            PrepareShapes(registration, params, type, row, row, two_rows));
+  EXPECT_EQ(kTfLiteError,
+            PrepareShapes(registration, params, type, row, one, long_row));
+  int three[] = {2, 1, 3};
+  EXPECT_EQ(kTfLiteError,
+            PrepareShapes(registration, params, type, row, three, row));
+  EXPECT_EQ(kTfLiteOk,
+            PrepareShapes(registration, params, type, row, one, row));
+}
+
+// Adds {2, 4, 6, 8} and {2, 2, 2, 2} (scale 0.5, zero point 0) of shape {1, 4}
+// into an output of `output_dims` (scale 1) and checks {2, 3, 4, 5}.
+template <typename T>
+void ExpectAddHighRankOutput(int* output_dims) {
+  const T input1[4] = {2, 4, 6, 8};
+  const T input2[4] = {2, 2, 2, 2};
+  T output[4] = {};
+  int row[] = {2, 1, 4};
+  TfLiteTensor tensors[] = {
+      CreateQuantizedTensor(input1, IntArrayFromInts(row), 0.5f, 0),
+      CreateQuantizedTensor(input2, IntArrayFromInts(row), 0.5f, 0),
+      CreateQuantizedTensor(output, IntArrayFromInts(output_dims), 1.f, 0),
+  };
+  TfLiteAddParams params = {};
+  params.activation = kTfLiteActNone;
+  int inputs[] = {2, 0, 1};
+  int outputs[] = {1, 2};
+  const TFLMRegistration registration = tflite::Register_ADD();
+  micro::KernelRunner runner(registration, tensors, 3, IntArrayFromInts(inputs),
+                             IntArrayFromInts(outputs), &params);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  for (int i = 0; i < 4; ++i) EXPECT_EQ(static_cast<T>(i + 2), output[i]);
+}
+
+// Divides `dividend` (scale `dividend_scale`) by `divisor` (scale 1) into an
+// output of scale 1, all zero points 0, and checks `expected`.
+void ExpectDivInt8Quotients(float dividend_scale, const int8_t* dividend,
+                            const int8_t* divisor, const int8_t* expected) {
+  int8_t output[4] = {};
+  int dims[] = {1, 4};
+  TfLiteTensor tensors[] = {
+      CreateQuantizedTensor(dividend, IntArrayFromInts(dims), dividend_scale,
+                            0),
+      CreateQuantizedTensor(divisor, IntArrayFromInts(dims), 1.f, 0),
+      CreateQuantizedTensor(output, IntArrayFromInts(dims), 1.f, 0),
+  };
+  TfLiteDivParams params = {};
+  params.activation = kTfLiteActNone;
+  int inputs[] = {2, 0, 1};
+  int outputs[] = {1, 2};
+  const TFLMRegistration registration = tflite::Register_DIV();
+  micro::KernelRunner runner(registration, tensors, 3, IntArrayFromInts(inputs),
+                             IntArrayFromInts(outputs), &params);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  for (int i = 0; i < 4; ++i) EXPECT_EQ(expected[i], output[i]);
+}
+
+// Divides every int8 value by the scalar `divisor`, with unit scales and zero
+// points 0, and checks each quotient is a nearest integer of the clamped real
+// quotient.
+void ExpectDivInt8NearestQuotients(int8_t divisor) {
+  int8_t dividend[256];
+  for (int i = 0; i < 256; ++i) dividend[i] = static_cast<int8_t>(i - 128);
+  int8_t output[256] = {};
+  int vector[] = {1, 256};
+  int scalar[] = {1, 1};
+  TfLiteTensor tensors[] = {
+      CreateQuantizedTensor(dividend, IntArrayFromInts(vector), 1.f, 0),
+      CreateQuantizedTensor(&divisor, IntArrayFromInts(scalar), 1.f, 0),
+      CreateQuantizedTensor(output, IntArrayFromInts(vector), 1.f, 0),
+  };
+  TfLiteDivParams params = {};
+  params.activation = kTfLiteActNone;
+  int inputs[] = {2, 0, 1};
+  int outputs[] = {1, 2};
+  const TFLMRegistration registration = tflite::Register_DIV();
+  micro::KernelRunner runner(registration, tensors, 3, IntArrayFromInts(inputs),
+                             IntArrayFromInts(outputs), &params);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  for (int i = 0; i < 256; ++i) {
+    float expected = static_cast<float>(dividend[i]) / divisor;
+    expected = std::fmin(127.f, std::fmax(-128.f, expected));
+    EXPECT_NEAR(expected, static_cast<float>(output[i]), 0.5f);
+  }
 }
 
 // Prepares an ADD of type T with the given scales and zero points (input1,
@@ -572,6 +703,62 @@ TEST(HeliaMalformedModelTest, DivInt8RejectsZeroDivisor) {
   int dims[] = {1, 4};
   EXPECT_EQ(kTfLiteError,
             InvokeDivInt8(0.5f, 3, 1.f, 0, last_at_zero_point, dims));
+}
+
+TEST(HeliaMalformedModelTest, DivRejectsOutputNotBroadcast) {
+  using tflite::testing::ExpectOutputMustBeBroadcast;
+  TfLiteDivParams params = {};
+  params.activation = kTfLiteActNone;
+  const TFLMRegistration registration = tflite::Register_DIV();
+  ExpectOutputMustBeBroadcast(registration, &params, kTfLiteInt8);
+  ExpectOutputMustBeBroadcast(registration, &params, kTfLiteInt32);
+  ExpectOutputMustBeBroadcast(registration, &params, kTfLiteFloat32);
+}
+
+TEST(HeliaMalformedModelTest, DivInt8SmallQuotients) {
+  using tflite::testing::ExpectDivInt8Quotients;
+  // With unit scales, 0 / 4, 1 / 8 and 1 / 127 right-shift by more than 31 in
+  // the reference.
+  const int8_t unit_dividend[4] = {0, 1, 1, 100};
+  const int8_t unit_divisor[4] = {4, 8, 127, 3};
+  const int8_t unit_quotient[4] = {0, 0, 0, 33};
+  ExpectDivInt8Quotients(1.f, unit_dividend, unit_divisor, unit_quotient);
+  // A dividend scale of 1.98 puts each of these at a right shift of exactly 31,
+  // where the quotient (0.74, 0.40, 0.50 and 0.87 before rounding) can still
+  // round to 1.
+  const int8_t dividend[4] = {3, 3, 1, 7};
+  const int8_t divisor[4] = {8, 15, 4, 16};
+  const int8_t quotient[4] = {1, 0, 0, 1};
+  ExpectDivInt8Quotients(1.98f, dividend, divisor, quotient);
+}
+
+TEST(HeliaMalformedModelTest, DivInt8NearestQuotientsForEveryDividend) {
+  for (int divisor = -128; divisor <= 127; ++divisor) {
+    if (divisor == 0) continue;
+    tflite::testing::ExpectDivInt8NearestQuotients(
+        static_cast<int8_t>(divisor));
+  }
+}
+
+TEST(HeliaMalformedModelTest, AddRejectsOutputNotBroadcast) {
+  using tflite::testing::ExpectOutputMustBeBroadcast;
+  TfLiteAddParams params = {};
+  params.activation = kTfLiteActNone;
+  const TFLMRegistration registration = tflite::Register_ADD();
+  ExpectOutputMustBeBroadcast(registration, &params, kTfLiteInt8);
+  ExpectOutputMustBeBroadcast(registration, &params, kTfLiteInt16);
+  ExpectOutputMustBeBroadcast(registration, &params, kTfLiteInt32);
+  ExpectOutputMustBeBroadcast(registration, &params, kTfLiteFloat32);
+}
+
+TEST(HeliaMalformedModelTest, AddQuantizedHighRankOutput) {
+  using tflite::testing::ExpectAddHighRankOutput;
+  int rank5[] = {5, 1, 1, 1, 1, 4};
+  int rank6[] = {6, 1, 1, 1, 1, 1, 4};
+  ExpectAddHighRankOutput<int8_t>(rank5);
+  ExpectAddHighRankOutput<int8_t>(rank6);
+  ExpectAddHighRankOutput<int16_t>(rank5);
+  ExpectAddHighRankOutput<int16_t>(rank6);
 }
 
 TEST(HeliaMalformedModelTest, AddRejectsRankAboveSix) {
