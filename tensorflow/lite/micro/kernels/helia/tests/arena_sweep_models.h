@@ -277,12 +277,14 @@ inline int AllocateWithFailure(const tflite::Model* model,
   return arena.allocations();
 }
 
-// Fails each allocation AllocateTensors makes, together with every later
-// one, as an exhausted arena does; the KernelRunner sweep also fails each
-// kernel allocation alone.
+// Fails each allocation AllocateTensors makes together with every later one,
+// as an exhausted arena does, and, unless `alone_too` is false, alone, as when
+// a later smaller request still fits: AllocateTensors must return
+// kTfLiteError each time.
 inline void InjectAllocationFailures(const char* label,
                                      const unsigned char* model_data,
-                                     bool resource_variables = false) {
+                                     bool resource_variables = false,
+                                     bool alone_too = true) {
   Resolver resolver;
   ASSERT_EQ(AddModelOps(resolver), kTfLiteOk);
   const tflite::Model* model = tflite::GetModel(model_data);
@@ -302,17 +304,21 @@ inline void InjectAllocationFailures(const char* label,
   ASSERT_EQ(status, kTfLiteOk);
   int unexpected = 0;
   for (int index = 0; index < allocations; ++index) {
-    AllocateWithFailure(model, resolver, resource_variables, arena_size, index,
-                        /*fail_later=*/true, &status);
-    if (status != kTfLiteError) {
-      MicroPrintf("%s: AllocateTensors returned %d with allocation %d failing",
-                  label, static_cast<int>(status), index);
-      ++unexpected;
+    for (int fail_later = alone_too ? 0 : 1; fail_later < 2; ++fail_later) {
+      AllocateWithFailure(model, resolver, resource_variables, arena_size,
+                          index, fail_later != 0, &status);
+      if (status != kTfLiteError) {
+        MicroPrintf(
+            "%s: AllocateTensors returned %d with allocation %d%s failing",
+            label, static_cast<int>(status), index,
+            fail_later != 0 ? " and later ones" : "");
+        ++unexpected;
+      }
+      EXPECT_TRUE(GuardIntact(arena_size));
     }
-    EXPECT_TRUE(GuardIntact(arena_size));
   }
-  MicroPrintf("%s: failed each of %d arena allocations and the rest", label,
-              allocations);
+  MicroPrintf("%s: failed each of %d arena allocations%s and with the rest",
+              label, allocations, alone_too ? " alone" : "");
   EXPECT_EQ(unexpected, 0);
 }
 
