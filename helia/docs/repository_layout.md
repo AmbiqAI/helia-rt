@@ -181,6 +181,10 @@ When inline drift is required:
    ```cpp
    #if defined(CMSIS_NN) || defined(HELIA)  // helia: see kernels/helia/conv.cc
    ```
+   A correctness fix that should go upstream instead carries the one-line
+   marker `// TODO(AmbiqAI/helia-rt#460): <what upstream lacks>; drop when
+   upstream has it.`, which `grep -rn 'TODO(AmbiqAI/helia-rt#460)'` lists,
+   and is tracked on AmbiqAI/helia-rt#460.
 3. **Track it.** New inline drift goes into the inventory at
    [`helia/patches/inline_drift.md`](../patches/inline_drift.md).
 

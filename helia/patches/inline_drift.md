@@ -611,3 +611,53 @@ leave reference, direct CMake, Bazel and source consumers unfixed.
 Drop condition: upstream's SPACE_TO_BATCH_ND and BATCH_TO_SPACE_ND Prepare
 check the stored output shape against constant block shape and
 paddings/crops.
+
+## Wave 1 hardening: local patches tracked on AmbiqAI/helia-rt#460
+
+These patches fix memory-safety and correctness bugs in upstream-derived
+files, found by the post-2.1.1 backlog work (AmbiqAI/helia-rt#459). Each site
+carries a one-line marker
+`// TODO(AmbiqAI/helia-rt#460): <what upstream lacks>; drop when upstream has it.`,
+so `grep -rn 'TODO(AmbiqAI/helia-rt#460)' tensorflow signal` lists every site.
+AmbiqAI/helia-rt#460 keeps the per-site table and the upstream status.
+
+These correctness fixes stay in the shared files: a build_helia.sh patch would
+leave reference, direct CMake, Bazel and source consumers unfixed.
+
+- **Failed arena allocations (AmbiqAI/helia-rt#465).**
+  `micro_interpreter_context.cc`, `micro_interpreter_graph.{h,cc}`,
+  `micro_allocator.cc`, `micro_resource_variable.cc`,
+  `arena_allocator/single_arena_buffer_allocator.cc`,
+  `kernels/kernel_runner.{h,cc}` and `kernels/kernel_util.cc`. A failed
+  persistent or temporary allocation stops `AllocateTensors` with
+  `kTfLiteError` instead of a write through `nullptr`; the single-arena
+  allocator refuses a request larger than the space left instead of wrapping.
+  `KernelRunner` gains a test-only hook that is null in every library.
+- **Kernel checks on failed allocations (AmbiqAI/helia-rt#465).**
+  `kernels/{fully_connected_common,select,detection_postprocess,circular_buffer,cumsum,add_n,log_softmax,broadcast_args,broadcast_to,mirror_pad,resize_bilinear,slice,read_variable,assign_variable,strided_slice_common,lstm_eval,depthwise_conv_common}.cc`
+  and `signal/micro/kernels/{window,pcan,rfft,delay,framer,overlap_add}.cc`
+  check their OpData, temporary tensors and buffers before use.
+- **Tensor sizes and memory planning (AmbiqAI/helia-rt#464).**
+  `memory_helpers.{h,cc}`, `micro_allocator.cc`,
+  `arena_allocator/{persistent,non_persistent}_arena_buffer_allocator.cc`,
+  `memory_planner/greedy_memory_planner.{h,cc}`,
+  `memory_planner/linear_memory_planner.cc`, `micro_resource_variable.cc`,
+  `kernels/reshape_common.cc`, `kernels/kernel_util.cc` and `BUILD`. Byte
+  sizes use checked arithmetic with a cap the planner's `int` can hold, a
+  `-1` that a kernel resolves in Prepare keeps upstream's behaviour, and the
+  planners refuse a plan whose real offsets pass `INT_MAX`.
+- **Elementwise (AmbiqAI/helia-rt#462).** `kernels/elementwise.cc` and
+  `kernels/elementwise_test.cc`: every Prepare rejection releases its
+  temporaries, int16 RSQRT must be quantized, missing zero points are
+  rejected, and the fallback loops require an output count equal to the
+  input's, computed without overflow.
+- **Reduce, PRELU and STRIDED_SLICE (AmbiqAI/helia-rt#463).**
+  `kernels/reduce_common.cc` (the MEAN `[N,1,1,C]` special case, an output
+  count that matches the reduction, and an empty input),
+  `kernels/reduce_test.cc`, `kernels/prelu_common.cc` (temporaries released on
+  every rejection), `kernels/internal/reference/strided_slice.h` (64-bit loop
+  offsets for a stride near `INT32_MAX`) and `kernels/strided_slice_test.cc`.
+
+Drop condition: for each site, upstream carries an equivalent fix. Re-check
+every site at the next upstream sync (AmbiqAI/helia-rt#446) and drop it or
+carry it forward.
