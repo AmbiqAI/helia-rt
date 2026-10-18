@@ -105,8 +105,9 @@ mkdir -p "${WORKDIR}"
 LIB_ABS="$(cd "$(dirname "${LIB}")" && pwd)/$(basename "${LIB}")"
 
 # ------------------------- 1. Harvest the symbol list --------------------------
-# Match call sites: an `arm_..._f32` / `arm_..._f16` identifier immediately
-# followed by an open paren. Declarations match too, which is fine -- helia
+# Match call sites: an `arm_..._f32` / `arm_..._f16` identifier, optionally
+# with the `_acc16` suffix of the float16-lane entries, immediately followed by
+# an open paren. Declarations match too, which is fine -- helia
 # only declares what it calls -- but comments and doc prose do not, which is
 # the point of requiring the paren.
 #
@@ -119,7 +120,7 @@ harvest_pairs() {
   # Emits "<symbol><TAB><file>" per call site. awk splits on the FIRST colon
   # only (repo paths carry no colon), then strips the trailing "(" and any
   # leading space off the matched token.
-  grep -rHoE '\barm_[a-z0-9_]+_f(16|32)[[:space:]]*\(' \
+  grep -rHoE '\barm_[a-z0-9_]+_f(16|32)(_acc16)?[[:space:]]*\(' \
        --include='*.cc' --include='*.h' --include='*.c' \
        "${KERNELS_DIR}" \
     | awk -F: '{ file=$1; sym=$2; sub(/[[:space:]]*\(.*/, "", sym); print sym "\t" file }' \
@@ -209,7 +210,7 @@ esac
 
 SYMBOLS=()
 for sym in "${ALL_SYMBOLS[@]}"; do
-  if [[ "${sym}" == *_f16 && "${ENABLE_F16}" -eq 0 ]]; then
+  if [[ ( "${sym}" == *_f16 || "${sym}" == *_f16_acc16 ) && "${ENABLE_F16}" -eq 0 ]]; then
     continue
   fi
   SYMBOLS+=("${sym}")

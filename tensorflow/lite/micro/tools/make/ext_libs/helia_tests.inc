@@ -445,6 +445,7 @@ $(kernel_float_context_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_convolve_wrapper_f16 \
   -Wl,--wrap=arm_depthwise_conv_wrapper_f16_get_buffer_size \
   -Wl,--wrap=arm_depthwise_conv_wrapper_f16 \
+  -Wl,--wrap=arm_depthwise_conv_wrapper_f16_acc16 \
   -Wl,--wrap=arm_batch_matmul_f16_get_buffer_size \
   -Wl,--wrap=arm_batch_matmul_f16
 endif

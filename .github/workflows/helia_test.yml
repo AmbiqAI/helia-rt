@@ -379,30 +379,32 @@ jobs:
         # Persistent-buffer failure, arena-size sweep and allocation-failure
         # injection tests add four binaries and forty-one cases on every leg.
         # see AmbiqAI/helia-rt#449
+        # The float16 DEPTHWISE_CONV_2D _acc16 opt-in registration adds one case
+        # on every leg and three on the cortex-m55 ones. see AmbiqAI/ns-cmsis-nn#830
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 185
-            min-cases: 1717
+            min-cases: 1718
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 185
-            min-cases: 1717
+            min-cases: 1718
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 184
-            min-cases: 1715
+            min-cases: 1716
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 185
-            min-cases: 1780
+            min-cases: 1783
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 184
-            min-cases: 1778
+            min-cases: 1781
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
