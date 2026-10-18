@@ -146,6 +146,19 @@ inline void SetRsqrtOutputMultiplier(const float input_scale,
 
 typedef bool (*IsSupportedType)(TfLiteType);
 template <IsSupportedType is_supported_type>
+TfLiteStatus ValidateGenericTensors(TfLiteContext* context,
+                                    const TfLiteTensor* input,
+                                    const TfLiteTensor* output) {
+  TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
+  if (!is_supported_type(input->type)) {
+    MicroPrintf("Input data type %s (%d) is not supported.",
+                TfLiteTypeGetName(input->type), input->type);
+    return kTfLiteError;
+  }
+  return kTfLiteOk;
+}
+
+template <IsSupportedType is_supported_type>
 TfLiteStatus GenericPrepare(TfLiteContext* context, TfLiteNode* node) {
   MicroContext* micro_context = GetMicroContext(context);
   TF_LITE_ENSURE_EQ(context, NumInputs(node), 1);
@@ -155,19 +168,15 @@ TfLiteStatus GenericPrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE(context, input != nullptr);
   TfLiteTensor* output =
       micro_context->AllocateTempOutputTensor(node, kElementwiseOutputTensor);
-  TF_LITE_ENSURE(context, output != nullptr);
-  TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
-  if (!is_supported_type(input->type)) {
-    MicroPrintf("Input data type %s (%d) is not supported.",
-                TfLiteTypeGetName(input->type), input->type);
+  if (output == nullptr) {
     micro_context->DeallocateTempTfLiteTensor(input);
-    micro_context->DeallocateTempTfLiteTensor(output);
     return kTfLiteError;
   }
-
+  const TfLiteStatus status =
+      ValidateGenericTensors<is_supported_type>(context, input, output);
   micro_context->DeallocateTempTfLiteTensor(input);
   micro_context->DeallocateTempTfLiteTensor(output);
-  return kTfLiteOk;
+  return status;
 }
 
 TfLiteStatus ValidateSqrtTensors(TfLiteContext* context,
@@ -312,9 +321,8 @@ TfLiteStatus ValidateAndPopulateRsqrtData(TfLiteContext* context,
   TF_LITE_ENSURE(context, op_data != nullptr);
   op_data->input_type = input->type;
 
-  if (input->type == kTfLiteInt8 ||
-      (input->type == kTfLiteInt16 &&
-       input->quantization.type != kTfLiteNoQuantization)) {
+  // RsqrtEval has no unquantized int16 path, so int16 must be quantized too.
+  if (input->type == kTfLiteInt8 || input->type == kTfLiteInt16) {
     TF_LITE_ENSURE_EQ(context, input->quantization.type,
                       kTfLiteAffineQuantization);
     TF_LITE_ENSURE_EQ(context, output->quantization.type,
@@ -368,6 +376,8 @@ TfLiteStatus RsqrtPrepare(TfLiteContext* context, TfLiteNode* node) {
   return status;
 }
 
+// The fallback loops write as many elements as they read, so, as for
+// EvalHeliaUnary, the output must hold the input's element count.
 template <typename T>
 inline TfLiteStatus EvalImplQuantized(
     TfLiteContext* context, TfLiteNode* node,
@@ -377,10 +387,13 @@ inline TfLiteStatus EvalImplQuantized(
   const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
   TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, expected_type);
-  const size_t num_elements = ElementCount(*input->dims);
+  int32_t num_elements;
+  TF_LITE_ENSURE_OK(
+      context, HeliaCheckedMatchingElementCount(context, input->dims,
+                                                output->dims, &num_elements));
   const T* in_data = tflite::micro::GetTensorData<T>(input);
   T* out_data = tflite::micro::GetTensorData<T>(output);
-  for (size_t i = 0; i < num_elements; ++i) {
+  for (int32_t i = 0; i < num_elements; ++i) {
     if (validate_input_func) {
       TF_LITE_ENSURE_OK(context,
                         validate_input_func(context, node, in_data[i]));
@@ -402,10 +415,13 @@ inline TfLiteStatus EvalImpl(TfLiteContext* context, TfLiteNode* node,
   const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
   TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, expected_type);
-  const size_t num_elements = ElementCount(*input->dims);
+  int32_t num_elements;
+  TF_LITE_ENSURE_OK(
+      context, HeliaCheckedMatchingElementCount(context, input->dims,
+                                                output->dims, &num_elements));
   const T* in_data = tflite::micro::GetTensorData<T>(input);
   T* out_data = tflite::micro::GetTensorData<T>(output);
-  for (size_t i = 0; i < num_elements; ++i) {
+  for (int32_t i = 0; i < num_elements; ++i) {
     if (validate_input_func) {
       TF_LITE_ENSURE_OK(context, validate_input_func(in_data[i]));
     }
