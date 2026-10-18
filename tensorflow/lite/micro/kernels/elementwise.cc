@@ -89,8 +89,19 @@ TfLiteStatus GenericPrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE(context, input != nullptr);
   TfLiteTensor* output =
       micro_context->AllocateTempOutputTensor(node, kElementwiseOutputTensor);
-  TF_LITE_ENSURE(context, output != nullptr);
-  TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
+  // TODO(AmbiqAI/helia-rt#460): upstream leaks temporaries on rejection; drop when upstream has it.
+  if (output == nullptr) {
+    micro_context->DeallocateTempTfLiteTensor(input);
+    return kTfLiteError;
+  }
+  if (input->type != output->type) {
+    MicroPrintf("Output data type %s (%d) does not match input type %s (%d).",
+                TfLiteTypeGetName(output->type), output->type,
+                TfLiteTypeGetName(input->type), input->type);
+    micro_context->DeallocateTempTfLiteTensor(input);
+    micro_context->DeallocateTempTfLiteTensor(output);
+    return kTfLiteError;
+  }
   if (!is_supported_type(input->type)) {
     MicroPrintf("Input data type %s (%d) is not supported.",
                 TfLiteTypeGetName(input->type), input->type);
@@ -106,21 +117,22 @@ TfLiteStatus GenericPrepare(TfLiteContext* context, TfLiteNode* node) {
 
 typedef bool (*IsSupportedType)(TfLiteType);
 // helia: named and called, as in GenericPrepare. see AmbiqAI/helia-rt#376
+// TODO(AmbiqAI/helia-rt#460): upstream PrepareAbsRsqrt leaks temporaries on rejection; drop when upstream has it.
 template <IsSupportedType is_supported_type, const int op_nameid>
-TfLiteStatus PrepareAbsRsqrt(TfLiteContext* context, TfLiteNode* node) {
-  MicroContext* micro_context = GetMicroContext(context);
-  TF_LITE_ENSURE_EQ(context, NumInputs(node), 1);
-  TF_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
-  TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
-  TF_LITE_ENSURE(context, input != nullptr);
-  TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
-  TF_LITE_ENSURE(context, output != nullptr);
+TfLiteStatus ValidateAndPopulateAbsRsqrt(TfLiteContext* context,
+                                         TfLiteNode* node,
+                                         const TfLiteTensor* input,
+                                         const TfLiteTensor* output) {
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
   if (!is_supported_type(input->type)) {
     MicroPrintf("Input data type %s (%d) is not supported.",
                 TfLiteTypeGetName(input->type), input->type);
-    micro_context->DeallocateTempTfLiteTensor(input);
-    micro_context->DeallocateTempTfLiteTensor(output);
+    return kTfLiteError;
+  }
+  // TODO(AmbiqAI/helia-rt#460): upstream RSQRT admits unquantized int16; drop when upstream has it.
+  if (op_nameid == kRsrqtNameId && input->type == kTfLiteInt16 &&
+      input->quantization.type != kTfLiteAffineQuantization) {
+    MicroPrintf("RSQRT int16 requires affine quantization.");
     return kTfLiteError;
   }
 
@@ -147,10 +159,13 @@ TfLiteStatus PrepareAbsRsqrt(TfLiteContext* context, TfLiteNode* node) {
     TF_LITE_ENSURE(context, input_params != nullptr);
     TF_LITE_ENSURE(context, input_params->scale != nullptr);
     TF_LITE_ENSURE(context, input_params->scale->size > 0);
+    // TODO(AmbiqAI/helia-rt#460): upstream reads zero_point->size without a null check; drop when upstream has it.
+    TF_LITE_ENSURE(context, input_params->zero_point != nullptr);
     TF_LITE_ENSURE(context, input_params->zero_point->size > 0);
     TF_LITE_ENSURE(context, output_params != nullptr);
     TF_LITE_ENSURE(context, output_params->scale != nullptr);
     TF_LITE_ENSURE(context, output_params->scale->size > 0);
+    TF_LITE_ENSURE(context, output_params->zero_point != nullptr);
     TF_LITE_ENSURE(context, output_params->zero_point->size > 0);
     op_data->input_offset = input_params->zero_point->data[0];
     op_data->output_offset = output_params->zero_point->data[0];
@@ -169,8 +184,58 @@ TfLiteStatus PrepareAbsRsqrt(TfLiteContext* context, TfLiteNode* node) {
                                &op_data->shift);
     }
   }
+  return kTfLiteOk;
+}
+
+template <IsSupportedType is_supported_type, const int op_nameid>
+TfLiteStatus PrepareAbsRsqrt(TfLiteContext* context, TfLiteNode* node) {
+  MicroContext* micro_context = GetMicroContext(context);
+  TF_LITE_ENSURE_EQ(context, NumInputs(node), 1);
+  TF_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
+  TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
+  TF_LITE_ENSURE(context, input != nullptr);
+  TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
+  if (output == nullptr) {
+    micro_context->DeallocateTempTfLiteTensor(input);
+    return kTfLiteError;
+  }
+  const TfLiteStatus status =
+      ValidateAndPopulateAbsRsqrt<is_supported_type, op_nameid>(context, node,
+                                                                input, output);
   micro_context->DeallocateTempTfLiteTensor(input);
   micro_context->DeallocateTempTfLiteTensor(output);
+  return status;
+}
+
+// TODO(AmbiqAI/helia-rt#460): upstream's ElementCount accepts negative and wrapping dims; drop when upstream has it.
+TfLiteStatus CheckedElementCount(TfLiteContext* context,
+                                 const TfLiteIntArray* dims, int* count) {
+  TF_LITE_ENSURE(context, dims != nullptr && dims->size >= 0);
+  bool empty = false;
+  for (int i = 0; i < dims->size; ++i) {
+    TF_LITE_ENSURE(context, dims->data[i] >= 0);
+    empty = empty || dims->data[i] == 0;
+  }
+  int elements = empty ? 0 : 1;
+  for (int i = 0; !empty && i < dims->size; ++i) {
+    TF_LITE_ENSURE(context,
+                   dims->data[i] <= std::numeric_limits<int>::max() / elements);
+    elements *= dims->data[i];
+  }
+  *count = elements;
+  return kTfLiteOk;
+}
+
+// The input's element count, which the output must match.
+TfLiteStatus CheckedMatchingElementCount(TfLiteContext* context,
+                                         const TfLiteIntArray* input_dims,
+                                         const TfLiteIntArray* output_dims,
+                                         int* count) {
+  int output_count;
+  TF_LITE_ENSURE_OK(context, CheckedElementCount(context, input_dims, count));
+  TF_LITE_ENSURE_OK(context,
+                    CheckedElementCount(context, output_dims, &output_count));
+  TF_LITE_ENSURE_EQ(context, *count, output_count);
   return kTfLiteOk;
 }
 
@@ -183,10 +248,14 @@ inline TfLiteStatus EvalImplQuantized(
   const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
   TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, expected_type);
-  const size_t num_elements = ElementCount(*input->dims);
+  // TODO(AmbiqAI/helia-rt#460): upstream unary loops skip the output count check; drop when upstream has it.
+  int num_elements;
+  TF_LITE_ENSURE_OK(
+      context, CheckedMatchingElementCount(context, input->dims, output->dims,
+                                           &num_elements));
   const T* in_data = tflite::micro::GetTensorData<T>(input);
   T* out_data = tflite::micro::GetTensorData<T>(output);
-  for (size_t i = 0; i < num_elements; ++i) {
+  for (int i = 0; i < num_elements; ++i) {
     if (validate_input_func) {
       TF_LITE_ENSURE_OK(context,
                         validate_input_func(context, node, in_data[i]));
@@ -208,10 +277,14 @@ inline TfLiteStatus EvalImpl(TfLiteContext* context, TfLiteNode* node,
   const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
   TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, expected_type);
-  const size_t num_elements = ElementCount(*input->dims);
+  // TODO(AmbiqAI/helia-rt#460): upstream unary loops skip the output count check; drop when upstream has it.
+  int num_elements;
+  TF_LITE_ENSURE_OK(
+      context, CheckedMatchingElementCount(context, input->dims, output->dims,
+                                           &num_elements));
   const T* in_data = tflite::micro::GetTensorData<T>(input);
   T* out_data = tflite::micro::GetTensorData<T>(output);
-  for (size_t i = 0; i < num_elements; ++i) {
+  for (int i = 0; i < num_elements; ++i) {
     if (validate_input_func) {
       TF_LITE_ENSURE_OK(context, validate_input_func(in_data[i]));
     }
