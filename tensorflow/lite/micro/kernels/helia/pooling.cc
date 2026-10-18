@@ -310,6 +310,8 @@ TfLiteStatus AveragePrepare(TfLiteContext* context, TfLiteNode* node) {
       micro_context->AllocateTempInputTensor(node, kPoolingInputTensor);
   TfLiteTensor* output =
       micro_context->AllocateTempOutputTensor(node, kPoolingOutputTensor);
+  TF_LITE_ENSURE(context, input != nullptr);
+  TF_LITE_ENSURE(context, output != nullptr);
 
   if (input->type == kTfLiteInt8 || input->type == kTfLiteInt16) {
     RuntimeShape input_shape = GetTensorShape(input);

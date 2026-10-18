@@ -135,6 +135,8 @@ TfLiteStatus CreateWritableTensorDimsWithCopy(TfLiteContext* context,
   size_t alloc_size = TfLiteIntArrayGetSizeInBytes(ranks);
   TfLiteIntArray* new_dims = static_cast<TfLiteIntArray*>(
       context->AllocatePersistentBuffer(context, alloc_size));
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  TF_LITE_ENSURE(context, new_dims != nullptr);
   TfLiteIntArray* old_dims = tensor->dims;
   new_dims->size = ranks;
   tensor->dims = new_dims;

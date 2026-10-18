@@ -45,6 +45,10 @@ struct TfLitePcanParams {
 void* PcanInit(TfLiteContext* context, const char* buffer, size_t length) {
   auto* params = static_cast<TfLitePcanParams*>(
       context->AllocatePersistentBuffer(context, sizeof(TfLitePcanParams)));
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  if (params == nullptr) {
+    return nullptr;
+  }
 
   tflite::FlexbufferWrapper fbw(reinterpret_cast<const uint8_t*>(buffer),
                                 length);

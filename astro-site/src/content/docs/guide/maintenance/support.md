@@ -7,9 +7,9 @@ Ambiq supports the current and previous heliaRT minor releases. Use the latest p
 
 | Track | Version | Status |
 | --- | --- | --- |
-| Current minor | `v1.21.x` | Supported |
-| Previous minor | `v1.20.x` | Supported |
-| Older minors | `v1.19.x` and earlier | Not supported |
+| Current minor | `v2.1.x` | Supported |
+| Previous minor | `v2.0.x` | Supported |
+| Older minors | `v1.21.x` and earlier | Not supported |
 
 `v1.18.0` is withdrawn because its heliaCORE pin is defective for the float32 and float16 kernels, including NaN handling and FP16 LSTM. It does not count as a supported minor. Upgrade to a supported release; its tag remains for reproducibility.
 

@@ -565,6 +565,48 @@ endif
 $(eval $(call microlite_test,kernel_float32_fallback_shape_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float32_fallback_shape_test.cc))
 
+# Kernels that write into a persistent buffer fail when the arena cannot hold
+# it and the single-arena allocator stays inside the arena and off live temp
+# memory; every model in the tree fails AllocateTensors cleanly at every
+# undersized arena and under every failed arena allocation.
+# see AmbiqAI/helia-rt#449
+$(eval $(call microlite_test,kernel_persistent_buffer_failure_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/persistent_buffer_failure_test.cc))
+
+ARENA_SWEEP_MODELS := \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/models/keyword_scrambled.tflite \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/models/keyword_scrambled_8bit.tflite \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/models/person_detect.tflite \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/dtln/dtln_noise_suppression.tflite \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/hello_world/models/hello_world_float.tflite \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/hello_world/models/hello_world_int8.tflite \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/memory_footprint/models/simple_add_model.tflite \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/micro_speech/models/audio_preprocessor_float.tflite \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/micro_speech/models/audio_preprocessor_int8.tflite \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/micro_speech/models/micro_speech_quantized.tflite \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/mnist_lstm/trained_lstm.tflite \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/mnist_lstm/trained_lstm_int8.tflite \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/recipes/add_four_numbers.tflite \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/recipes/resource_variables.tflite
+$(eval $(call microlite_test,kernel_arena_size_sweep_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/arena_size_sweep_test.cc \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/testing/test_conv_model.cc,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/testing/test_conv_model.h \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/arena_sweep_models.h,\
+$(ARENA_SWEEP_MODELS)))
+$(eval $(call microlite_test,kernel_arena_exhaustion_injection_large_model_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/arena_exhaustion_injection_large_model_test.cc \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/testing/test_conv_model.cc,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/testing/test_conv_model.h \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/arena_sweep_models.h,\
+$(ARENA_SWEEP_MODELS)))
+$(eval $(call microlite_test,kernel_arena_exhaustion_injection_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/arena_exhaustion_injection_test.cc \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/testing/test_conv_model.cc,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/testing/test_conv_model.h \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/arena_sweep_models.h,\
+$(ARENA_SWEEP_MODELS)))
+
 # SPLIT, SQUEEZE, DIV and ADD return kTfLiteError for a malformed axis, shape,
 # rank or quantization, a zero divisor or int32 INT32_MIN / -1, and release
 # their Prepare temporaries. see AmbiqAI/helia-rt#451

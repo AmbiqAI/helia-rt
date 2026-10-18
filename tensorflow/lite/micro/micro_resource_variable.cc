@@ -48,6 +48,10 @@ MicroResourceVariables* MicroResourceVariables::Create(
   MicroResourceVariable* variable_array =
       static_cast<MicroResourceVariable*>(allocator->AllocatePersistentBuffer(
           sizeof(MicroResourceVariable) * max_num_variables));
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  if (allocator_buffer == nullptr || variable_array == nullptr) {
+    return nullptr;
+  }
   MicroResourceVariables* variables = new (allocator_buffer)
       MicroResourceVariables(variable_array, max_num_variables);
   return variables;

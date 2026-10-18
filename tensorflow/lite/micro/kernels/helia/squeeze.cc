@@ -51,6 +51,8 @@ TfLiteStatus SqueezePrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
 
   SqueezeContext op_context(context, node);
+  TF_LITE_ENSURE(context, op_context.input != nullptr);
+  TF_LITE_ENSURE(context, op_context.output != nullptr);
   const int input_num_dims = NumDimensions(op_context.input);
   const int num_squeeze_dims = op_context.params->num_squeeze_dims;
 

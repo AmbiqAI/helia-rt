@@ -177,6 +177,10 @@ TfLiteStatus MirrorPadPrepare(TfLiteContext* context, TfLiteNode* node) {
       micro_context->AllocateTempInputTensor(node, 1);
   TfLiteTensor* output_tensor =
       micro_context->AllocateTempOutputTensor(node, 0);
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  TF_LITE_ENSURE(context, input_tensor != nullptr);
+  TF_LITE_ENSURE(context, padding_matrix != nullptr);
+  TF_LITE_ENSURE(context, output_tensor != nullptr);
 
   TF_LITE_ENSURE_EQ(context, NumDimensions(padding_matrix), 2);
   TF_LITE_ENSURE_EQ(context, SizeOfDimension(padding_matrix, 0),

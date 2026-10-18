@@ -126,6 +126,10 @@ void* DetectionPostProcessInit(TfLiteContext* context, const char* buffer,
   const flexbuffers::Map& m = flexbuffers::GetRoot(buffer_t, length).AsMap();
   op_data = reinterpret_cast<OpData*>(
       context->AllocatePersistentBuffer(context, sizeof(OpData)));
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  if (op_data == nullptr) {
+    return nullptr;
+  }
 
   op_data->max_detections = m["max_detections"].AsInt32();
   op_data->max_classes_per_detection = m["max_classes_per_detection"].AsInt32();
@@ -165,6 +169,10 @@ TfLiteStatus DetectionPostProcessPrepare(TfLiteContext* context,
                                              kInputTensorClassPredictions);
   TfLiteTensor* input_anchors =
       micro_context->AllocateTempInputTensor(node, kInputTensorAnchors);
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  TF_LITE_ENSURE(context, input_box_encodings != nullptr);
+  TF_LITE_ENSURE(context, input_class_predictions != nullptr);
+  TF_LITE_ENSURE(context, input_anchors != nullptr);
   TF_LITE_ENSURE_EQ(context, NumDimensions(input_box_encodings), 3);
   TF_LITE_ENSURE_EQ(context, NumDimensions(input_class_predictions), 3);
   TF_LITE_ENSURE_EQ(context, NumDimensions(input_anchors), 2);

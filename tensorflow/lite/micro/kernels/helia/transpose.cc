@@ -83,6 +83,9 @@ TfLiteStatus TransposePrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
 
   TransposeContext op_context(context, node);
+  TF_LITE_ENSURE(context, op_context.input != nullptr);
+  TF_LITE_ENSURE(context, op_context.perm != nullptr);
+  TF_LITE_ENSURE(context, op_context.output != nullptr);
 
   // Ensure validity of input tensor.
   TF_LITE_ENSURE_MSG(context, NumDimensions(op_context.input) <= 5,
