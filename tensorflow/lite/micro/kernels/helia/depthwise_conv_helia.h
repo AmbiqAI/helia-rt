@@ -22,8 +22,8 @@ namespace micro {
 
 // DEPTHWISE_CONV_2D for every type Register_DEPTHWISE_CONV_2D() takes, except
 // that float16 layers call heliaCORE's arm_depthwise_conv_wrapper_f16_acc16,
-// which accumulates in float16 lanes on MVE: faster than the default entry and
-// less accurate. Opt in per resolver with
+// which accumulates in float16 lanes on MVE: the speed-oriented alternative to
+// the default entry, and less accurate. Opt in per resolver with
 // AddDepthwiseConv2D(Register_DEPTHWISE_CONV_2D_FLOAT16_ACC16()).
 // see AmbiqAI/ns-cmsis-nn#830
 TFLMRegistration Register_DEPTHWISE_CONV_2D_FLOAT16_ACC16();
