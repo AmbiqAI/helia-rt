@@ -453,13 +453,35 @@ TEST(HeliaReduceOutputSizeTest, MeanFloat32KeepDimsOutputLayouts) {
   int tall_dims[] = {4, 1, 2, 1, 2};
   int rank3_dims[] = {3, 1, 1, 4};
   int rank5_dims[] = {5, 1, 1, 1, 1, 4};
-  for (int* output_dims : {nhwc_dims, batch_dims, split_dims, tall_dims,
-                           rank3_dims, rank5_dims}) {
+  for (int* output_dims :
+       {nhwc_dims, batch_dims, split_dims, tall_dims, rank3_dims, rank5_dims}) {
     EXPECT_EQ(kTfLiteOk,
               RunReduce<float>(tflite::Register_MEAN(), kTfLiteFloat32,
                                input_dims, axis, 2, output_dims, 4, expected,
                                /*keep_dims=*/true));
   }
+}
+
+// The special case takes a rank-4 output only. A rank-3 [1, 1, 1] output has
+// no fourth extent to compare. A rank-5 [1, 1, 1, 4, 1] output starts with
+// [N, 1, 1, C] but fails the special case's output rank check.
+TEST(HeliaReduceOutputSizeTest, MeanFloat32KeepDimsOutputRank) {
+  const int32_t axis[] = {1, 2};
+  int single_channel_dims[] = {4, 1, 2, 2, 1};
+  int rank3_dims[] = {3, 1, 1, 1};
+  // Input elements 1, 2, 3 and 4.
+  const float single_expected[1] = {2.5f};
+  EXPECT_EQ(kTfLiteOk,
+            RunReduce<float>(tflite::Register_MEAN(), kTfLiteFloat32,
+                             single_channel_dims, axis, 2, rank3_dims, 1,
+                             single_expected, /*keep_dims=*/true));
+  int input_dims[] = {4, 1, 2, 2, 4};
+  int rank5_dims[] = {5, 1, 1, 1, 4, 1};
+  const float expected[4] = {3.25f, 3.0f, 2.75f, 2.5f};
+  EXPECT_EQ(kTfLiteOk,
+            RunReduce<float>(tflite::Register_MEAN(), kTfLiteFloat32,
+                             input_dims, axis, 2, rank5_dims, 4, expected,
+                             /*keep_dims=*/true));
 }
 
 TF_LITE_MICRO_TESTS_MAIN
