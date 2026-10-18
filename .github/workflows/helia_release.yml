@@ -90,6 +90,14 @@ jobs:
       - id: image
         run: echo "image=ghcr.io/ambiqai/helia-rt-ci@sha256:55372f29023cd1be1887af5761c8e6c18765b4e68ac28e02510d519e461692c9" >> "$GITHUB_OUTPUT"  # ghcr.io/ambiqai/helia-rt-ci:latest as of 2026-08-25
 
+      # Every build needs this job, so a release whose version or ns-cmsis-nn
+      # pin sites disagree stops before the matrix. see AmbiqAI/helia-rt#402
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+      - name: Check release versions and the ns-cmsis-nn pin agree
+        run: python3 ./tensorflow/lite/micro/tools/ci_build/check_helia_release_versions.py
+
   build:
     name: Build heliaRT (${{ matrix.arch }} • ${{ matrix.toolchain }} • ${{ matrix.build }})
     needs: ci-image
