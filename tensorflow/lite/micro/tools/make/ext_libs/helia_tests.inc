@@ -525,3 +525,27 @@ $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/reduce_output_size_t
 # temporary. see AmbiqAI/helia-rt#454
 $(eval $(call microlite_test,kernel_reduce_prepare_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/reduce_prepare_test.cc))
+
+# MEAN and SUM fail Invoke when their heliaCORE entry fails, for int8, int16,
+# float32 and float16. GCC and ATfE links wrap the entries to make each fail.
+# see AmbiqAI/helia-rt#458
+$(eval $(call microlite_test,kernel_reduce_status_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/reduce_status_test.cc))
+
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
+$(kernel_reduce_status_test_BINARY): CXXFLAGS += \
+  -DHELIA_REDUCE_STATUS_LINK_WRAP=1
+$(kernel_reduce_status_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_mean_s8 \
+  -Wl,--wrap=arm_mean_s16
+ifeq ($(strip $(HELIA_ENABLE_F32)),1)
+$(kernel_reduce_status_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_nn_mean_f32 \
+  -Wl,--wrap=arm_reduce_sum_f32
+endif
+ifneq (,$(filter cortex-m55,$(TARGET_ARCH)))
+$(kernel_reduce_status_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_nn_mean_f16 \
+  -Wl,--wrap=arm_reduce_sum_f16
+endif
+endif

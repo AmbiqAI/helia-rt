@@ -730,17 +730,15 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
         PopulateCmsisShapeAndAxis(input,
                                   tflite::micro::GetTensorData<int32_t>(axis),
                                   num_axis, &in_d, &ax_d, &out_d);
-        if (arm_nn_mean_f16(tflite::micro::GetTensorData<float16_t>(input),
-                            &in_d, &ax_d,
-                            tflite::micro::GetTensorData<float16_t>(output),
-                            &out_d) == ARM_CMSIS_NN_SUCCESS) {
-          break;
-        }
+        const arm_cmsis_nn_status status = arm_nn_mean_f16(
+            tflite::micro::GetTensorData<float16_t>(input), &in_d, &ax_d,
+            tflite::micro::GetTensorData<float16_t>(output), &out_d);
+        return CoreStatus(status, "MEAN", "arm_nn_mean_f16");
       }
 #endif
       MicroPrintf(
-          "Float16 MEAN: optimized kernel rejected the configuration; it "
-          "requires rank <= 4, axes inside the rank, and ARM_NN_ENABLE_F16.");
+          "Float16 MEAN requires rank <= 4, axes inside the rank, and "
+          "ARM_NN_ENABLE_F16.");
       return kTfLiteError;
     }
     case kTfLiteFloat32: {
@@ -754,11 +752,10 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
         PopulateCmsisShapeAndAxis(input,
                                   tflite::micro::GetTensorData<int32_t>(axis),
                                   num_axis, &in_d, &ax_d, &out_d);
-        if (arm_nn_mean_f32(tflite::micro::GetTensorData<float>(input), &in_d,
-                            &ax_d, tflite::micro::GetTensorData<float>(output),
-                            &out_d) == ARM_CMSIS_NN_SUCCESS) {
-          break;
-        }
+        const arm_cmsis_nn_status status = arm_nn_mean_f32(
+            tflite::micro::GetTensorData<float>(input), &in_d, &ax_d,
+            tflite::micro::GetTensorData<float>(output), &out_d);
+        return CoreStatus(status, "MEAN", "arm_nn_mean_f32");
       }
 #endif
       tflite::MeanParams op_params;
@@ -915,17 +912,15 @@ TfLiteStatus EvalSumHelper(TfLiteContext* context, TfLiteNode* node,
         PopulateCmsisShapeAndAxis(input,
                                   tflite::micro::GetTensorData<int32_t>(axis),
                                   num_axis, &in_d, &ax_d, &out_d);
-        if (arm_reduce_sum_f16(tflite::micro::GetTensorData<float16_t>(input),
-                               &in_d, &ax_d,
-                               tflite::micro::GetTensorData<float16_t>(output),
-                               &out_d) == ARM_CMSIS_NN_SUCCESS) {
-          break;
-        }
+        const arm_cmsis_nn_status status = arm_reduce_sum_f16(
+            tflite::micro::GetTensorData<float16_t>(input), &in_d, &ax_d,
+            tflite::micro::GetTensorData<float16_t>(output), &out_d);
+        return CoreStatus(status, "SUM", "arm_reduce_sum_f16");
       }
 #endif
       MicroPrintf(
-          "Float16 REDUCE_SUM: optimized kernel rejected the configuration; it "
-          "requires rank <= 4, axes inside the rank, and ARM_NN_ENABLE_F16.");
+          "Float16 REDUCE_SUM requires rank <= 4, axes inside the rank, and "
+          "ARM_NN_ENABLE_F16.");
       return kTfLiteError;
     }
     case kTfLiteFloat32: {
@@ -939,12 +934,10 @@ TfLiteStatus EvalSumHelper(TfLiteContext* context, TfLiteNode* node,
         PopulateCmsisShapeAndAxis(input,
                                   tflite::micro::GetTensorData<int32_t>(axis),
                                   num_axis, &in_d, &ax_d, &out_d);
-        if (arm_reduce_sum_f32(tflite::micro::GetTensorData<float>(input),
-                               &in_d, &ax_d,
-                               tflite::micro::GetTensorData<float>(output),
-                               &out_d) == ARM_CMSIS_NN_SUCCESS) {
-          break;
-        }
+        const arm_cmsis_nn_status status = arm_reduce_sum_f32(
+            tflite::micro::GetTensorData<float>(input), &in_d, &ax_d,
+            tflite::micro::GetTensorData<float>(output), &out_d);
+        return CoreStatus(status, "SUM", "arm_reduce_sum_f32");
       }
 #endif
       TF_LITE_ENSURE(
