@@ -208,8 +208,11 @@ TfLiteStatus EvalAddQuantizedInt8(TfLiteContext* context, TfLiteNode* node,
   const int32_t input1_dims_count = input1_shape.DimensionsCount();
   const RuntimeShape input2_shape = tflite::micro::GetTensorShape(input2);
   const int32_t input2_dims_count = input2_shape.DimensionsCount();
+  const int32_t output_dims_count =
+      tflite::micro::GetTensorShape(output).DimensionsCount();
 
-  if (input1_dims_count > 4 || input2_dims_count > 4) {
+  // The heliaCORE route takes 4-D NHWC dims for all three tensors.
+  if (input1_dims_count > 4 || input2_dims_count > 4 || output_dims_count > 4) {
     reference_integer_ops::BroadcastAdd4DSlow(
         op_params, tflite::micro::GetTensorShape(input1),
         tflite::micro::GetTensorData<int8_t>(input1),
@@ -277,8 +280,11 @@ TfLiteStatus EvalAddQuantizedInt16(TfLiteContext* context, TfLiteNode* node,
   const int32_t input1_dims_count = input1_shape.DimensionsCount();
   const RuntimeShape input2_shape = tflite::micro::GetTensorShape(input2);
   const int32_t input2_dims_count = input2_shape.DimensionsCount();
+  const int32_t output_dims_count =
+      tflite::micro::GetTensorShape(output).DimensionsCount();
 
-  if (input1_dims_count > 4 || input2_dims_count > 4) {
+  // The heliaCORE route takes 4-D NHWC dims for all three tensors.
+  if (input1_dims_count > 4 || input2_dims_count > 4 || output_dims_count > 4) {
     reference_ops::BroadcastAdd4DSlow(
         op_params, tflite::micro::GetTensorShape(input1),
         tflite::micro::GetTensorData<int16_t>(input1),
@@ -516,6 +522,12 @@ TfLiteStatus PrepareAdd(TfLiteContext* context, TfLiteNode* node) {
                          NumDimensions(input2) <= RuntimeShape::kMaxSmallSize &&
                          NumDimensions(output) <= RuntimeShape::kMaxSmallSize,
                      "ADD supports tensors of rank 6 or less.");
+  TF_LITE_ENSURE_MSG(
+      context,
+      HeliaShapesBroadcastToOutput(tflite::GetTensorShape(input1),
+                                   tflite::GetTensorShape(input2),
+                                   tflite::GetTensorShape(output)),
+      "ADD input shapes do not broadcast to the output.");
 
   TF_LITE_ENSURE_EQ(context, input1->type, output->type);
   TF_LITE_ENSURE_MSG(

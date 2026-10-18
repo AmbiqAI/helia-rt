@@ -74,34 +74,6 @@ bool IsValidInt8Quantization(const TfLiteTensor* tensor) {
          tensor->params.zero_point <= std::numeric_limits<int8_t>::max();
 }
 
-// The reference int32 DIV and the overflow walk pair operands by broadcasting
-// both inputs to the output, so each output extent must be the broadcast of
-// the two input extents.
-bool Int32DivShapesBroadcast(const TfLiteTensor* input1,
-                             const TfLiteTensor* input2,
-                             const TfLiteTensor* output) {
-  const RuntimeShape shape1 = GetTensorShape(input1);
-  const RuntimeShape shape2 = GetTensorShape(input2);
-  const RuntimeShape output_shape = GetTensorShape(output);
-  const int rank =
-      std::max(output_shape.DimensionsCount(),
-               std::max(shape1.DimensionsCount(), shape2.DimensionsCount()));
-  const RuntimeShape extended1 = RuntimeShape::ExtendedShape(rank, shape1);
-  const RuntimeShape extended2 = RuntimeShape::ExtendedShape(rank, shape2);
-  const RuntimeShape extended_output =
-      RuntimeShape::ExtendedShape(rank, output_shape);
-  for (int d = 0; d < rank; ++d) {
-    const int extent = extended_output.Dims(d);
-    const int dim1 = extended1.Dims(d);
-    const int dim2 = extended2.Dims(d);
-    const int broadcast = dim1 == 1 ? dim2 : dim1;
-    if (extent < 0 || (dim2 != 1 && dim2 != broadcast) || extent != broadcast) {
-      return false;
-    }
-  }
-  return true;
-}
-
 TfLiteStatus CalculateOpDataDiv(TfLiteContext* context, TfLiteTensor* input1,
                                 TfLiteTensor* input2, TfLiteTensor* output,
                                 TfLiteDivParams* params, OpDataDiv* data) {
@@ -165,6 +137,11 @@ TfLiteStatus DivPrepare(TfLiteContext* context, TfLiteNode* node) {
                          NumDimensions(input2) <= RuntimeShape::kMaxSmallSize &&
                          NumDimensions(output) <= RuntimeShape::kMaxSmallSize,
                      "DIV supports tensors of rank 6 or less.");
+  TF_LITE_ENSURE_MSG(context,
+                     HeliaShapesBroadcastToOutput(GetTensorShape(input1),
+                                                  GetTensorShape(input2),
+                                                  GetTensorShape(output)),
+                     "DIV input shapes do not broadcast to the output.");
 
   OpDataDiv* data = static_cast<OpDataDiv*>(node->user_data);
   auto* params = reinterpret_cast<TfLiteDivParams*>(node->builtin_data);
@@ -190,9 +167,6 @@ TfLiteStatus DivPrepare(TfLiteContext* context, TfLiteNode* node) {
                       kTfLiteNoQuantization);
     TF_LITE_ENSURE_EQ(context, input2->quantization.type,
                       kTfLiteNoQuantization);
-    TF_LITE_ENSURE_MSG(
-        context, Int32DivShapesBroadcast(input1, input2, output),
-        "DIV int32 input shapes do not broadcast to the output.");
   }
   return kTfLiteOk;
 }
@@ -337,14 +311,6 @@ TfLiteStatus EvalQuantized(TfLiteContext* context, TfLiteNode* node,
                            TfLiteEvalTensor* output) {
   tflite::micro::ArithmeticParams op_params = {};
 
-#define TF_LITE_DIV(type, opname, dtype)                         \
-  type::opname(op_params, tflite::micro::GetTensorShape(input1), \
-               tflite::micro::GetTensorData<dtype>(input1),      \
-               tflite::micro::GetTensorShape(input2),            \
-               tflite::micro::GetTensorData<dtype>(input2),      \
-               tflite::micro::GetTensorShape(output),            \
-               tflite::micro::GetTensorData<dtype>(output))
-
   if (input1->type == kTfLiteInt8 && input2->type == kTfLiteInt8 &&
       output->type == kTfLiteInt8) {
     if (tflite::micro::GetTensorShape(output).FlatSize() == 0) {
@@ -368,16 +334,44 @@ TfLiteStatus EvalQuantized(TfLiteContext* context, TfLiteNode* node,
     op_params.output_multiplier = data->output_multiplier;
     op_params.output_shift = data->output_shift;
 
-    bool requires_broadcast = reference_ops::ProcessBroadcastShapes(
+    // The reference int8 element, except that a total right shift above 31
+    // yields a zero quotient: the reference shifts by that much there (a zero
+    // or small dividend over a large divisor), which gemmlowp asserts on and
+    // which is undefined under NDEBUG. The scaled quotient is below 2^31 in
+    // magnitude, so the exact result of such a shift rounds to 0. Prepare
+    // bounds output_shift so the shift is never negative.
+    auto op = [&op_params](int8_t a, int8_t b) {
+      int32_t input1_val = op_params.input1_offset + a;
+      int32_t input2_val = op_params.input2_offset + b;
+      if (input2_val < 0) {
+        input1_val = -input1_val;
+        input2_val = -input2_val;
+      }
+      int recip_shift;
+      const int32_t input2_inv = GetReciprocal(input2_val, 31, &recip_shift);
+      const int headroom = CountLeadingSignBits(input1_val);
+      const int32_t unscaled_quotient =
+          MultiplyByQuantizedMultiplierGreaterThanOne(input1_val, input2_inv,
+                                                      headroom);
+      const int total_shift = op_params.output_shift - recip_shift - headroom;
+      const int32_t quotient =
+          total_shift < -31 ? 0
+                            : MultiplyByQuantizedMultiplierSmallerThanOneExp(
+                                  unscaled_quotient,
+                                  op_params.output_multiplier, total_shift);
+      const int32_t result =
+          std::min(op_params.quantized_activation_max,
+                   std::max(op_params.quantized_activation_min,
+                            op_params.output_offset + quotient));
+      return static_cast<int8_t>(result);
+    };
+    reference_ops::BroadcastBinaryOpSimple(
         tflite::micro::GetTensorShape(input1),
-        tflite::micro::GetTensorShape(input2), &op_params);
-
-    if (requires_broadcast) {
-      TF_LITE_DIV(reference_ops, BroadcastDivSlow, int8_t);
-    } else {
-      TF_LITE_DIV(reference_ops, Div, int8_t);
-    }
-#undef TF_LITE_DIV
+        tflite::micro::GetTensorData<int8_t>(input1),
+        tflite::micro::GetTensorShape(input2),
+        tflite::micro::GetTensorData<int8_t>(input2),
+        tflite::micro::GetTensorShape(output),
+        tflite::micro::GetTensorData<int8_t>(output), op);
   } else {
     MicroPrintf("Unsupported combination of input and output types in DIV.");
     return kTfLiteError;
