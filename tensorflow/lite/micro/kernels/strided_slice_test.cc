@@ -15,6 +15,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/kernels/strided_slice.h"
 
 #include <cstdint>
+#include <limits>
 
 #include "tensorflow/lite/micro/c/builtin_op_data.h"
 #include "tensorflow/lite/micro/c/common.h"
@@ -1275,6 +1276,28 @@ TEST(StridedSliceTest, OutOfBounds) {
       input_shape, begin_shape, end_shape, strides_shape, &builtin_data,
       input_data, begin_data, end_data, strides_data, output_shape, output_data,
       golden, false, 1, true);
+}
+
+// TODO(AmbiqAI/helia-rt#460): INT32_MAX stride; drop when upstream has it.
+TEST(StridedSliceTest, In1D_Int32MaxStrideFromNonzeroBegin) {
+  int input_shape[] = {1, 4};
+  int begin_shape[] = {1, 1};
+  int end_shape[] = {1, 1};
+  int strides_shape[] = {1, 1};
+  int output_shape[] = {1, 1};
+  float input_data[] = {1, 2, 3, 4};
+  int32_t begin_data[] = {1};
+  int32_t end_data[] = {4};
+  int32_t strides_data[] = {std::numeric_limits<int32_t>::max()};
+  float golden[] = {2};
+  float output_data[4];
+
+  TfLiteStridedSliceParams builtin_data = {};
+
+  tflite::testing::TestStridedSliceFloat(
+      input_shape, begin_shape, end_shape, strides_shape, &builtin_data,
+      input_data, begin_data, end_data, strides_data, output_shape, output_data,
+      golden, false);
 }
 
 TF_LITE_MICRO_TESTS_MAIN

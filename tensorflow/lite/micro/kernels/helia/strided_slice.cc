@@ -129,6 +129,32 @@ TfLiteStatus EvalArm(const TfLiteEvalTensor* input, TfLiteEvalTensor* output,
   return kTfLiteOk;
 }
 
+// Copies the slice ArmPopulateCommonParams described, for the types with no
+// heliaCORE entry. Its begin, stride and counts keep every index inside the
+// input, where the reference's int32_t loop index overflows on a stride near
+// INT32_MAX.
+template <typename T>
+void CopySlice(const T* input, T* output, const cmsis_nn_dims& input_dims,
+               const cmsis_nn_dims& output_dims,
+               const cmsis_nn_dims& begin_dims,
+               const cmsis_nn_dims& stride_dims) {
+  for (int32_t n = 0; n < output_dims.n; ++n) {
+    const int64_t in_n = begin_dims.n + int64_t{stride_dims.n} * n;
+    for (int32_t h = 0; h < output_dims.h; ++h) {
+      const int64_t in_h = begin_dims.h + int64_t{stride_dims.h} * h;
+      for (int32_t w = 0; w < output_dims.w; ++w) {
+        const int64_t in_w = begin_dims.w + int64_t{stride_dims.w} * w;
+        const int64_t row =
+            ((in_n * input_dims.h + in_h) * input_dims.w + in_w) *
+            input_dims.c;
+        for (int32_t c = 0; c < output_dims.c; ++c) {
+          *output++ = input[row + begin_dims.c + int64_t{stride_dims.c} * c];
+        }
+      }
+    }
+  }
+}
+
 TfLiteStatus StridedSliceHeliaPrepare(TfLiteContext* context,
                                       TfLiteNode* node) {
   TF_LITE_ENSURE_OK(context, StridedSlicePrepare(context, node));
@@ -218,11 +244,9 @@ TfLiteStatus StridedSliceEval(TfLiteContext* context, TfLiteNode* node) {
                                 begin_dims, stride_dims, arm_strided_slice_f32,
                                 "arm_strided_slice_f32");
 #else
-      reference_ops::StridedSlice(
-          op_params, tflite::micro::GetTensorShape(input),
-          tflite::micro::GetTensorData<float>(input),
-          tflite::micro::GetTensorShape(output),
-          tflite::micro::GetTensorData<float>(output));
+      CopySlice(tflite::micro::GetTensorData<float>(input),
+                tflite::micro::GetTensorData<float>(output), input_dims,
+                output_dims, begin_dims, stride_dims);
       return kTfLiteOk;
 #endif
 #if ARM_NN_ENABLE_F16
@@ -244,13 +268,9 @@ TfLiteStatus StridedSliceEval(TfLiteContext* context, TfLiteNode* node) {
                               begin_dims, stride_dims, arm_strided_slice_s32,
                               "arm_strided_slice_s32");
     case kTfLiteBool:
-      reference_ops::StridedSlice(
-        op_params,
-        tflite::micro::GetTensorShape(input),
-        tflite::micro::GetTensorData<bool>(input),
-        tflite::micro::GetTensorShape(output),
-        tflite::micro::GetTensorData<bool>(output)
-      );
+      CopySlice(tflite::micro::GetTensorData<bool>(input),
+                tflite::micro::GetTensorData<bool>(output), input_dims,
+                output_dims, begin_dims, stride_dims);
       break;
     default:
       MicroPrintf("Type %s (%d) not supported.", TfLiteTypeGetName(input->type),

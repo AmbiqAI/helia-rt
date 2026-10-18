@@ -163,6 +163,13 @@ void FillInput(T* input, int count) {
 }
 
 template <>
+void FillInput<bool>(bool* input, int count) {
+  for (int i = 0; i < count; ++i) {
+    input[i] = i % 3 == 0;
+  }
+}
+
+template <>
 void FillInput<float>(float* input, int count) {
   for (int i = 0; i < count; ++i) {
     input[i] = 0.25f * static_cast<float>(i) - 7.0f;
@@ -271,6 +278,8 @@ void ExpectAllTypesMatch(const Slice& s, int only = -1) {
   ExpectMatchesReference<int8_t>(s, kTfLiteInt8, Leaf::kS8, only);
   ExpectMatchesReference<int16_t>(s, kTfLiteInt16, Leaf::kS16, only);
   ExpectMatchesReference<int32_t>(s, kTfLiteInt32, Leaf::kS32, only);
+  // bool has no heliaCORE entry.
+  ExpectMatchesReference<bool>(s, kTfLiteBool, Leaf::kCount, only);
 #if ARM_NN_ENABLE_F16
   ExpectMatchesReference<uint16_t>(s, kTfLiteFloat16, Leaf::kF16, only);
 #endif
