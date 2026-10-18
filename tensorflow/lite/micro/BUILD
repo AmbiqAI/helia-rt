@@ -242,6 +242,8 @@ tflm_cc_library(
     srcs = ["memory_helpers.cc"],
     hdrs = ["memory_helpers.h"],
     deps = [
+        # TODO(AmbiqAI/helia-rt#460): no overflow check; drop when upstream has it.
+        ":micro_log",
         "//tensorflow/lite/micro/c:common",
         "//tensorflow/lite/micro/kernels/internal:reference",
         "//tensorflow/lite/micro/tflite_bridge:flatbuffer_conversions_bridge",

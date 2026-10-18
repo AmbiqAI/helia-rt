@@ -42,6 +42,14 @@ size_t AlignSizeUp(size_t count = 1) {
 // Returns size in bytes for a given TfLiteType.
 TfLiteStatus TfLiteTypeSizeOf(TfLiteType type, size_t* size);
 
+// TODO(AmbiqAI/helia-rt#460): no overflow check; drop when upstream has it.
+// Multiplies *size by factor in place. Returns kTfLiteError, leaving *size
+// unchanged, if factor is negative or the product exceeds limit. The tensor
+// sizing functions below use INT_MAX as the limit for element counts, which
+// kernels hold in int, and SIZE_MAX for byte counts. limit is a parameter so
+// the SIZE_MAX bound can be tested where size_t is 64 bits.
+TfLiteStatus MultiplyTensorSize(size_t* size, int64_t factor, size_t limit);
+
 // How many bytes are needed to hold a tensor's contents.
 TfLiteStatus BytesRequiredForTensor(const tflite::Tensor& flatbuffer_tensor,
                                     size_t* bytes, size_t* type_size);
