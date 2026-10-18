@@ -551,3 +551,8 @@ $(kernel_reduce_status_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_reduce_sum_f16
 endif
 endif
+
+# float32 HARD_SWISH and FULLY_CONNECTED fail Invoke on a mismatched output on
+# both the heliaCORE and the reference route. see AmbiqAI/helia-rt#452
+$(eval $(call microlite_test,kernel_float32_fallback_shape_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/float32_fallback_shape_test.cc))

@@ -535,6 +535,15 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
       return kTfLiteError;
     }
     case kTfLiteFloat32: {
+      // The reference takes the output depth from the filter rows and
+      // heliaCORE from the output, and either may run, so they must agree.
+      const RuntimeShape filter_shape = tflite::micro::GetTensorShape(filter);
+      const RuntimeShape output_shape = tflite::micro::GetTensorShape(output);
+      TF_LITE_ENSURE(context, filter_shape.DimensionsCount() >= 2 &&
+                                  output_shape.DimensionsCount() >= 1);
+      TF_LITE_ENSURE_EQ(
+          context, filter_shape.Dims(filter_shape.DimensionsCount() - 2),
+          output_shape.Dims(output_shape.DimensionsCount() - 1));
       const float* bias_data =
           tflite::micro::GetOptionalTensorData<float>(bias);
 #if ARM_NN_ENABLE_F32
