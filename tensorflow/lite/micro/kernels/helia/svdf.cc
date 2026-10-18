@@ -88,6 +88,12 @@ TfLiteStatus CmsisNnPrepareSvdf(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE(context, weights_time != nullptr);
   TfLiteTensor* bias =
       micro_context->AllocateTempInputTensor(node, kSvdfBiasTensor);
+  // A nullptr is an absent bias only if the model leaves the input empty;
+  // otherwise its temp allocation failed.
+  const bool has_bias =
+      node->inputs->size > kSvdfBiasTensor &&
+      node->inputs->data[kSvdfBiasTensor] != kTfLiteOptionalTensor;
+  TF_LITE_ENSURE(context, !has_bias || bias != nullptr);
   TfLiteTensor* activation_state = micro_context->AllocateTempInputTensor(
       node, kSvdfInputActivationStateTensor);
   TF_LITE_ENSURE(context, activation_state != nullptr);
@@ -166,14 +172,13 @@ TfLiteStatus CmsisNnPrepareSvdf(TfLiteContext* context, TfLiteNode* node) {
 
     // TODO(b/162018098): Use TF_LITE_ENSURE_NEAR when it is ready.
     // TODO(#1751): account for optional bias tensor
-    // Integer Eval reads the bias unconditionally, and a nullptr here is also
-    // what a temp allocation in a full arena returns.
-    TF_LITE_ENSURE(context, bias != nullptr);
-    TF_LITE_ENSURE(
-        context,
-        std::abs(static_cast<double>(bias->params.scale) -
-                 static_cast<double>(activation_state->params.scale *
-                                     weights_time->params.scale)) < 1e-5);
+    if (bias != nullptr) {
+      TF_LITE_ENSURE(
+          context,
+          std::abs(static_cast<double>(bias->params.scale) -
+                   static_cast<double>(activation_state->params.scale *
+                                       weights_time->params.scale)) < 1e-5);
+    }
 
     QuantizeMultiplier(effective_scale_1, &(data->effective_scale_1_a),
                        &(data->effective_scale_1_b));
@@ -314,12 +319,15 @@ TfLiteStatus EvalIntegerSVDF(TfLiteContext* context, TfLiteNode* node,
   weights_time_dims.n = weights_time_tensor->dims->data[0];
   weights_time_dims.h = weights_time_tensor->dims->data[1];
 
-  cmsis_nn_dims bias_dims;
-  bias_dims.n = bias_tensor->dims->data[0];
+  // The integer SVDF entry points accept a nullptr bias_data.
+  cmsis_nn_dims bias_dims = {};
+  if (bias_tensor != nullptr) {
+    bias_dims.n = bias_tensor->dims->data[0];
+  }
 
-  cmsis_nn_dims state_dims;
-  state_dims.n = bias_tensor->dims->data[0];
-  state_dims.h = bias_tensor->dims->data[1];
+  cmsis_nn_dims state_dims = {};
+  state_dims.n = activation_state_tensor->dims->data[0];
+  state_dims.h = activation_state_tensor->dims->data[1];
 
   cmsis_nn_dims output_dims;
   output_dims.n = output_tensor->dims->data[0];
@@ -415,8 +423,8 @@ TfLiteStatus EvalIntegerSVDF(TfLiteContext* context, TfLiteNode* node,
           tflite::micro::GetTensorData<int8_t>(weights_feature_tensor),
           &weights_time_dims,
           tflite::micro::GetTensorData<int8_t>(weights_time_tensor), &bias_dims,
-          tflite::micro::GetTensorData<int32_t>(bias_tensor), &output_dims,
-          output_data);
+          tflite::micro::GetOptionalTensorData<int32_t>(bias_tensor),
+          &output_dims, output_data);
       if (status != ARM_CMSIS_NN_SUCCESS) {
         MicroPrintf("SVDF: arm_svdf_s8 failed (%d).", static_cast<int>(status));
         return kTfLiteError;
@@ -434,7 +442,8 @@ TfLiteStatus EvalIntegerSVDF(TfLiteContext* context, TfLiteNode* node,
           tflite::micro::GetTensorData<int8_t>(weights_feature_tensor),
           &weights_time_dims,
           tflite::micro::GetTensorData<int16_t>(weights_time_tensor),
-          &bias_dims, tflite::micro::GetTensorData<int32_t>(bias_tensor),
+          &bias_dims,
+          tflite::micro::GetOptionalTensorData<int32_t>(bias_tensor),
           &output_dims, output_data);
       if (status != ARM_CMSIS_NN_SUCCESS) {
         MicroPrintf("SVDF: arm_svdf_state_s16_s8 failed (%d).",

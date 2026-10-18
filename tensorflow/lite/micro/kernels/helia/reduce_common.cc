@@ -166,6 +166,7 @@ TfLiteStatus PrepareSimple(TfLiteContext* context, TfLiteNode* node,
   // [0] = Input
   // [1] = Axis
   TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
+  TF_LITE_ENSURE(context, input != nullptr);
 
   // Outputs Tensor (dtype depends on quantization):
   // [0] = Output
@@ -181,6 +182,7 @@ TfLiteStatus PrepareSimple(TfLiteContext* context, TfLiteNode* node,
 
   if (input->type == kTfLiteInt8) {
     TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
+    TF_LITE_ENSURE(context, output != nullptr);
     const double real_multiplier = static_cast<double>(input->params.scale) /
                                    static_cast<double>(output->params.scale);
     QuantizeMultiplier(real_multiplier, multiplier, shift);
@@ -605,6 +607,9 @@ TfLiteStatus PrepareMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
   TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
   TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
   TfLiteTensor* axis = micro_context->AllocateTempInputTensor(node, 1);
+  TF_LITE_ENSURE(context, input != nullptr);
+  TF_LITE_ENSURE(context, output != nullptr);
+  TF_LITE_ENSURE(context, axis != nullptr);
 
   if (input->type == kTfLiteFloat16 &&
       PrepareFloat16Reduce(context, input, axis, "REDUCE_MAX/REDUCE_MIN") !=
@@ -639,6 +644,9 @@ TfLiteStatus PrepareMeanOrSumHelper(TfLiteContext* context, TfLiteNode* node,
   TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
   TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
   TfLiteTensor* axis = micro_context->AllocateTempInputTensor(node, 1);
+  TF_LITE_ENSURE(context, input != nullptr);
+  TF_LITE_ENSURE(context, output != nullptr);
+  TF_LITE_ENSURE(context, axis != nullptr);
 
   if (input->type == kTfLiteFloat16 &&
       PrepareFloat16Reduce(context, input, axis, "MEAN/REDUCE_SUM") !=
@@ -1022,6 +1030,9 @@ TfLiteStatus PrepareAllHelper(TfLiteContext* context, TfLiteNode* node,
   TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
   TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
   TfLiteTensor* axis = micro_context->AllocateTempInputTensor(node, 1);
+  TF_LITE_ENSURE(context, input != nullptr);
+  TF_LITE_ENSURE(context, output != nullptr);
+  TF_LITE_ENSURE(context, axis != nullptr);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, kTfLiteBool);
 
   TF_LITE_ENSURE_OK(context, PrepareSimple(context, node, &op_data->multiplier,
