@@ -85,7 +85,8 @@ struct SvdfFloat {
 constexpr float kSvdfNoBiasGolden[4] = {6, -1, 4, 2};
 
 // Transposes a 2x3 int8 input by {1, 0}, with the perm tensor read-only
-// (constant) or arena-backed, and its data present or still unplanned.
+// (constant) or arena-backed, and its data present or still unplanned. Prepare
+// must release its temporaries whether it succeeds or not.
 TfLiteStatus PrepareTranspose(TfLiteAllocationType perm_allocation,
                               bool perm_planned) {
   int input_shape[] = {2, 2, 3};
@@ -109,7 +110,10 @@ TfLiteStatus PrepareTranspose(TfLiteAllocationType perm_allocation,
   micro::KernelRunner runner(registration, tensors, 3,
                              IntArrayFromInts(inputs_array_data),
                              IntArrayFromInts(outputs_array_data), nullptr);
-  return runner.InitAndPrepare();
+  const TfLiteStatus status = runner.InitAndPrepare();
+  // InitAndPrepare checks the temporaries only when Prepare succeeds.
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
+  return status;
 }
 
 }  // namespace
