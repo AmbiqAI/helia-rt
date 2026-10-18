@@ -400,5 +400,8 @@ TFLMRegistration Register_PAD() { return tflite::micro::RegisterOp(Init, Prepare
 // Also register Pad as PadV2.
 TFLMRegistration Register_PADV2() { return tflite::micro::RegisterOp(Init, Prepare, Eval); }
 
+// pad.h declares this for every CMSIS_NN build, helia included.
+TFLMRegistration Register_PAD_INT8() { return Register_PAD(); }
+
 }  // namespace micro
 } // namespace tflite
