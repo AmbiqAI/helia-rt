@@ -74,8 +74,9 @@ bool IsValidInt8Quantization(const TfLiteTensor* tensor) {
          tensor->params.zero_point <= std::numeric_limits<int8_t>::max();
 }
 
-// The int32 overflow walk pairs operands by broadcasting each input to the
-// output shape, so every input extent must be 1 or the output extent.
+// The reference int32 DIV and the overflow walk pair operands by broadcasting
+// both inputs to the output, so each output extent must be the broadcast of
+// the two input extents.
 bool Int32DivShapesBroadcast(const TfLiteTensor* input1,
                              const TfLiteTensor* input2,
                              const TfLiteTensor* output) {
@@ -91,8 +92,10 @@ bool Int32DivShapesBroadcast(const TfLiteTensor* input1,
       RuntimeShape::ExtendedShape(rank, output_shape);
   for (int d = 0; d < rank; ++d) {
     const int extent = extended_output.Dims(d);
-    if (extent < 0 || (extended1.Dims(d) != 1 && extended1.Dims(d) != extent) ||
-        (extended2.Dims(d) != 1 && extended2.Dims(d) != extent)) {
+    const int dim1 = extended1.Dims(d);
+    const int dim2 = extended2.Dims(d);
+    const int broadcast = dim1 == 1 ? dim2 : dim1;
+    if (extent < 0 || (dim2 != 1 && dim2 != broadcast) || extent != broadcast) {
       return false;
     }
   }
@@ -121,6 +124,11 @@ TfLiteStatus CalculateOpDataDiv(TfLiteContext* context, TfLiteTensor* input1,
                        "DIV int8 scales give a non-finite multiplier.");
     QuantizeMultiplier(real_multiplier, &data->output_multiplier,
                        &data->output_shift);
+    // The reference right-shifts by output_shift - recip_shift - headroom, with
+    // recip_shift >= 0 and a headroom of at least 23 for an int8 difference in
+    // [-255, 255], so a larger output_shift is a negative shift.
+    TF_LITE_ENSURE_MSG(context, data->output_shift <= 23,
+                       "DIV int8 scales give a multiplier above 2^23.");
     data->input1_zero_point = input1->params.zero_point;
     data->input2_zero_point = input2->params.zero_point;
     data->output_zero_point = output->params.zero_point;
@@ -380,7 +388,8 @@ TfLiteStatus EvalQuantized(TfLiteContext* context, TfLiteNode* node,
 
 // Rejects the first output element whose operands are INT32_MIN and -1,
 // walking input1 and input2 in the broadcast order the reference uses. Prepare
-// bounded the rank and checked that both inputs broadcast to the output.
+// bounded the rank and checked that the output is the broadcast of the inputs,
+// so same-shape inputs have the output's element count.
 TfLiteStatus CheckInt32DivOverflow(const TfLiteEvalTensor* input1,
                                    const TfLiteEvalTensor* input2,
                                    const TfLiteEvalTensor* output) {
