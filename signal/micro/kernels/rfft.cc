@@ -61,6 +61,10 @@ void* RfftInit(TfLiteContext* context, const char* buffer, size_t length) {
   auto* params = static_cast<TfLiteAudioFrontendRfftParams<T>*>(
       context->AllocatePersistentBuffer(
           context, sizeof(TfLiteAudioFrontendRfftParams<T>)));
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  if (params == nullptr) {
+    return nullptr;
+  }
 
   tflite::FlexbufferWrapper fbw(buffer_t, length);
   params->fft_length = fbw.ElementAsInt32(kFftLengthIndex);
@@ -69,6 +73,10 @@ void* RfftInit(TfLiteContext* context, const char* buffer, size_t length) {
   size_t state_size = (*get_needed_memory_func)(params->fft_length);
   params->state = static_cast<int8_t*>(
       context->AllocatePersistentBuffer(context, state_size * sizeof(int8_t)));
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  if (params->state == nullptr) {
+    return nullptr;
+  }
   (*init_func)(params->fft_length, params->state, state_size);
   return params;
 }

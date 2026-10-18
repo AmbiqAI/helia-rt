@@ -127,7 +127,8 @@ TfLiteStatus CalculateOpDataDepthwiseConv(
 
   micro_context->DeallocateTempTfLiteTensor(input);
   micro_context->DeallocateTempTfLiteTensor(filter);
-  if (has_bias) {
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  if (bias != nullptr) {
     micro_context->DeallocateTempTfLiteTensor(bias);
   }
   micro_context->DeallocateTempTfLiteTensor(output);

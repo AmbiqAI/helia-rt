@@ -16,6 +16,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/kernels/depthwise_conv.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 
 #include "Include/arm_nnfunctions.h"
@@ -174,13 +175,22 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     // Allocate memory for per-channel quantization parameters
     const int num_channels =
         filter->dims->data[kDepthwiseConvQuantizedDimension];
+    // The byte count wraps a 32-bit size_t from 2^30 channels.
+    TF_LITE_ENSURE(context,
+                   num_channels > 0 && static_cast<size_t>(num_channels) <=
+                                           SIZE_MAX / sizeof(int32_t));
 
     data->reference_op_data.per_channel_output_multiplier =
         reinterpret_cast<int32_t*>(context->AllocatePersistentBuffer(
             context, num_channels * sizeof(int32_t)));
+    TF_LITE_ENSURE(
+        context,
+        data->reference_op_data.per_channel_output_multiplier != nullptr);
     data->reference_op_data.per_channel_output_shift =
         reinterpret_cast<int32_t*>(context->AllocatePersistentBuffer(
             context, num_channels * sizeof(int32_t)));
+    TF_LITE_ENSURE(context,
+                   data->reference_op_data.per_channel_output_shift != nullptr);
   }
 
   // Float16 is unquantized like Float32; present it as Float32 so the

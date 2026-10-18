@@ -115,6 +115,9 @@ TfLiteStatus FramerPrepare(TfLiteContext* context, TfLiteNode* node) {
       context->AllocatePersistentBuffer(
           context,
           params->outer_dims * sizeof(tflite::tflm_signal::CircularBuffer*)));
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  TF_LITE_ENSURE(context, params->state_buffers != nullptr);
+  TF_LITE_ENSURE(context, params->circular_buffers != nullptr);
   for (int i = 0; i < params->outer_dims; i++) {
     // Calculate the capacity of the circular buffer. Round up the frame size to
     // a multiple of frame step. Saves memory relative to the simpler frame_size
@@ -128,6 +131,7 @@ TfLiteStatus FramerPrepare(TfLiteContext* context, TfLiteNode* node) {
     params->state_buffers[i] =
         static_cast<int8_t*>(context->AllocatePersistentBuffer(
             context, state_size * sizeof(int8_t)));
+    TF_LITE_ENSURE(context, params->state_buffers[i] != nullptr);
     params->circular_buffers[i] = tflite::tflm_signal::CircularBufferInit(
         capacity, params->state_buffers[i], state_size);
   }

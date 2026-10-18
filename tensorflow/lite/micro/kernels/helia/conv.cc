@@ -15,6 +15,9 @@ limitations under the License.
 
 #include "tensorflow/lite/micro/kernels/conv.h"
 
+#include <cstddef>
+#include <cstdint>
+
 #include "Include/arm_nnfunctions.h"
 #include "Include/arm_nnsupportfunctions.h"
 #include "tensorflow/lite/micro/c/builtin_op_data.h"
@@ -155,12 +158,21 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   output_dims.c = output->dims->data[3];
   if (input->type == kTfLiteInt8 || input->type == kTfLiteInt16) {
     const int num_channels = filter->dims->data[kConvQuantizedDimension];
+    // The byte count wraps a 32-bit size_t from 2^30 channels.
+    TF_LITE_ENSURE(context,
+                   num_channels > 0 && static_cast<size_t>(num_channels) <=
+                                           SIZE_MAX / sizeof(int32_t));
     data->reference_op_data.per_channel_output_multiplier =
         static_cast<int32_t*>(context->AllocatePersistentBuffer(
             context, num_channels * sizeof(int32_t)));
+    TF_LITE_ENSURE(
+        context,
+        data->reference_op_data.per_channel_output_multiplier != nullptr);
     data->reference_op_data.per_channel_output_shift =
         static_cast<int32_t*>(context->AllocatePersistentBuffer(
             context, num_channels * sizeof(int32_t)));
+    TF_LITE_ENSURE(context,
+                   data->reference_op_data.per_channel_output_shift != nullptr);
   }
 
   // Float16 is unquantized like Float32; present it as Float32 so the

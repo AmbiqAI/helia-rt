@@ -49,18 +49,19 @@ TfLiteStatus SlicePrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, NumInputs(node), 3);
   TF_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
 
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
   TfLiteTensor* input =
       micro_context->AllocateTempInputTensor(node, kInputTensor);
-  TFLITE_DCHECK(input != nullptr);
+  TF_LITE_ENSURE(context, input != nullptr);
   TfLiteTensor* begin =
       micro_context->AllocateTempInputTensor(node, kBeginTensor);
-  TFLITE_DCHECK(begin != nullptr);
+  TF_LITE_ENSURE(context, begin != nullptr);
   TfLiteTensor* size =
       micro_context->AllocateTempInputTensor(node, kSizeTensor);
-  TFLITE_DCHECK(size != nullptr);
+  TF_LITE_ENSURE(context, size != nullptr);
   TfLiteTensor* output =
       micro_context->AllocateTempOutputTensor(node, kOutputTensor);
-  TFLITE_DCHECK(output != nullptr);
+  TF_LITE_ENSURE(context, output != nullptr);
 
   // Ensure validity of input tensor and its dimension.
   TFLITE_DCHECK(input->type == output->type);

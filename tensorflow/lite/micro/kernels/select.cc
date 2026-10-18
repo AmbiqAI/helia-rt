@@ -39,6 +39,10 @@ void* SelectInit(TfLiteContext* context, const char* buffer, size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
   auto* data = static_cast<OpData*>(
       context->AllocatePersistentBuffer(context, sizeof(OpData)));
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  if (data == nullptr) {
+    return nullptr;
+  }
   data->requires_broadcast = false;
   return data;
 }
@@ -90,6 +94,11 @@ TfLiteStatus SelectPrepare(TfLiteContext* context, TfLiteNode* node) {
 
   TfLiteTensor* output =
       micro_context->AllocateTempOutputTensor(node, kOutputTensor);
+  // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.
+  TF_LITE_ENSURE(context, input_condition != nullptr);
+  TF_LITE_ENSURE(context, input_x != nullptr);
+  TF_LITE_ENSURE(context, input_y != nullptr);
+  TF_LITE_ENSURE(context, output != nullptr);
 
   // Input must be bool.
   TF_LITE_ENSURE_TYPES_EQ(context, input_condition->type, kTfLiteBool);

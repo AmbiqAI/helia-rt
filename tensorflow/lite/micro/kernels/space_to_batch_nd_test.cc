@@ -41,7 +41,9 @@ void* InitWithNonzeroPadding(TfLiteContext* context, const char* buffer,
                              size_t length) {
   void* data = Register_SPACE_TO_BATCH_ND().init(context, buffer, length);
   // Persistent storage is not guaranteed to be zero-filled before Prepare.
-  static_cast<SpaceToBatchParams*>(data)->output_offset = 0x55555555;
+  if (data != nullptr) {
+    static_cast<SpaceToBatchParams*>(data)->output_offset = 0x55555555;
+  }
   return data;
 }
 

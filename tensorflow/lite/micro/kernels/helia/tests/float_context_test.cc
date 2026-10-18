@@ -24,6 +24,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/c/builtin_op_data.h"
 #include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/helia/depthwise_conv_helia.h"
+#include "tensorflow/lite/micro/kernels/helia/tests/allocation_sweep.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
 #include "tensorflow/lite/micro/kernels/micro_ops.h"
 #include "tensorflow/lite/micro/test_helpers.h"
@@ -40,6 +41,15 @@ limitations under the License.
 #else
 #define HELIA_FLOAT_CONTEXT_WRAPS 0
 #endif
+
+namespace {
+
+// The link wraps count the heliaCORE calls Prepare makes, which the
+// allocation sweep would repeat.
+[[maybe_unused]] const bool kAllocationSweepOff =
+    (tflite::micro::helia::AllocationSweepEnabled() = false, true);
+
+}  // namespace
 
 namespace {
 
