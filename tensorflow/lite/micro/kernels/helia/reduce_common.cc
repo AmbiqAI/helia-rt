@@ -426,13 +426,17 @@ TfLiteStatus FillEmptyReduction(TfLiteEvalTensor* output, T start) {
   return kTfLiteOk;
 }
 
-TfLiteStatus MinMaxStatus(arm_cmsis_nn_status status, const char* entry) {
+TfLiteStatus CoreStatus(arm_cmsis_nn_status status, const char* op,
+                        const char* entry) {
   if (status != ARM_CMSIS_NN_SUCCESS) {
-    MicroPrintf("REDUCE_MAX/REDUCE_MIN: %s failed (%d).", entry,
-                static_cast<int>(status));
+    MicroPrintf("%s: %s failed (%d).", op, entry, static_cast<int>(status));
     return kTfLiteError;
   }
   return kTfLiteOk;
+}
+
+TfLiteStatus MinMaxStatus(arm_cmsis_nn_status status, const char* entry) {
+  return CoreStatus(status, "REDUCE_MAX/REDUCE_MIN", entry);
 }
 
 TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
@@ -804,7 +808,7 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
           output_mult,
           output_shift
         );
-        return rst == ARM_CMSIS_NN_SUCCESS ? kTfLiteOk : kTfLiteError;
+        return CoreStatus(rst, "MEAN", "arm_mean_s8");
       }
       TF_LITE_ENSURE_OK(
           context, EvalIntegerMean<int8_t>(context, node, num_axis, op_data,
@@ -839,7 +843,7 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
           output_mult,
           output_shift
         );
-        return rst == ARM_CMSIS_NN_SUCCESS ? kTfLiteOk : kTfLiteError;
+        return CoreStatus(rst, "MEAN", "arm_mean_s16");
       }
       TF_LITE_ENSURE_OK(
           context, EvalIntegerMean<int16_t>(context, node, num_axis, op_data,
@@ -965,7 +969,7 @@ TfLiteStatus EvalSumHelper(TfLiteContext* context, TfLiteNode* node,
           output_mult,
           output_shift
         );
-        return rst == ARM_CMSIS_NN_SUCCESS ? kTfLiteOk : kTfLiteError;
+        return CoreStatus(rst, "SUM", "arm_mean_s8");
       }
 
       int32_t* temp_sum = static_cast<int32_t*>(
@@ -1003,7 +1007,7 @@ TfLiteStatus EvalSumHelper(TfLiteContext* context, TfLiteNode* node,
           output_mult,
           output_shift
         );
-        return rst == ARM_CMSIS_NN_SUCCESS ? kTfLiteOk : kTfLiteError;
+        return CoreStatus(rst, "SUM", "arm_mean_s16");
       }
 
       int32_t* temp_sum = static_cast<int32_t*>(
