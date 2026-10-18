@@ -75,13 +75,26 @@ constexpr int kMaxResourceVariables = 4;
 // working arena can exceed arena_used_bytes() by the planner's temp memory.
 constexpr size_t kInjectionHeadroom = 8 * 1024;
 
-// MicroInterpreter's constructor places these three in the arena tail without
-// checking that they fit, so no smaller arena is swept.
-constexpr size_t kConstructorFloor =
-    sizeof(tflite::SingleArenaBufferAllocator) +
-    alignof(tflite::SingleArenaBufferAllocator) +
-    sizeof(tflite::GreedyMemoryPlanner) + alignof(tflite::GreedyMemoryPlanner) +
-    sizeof(tflite::MicroAllocator) + alignof(tflite::MicroAllocator);
+// The smallest arena at g_arena that holds the three objects
+// MicroInterpreter's constructor places in the arena tail without checking
+// that they fit, found the way the constructor allocates them; no smaller
+// arena is swept.
+inline size_t ConstructorFloor() {
+  for (size_t size = 0;; ++size) {
+    tflite::SingleArenaBufferAllocator tail(g_arena, size);
+    if (tail.AllocatePersistentBuffer(
+            sizeof(tflite::SingleArenaBufferAllocator),
+            alignof(tflite::SingleArenaBufferAllocator)) != nullptr &&
+        tail.AllocatePersistentBuffer(sizeof(tflite::GreedyMemoryPlanner),
+                                      alignof(tflite::GreedyMemoryPlanner)) !=
+            nullptr &&
+        tail.AllocatePersistentBuffer(sizeof(tflite::MicroAllocator),
+                                      alignof(tflite::MicroAllocator)) !=
+            nullptr) {
+      return size;
+    }
+  }
+}
 
 using Resolver = tflite::MicroMutableOpResolver<48>;
 
@@ -135,23 +148,36 @@ inline bool GuardIntact(size_t arena_size) {
   return true;
 }
 
+// Runs Invoke, on zeroed inputs, after AllocateTensors succeeds.
+inline TfLiteStatus InvokeAllocated(tflite::MicroInterpreter& interpreter) {
+  for (size_t i = 0; i < interpreter.inputs_size(); ++i) {
+    TfLiteTensor* input = interpreter.input(i);
+    std::memset(input->data.raw, 0, input->bytes);
+  }
+  return interpreter.Invoke();
+}
+
+// Returns the AllocateTensors status; with `invoke_status`, a successful
+// allocation is also invoked and that status stored there.
 inline TfLiteStatus AllocateInArena(const tflite::Model* model,
                                     const Resolver& resolver, size_t arena_size,
-                                    bool resource_variables,
-                                    bool* guard_intact) {
+                                    bool resource_variables, bool* guard_intact,
+                                    TfLiteStatus* invoke_status = nullptr) {
   std::memset(g_arena, kFill, arena_size + kGuardSize);
   TfLiteStatus status = kTfLiteError;
-  if (resource_variables) {
-    tflite::MicroAllocator* allocator =
-        tflite::MicroAllocator::Create(g_arena, arena_size);
-    tflite::MicroResourceVariables* variables =
-        tflite::MicroResourceVariables::Create(allocator,
-                                               kMaxResourceVariables);
+  tflite::MicroAllocator* allocator =
+      tflite::MicroAllocator::Create(g_arena, arena_size);
+  tflite::MicroResourceVariables* variables =
+      resource_variables ? tflite::MicroResourceVariables::Create(
+                               allocator, kMaxResourceVariables)
+                         : nullptr;
+  {
     tflite::MicroInterpreter interpreter(model, resolver, allocator, variables);
     status = interpreter.AllocateTensors();
-  } else {
-    tflite::MicroInterpreter interpreter(model, resolver, g_arena, arena_size);
-    status = interpreter.AllocateTensors();
+    if (invoke_status != nullptr) {
+      *invoke_status =
+          status == kTfLiteOk ? InvokeAllocated(interpreter) : kTfLiteError;
+    }
   }
   *guard_intact = GuardIntact(arena_size);
   return status;
@@ -169,9 +195,10 @@ inline void SweepArenaSizes(const char* label, const unsigned char* model_data,
                             &guard_intact),
             kTfLiteOk);
 
+  const size_t floor = ConstructorFloor();
   size_t required = 0;
   int undersized = 0;
-  for (size_t size = kConstructorFloor; size <= kArenaSize; size += kStep) {
+  for (size_t size = floor; size <= kArenaSize; size += kStep) {
     const TfLiteStatus status = AllocateInArena(
         model, resolver, size, resource_variables, &guard_intact);
     if (!guard_intact) {
@@ -189,16 +216,19 @@ inline void SweepArenaSizes(const char* label, const unsigned char* model_data,
   MicroPrintf(
       "%s: smallest working arena %d, %d undersized arenas from %d bytes "
       "failed cleanly",
-      label, static_cast<int>(required), undersized,
-      static_cast<int>(kConstructorFloor));
+      label, static_cast<int>(required), undersized, static_cast<int>(floor));
   ASSERT_GT(required, 0u);
   ASSERT_LE(required + kMonotonicSpan, kArenaSize);
 
-  for (size_t size = required + kStep; size <= required + kMonotonicSpan;
+  // The smallest working arena and the sizes just above it allocate, invoke
+  // and stay inside the arena.
+  for (size_t size = required; size <= required + kMonotonicSpan;
        size += kStep) {
+    TfLiteStatus invoke_status = kTfLiteError;
     EXPECT_EQ(AllocateInArena(model, resolver, size, resource_variables,
-                              &guard_intact),
+                              &guard_intact, &invoke_status),
               kTfLiteOk);
+    EXPECT_EQ(invoke_status, kTfLiteOk);
     EXPECT_TRUE(guard_intact);
   }
 }

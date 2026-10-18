@@ -16,10 +16,10 @@ limitations under the License.
 // AllocateTensors at every arena size, in 12-byte steps, from the smallest
 // one MicroInterpreter can be constructed in up to the smallest one the model
 // runs in: each must return kTfLiteError without writing past the arena end,
-// and that size and the sizes just above it must succeed. The keyword model's
-// arena is mostly persistent data and the int8 conv model's mostly
-// activations. Sweeping every model this way is too slow for the FVP;
-// arena_exhaustion_injection_test.cc fails each of every model's allocations
+// and that size and the sizes just above it must allocate and invoke. The
+// keyword model's arena is mostly persistent data and the int8 conv model's
+// mostly activations. Sweeping every model this way is too slow for the FVP;
+// the arena_exhaustion_injection tests fail each of every model's allocations
 // instead. see AmbiqAI/helia-rt#449
 
 #include "flatbuffers/flatbuffers.h"  // from @flatbuffers
