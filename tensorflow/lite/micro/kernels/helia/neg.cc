@@ -97,11 +97,20 @@ TfLiteStatus NegEval(TfLiteContext* context, TfLiteNode* node) {
       return EvalHeliaNeg<float>(context, input, output, arm_nn_neg_f32,
                                  "arm_nn_neg_f32");
 #else
-      reference_ops::Negate(tflite::micro::GetTensorShape(input),
+    {
+      // The reference writes as many elements as it reads, as the entry does.
+      TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
+      int32_t count;
+      TF_LITE_ENSURE_OK(context,
+                        HeliaCheckedMatchingElementCount(
+                            context, input->dims, output->dims, &count));
+      const RuntimeShape flat_shape(1, &count);
+      reference_ops::Negate(flat_shape,
                             tflite::micro::GetTensorData<float>(input),
-                            tflite::micro::GetTensorShape(output),
+                            flat_shape,
                             tflite::micro::GetTensorData<float>(output));
       break;
+    }
 #endif
 #if ARM_NN_ENABLE_F16
     case kTfLiteFloat16: {
