@@ -13,11 +13,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-// SPLIT, SQUEEZE, DIV and ADD return kTfLiteError on a malformed model or a
-// zero int32 divisor instead of indexing out of bounds, dividing by zero or
-// reaching TFLITE_ABORT. see AmbiqAI/helia-rt#451
+// SPLIT, SQUEEZE, DIV and ADD return kTfLiteError on a malformed model, a zero
+// int32 divisor or INT32_MIN / -1, instead of indexing out of bounds, hitting
+// undefined integer division or reaching TFLITE_ABORT.
+// see AmbiqAI/helia-rt#451
 
+#include <cmath>
 #include <cstdint>
+#include <limits>
 
 #include "tensorflow/lite/micro/c/builtin_op_data.h"
 #include "tensorflow/lite/micro/c/common.h"
@@ -135,17 +138,18 @@ TfLiteStatus PrepareSqueeze(int* output_dims) {
   return runner.InitAndPrepare();
 }
 
-// Divides {8, 9, 10, 12} by `divisor` of shape `divisor_dims` and checks the
-// output was not written.
-TfLiteStatus InvokeDivInt32(const int32_t* divisor, int* divisor_dims) {
+// Divides `dividend` by `divisor` into an output shaped like `dividend`, with
+// four elements. On kTfLiteOk the output must equal `expected` when one is
+// given; on an error it must be unwritten.
+TfLiteStatus InvokeDivInt32(const int32_t* dividend, int* dividend_dims,
+                            const int32_t* divisor, int* divisor_dims,
+                            const int32_t* expected) {
   constexpr int32_t kSentinel = 0x5a5a5a5a;
-  const int32_t dividend[4] = {8, 9, 10, 12};
   int32_t output[4] = {kSentinel, kSentinel, kSentinel, kSentinel};
-  int shape[] = {4, 1, 1, 1, 4};
   TfLiteTensor tensors[] = {
-      CreateTensor(dividend, IntArrayFromInts(shape)),
+      CreateTensor(dividend, IntArrayFromInts(dividend_dims)),
       CreateTensor(divisor, IntArrayFromInts(divisor_dims)),
-      CreateTensor(output, IntArrayFromInts(shape)),
+      CreateTensor(output, IntArrayFromInts(dividend_dims)),
   };
   TfLiteDivParams params = {};
   params.activation = kTfLiteActNone;
@@ -157,7 +161,13 @@ TfLiteStatus InvokeDivInt32(const int32_t* divisor, int* divisor_dims) {
   TfLiteStatus status = runner.InitAndPrepare();
   EXPECT_EQ(kTfLiteOk, status);
   if (status == kTfLiteOk) status = runner.Invoke();
-  for (int32_t value : output) EXPECT_EQ(kSentinel, value);
+  for (int i = 0; i < 4; ++i) {
+    if (status != kTfLiteOk) {
+      EXPECT_EQ(kSentinel, output[i]);
+    } else if (expected != nullptr) {
+      EXPECT_EQ(expected[i], output[i]);
+    }
+  }
   return status;
 }
 
@@ -184,6 +194,51 @@ TfLiteStatus PrepareAddUnquantized(int unquantized) {
   micro::KernelRunner runner(registration, tensors, 3, IntArrayFromInts(inputs),
                              IntArrayFromInts(outputs), &params);
   return runner.InitAndPrepare();
+}
+
+// Prepares an ADD whose input1, input2 and output carry the given scales.
+template <typename T>
+TfLiteStatus PrepareAddScales(float scale1, float scale2, float output_scale) {
+  T input1[4] = {};
+  T input2[4] = {};
+  T output[4] = {};
+  int shape[] = {1, 4};
+  TfLiteTensor tensors[] = {
+      CreateQuantizedTensor(input1, IntArrayFromInts(shape), scale1, 0),
+      CreateQuantizedTensor(input2, IntArrayFromInts(shape), scale2, 0),
+      CreateQuantizedTensor(output, IntArrayFromInts(shape), output_scale, 0),
+  };
+  TfLiteAddParams params = {};
+  params.activation = kTfLiteActNone;
+  int inputs[] = {2, 0, 1};
+  int outputs[] = {1, 2};
+  const TFLMRegistration registration = tflite::Register_ADD();
+  micro::KernelRunner runner(registration, tensors, 3, IntArrayFromInts(inputs),
+                             IntArrayFromInts(outputs), &params);
+  return runner.InitAndPrepare();
+}
+
+template <typename T>
+void ExpectAddRejectsScales() {
+  const float nan = std::numeric_limits<float>::quiet_NaN();
+  const float inf = std::numeric_limits<float>::infinity();
+  EXPECT_EQ(kTfLiteError, PrepareAddScales<T>(0.f, 0.25f, 1.f));
+  EXPECT_EQ(kTfLiteError, PrepareAddScales<T>(0.5f, -0.25f, 1.f));
+  EXPECT_EQ(kTfLiteError, PrepareAddScales<T>(0.5f, 0.25f, nan));
+  EXPECT_EQ(kTfLiteError, PrepareAddScales<T>(inf, 0.25f, 1.f));
+  EXPECT_EQ(kTfLiteError, PrepareAddScales<T>(0.5f, 0.5f, 1e-7f));
+  // All negative: every multiplier lands in (0, 1).
+  EXPECT_EQ(kTfLiteError, PrepareAddScales<T>(-0.5f, -0.4f, -1.f));
+}
+
+// With both input scales 0.5 the output multiplier is
+// 2^-left_shift / output_scale, where left_shift is 20 for int8 and 15 for
+// int16.
+template <typename T>
+void ExpectAddOutputMultiplierBoundary(int left_shift) {
+  const float at_one = std::ldexp(1.f, -left_shift);
+  EXPECT_EQ(kTfLiteError, PrepareAddScales<T>(0.5f, 0.5f, at_one));
+  EXPECT_EQ(kTfLiteOk, PrepareAddScales<T>(0.5f, 0.5f, at_one * 1.001f));
 }
 
 }  // namespace
@@ -234,11 +289,50 @@ TEST(HeliaMalformedModelTest, SqueezeRejectsShortOrShrunkOutput) {
 TEST(HeliaMalformedModelTest, DivInt32RejectsZeroDivisor) {
   using tflite::testing::InvokeDivInt32;
   int same_shape[] = {4, 1, 1, 1, 4};
+  const int32_t dividend[4] = {8, 9, 10, 12};
   const int32_t last_zero[4] = {2, 3, 5, 0};
-  EXPECT_EQ(kTfLiteError, InvokeDivInt32(last_zero, same_shape));
+  EXPECT_EQ(kTfLiteError, InvokeDivInt32(dividend, same_shape, last_zero,
+                                         same_shape, nullptr));
   int scalar_shape[] = {4, 1, 1, 1, 1};
   const int32_t zero[1] = {0};
-  EXPECT_EQ(kTfLiteError, InvokeDivInt32(zero, scalar_shape));
+  EXPECT_EQ(kTfLiteError,
+            InvokeDivInt32(dividend, same_shape, zero, scalar_shape, nullptr));
+}
+
+TEST(HeliaMalformedModelTest, DivInt32RejectsMinByMinusOne) {
+  using tflite::testing::InvokeDivInt32;
+  constexpr int32_t kMin = std::numeric_limits<int32_t>::min();
+  int same_shape[] = {4, 1, 1, 1, 4};
+  const int32_t last_min[4] = {1, 2, 3, kMin};
+  const int32_t last_minus_one[4] = {1, 1, 1, -1};
+  EXPECT_EQ(kTfLiteError, InvokeDivInt32(last_min, same_shape, last_minus_one,
+                                         same_shape, nullptr));
+  // Unpaired INT32_MIN and -1 still divide.
+  const int32_t first_min[4] = {kMin, 4, 6, 8};
+  const int32_t unpaired[4] = {2, -1, 1, 1};
+  const int32_t unpaired_quotient[4] = {kMin / 2, -4, 6, 8};
+  EXPECT_EQ(kTfLiteOk, InvokeDivInt32(first_min, same_shape, unpaired,
+                                      same_shape, unpaired_quotient));
+  int scalar_shape[] = {4, 1, 1, 1, 1};
+  const int32_t minus_one[1] = {-1};
+  EXPECT_EQ(kTfLiteError, InvokeDivInt32(first_min, same_shape, minus_one,
+                                         scalar_shape, nullptr));
+  // A {2, 2} dividend over a {2, 1} divisor: row 0 divides by divisor[0].
+  int square_shape[] = {4, 1, 1, 2, 2};
+  int column_shape[] = {4, 1, 1, 2, 1};
+  const int32_t row1_minus_one[2] = {2, -1};
+  const int32_t row_quotient[4] = {kMin / 2, 2, -6, -8};
+  EXPECT_EQ(kTfLiteOk, InvokeDivInt32(first_min, square_shape, row1_minus_one,
+                                      column_shape, row_quotient));
+  // INT32_MIN at flat index 1 pairs with divisor[0], not divisor[1].
+  const int32_t second_min[4] = {4, kMin, 6, 8};
+  const int32_t second_quotient[4] = {2, kMin / 2, -6, -8};
+  EXPECT_EQ(kTfLiteOk, InvokeDivInt32(second_min, square_shape, row1_minus_one,
+                                      column_shape, second_quotient));
+  const int32_t row0_minus_one[2] = {-1, 2};
+  EXPECT_EQ(kTfLiteError,
+            InvokeDivInt32(first_min, square_shape, row0_minus_one,
+                           column_shape, nullptr));
 }
 
 TEST(HeliaMalformedModelTest, AddRejectsUnquantizedInt8Int16) {
@@ -247,6 +341,16 @@ TEST(HeliaMalformedModelTest, AddRejectsUnquantizedInt8Int16) {
     EXPECT_EQ(kTfLiteError, PrepareAddUnquantized<int8_t>(unquantized));
     EXPECT_EQ(kTfLiteError, PrepareAddUnquantized<int16_t>(unquantized));
   }
+}
+
+TEST(HeliaMalformedModelTest, AddRejectsInvalidScales) {
+  tflite::testing::ExpectAddRejectsScales<int8_t>();
+  tflite::testing::ExpectAddRejectsScales<int16_t>();
+}
+
+TEST(HeliaMalformedModelTest, AddOutputMultiplierBoundary) {
+  tflite::testing::ExpectAddOutputMultiplierBoundary<int8_t>(20);
+  tflite::testing::ExpectAddOutputMultiplierBoundary<int16_t>(15);
 }
 
 TF_LITE_MICRO_TESTS_MAIN
