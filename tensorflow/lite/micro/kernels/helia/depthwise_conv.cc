@@ -23,6 +23,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/c/builtin_op_data.h"
 #include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/conv.h"
+#include "tensorflow/lite/micro/kernels/helia/depthwise_conv_helia.h"
 #include "tensorflow/lite/micro/kernels/helia/helia_float_common.h"
 #include "tensorflow/lite/micro/kernels/internal/common.h"
 #include "tensorflow/lite/micro/kernels/internal/quantization_util.h"
@@ -654,6 +655,74 @@ TfLiteStatus EvalQuantizedPerChannel16x8(
   return kTfLiteOk;
 }
 
+// Float16 layers on heliaCORE. kAcc16 selects the float16-lane entry, which
+// Register_DEPTHWISE_CONV_2D_FLOAT16_ACC16 takes for speed; a template
+// parameter so that each Eval references only its own entry.
+template <bool kAcc16>
+TfLiteStatus EvalFloat16(TfLiteContext* context,
+                         const TfLiteDepthwiseConvParams& params,
+                         const OpData& data, const TfLiteEvalTensor* input,
+                         const TfLiteEvalTensor* filter,
+                         const TfLiteEvalTensor* bias,
+                         TfLiteEvalTensor* output) {
+#if ARM_NN_ENABLE_F16
+  cmsis_nn_dims input_dims = {input->dims->data[0], input->dims->data[1],
+                              input->dims->data[2], input->dims->data[3]};
+  cmsis_nn_dims filter_dims = {filter->dims->data[0], filter->dims->data[1],
+                               filter->dims->data[2], filter->dims->data[3]};
+  cmsis_nn_dims output_dims = {output->dims->data[0], output->dims->data[1],
+                               output->dims->data[2], output->dims->data[3]};
+  cmsis_nn_dims bias_dims = {1, 1, 1, output_dims.c};
+  float activation_min;
+  float activation_max;
+  CalculateActivationRange(params.activation, &activation_min, &activation_max);
+  cmsis_nn_dw_conv_params_f16 dw_params = {
+      .ch_mult = params.depth_multiplier,
+      .stride = {params.stride_width, params.stride_height},
+      .padding = {data.reference_op_data.padding.width,
+                  data.reference_op_data.padding.height},
+      .dilation = {params.dilation_width_factor, params.dilation_height_factor},
+      .activation = {HeliaFloat16ActivationBound(activation_min),
+                     HeliaFloat16ActivationBound(activation_max)}};
+  cmsis_nn_context ctx = {nullptr, 0};
+  if (data.activation_buffer_idx >= 0) {
+    ctx.buf = context->GetScratchBuffer(context, data.activation_buffer_idx);
+    ctx.size = data.activation_buffer_size;
+  }
+  arm_cmsis_nn_status status;
+  if constexpr (kAcc16) {
+    status = arm_depthwise_conv_wrapper_f16_acc16(
+        &ctx, &dw_params, &input_dims,
+        tflite::micro::GetTensorData<float16_t>(input), &filter_dims,
+        tflite::micro::GetTensorData<float16_t>(filter), &bias_dims,
+        tflite::micro::GetOptionalTensorData<float16_t>(bias), &output_dims,
+        tflite::micro::GetTensorData<float16_t>(output));
+  } else {
+    status = arm_depthwise_conv_wrapper_f16(
+        &ctx, &dw_params, &input_dims,
+        tflite::micro::GetTensorData<float16_t>(input), &filter_dims,
+        tflite::micro::GetTensorData<float16_t>(filter), &bias_dims,
+        tflite::micro::GetOptionalTensorData<float16_t>(bias), &output_dims,
+        tflite::micro::GetTensorData<float16_t>(output));
+  }
+  if (status == ARM_CMSIS_NN_SUCCESS) {
+    return kTfLiteOk;
+  }
+#else
+  (void)context;
+  (void)params;
+  (void)data;
+  (void)input;
+  (void)filter;
+  (void)bias;
+  (void)output;
+#endif
+  MicroPrintf(
+      "Float16 DEPTHWISE_CONV_2D: optimized kernel rejected the "
+      "configuration.");
+  return kTfLiteError;
+}
+
 TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
   TFLITE_DCHECK(node->builtin_data != nullptr);
@@ -674,47 +743,9 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
           : nullptr;
 
   switch (input->type) {  // Already know in/out types are same.
-    case kTfLiteFloat16: {
-#if ARM_NN_ENABLE_F16
-      cmsis_nn_dims input_dims = {input->dims->data[0], input->dims->data[1],
-                                  input->dims->data[2], input->dims->data[3]};
-      cmsis_nn_dims filter_dims = {filter->dims->data[0], filter->dims->data[1],
-                                   filter->dims->data[2], filter->dims->data[3]};
-      cmsis_nn_dims output_dims = {output->dims->data[0], output->dims->data[1],
-                                   output->dims->data[2], output->dims->data[3]};
-      cmsis_nn_dims bias_dims = {1, 1, 1, output_dims.c};
-      float activation_min;
-      float activation_max;
-      CalculateActivationRange(params.activation, &activation_min,
-                               &activation_max);
-      cmsis_nn_dw_conv_params_f16 dw_params = {
-          .ch_mult = params.depth_multiplier,
-          .stride = {params.stride_width, params.stride_height},
-          .padding = {data.reference_op_data.padding.width,
-                      data.reference_op_data.padding.height},
-          .dilation = {params.dilation_width_factor,
-                       params.dilation_height_factor},
-          .activation = {HeliaFloat16ActivationBound(activation_min),
-                         HeliaFloat16ActivationBound(activation_max)}};
-      cmsis_nn_context ctx = {nullptr, 0};
-      if (data.activation_buffer_idx >= 0) {
-        ctx.buf = context->GetScratchBuffer(context, data.activation_buffer_idx);
-        ctx.size = data.activation_buffer_size;
-      }
-      if (arm_depthwise_conv_wrapper_f16(
-              &ctx, &dw_params, &input_dims, tflite::micro::GetTensorData<float16_t>(input),
-              &filter_dims, tflite::micro::GetTensorData<float16_t>(filter), &bias_dims,
-              tflite::micro::GetOptionalTensorData<float16_t>(bias),
-              &output_dims, tflite::micro::GetTensorData<float16_t>(output)) ==
-          ARM_CMSIS_NN_SUCCESS) {
-        break;
-      }
-#endif
-      MicroPrintf(
-          "Float16 DEPTHWISE_CONV_2D: optimized kernel rejected the "
-          "configuration.");
-      return kTfLiteError;
-    }
+    case kTfLiteFloat16:
+      return EvalFloat16</*kAcc16=*/false>(context, params, data, input, filter,
+                                           bias, output);
     case kTfLiteFloat32: {
 #if ARM_NN_ENABLE_F32
       cmsis_nn_dims input_dims = {input->dims->data[0], input->dims->data[1],
@@ -789,6 +820,30 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
       return kTfLiteError;
   }
   return kTfLiteOk;
+}
+
+// Every type as Eval does, except float16 layers on the float16-lane entry.
+TfLiteStatus EvalFloat16Acc16(TfLiteContext* context, TfLiteNode* node) {
+  const TfLiteEvalTensor* input =
+      tflite::micro::GetEvalInput(context, node, kDepthwiseConvInputTensor);
+  if (input->type != kTfLiteFloat16) {
+    return Eval(context, node);
+  }
+  TFLITE_DCHECK(node->user_data != nullptr);
+  TFLITE_DCHECK(node->builtin_data != nullptr);
+  const auto& params =
+      *(reinterpret_cast<TfLiteDepthwiseConvParams*>(node->builtin_data));
+  const OpData& data = *(static_cast<OpData*>(node->user_data));
+  TfLiteEvalTensor* output =
+      tflite::micro::GetEvalOutput(context, node, kDepthwiseConvOutputTensor);
+  const TfLiteEvalTensor* filter =
+      tflite::micro::GetEvalInput(context, node, kDepthwiseConvWeightsTensor);
+  const TfLiteEvalTensor* bias =
+      (NumInputs(node) == 3)
+          ? tflite::micro::GetEvalInput(context, node, kDepthwiseConvBiasTensor)
+          : nullptr;
+  return EvalFloat16</*kAcc16=*/true>(context, params, data, input, filter,
+                                      bias, output);
 }
 
 TfLiteStatus EvalInt8(TfLiteContext* context, TfLiteNode* node) {
@@ -876,6 +931,10 @@ TFLMRegistration Register_DEPTHWISE_CONV_2D_INT16() {
 
 TFLMRegistration Register_DEPTHWISE_CONV_2D_INT4() {
   return tflite::micro::RegisterOp(Init, Prepare, EvalInt4);
+}
+
+TFLMRegistration Register_DEPTHWISE_CONV_2D_FLOAT16_ACC16() {
+  return tflite::micro::RegisterOp(Init, Prepare, EvalFloat16Acc16);
 }
 
 }  // namespace micro
