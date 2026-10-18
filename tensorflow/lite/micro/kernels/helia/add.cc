@@ -15,6 +15,8 @@ limitations under the License.
 
 #include "tensorflow/lite/micro/kernels/internal/reference/add.h"
 
+#include <cmath>
+
 #include "Include/arm_nnfunctions.h"
 
 #include "tensorflow/lite/micro/c/builtin_op_data.h"
@@ -65,6 +67,16 @@ struct OpData {
   HeliaBroadcastClass broadcast_class;
 };
 
+// QuantizeMultiplierSmallerThanOneExp aborts unless `multiplier` is in (0, 1)
+// and stays below 1 when rounded to Q31.
+bool IsQ31MultiplierBelowOne(double multiplier) {
+  return multiplier > 0. && multiplier < 1. - 1. / (1LL << 32);
+}
+
+bool IsPositiveFiniteScale(float scale) {
+  return std::isfinite(scale) && scale > 0.f;
+}
+
 TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteAddParams* params,
                              const TfLiteTensor* input1,
                              const TfLiteTensor* input2, TfLiteTensor* output,
@@ -90,6 +102,11 @@ TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteAddParams* params,
     const double real_output_multiplier =
         twice_max_input_scale /
         ((1 << data->left_shift) * static_cast<double>(output->params.scale));
+    TF_LITE_ENSURE_MSG(context,
+                       IsQ31MultiplierBelowOne(real_input1_multiplier) &&
+                           IsQ31MultiplierBelowOne(real_input2_multiplier) &&
+                           IsQ31MultiplierBelowOne(real_output_multiplier),
+                       "ADD scales give a rescale multiplier outside (0, 1).");
 
     QuantizeMultiplierSmallerThanOneExp(
         real_input1_multiplier, &data->input1_multiplier, &data->input1_shift);
@@ -492,6 +509,11 @@ TfLiteStatus PrepareAdd(TfLiteContext* context, TfLiteNode* node) {
             input2->quantization.type != kTfLiteNoQuantization &&
             output->quantization.type != kTfLiteNoQuantization,
         "ADD int8/int16 requires quantized input1, input2 and output.");
+    TF_LITE_ENSURE_MSG(context,
+                       IsPositiveFiniteScale(input1->params.scale) &&
+                           IsPositiveFiniteScale(input2->params.scale) &&
+                           IsPositiveFiniteScale(output->params.scale),
+                       "ADD int8/int16 requires finite scales above zero.");
   }
 
   OpData* data = static_cast<OpData*>(node->user_data);
