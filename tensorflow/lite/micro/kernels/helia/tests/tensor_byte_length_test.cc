@@ -14,11 +14,13 @@ limitations under the License.
 ==============================================================================*/
 
 // Tensor byte sizes come from model shapes, so BytesRequiredForTensor and
-// TfLiteEvalTensorByteLength must fail on a negative dimension, an element
-// count above INT_MAX or a byte count above kMaxTensorBytes, the largest the
-// memory planner can hold once rounded up to the arena alignment. The failure
-// must stop AllocateTensors before any kernel Prepare and must reach
-// CopyOpInputsToOpOutputs. see AmbiqAI/helia-rt#453
+// TfLiteEvalTensorByteLength must fail on a negative dimension or an element
+// or byte count above kMaxTensorBytes, the largest the memory planner can hold
+// once rounded up to the arena alignment. The failure must stop
+// AllocateTensors before any kernel Prepare and must reach
+// CopyOpInputsToOpOutputs. The arena allocators and memory planners must
+// refuse a request or plan that does not fit, rather than wrap.
+// see AmbiqAI/helia-rt#453
 
 #include <climits>
 #include <cstddef>
@@ -26,9 +28,13 @@ limitations under the License.
 #include <initializer_list>
 
 #include "flatbuffers/flatbuffers.h"  // from @flatbuffers
+#include "tensorflow/lite/micro/arena_allocator/non_persistent_arena_buffer_allocator.h"
+#include "tensorflow/lite/micro/arena_allocator/persistent_arena_buffer_allocator.h"
 #include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/memory_helpers.h"
+#include "tensorflow/lite/micro/memory_planner/greedy_memory_planner.h"
+#include "tensorflow/lite/micro/memory_planner/linear_memory_planner.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/micro/test_helpers.h"
@@ -109,23 +115,39 @@ const tflite::Model* FinishModel(
   return tflite::GetModel(builder.GetBufferPointer());
 }
 
-// The custom no_op with outputs [3, 2] int8 and `shape` of `type`.
-const tflite::Model* NoOpModel(TensorType type,
-                               const std::initializer_list<int32_t>& shape,
-                               bool is_variable = false) {
+// The custom no_op with outputs `first_shape` int8 and `shape` of `type`.
+const tflite::Model* NoOpModel(
+    TensorType type, const std::initializer_list<int32_t>& shape,
+    bool is_variable = false,
+    const std::initializer_list<int32_t>& first_shape = {3, 2}) {
   flatbuffer_storage.Reset();
   flatbuffers::FlatBufferBuilder builder(1024, &flatbuffer_storage);
-  const int32_t small_shape[] = {3, 2};
   return FinishModel(
       builder,
       tflite::CreateOperatorCodeDirect(builder, 0, "no_op", 0,
                                        tflite::BuiltinOperator_CUSTOM),
-      {tflite::CreateTensor(builder, builder.CreateVector(small_shape, 2),
-                            TensorType_INT8, 0, builder.CreateString("a")),
+      {tflite::CreateTensor(
+           builder,
+           builder.CreateVector(first_shape.begin(), first_shape.size()),
+           TensorType_INT8, 0, builder.CreateString("a")),
        tflite::CreateTensor(
            builder, builder.CreateVector(shape.begin(), shape.size()), type, 0,
            builder.CreateString("b"), 0, is_variable)},
       {}, {0, 1}, {}, {0, 1}, {tflite::CreateBuffer(builder)});
+}
+
+// The custom big_scratch op with one [3, 2] int8 output.
+const tflite::Model* ScratchModel() {
+  flatbuffer_storage.Reset();
+  flatbuffers::FlatBufferBuilder builder(1024, &flatbuffer_storage);
+  const int32_t shape[] = {3, 2};
+  return FinishModel(
+      builder,
+      tflite::CreateOperatorCodeDirect(builder, 0, "big_scratch", 0,
+                                       tflite::BuiltinOperator_CUSTOM),
+      {tflite::CreateTensor(builder, builder.CreateVector(shape, 2),
+                            TensorType_INT8, 0, builder.CreateString("a"))},
+      {}, {0}, {}, {0}, {tflite::CreateBuffer(builder)});
 }
 
 // MEAN over axis 1 of a [rows, columns] int8 input.
@@ -173,11 +195,37 @@ alignas(16) uint8_t arena[kArenaSize];
 
 TfLiteStatus AllocateNoOp(TensorType type,
                           const std::initializer_list<int32_t>& shape,
-                          bool is_variable = false) {
+                          bool is_variable = false,
+                          const std::initializer_list<int32_t>& first_shape = {
+                              3, 2}) {
   tflite::testing::TestingOpResolver op_resolver;
   TF_LITE_ENSURE_STATUS(tflite::testing::GetTestingOpResolver(op_resolver));
-  tflite::MicroInterpreter interpreter(NoOpModel(type, shape, is_variable),
-                                       op_resolver, arena, kArenaSize);
+  tflite::MicroInterpreter interpreter(
+      NoOpModel(type, shape, is_variable, first_shape), op_resolver, arena,
+      kArenaSize);
+  return interpreter.AllocateTensors();
+}
+
+size_t scratch_request_bytes = 0;
+
+TfLiteStatus BigScratchPrepare(TfLiteContext* context, TfLiteNode* node) {
+  int index = -1;
+  return context->RequestScratchBufferInArena(context, scratch_request_bytes,
+                                              &index);
+}
+
+TfLiteStatus NoInvoke(TfLiteContext* context, TfLiteNode* node) {
+  return kTfLiteOk;
+}
+
+TfLiteStatus AllocateWithScratch(size_t bytes) {
+  scratch_request_bytes = bytes;
+  static TFLMRegistration registration =
+      tflite::micro::RegisterOp(nullptr, BigScratchPrepare, NoInvoke);
+  tflite::MicroMutableOpResolver<1> op_resolver;
+  TF_LITE_ENSURE_STATUS(op_resolver.AddCustom("big_scratch", &registration));
+  tflite::MicroInterpreter interpreter(ScratchModel(), op_resolver, arena,
+                                       kArenaSize);
   return interpreter.AllocateTensors();
 }
 
@@ -365,8 +413,7 @@ TEST(TensorByteLengthTest, AllocateTensorsFailsOnSizeOverflow) {
             AllocateNoOp(TensorType_INT16, {16, 2}, /*is_variable=*/true));
 }
 
-// MEAN's Prepare uses its input tensor without a null check, so the size check
-// has to fail AllocateTensors before Prepare runs.
+// The overflowing input must fail AllocateTensors before MEAN's Prepare runs.
 TEST(TensorByteLengthTest, AllocateTensorsFailsBeforeKernelPrepare) {
   EXPECT_EQ(kTfLiteError, AllocateMean(65536, 65536));
   EXPECT_EQ(kTfLiteOk, AllocateMean(16, 8));
@@ -387,6 +434,75 @@ TEST(TensorByteLengthTest, CopyOpInputsToOpOutputsFailsOnSizeOverflow) {
   EXPECT_EQ(kTfLiteOk,
             CopyWithDims(kTfLiteInt8, fits, input_data, output_data));
   EXPECT_EQ(1, output_data[0]);
+}
+
+TEST(TensorByteLengthTest, AllocateTensorsFailsOnPlanAboveIntMax) {
+  // Two live 1.2e9-byte tensors: each fits, their offsets do not.
+  EXPECT_EQ(kTfLiteError,
+            AllocateNoOp(TensorType_INT8, {1200000000}, false, {1200000000}));
+}
+
+TEST(TensorByteLengthTest, AllocateTensorsFailsOnOversizedScratchRequest) {
+  EXPECT_EQ(kTfLiteError, AllocateWithScratch(tflite::kMaxTensorBytes + 1));
+  // Rounding this up for the planner would wrap to a small size.
+  EXPECT_EQ(kTfLiteError, AllocateWithScratch(SIZE_MAX - 7));
+  EXPECT_EQ(kTfLiteOk, AllocateWithScratch(64));
+}
+
+TEST(TensorByteLengthTest, PersistentArenaAllocatorRefusesOversizedRequest) {
+  alignas(16) static uint8_t buffer[1024];
+  tflite::PersistentArenaBufferAllocator allocator(buffer, sizeof(buffer));
+  EXPECT_EQ(nullptr, allocator.AllocatePersistentBuffer(SIZE_MAX - 15, 16));
+  EXPECT_EQ(nullptr, allocator.AllocatePersistentBuffer(sizeof(buffer) + 1, 1));
+  EXPECT_EQ(buffer, allocator.AllocatePersistentBuffer(sizeof(buffer), 16));
+}
+
+TEST(TensorByteLengthTest, NonPersistentArenaAllocatorStaysInsideArena) {
+  alignas(16) static uint8_t buffer[64];
+  {
+    // The 16-byte-aligned temp start lies past the 20-byte arena's tail.
+    tflite::NonPersistentArenaBufferAllocator allocator(buffer, 20);
+    EXPECT_NE(nullptr, allocator.AllocateTemp(17, 1));
+    EXPECT_EQ(nullptr, allocator.AllocateTemp(1, 16));
+    EXPECT_EQ(static_cast<size_t>(0), allocator.GetAvailableMemory(16));
+  }
+  {
+    // The 16-byte-aligned resizable buffer starts past the arena's tail.
+    tflite::NonPersistentArenaBufferAllocator allocator(buffer + 1, 8);
+    EXPECT_EQ(nullptr, allocator.AllocateResizableBuffer(4, 16));
+    EXPECT_EQ(static_cast<size_t>(0), allocator.GetAvailableMemory(16));
+    EXPECT_EQ(buffer + 1, allocator.AllocateResizableBuffer(4, 1));
+  }
+}
+
+TEST(TensorByteLengthTest, GreedyPlannerRefusesPlanAboveIntMax) {
+  alignas(16) static uint8_t scratch[1024];
+  tflite::GreedyMemoryPlanner planner;
+  ASSERT_EQ(kTfLiteOk, planner.Init(scratch, sizeof(scratch)));
+  EXPECT_EQ(kTfLiteOk, planner.AddBuffer(1200000000, 0, 1));
+  EXPECT_EQ(kTfLiteError, planner.AddBuffer(1200000000, 0, 1));
+  EXPECT_EQ(kTfLiteError, planner.AddBuffer(-1, 0, 1));
+
+  ASSERT_EQ(kTfLiteOk, planner.Init(scratch, sizeof(scratch)));
+  EXPECT_EQ(kTfLiteError, planner.AddBuffer(16, 0, 1, INT_MAX - 8));
+  EXPECT_EQ(kTfLiteError, planner.AddBuffer(16, 0, 1, -2));
+  EXPECT_EQ(kTfLiteOk, planner.AddBuffer(16, 0, 1, 1024));
+
+  // Sizes summing to exactly INT_MAX still plan.
+  ASSERT_EQ(kTfLiteOk, planner.Init(scratch, sizeof(scratch)));
+  EXPECT_EQ(kTfLiteOk, planner.AddBuffer(INT_MAX - 32, 0, 1));
+  EXPECT_EQ(kTfLiteOk, planner.AddBuffer(32, 2, 3));
+  EXPECT_EQ(kTfLiteError, planner.AddBuffer(1, 4, 5));
+  EXPECT_EQ(static_cast<size_t>(INT_MAX - 32), planner.GetMaximumMemorySize());
+}
+
+TEST(TensorByteLengthTest, LinearPlannerRefusesPlanAboveIntMax) {
+  tflite::LinearMemoryPlanner planner;
+  EXPECT_EQ(kTfLiteOk, planner.AddBuffer(1200000000, 0, 1));
+  EXPECT_EQ(kTfLiteError, planner.AddBuffer(1200000000, 0, 1));
+  EXPECT_EQ(kTfLiteError, planner.AddBuffer(-1, 0, 1));
+  EXPECT_EQ(kTfLiteOk, planner.AddBuffer(INT_MAX - 1200000000, 0, 1));
+  EXPECT_EQ(static_cast<size_t>(INT_MAX), planner.GetMaximumMemorySize());
 }
 
 TF_LITE_MICRO_TESTS_MAIN
