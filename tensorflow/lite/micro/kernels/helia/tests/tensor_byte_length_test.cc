@@ -151,6 +151,24 @@ const tflite::Model* ScratchModel() {
       {}, {0}, {}, {0}, {tflite::CreateBuffer(builder)});
 }
 
+// RESHAPE of an [8] float32 input to a [2, 1, -1] output.
+const tflite::Model* ReshapeStretchModel() {
+  flatbuffer_storage.Reset();
+  flatbuffers::FlatBufferBuilder builder(1024, &flatbuffer_storage);
+  const int32_t input_shape[] = {8};
+  const int32_t output_shape[] = {2, 1, -1};
+  return FinishModel(
+      builder,
+      tflite::CreateOperatorCode(builder, 0, 0, 1,
+                                 tflite::BuiltinOperator_RESHAPE),
+      {tflite::CreateTensor(builder, builder.CreateVector(input_shape, 1),
+                            TensorType_FLOAT32, 0, builder.CreateString("in")),
+       tflite::CreateTensor(builder, builder.CreateVector(output_shape, 3),
+                            TensorType_FLOAT32, 0,
+                            builder.CreateString("out"))},
+      {0}, {1}, {0}, {1}, {tflite::CreateBuffer(builder)});
+}
+
 // MEAN over axis 1 of a [rows, columns] int8 input.
 const tflite::Model* MeanModel(int32_t rows, int32_t columns) {
   flatbuffer_storage.Reset();
@@ -281,10 +299,23 @@ TEST(TensorByteLengthTest, FlatbufferElementCountOverflowFails) {
 
 TEST(TensorByteLengthTest, FlatbufferNegativeDimensionFails) {
   size_t bytes = 0;
-  EXPECT_EQ(kTfLiteError, FlatbufferBytes(TensorType_INT8, {3, 2, -1}, &bytes));
-  EXPECT_EQ(kTfLiteError, FlatbufferBytes(TensorType_INT8, {-1, -1}, &bytes));
+  EXPECT_EQ(kTfLiteError, FlatbufferBytes(TensorType_INT8, {3, 2, -2}, &bytes));
+  EXPECT_EQ(kTfLiteError,
+            FlatbufferBytes(TensorType_INT8, {INT_MIN, 1}, &bytes));
   // A zero before the negative dimension must not hide it.
-  EXPECT_EQ(kTfLiteError, FlatbufferBytes(TensorType_INT8, {0, -1}, &bytes));
+  EXPECT_EQ(kTfLiteError, FlatbufferBytes(TensorType_INT8, {0, -2}, &bytes));
+}
+
+// A -1 dimension is left for the tensor's kernel to resolve in Prepare, but
+// the rest of the shape is still checked.
+TEST(TensorByteLengthTest, FlatbufferStretchDimensionIsUnresolved) {
+  size_t bytes = 1;
+  EXPECT_EQ(kTfLiteOk, FlatbufferBytes(TensorType_FLOAT32, {2, 1, -1}, &bytes));
+  EXPECT_EQ(static_cast<size_t>(0), bytes);
+  EXPECT_EQ(kTfLiteError,
+            FlatbufferBytes(TensorType_INT8, {65536, 65536, -1}, &bytes));
+  EXPECT_EQ(kTfLiteError,
+            FlatbufferBytes(TensorType_INT8, {-1, 3, -2}, &bytes));
 }
 
 TEST(TensorByteLengthTest, FlatbufferByteCountAboveLimitFails) {
@@ -418,6 +449,31 @@ TEST(TensorByteLengthTest, AllocateTensorsFailsOnSizeOverflow) {
 TEST(TensorByteLengthTest, AllocateTensorsFailsBeforeKernelPrepare) {
   EXPECT_EQ(kTfLiteError, AllocateMean(65536, 65536));
   EXPECT_EQ(kTfLiteOk, AllocateMean(16, 8));
+}
+
+// RESHAPE resolves its output's -1 dimension in Prepare, and the planner then
+// sizes the resolved shape.
+TEST(TensorByteLengthTest, AllocateTensorsResolvesReshapeStretchDimension) {
+  tflite::MicroMutableOpResolver<1> op_resolver;
+  ASSERT_EQ(kTfLiteOk, op_resolver.AddReshape());
+  tflite::MicroInterpreter interpreter(ReshapeStretchModel(), op_resolver,
+                                       arena, kArenaSize);
+  ASSERT_EQ(kTfLiteOk, interpreter.AllocateTensors());
+  TfLiteTensor* input = interpreter.input(0);
+  TfLiteTensor* output = interpreter.output(0);
+  ASSERT_NE(nullptr, input);
+  ASSERT_NE(nullptr, output);
+  for (int i = 0; i < 8; ++i) {
+    input->data.f[i] = static_cast<float>(i + 1);
+  }
+  ASSERT_EQ(kTfLiteOk, interpreter.Invoke());
+  ASSERT_EQ(3, output->dims->size);
+  EXPECT_EQ(2, output->dims->data[0]);
+  EXPECT_EQ(1, output->dims->data[1]);
+  EXPECT_EQ(4, output->dims->data[2]);
+  for (int i = 0; i < 8; ++i) {
+    EXPECT_FLOAT_EQ(static_cast<float>(i + 1), output->data.f[i]);
+  }
 }
 
 TEST(TensorByteLengthTest, CopyOpInputsToOpOutputsFailsOnSizeOverflow) {

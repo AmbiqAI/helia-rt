@@ -1069,7 +1069,9 @@ TfLiteStatus MicroAllocator::AllocateTfLiteEvalTensors(
       }
       // TODO(AmbiqAI/helia-rt#460): upstream sizes tensors only after kernel Prepare; drop when upstream has it.
       size_t bytes;
-      if (TfLiteEvalTensorByteLength(&tensors[i], &bytes) != kTfLiteOk) {
+      size_t type_size;
+      if (BytesRequiredForTensor(*subgraph->tensors()->Get(i), &bytes,
+                                 &type_size) != kTfLiteOk) {
         MicroPrintf("Failed to size tensor %d in subgraph %d",
                     static_cast<int>(i), static_cast<int>(subgraph_idx));
         return kTfLiteError;
