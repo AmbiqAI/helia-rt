@@ -1278,7 +1278,7 @@ TEST(StridedSliceTest, OutOfBounds) {
       golden, false, 1, true);
 }
 
-// TODO(AmbiqAI/helia-rt#460): INT32_MAX stride; drop when upstream has it.
+// TODO(AmbiqAI/helia-rt#460): local INT32_MAX stride case; fold into upstream.
 TEST(StridedSliceTest, In1D_Int32MaxStrideFromNonzeroBegin) {
   int input_shape[] = {1, 4};
   int begin_shape[] = {1, 1};

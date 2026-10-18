@@ -337,8 +337,8 @@ TEST(HeliaStridedSliceRouteTest, ExtremeStridesTakeOneElement) {
                             0, 0, 0});
 }
 
-// begin + stride passes INT32_MAX: the single element is input[1]. The
-// reference overflows here, so the case names the element it expects.
+// begin + stride passes INT32_MAX: the single element is input[1]. The case
+// names the element it expects.
 TEST(HeliaStridedSliceRouteTest, ExtremeStrideFromNonzeroBegin) {
   ExpectAllTypesMatch(
       Slice{1, {4}, {1}, {4}, {std::numeric_limits<int32_t>::max()}, 0, 0, 0},

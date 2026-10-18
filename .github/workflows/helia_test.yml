@@ -594,7 +594,11 @@ jobs:
             test_kernel_float_lstm_tail_lane_test \
             test_kernel_gather_pair_test \
             test_kernel_resize_nearest_neighbor_route_test \
-            test_kernel_strided_slice_route_test
+            test_kernel_strided_slice_route_test \
+            test_kernel_prelu_route_test \
+            test_kernel_squared_difference_route_test \
+            test_kernel_div_route_test \
+            test_kernel_transpose_conv_float_bias_test
           # The knob must have left heliaCORE's float32 MEAN out, or the
           # reduce tests above ran the heliaCORE route instead.
           bin=gen-f32-off/linux_x86_64_default_helia_gcc/bin/kernel_reduce_output_size_test

@@ -131,8 +131,7 @@ TfLiteStatus EvalArm(const TfLiteEvalTensor* input, TfLiteEvalTensor* output,
 
 // Copies the slice ArmPopulateCommonParams described, for the types with no
 // heliaCORE entry. Its begin, stride and counts keep every index inside the
-// input, where the reference's int32_t loop index overflows on a stride near
-// INT32_MAX.
+// input, including for a stride near INT32_MAX.
 template <typename T>
 void CopySlice(const T* input, T* output, const cmsis_nn_dims& input_dims,
                const cmsis_nn_dims& output_dims,
