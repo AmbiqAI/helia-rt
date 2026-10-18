@@ -359,32 +359,34 @@ jobs:
         # Elementwise bool and int16-quantized output-count, hostile-dims and
         # missing-zero-point cases add six cases on every leg.
         # see AmbiqAI/helia-rt#450
+        # SPLIT, SQUEEZE, DIV and ADD malformed-model checks add one binary and
+        # twenty-four cases on every leg. see AmbiqAI/helia-rt#451
         # Tensor byte-size, arena and planner overflow adds one binary and
         # twenty cases on every leg. see AmbiqAI/helia-rt#453
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 177
-            min-cases: 1622
+            min-binaries: 178
+            min-cases: 1646
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 177
-            min-cases: 1622
+            min-binaries: 178
+            min-cases: 1646
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 176
-            min-cases: 1620
+            min-binaries: 177
+            min-cases: 1644
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 177
-            min-cases: 1685
+            min-binaries: 178
+            min-cases: 1709
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 176
-            min-cases: 1683
+            min-binaries: 177
+            min-cases: 1707
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}

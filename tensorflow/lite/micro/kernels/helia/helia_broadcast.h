@@ -95,6 +95,40 @@ inline HeliaBroadcastClass HeliaClassifyBroadcast(
   return HeliaBroadcastClass::kGeneral;
 }
 
+// Whether each output extent is the broadcast of the two input extents (equal
+// extents, or 1 against any extent), after left-padding every shape with ones
+// to the largest rank. The reference broadcast walks index the inputs by the
+// output's coordinates, so any other output reads past an input. Ranks must be
+// at most RuntimeShape::kMaxSmallSize.
+inline bool HeliaShapesBroadcastToOutput(
+    const RuntimeShape& unextended_input1_shape,
+    const RuntimeShape& unextended_input2_shape,
+    const RuntimeShape& unextended_output_shape) {
+  int rank = unextended_output_shape.DimensionsCount();
+  if (unextended_input1_shape.DimensionsCount() > rank) {
+    rank = unextended_input1_shape.DimensionsCount();
+  }
+  if (unextended_input2_shape.DimensionsCount() > rank) {
+    rank = unextended_input2_shape.DimensionsCount();
+  }
+  const RuntimeShape input1_shape =
+      RuntimeShape::ExtendedShape(rank, unextended_input1_shape);
+  const RuntimeShape input2_shape =
+      RuntimeShape::ExtendedShape(rank, unextended_input2_shape);
+  const RuntimeShape output_shape =
+      RuntimeShape::ExtendedShape(rank, unextended_output_shape);
+  for (int i = 0; i < rank; ++i) {
+    const int dim1 = input1_shape.Dims(i);
+    const int dim2 = input2_shape.Dims(i);
+    const int broadcast = dim1 == 1 ? dim2 : dim1;
+    if (output_shape.Dims(i) < 0 || (dim2 != 1 && dim2 != broadcast) ||
+        output_shape.Dims(i) != broadcast) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // True when the class needs the broadcast entry point rather than the flat one.
 inline bool HeliaBroadcastNeedsWalk(HeliaBroadcastClass broadcast_class) {
   return broadcast_class != HeliaBroadcastClass::kUnsupported &&
