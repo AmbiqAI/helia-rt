@@ -126,7 +126,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "Quantized weight/bias combinations and depth multiplier are constrained. int4 is a weight type with int8 activations; it is not a general activation type."
+    "notes": "Quantized weight/bias combinations and depth multiplier are constrained. int4 is a weight type with int8 activations; it is not a general activation type. Register_DEPTHWISE_CONV_2D_FLOAT16_ACC16() is an opt-in registration that accumulates float16 layers in float16 lanes on MVE; see the floating-point guide."
   },
   {
     "name": "DEQUANTIZE",

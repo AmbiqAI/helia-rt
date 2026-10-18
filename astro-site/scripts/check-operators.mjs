@@ -21,5 +21,16 @@ for (const row of rows) {
   if (row.name !== 'QUANTIZE' && !source.includes(`Register_${row.name}(`)) throw new Error(`Registration missing: ${row.name} in ${row.source}`);
   if (row.name === 'QUANTIZE' && !fs.readFileSync(path.join(dir, '../quantize.cc'), 'utf8').includes('Register_QUANTIZE(')) throw new Error('QUANTIZE registration missing');
 }
-for (const name of registered) if (!names.has(name)) throw new Error(`Undocumented HELIA registration: ${name}`);
+// An accumulation variant (Register_<OP>_FLOAT16_ACC16) is an alternative registration of <OP>, not an operator of
+// its own: its operator's row must exist and name it in the notes.
+const notes = new Map(rows.map(row => [row.name, row.notes]));
+for (const name of registered) {
+  const variant = name.match(/^(.+)_FLOAT16_ACC16$/);
+  if (variant) {
+    if (!notes.has(variant[1])) throw new Error(`Undocumented HELIA registration: ${name} (no ${variant[1]} row)`);
+    if (!notes.get(variant[1]).includes(`Register_${name}()`)) throw new Error(`Undocumented HELIA registration: ${name} (not named in the ${variant[1]} notes)`);
+    continue;
+  }
+  if (!names.has(name)) throw new Error(`Undocumented HELIA registration: ${name}`);
+}
 console.log(`Checked ${rows.length} operator records against HELIA source registrations.`);
