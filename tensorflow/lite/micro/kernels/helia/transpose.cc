@@ -238,5 +238,8 @@ TFLMRegistration Register_TRANSPOSE() {
   return tflite::micro::RegisterOp(nullptr, TransposePrepare, TransposeEval);
 }
 
+// transpose.h declares this for every CMSIS_NN build, helia included.
+TFLMRegistration Register_TRANSPOSE_INT8() { return Register_TRANSPOSE(); }
+
 }  // namespace micro
 }  // namespace tflite

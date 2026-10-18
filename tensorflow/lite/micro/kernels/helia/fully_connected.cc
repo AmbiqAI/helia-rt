@@ -148,7 +148,20 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   if (input->type == kTfLiteInt16) {
     TF_LITE_ENSURE_EQ(context, input->params.zero_point, 0);
     TF_LITE_ENSURE_EQ(context, output->params.zero_point, 0);
-    if (data->reference_op_data.is_per_channel) {
+    // heliaCORE takes an int64 bias; an int32 bias runs the reference.
+    if (bias != nullptr && bias->type != kTfLiteInt64 &&
+        bias->type != kTfLiteInt32) {
+      MicroPrintf("FULLY_CONNECTED: 16x8 bias type %s (%d) not supported.",
+                  TfLiteTypeGetName(bias->type), bias->type);
+      micro_context->DeallocateTempTfLiteTensor(output);
+      micro_context->DeallocateTempTfLiteTensor(input);
+      micro_context->DeallocateTempTfLiteTensor(filter);
+      micro_context->DeallocateTempTfLiteTensor(bias);
+      return kTfLiteError;
+    }
+    if (bias != nullptr && bias->type == kTfLiteInt32) {
+      buf_size = 0;
+    } else if (data->reference_op_data.is_per_channel) {
       buf_size = arm_fully_connected_per_channel_s16_get_buffer_size(&filter_dims);
     } else {
       buf_size = arm_fully_connected_s16_get_buffer_size(&filter_dims);
@@ -446,6 +459,36 @@ TfLiteStatus EvalQuantizedInt16(TfLiteContext* context, TfLiteNode* node,
   cmsis_nn_dims bias_dims;
   cmsis_nn_dims output_dims;
   cmsis_nn_context ctx;
+
+  if (bias != nullptr && bias->type == kTfLiteInt32) {
+    const FullyConnectedParams op_params =
+        FullyConnectedParamsQuantized(data.reference_op_data);
+    if (data.reference_op_data.is_per_channel) {
+      tflite::micro::reference_integer_ops::FullyConnectedPerChannel(
+          op_params, data.reference_op_data.per_channel_output_multiplier,
+          reinterpret_cast<const int*>(
+              data.reference_op_data.per_channel_output_shift),
+          tflite::micro::GetTensorShape(input),
+          tflite::micro::GetTensorData<int16_t>(input),
+          tflite::micro::GetTensorShape(filter),
+          tflite::micro::GetTensorData<int8_t>(filter),
+          tflite::micro::GetTensorShape(bias),
+          tflite::micro::GetTensorData<int32_t>(bias),
+          tflite::micro::GetTensorShape(output),
+          tflite::micro::GetTensorData<int16_t>(output));
+    } else {
+      tflite::micro::reference_integer_ops::FullyConnected(
+          op_params, tflite::micro::GetTensorShape(input),
+          tflite::micro::GetTensorData<int16_t>(input),
+          tflite::micro::GetTensorShape(filter),
+          tflite::micro::GetTensorData<int8_t>(filter),
+          tflite::micro::GetTensorShape(bias),
+          tflite::micro::GetTensorData<int32_t>(bias),
+          tflite::micro::GetTensorShape(output),
+          tflite::micro::GetTensorData<int16_t>(output));
+    }
+    return kTfLiteOk;
+  }
 
   PopulateCommonParams(context, &per_tensor_quant_params, &input_dims, &filter_dims,
                        &bias_dims, &output_dims, &ctx, data);

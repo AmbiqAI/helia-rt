@@ -653,6 +653,19 @@ TfLiteStatus UnidirectionalSequenceLstmPrepare(TfLiteContext* context,
 
   const TfLiteTensor* input = lstm_tensors.GetInternalTensor(kLstmInputTensor);
   const auto activation_type = input->type;
+  // Float LSTMs take weights of the activation type and quantized ones int8.
+  // Hybrid models are not supported on TFLite Micro.
+  const auto weight_type =
+      lstm_tensors.GetInternalTensor(kLstmInputToForgetWeightsTensor)->type;
+  const bool quantized =
+      activation_type == kTfLiteInt8 || activation_type == kTfLiteInt16;
+  if (weight_type != (quantized ? kTfLiteInt8 : activation_type)) {
+    MicroPrintf(
+        "UNIDIRECTIONAL_SEQUENCE_LSTM: %s weights with %s "
+        "activations are not supported.",
+        TfLiteTypeGetName(weight_type), TfLiteTypeGetName(activation_type));
+    return kTfLiteError;
+  }
 
   TF_LITE_ENSURE_OK(context, ValidateTensorSize(context, lstm_tensors,
                                                 op_data_lstm->size_info));
@@ -814,8 +827,11 @@ TfLiteStatus UnidirectionalSequenceLstmEvalInt8(TfLiteContext* context,
   const auto weight_type =
       kernel_content.internal_tensors[kLstmInputToInputWeightsTensor]->type;
 
-  TFLITE_DCHECK(weight_type == kTfLiteInt16 &&
-                "Only int16 filter type supported.");
+  if (weight_type != kTfLiteInt8) {
+    MicroPrintf("Filter type %s (%d) not supported.",
+                TfLiteTypeGetName(weight_type), weight_type);
+    return kTfLiteError;
+  }
 
   if (activation_type == kTfLiteInt8) {
     LSTMBuffers<int16_t> buffers =
@@ -841,8 +857,11 @@ TfLiteStatus UnidirectionalSequenceLstmEvalInt16(TfLiteContext* context,
   const auto weight_type =
       kernel_content.internal_tensors[kLstmInputToInputWeightsTensor]->type;
 
-  TFLITE_DCHECK(weight_type == kTfLiteInt16 &&
-                "Only int16 filter type supported.");
+  if (weight_type != kTfLiteInt8) {
+    MicroPrintf("Filter type %s (%d) not supported.",
+                TfLiteTypeGetName(weight_type), weight_type);
+    return kTfLiteError;
+  }
 
   if (activation_type == kTfLiteInt16) {
     LSTMBuffers<int16_t> buffers =
