@@ -106,6 +106,12 @@ TfLiteStatus MicroResourceVariables::Allocate(int id, TfLiteContext* context,
   MicroResourceVariable& variable = resource_variables_[id];
 
   if (variable.resource_buffer == nullptr) {
+    // TODO(AmbiqAI/helia-rt#460): upstream sizes a variable from an unresolved shape's wrapped byte count; drop when upstream has it.
+    if (tensor->bytes > kMaxTensorBytes) {
+      MicroPrintf("Resource variable %d of %u bytes is too large", id,
+                  tensor->bytes);
+      return kTfLiteError;
+    }
     variable.bytes = tensor->bytes;
     variable.resource_buffer =
         context->AllocatePersistentBuffer(context, tensor->bytes);

@@ -158,6 +158,22 @@ static void PopulateCmsisParams(const TfLiteEvalTensor* input_t,
 
 namespace {
 
+// Releases a Prepare temporary on every return.
+class ScopedTempTensor {
+ public:
+  ScopedTempTensor(MicroContext* context, TfLiteTensor* tensor)
+      : context_(context), tensor_(tensor) {}
+  ~ScopedTempTensor() {
+    if (tensor_ != nullptr) {
+      context_->DeallocateTempTfLiteTensor(tensor_);
+    }
+  }
+
+ private:
+  MicroContext* context_;
+  TfLiteTensor* tensor_;
+};
+
 TfLiteStatus PrepareSimple(TfLiteContext* context, TfLiteNode* node,
                            int32_t* multiplier, int* shift) {
   MicroContext* micro_context = GetMicroContext(context);
@@ -166,7 +182,7 @@ TfLiteStatus PrepareSimple(TfLiteContext* context, TfLiteNode* node,
   // [0] = Input
   // [1] = Axis
   TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
-  TF_LITE_ENSURE(context, input != nullptr);
+  ScopedTempTensor input_guard(micro_context, input);
 
   // Outputs Tensor (dtype depends on quantization):
   // [0] = Output
@@ -174,22 +190,23 @@ TfLiteStatus PrepareSimple(TfLiteContext* context, TfLiteNode* node,
   // Validate number of inputs and outputs
   TF_LITE_ENSURE_EQ(context, node->inputs->size, 2);
   TF_LITE_ENSURE_EQ(context, node->outputs->size, 1);
+  TF_LITE_ENSURE(context, input != nullptr);
 
   // Validate axis type
   TfLiteTensor* axis = micro_context->AllocateTempInputTensor(node, 1);
+  ScopedTempTensor axis_guard(micro_context, axis);
   TF_LITE_ENSURE(context, axis != nullptr);
   TF_LITE_ENSURE_TYPES_EQ(context, axis->type, kTfLiteInt32);
 
+  TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
+  ScopedTempTensor output_guard(micro_context, output);
+  TF_LITE_ENSURE(context, output != nullptr);
+
   if (input->type == kTfLiteInt8) {
-    TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
-    TF_LITE_ENSURE(context, output != nullptr);
     const double real_multiplier = static_cast<double>(input->params.scale) /
                                    static_cast<double>(output->params.scale);
     QuantizeMultiplier(real_multiplier, multiplier, shift);
-    micro_context->DeallocateTempTfLiteTensor(output);
   }
-  micro_context->DeallocateTempTfLiteTensor(axis);
-  micro_context->DeallocateTempTfLiteTensor(input);
   return kTfLiteOk;
 }
 
@@ -213,6 +230,7 @@ void ResolveAxis(const int* axis_data, int axis_count,
 // to 4; a higher rank, or an axis outside the input rank, has no such spelling.
 // A scalar input ignores its axes, as the reference's axis resolution does.
 // see AmbiqAI/ns-cmsis-nn#428
+#if ARM_NN_ENABLE_F32 || ARM_NN_ENABLE_F16
 bool HeliaFloatReduceSupported(const TfLiteEvalTensor* input,
                                const int32_t* axis_data, int axis_count) {
   const int input_rank = input->dims->size;
@@ -233,6 +251,7 @@ bool HeliaFloatReduceSupported(const TfLiteEvalTensor* input,
   }
   return true;
 }
+#endif
 
 // Float16 reductions are optimized-only (TFLM has no float16 reference) and
 // heliaCORE takes 4-D NHWC dims, so reject the rest at Prepare. A non-constant
@@ -426,13 +445,17 @@ TfLiteStatus FillEmptyReduction(TfLiteEvalTensor* output, T start) {
   return kTfLiteOk;
 }
 
-TfLiteStatus MinMaxStatus(arm_cmsis_nn_status status, const char* entry) {
+TfLiteStatus CoreStatus(arm_cmsis_nn_status status, const char* op,
+                        const char* entry) {
   if (status != ARM_CMSIS_NN_SUCCESS) {
-    MicroPrintf("REDUCE_MAX/REDUCE_MIN: %s failed (%d).", entry,
-                static_cast<int>(status));
+    MicroPrintf("%s: %s failed (%d).", op, entry, static_cast<int>(status));
     return kTfLiteError;
   }
   return kTfLiteOk;
+}
+
+TfLiteStatus MinMaxStatus(arm_cmsis_nn_status status, const char* entry) {
+  return CoreStatus(status, "REDUCE_MAX/REDUCE_MIN", entry);
 }
 
 TfLiteStatus EvalMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
@@ -605,19 +628,18 @@ TfLiteStatus PrepareMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
 
   MicroContext* micro_context = GetMicroContext(context);
   TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
-  TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
-  TfLiteTensor* axis = micro_context->AllocateTempInputTensor(node, 1);
+  ScopedTempTensor input_guard(micro_context, input);
   TF_LITE_ENSURE(context, input != nullptr);
+  TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
+  ScopedTempTensor output_guard(micro_context, output);
   TF_LITE_ENSURE(context, output != nullptr);
+  TfLiteTensor* axis = micro_context->AllocateTempInputTensor(node, 1);
+  ScopedTempTensor axis_guard(micro_context, axis);
   TF_LITE_ENSURE(context, axis != nullptr);
 
-  if (input->type == kTfLiteFloat16 &&
-      PrepareFloat16Reduce(context, input, axis, "REDUCE_MAX/REDUCE_MIN") !=
-          kTfLiteOk) {
-    micro_context->DeallocateTempTfLiteTensor(input);
-    micro_context->DeallocateTempTfLiteTensor(output);
-    micro_context->DeallocateTempTfLiteTensor(axis);
-    return kTfLiteError;
+  if (input->type == kTfLiteFloat16) {
+    TF_LITE_ENSURE_OK(context, PrepareFloat16Reduce(context, input, axis,
+                                                    "REDUCE_MAX/REDUCE_MIN"));
   }
 
   op_data->input_zp = input->params.zero_point;
@@ -626,35 +648,35 @@ TfLiteStatus PrepareMinMaxHelper(TfLiteContext* context, TfLiteNode* node,
   op_data->output_scale = output->params.scale;
   op_data->num_output_elements = NumElements(output);
 
-  context->RequestScratchBufferInArena(context, sizeof(int) * input->dims->size,
-                                       &op_data->scratch_input_iter_idx);
-  context->RequestScratchBufferInArena(
+  TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
+      context, sizeof(int) * input->dims->size,
+      &op_data->scratch_input_iter_idx));
+  TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
       context, sizeof(int) * static_cast<int>(ElementCount(*axis->dims)),
-      &op_data->scratch_resolved_axis_idx);
-
-  micro_context->DeallocateTempTfLiteTensor(input);
-  micro_context->DeallocateTempTfLiteTensor(output);
-  micro_context->DeallocateTempTfLiteTensor(axis);
+      &op_data->scratch_resolved_axis_idx));
   return kTfLiteOk;
 }
 
 TfLiteStatus PrepareMeanOrSumHelper(TfLiteContext* context, TfLiteNode* node,
                                     OpDataReduce* op_data) {
+  TF_LITE_ENSURE_OK(
+      context,
+      PrepareSimple(context, node, &(op_data->multiplier), &(op_data->shift)));
+
   MicroContext* micro_context = GetMicroContext(context);
   TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
-  TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
-  TfLiteTensor* axis = micro_context->AllocateTempInputTensor(node, 1);
+  ScopedTempTensor input_guard(micro_context, input);
   TF_LITE_ENSURE(context, input != nullptr);
+  TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
+  ScopedTempTensor output_guard(micro_context, output);
   TF_LITE_ENSURE(context, output != nullptr);
+  TfLiteTensor* axis = micro_context->AllocateTempInputTensor(node, 1);
+  ScopedTempTensor axis_guard(micro_context, axis);
   TF_LITE_ENSURE(context, axis != nullptr);
 
-  if (input->type == kTfLiteFloat16 &&
-      PrepareFloat16Reduce(context, input, axis, "MEAN/REDUCE_SUM") !=
-          kTfLiteOk) {
-    micro_context->DeallocateTempTfLiteTensor(input);
-    micro_context->DeallocateTempTfLiteTensor(output);
-    micro_context->DeallocateTempTfLiteTensor(axis);
-    return kTfLiteError;
+  if (input->type == kTfLiteFloat16) {
+    TF_LITE_ENSURE_OK(context, PrepareFloat16Reduce(context, input, axis,
+                                                    "MEAN/REDUCE_SUM"));
   }
 
   if (input->type == kTfLiteInt8 || input->type == kTfLiteInt16) {
@@ -667,21 +689,16 @@ TfLiteStatus PrepareMeanOrSumHelper(TfLiteContext* context, TfLiteNode* node,
   op_data->num_axis = NumElements(axis);
 
   if (input->type == kTfLiteInt8 || input->type == kTfLiteInt16) {
-    context->RequestScratchBufferInArena(context, output_size * sizeof(int32_t),
-                                         &op_data->scratch_accumulator_idx);
+    TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
+        context, output_size * sizeof(int32_t),
+        &op_data->scratch_accumulator_idx));
     op_data->input_zp = input->params.zero_point;
     op_data->input_scale = input->params.scale;
     op_data->output_zp = output->params.zero_point;
     op_data->output_scale = output->params.scale;
   }
 
-  TF_LITE_ENSURE_OK(
-      context,
-      PrepareSimple(context, node, &(op_data->multiplier), &(op_data->shift)));
   // TODO(b/144955155): Support uint8_t(b/144955155) and int8_t(b/144955018)
-  micro_context->DeallocateTempTfLiteTensor(input);
-  micro_context->DeallocateTempTfLiteTensor(output);
-  micro_context->DeallocateTempTfLiteTensor(axis);
   return kTfLiteOk;
 }
 
@@ -713,17 +730,15 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
         PopulateCmsisShapeAndAxis(input,
                                   tflite::micro::GetTensorData<int32_t>(axis),
                                   num_axis, &in_d, &ax_d, &out_d);
-        if (arm_nn_mean_f16(tflite::micro::GetTensorData<float16_t>(input),
-                            &in_d, &ax_d,
-                            tflite::micro::GetTensorData<float16_t>(output),
-                            &out_d) == ARM_CMSIS_NN_SUCCESS) {
-          break;
-        }
+        const arm_cmsis_nn_status status = arm_nn_mean_f16(
+            tflite::micro::GetTensorData<float16_t>(input), &in_d, &ax_d,
+            tflite::micro::GetTensorData<float16_t>(output), &out_d);
+        return CoreStatus(status, "MEAN", "arm_nn_mean_f16");
       }
 #endif
       MicroPrintf(
-          "Float16 MEAN: optimized kernel rejected the configuration; it "
-          "requires rank <= 4, axes inside the rank, and ARM_NN_ENABLE_F16.");
+          "Float16 MEAN requires rank <= 4, axes inside the rank, and "
+          "ARM_NN_ENABLE_F16.");
       return kTfLiteError;
     }
     case kTfLiteFloat32: {
@@ -737,11 +752,10 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
         PopulateCmsisShapeAndAxis(input,
                                   tflite::micro::GetTensorData<int32_t>(axis),
                                   num_axis, &in_d, &ax_d, &out_d);
-        if (arm_nn_mean_f32(tflite::micro::GetTensorData<float>(input), &in_d,
-                            &ax_d, tflite::micro::GetTensorData<float>(output),
-                            &out_d) == ARM_CMSIS_NN_SUCCESS) {
-          break;
-        }
+        const arm_cmsis_nn_status status = arm_nn_mean_f32(
+            tflite::micro::GetTensorData<float>(input), &in_d, &ax_d,
+            tflite::micro::GetTensorData<float>(output), &out_d);
+        return CoreStatus(status, "MEAN", "arm_nn_mean_f32");
       }
 #endif
       tflite::MeanParams op_params;
@@ -749,11 +763,18 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
                   &op_params);
 
       // Special case mean implementation exists for 4D mean across axes 1
-      // and 2.
+      // and 2. It indexes the input by the output's batch and depth, so it
+      // needs an output of exactly [N, 1, 1, C]; another output of the same
+      // count takes the generic Mean, which indexes by the input.
+      const TfLiteIntArray* in_dims = input->dims;
+      const TfLiteIntArray* out_dims = output->dims;
       bool special_case_4d_axes_1_and_2 =
-          input->dims->size == 4 && op_params.axis_count == 2 &&
+          in_dims->size == 4 && op_params.axis_count == 2 &&
           ((op_params.axis[0] == 1 && op_params.axis[1] == 2) ||
-           (op_params.axis[0] == 2 && op_params.axis[1] == 1));
+           (op_params.axis[0] == 2 && op_params.axis[1] == 1)) &&
+          out_dims->size == 4 && out_dims->data[0] == in_dims->data[0] &&
+          out_dims->data[1] == 1 && out_dims->data[2] == 1 &&
+          out_dims->data[3] == in_dims->data[3];
 
       // Defer to specialized implementation for 4D Mean across axes 1 & 2.
       if (params->keep_dims && special_case_4d_axes_1_and_2) {
@@ -803,7 +824,7 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
           output_mult,
           output_shift
         );
-        return rst == ARM_CMSIS_NN_SUCCESS ? kTfLiteOk : kTfLiteError;
+        return CoreStatus(rst, "MEAN", "arm_mean_s8");
       }
       TF_LITE_ENSURE_OK(
           context, EvalIntegerMean<int8_t>(context, node, num_axis, op_data,
@@ -838,7 +859,7 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
           output_mult,
           output_shift
         );
-        return rst == ARM_CMSIS_NN_SUCCESS ? kTfLiteOk : kTfLiteError;
+        return CoreStatus(rst, "MEAN", "arm_mean_s16");
       }
       TF_LITE_ENSURE_OK(
           context, EvalIntegerMean<int16_t>(context, node, num_axis, op_data,
@@ -891,17 +912,15 @@ TfLiteStatus EvalSumHelper(TfLiteContext* context, TfLiteNode* node,
         PopulateCmsisShapeAndAxis(input,
                                   tflite::micro::GetTensorData<int32_t>(axis),
                                   num_axis, &in_d, &ax_d, &out_d);
-        if (arm_reduce_sum_f16(tflite::micro::GetTensorData<float16_t>(input),
-                               &in_d, &ax_d,
-                               tflite::micro::GetTensorData<float16_t>(output),
-                               &out_d) == ARM_CMSIS_NN_SUCCESS) {
-          break;
-        }
+        const arm_cmsis_nn_status status = arm_reduce_sum_f16(
+            tflite::micro::GetTensorData<float16_t>(input), &in_d, &ax_d,
+            tflite::micro::GetTensorData<float16_t>(output), &out_d);
+        return CoreStatus(status, "SUM", "arm_reduce_sum_f16");
       }
 #endif
       MicroPrintf(
-          "Float16 REDUCE_SUM: optimized kernel rejected the configuration; it "
-          "requires rank <= 4, axes inside the rank, and ARM_NN_ENABLE_F16.");
+          "Float16 REDUCE_SUM requires rank <= 4, axes inside the rank, and "
+          "ARM_NN_ENABLE_F16.");
       return kTfLiteError;
     }
     case kTfLiteFloat32: {
@@ -915,12 +934,10 @@ TfLiteStatus EvalSumHelper(TfLiteContext* context, TfLiteNode* node,
         PopulateCmsisShapeAndAxis(input,
                                   tflite::micro::GetTensorData<int32_t>(axis),
                                   num_axis, &in_d, &ax_d, &out_d);
-        if (arm_reduce_sum_f32(tflite::micro::GetTensorData<float>(input),
-                               &in_d, &ax_d,
-                               tflite::micro::GetTensorData<float>(output),
-                               &out_d) == ARM_CMSIS_NN_SUCCESS) {
-          break;
-        }
+        const arm_cmsis_nn_status status = arm_reduce_sum_f32(
+            tflite::micro::GetTensorData<float>(input), &in_d, &ax_d,
+            tflite::micro::GetTensorData<float>(output), &out_d);
+        return CoreStatus(status, "SUM", "arm_reduce_sum_f32");
       }
 #endif
       TF_LITE_ENSURE(
@@ -964,7 +981,7 @@ TfLiteStatus EvalSumHelper(TfLiteContext* context, TfLiteNode* node,
           output_mult,
           output_shift
         );
-        return rst == ARM_CMSIS_NN_SUCCESS ? kTfLiteOk : kTfLiteError;
+        return CoreStatus(rst, "SUM", "arm_mean_s8");
       }
 
       int32_t* temp_sum = static_cast<int32_t*>(
@@ -1002,7 +1019,7 @@ TfLiteStatus EvalSumHelper(TfLiteContext* context, TfLiteNode* node,
           output_mult,
           output_shift
         );
-        return rst == ARM_CMSIS_NN_SUCCESS ? kTfLiteOk : kTfLiteError;
+        return CoreStatus(rst, "SUM", "arm_mean_s16");
       }
 
       int32_t* temp_sum = static_cast<int32_t*>(
@@ -1028,10 +1045,13 @@ TfLiteStatus PrepareAllHelper(TfLiteContext* context, TfLiteNode* node,
                               OpDataReduce* op_data) {
   MicroContext* micro_context = GetMicroContext(context);
   TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
-  TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
-  TfLiteTensor* axis = micro_context->AllocateTempInputTensor(node, 1);
+  ScopedTempTensor input_guard(micro_context, input);
   TF_LITE_ENSURE(context, input != nullptr);
+  TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
+  ScopedTempTensor output_guard(micro_context, output);
   TF_LITE_ENSURE(context, output != nullptr);
+  TfLiteTensor* axis = micro_context->AllocateTempInputTensor(node, 1);
+  ScopedTempTensor axis_guard(micro_context, axis);
   TF_LITE_ENSURE(context, axis != nullptr);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, kTfLiteBool);
 
@@ -1043,15 +1063,12 @@ TfLiteStatus PrepareAllHelper(TfLiteContext* context, TfLiteNode* node,
   op_data->output_zp = output->params.zero_point;
   op_data->output_scale = output->params.scale;
   op_data->num_output_elements = NumElements(output);
-  context->RequestScratchBufferInArena(context, sizeof(int) * input->dims->size,
-                                       &op_data->scratch_input_iter_idx);
-  context->RequestScratchBufferInArena(
+  TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
+      context, sizeof(int) * input->dims->size,
+      &op_data->scratch_input_iter_idx));
+  TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
       context, sizeof(int) * static_cast<int>(ElementCount(*axis->dims)),
-      &op_data->scratch_resolved_axis_idx);
-
-  micro_context->DeallocateTempTfLiteTensor(input);
-  micro_context->DeallocateTempTfLiteTensor(output);
-  micro_context->DeallocateTempTfLiteTensor(axis);
+      &op_data->scratch_resolved_axis_idx));
   return kTfLiteOk;
 }
 

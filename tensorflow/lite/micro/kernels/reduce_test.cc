@@ -1041,4 +1041,124 @@ TEST(ReduceTest, AllOpTestKeepDims) {
       expected_output_data, tflite::Register_REDUCE_ALL(), &params);
 }
 
+// TODO(AmbiqAI/helia-rt#460): MEAN [N,1,1,C] guard; drop when upstream has it.
+TEST(ReduceTest, MeanFloat4DKeepDimsOutputLayouts) {
+  int input_shape[] = {4, 1, 2, 2, 4};
+  float input_data[16];
+  for (int i = 0; i < 16; ++i) {
+    input_data[i] = static_cast<float>(i);
+  }
+  int axis_shape[] = {1, 2};
+  const int32_t axis_data[] = {1, 2};
+  const float golden[] = {6, 7, 8, 9};
+  int nhwc_shape[] = {4, 1, 1, 1, 4};
+  int batch_shape[] = {4, 4, 1, 1, 1};
+  int split_shape[] = {4, 2, 1, 1, 2};
+  int tall_shape[] = {4, 1, 2, 1, 2};
+  int rank3_shape[] = {3, 1, 1, 4};
+  int rank5_shape[] = {5, 1, 1, 1, 4, 1};
+  TfLiteReducerParams params = {true};
+  for (int* output_shape : {nhwc_shape, batch_shape, split_shape, tall_shape,
+                            rank3_shape, rank5_shape}) {
+    float output_data[4];
+    tflite::testing::TestReduceOp<float>(
+        input_shape, input_data, axis_shape, axis_data, output_shape,
+        output_data, golden, tflite::Register_MEAN(), &params);
+  }
+}
+
+// TODO(AmbiqAI/helia-rt#460): short MEAN output; drop when upstream has it.
+// An output with fewer elements than the reduction keeps fails Invoke
+// without a write past it, as the reference accumulates in the output.
+TEST(ReduceTest, MeanFloat4DKeepDimsShortOutputFails) {
+  int input_shape[] = {4, 1, 2, 2, 4};
+  float input_data[16];
+  for (int i = 0; i < 16; ++i) {
+    input_data[i] = static_cast<float>(i);
+  }
+  int axis_shape[] = {1, 2};
+  const int32_t axis_data[] = {1, 2};
+  int output_shape[] = {4, 1, 1, 1, 1};
+  constexpr float kCanary = -123.0f;
+  float output_data[4] = {kCanary, kCanary, kCanary, kCanary};
+  TfLiteTensor tensors[] = {
+      tflite::testing::CreateTensor(
+          input_data, tflite::testing::IntArrayFromInts(input_shape)),
+      tflite::testing::CreateTensor(
+          axis_data, tflite::testing::IntArrayFromInts(axis_shape)),
+      tflite::testing::CreateTensor(
+          output_data, tflite::testing::IntArrayFromInts(output_shape)),
+  };
+  tensors[1].allocation_type = kTfLiteMmapRo;
+  TfLiteReducerParams params = {true};
+  int inputs_array_data[] = {2, 0, 1};
+  int outputs_array_data[] = {1, 2};
+  const TFLMRegistration registration = tflite::Register_MEAN();
+  tflite::micro::KernelRunner runner(
+      registration, tensors, 3,
+      tflite::testing::IntArrayFromInts(inputs_array_data),
+      tflite::testing::IntArrayFromInts(outputs_array_data), &params);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteError, runner.Invoke());
+  for (int i = 1; i < 4; ++i) {
+    EXPECT_EQ(kCanary, output_data[i]);
+  }
+}
+
+namespace tflite {
+namespace testing {
+namespace {
+
+// TODO(AmbiqAI/helia-rt#460): empty MEAN input; drop when upstream has it.
+// Runs MEAN over axes {1, 2} with keep_dims on an empty `input_shape` into
+// `output_shape`. The input buffer holds a sentinel the kernel must not read,
+// and every output element past `written` holds a canary it must not write.
+void ExpectEmptyMeanInput(int* input_shape, int* output_shape, int written) {
+  constexpr float kSentinel = 7.0f;
+  constexpr float kCanary = -123.0f;
+  float input_data[4] = {kSentinel, kSentinel, kSentinel, kSentinel};
+  int axis_shape[] = {1, 2};
+  const int32_t axis_data[] = {1, 2};
+  float output_data[4] = {kCanary, kCanary, kCanary, kCanary};
+  TfLiteTensor tensors[] = {
+      CreateTensor(input_data, IntArrayFromInts(input_shape)),
+      CreateTensor(axis_data, IntArrayFromInts(axis_shape)),
+      CreateTensor(output_data, IntArrayFromInts(output_shape)),
+  };
+  tensors[1].allocation_type = kTfLiteMmapRo;
+  TfLiteReducerParams params = {true};
+  int inputs_array_data[] = {2, 0, 1};
+  int outputs_array_data[] = {1, 2};
+  const TFLMRegistration registration = Register_MEAN();
+  micro::KernelRunner runner(registration, tensors, 3,
+                             IntArrayFromInts(inputs_array_data),
+                             IntArrayFromInts(outputs_array_data), &params);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  for (int i = 0; i < written; ++i) {
+    EXPECT_EQ(0.0f, output_data[i]);
+  }
+  for (int i = written; i < 4; ++i) {
+    EXPECT_EQ(kCanary, output_data[i]);
+  }
+}
+
+}  // namespace
+}  // namespace testing
+}  // namespace tflite
+
+// An empty kept axis gives an empty output: nothing is written.
+TEST(ReduceTest, MeanFloat4DKeepDimsEmptyKeptAxisWritesNothing) {
+  int input_shape[] = {4, 1, 2, 2, 0};
+  int output_shape[] = {4, 0, 1, 1, 1};
+  tflite::testing::ExpectEmptyMeanInput(input_shape, output_shape, 0);
+}
+
+// An empty reduced axis gives the start value, 0, in every output element.
+TEST(ReduceTest, MeanFloat4DKeepDimsEmptyReducedAxisWritesZeros) {
+  int input_shape[] = {4, 1, 0, 2, 4};
+  int output_shape[] = {4, 4, 1, 1, 1};
+  tflite::testing::ExpectEmptyMeanInput(input_shape, output_shape, 4);
+}
+
 TF_LITE_MICRO_TESTS_MAIN

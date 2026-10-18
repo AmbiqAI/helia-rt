@@ -111,6 +111,11 @@ TfLiteStatus CreatePlan(MicroMemoryPlanner* planner,
   for (size_t i = 0; i < allocation_info_size; ++i) {
     const AllocationInfo* current = &allocation_info[i];
     if (current->needs_allocating) {
+      // TODO(AmbiqAI/helia-rt#460): upstream narrows buffer sizes to int unchecked; drop when upstream has it.
+      if (current->bytes > kMaxTensorBytes) {
+        MicroPrintf("Buffer of %u bytes is too large to plan", current->bytes);
+        return kTfLiteError;
+      }
       size_t aligned_bytes_required =
           AlignSizeUp(current->bytes, MicroArenaBufferAlignment());
       if (current->offline_offset == kOnlinePlannedBuffer) {
@@ -185,6 +190,24 @@ INonPersistentBufferAllocator* CreateNonPersistentArenaAllocator(
       new (allocator_buffer) NonPersistentArenaBufferAllocator(
           aligned_buffer_head, aligned_buffer_size);
   return non_persistent_buffer_allocator;
+}
+
+// TODO(AmbiqAI/helia-rt#460): upstream keeps the flatbuffer byte count after a kernel resolves the dims; drop when upstream has it.
+// Re-sizes a TfLiteTensor from the eval tensor dims it adopts. A shape that
+// still holds a negative dimension keeps its flatbuffer byte count.
+void SizeFromAdoptedDims(const TfLiteEvalTensor& eval_tensor,
+                         TfLiteTensor* tensor) {
+  if (eval_tensor.dims != nullptr) {
+    for (int i = 0; i < eval_tensor.dims->size; ++i) {
+      if (eval_tensor.dims->data[i] < 0) {
+        return;
+      }
+    }
+  }
+  size_t bytes;
+  if (TfLiteEvalTensorByteLength(&eval_tensor, &bytes) == kTfLiteOk) {
+    tensor->bytes = bytes;
+  }
 }
 
 }  // namespace
@@ -839,6 +862,9 @@ TfLiteTensor* MicroAllocator::AllocatePersistentTfLiteTensor(
     // TfLiteTensor dims.
     tensor->dims =
         subgraph_allocations[subgraph_index].tensors[tensor_index].dims;
+    // TODO(AmbiqAI/helia-rt#460): upstream keeps the flatbuffer byte count after a kernel resolves the dims; drop when upstream has it.
+    SizeFromAdoptedDims(
+        subgraph_allocations[subgraph_index].tensors[tensor_index], tensor);
   }
   return tensor;
 }
@@ -907,6 +933,9 @@ TfLiteTensor* MicroAllocator::AllocateTempTfLiteTensor(
     // TfLiteTensor dims.
     tensor->dims =
         subgraph_allocations[subgraph_index].tensors[tensor_index].dims;
+    // TODO(AmbiqAI/helia-rt#460): upstream keeps the flatbuffer byte count after a kernel resolves the dims; drop when upstream has it.
+    SizeFromAdoptedDims(
+        subgraph_allocations[subgraph_index].tensors[tensor_index], tensor);
   }
   return tensor;
 }
@@ -1068,6 +1097,15 @@ TfLiteStatus MicroAllocator::AllocateTfLiteEvalTensors(
           *subgraph->tensors()->Get(i), model->buffers(), &tensors[i]);
       if (status != kTfLiteOk) {
         MicroPrintf("Failed to initialize tensor %d", i);
+        return kTfLiteError;
+      }
+      // TODO(AmbiqAI/helia-rt#460): upstream sizes tensors only after kernel Prepare; drop when upstream has it.
+      size_t bytes;
+      size_t type_size;
+      if (BytesRequiredForTensor(*subgraph->tensors()->Get(i), &bytes,
+                                 &type_size) != kTfLiteOk) {
+        MicroPrintf("Failed to size tensor %d in subgraph %d",
+                    static_cast<int>(i), static_cast<int>(subgraph_idx));
         return kTfLiteError;
       }
     }

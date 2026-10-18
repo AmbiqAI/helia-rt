@@ -33,6 +33,14 @@ limitations under the License.
 #include "arm_nnfunctions_flt.h"
 #endif
 
+// The wraps exist only for the float APIs this build compiles in.
+#if defined(HELIA_FLOAT_CONTEXT_LINK_WRAP) && \
+    (ARM_NN_ENABLE_F32 || ARM_NN_ENABLE_F16)
+#define HELIA_FLOAT_CONTEXT_WRAPS 1
+#else
+#define HELIA_FLOAT_CONTEXT_WRAPS 0
+#endif
+
 namespace {
 
 // The link wraps count the heliaCORE calls Prepare makes, which the
@@ -64,9 +72,9 @@ struct RouteState {
   bool entry_buffer = false;
 };
 
+#if ARM_NN_ENABLE_F32 || ARM_NN_ENABLE_F16
 RouteState g_state[static_cast<int>(Route::kCount)];
 
-#if ARM_NN_ENABLE_F32 || ARM_NN_ENABLE_F16
 void ResetState() {
   for (RouteState& state : g_state) {
     state = RouteState{};
@@ -74,7 +82,7 @@ void ResetState() {
 }
 #endif
 
-#if defined(HELIA_FLOAT_CONTEXT_LINK_WRAP)
+#if HELIA_FLOAT_CONTEXT_WRAPS
 // Smallest size a wrapped sizer reports at Prepare, so every route requests
 // scratch, and the amount it adds on any later call.
 constexpr int32_t kMinPrepareSize = 64;
@@ -105,7 +113,7 @@ void RecordEntry(Route route, const cmsis_nn_dims* dims,
 
 }  // namespace
 
-#if defined(HELIA_FLOAT_CONTEXT_LINK_WRAP)
+#if HELIA_FLOAT_CONTEXT_WRAPS
 extern "C" {
 
 #define HELIA_WRAP_SIZER(route, name, params_type)                         \
@@ -146,6 +154,7 @@ extern "C" {
                          output_dims, output);                               \
   }
 
+#if ARM_NN_ENABLE_F32
 HELIA_WRAP_SIZER(Route::kConvF32, arm_convolve_wrapper_f32_get_buffer_size,
                  cmsis_nn_conv_params_f32)
 HELIA_WRAP_SIZER(Route::kDepthwiseF32,
@@ -159,6 +168,7 @@ HELIA_WRAP_CONV(Route::kDepthwiseF32, arm_depthwise_conv_wrapper_f32,
                 cmsis_nn_dw_conv_params_f32, float32_t)
 HELIA_WRAP_BMM(Route::kBatchMatmulF32, arm_batch_matmul_f32,
                cmsis_nn_bmm_params_f32, float32_t)
+#endif
 
 #if ARM_NN_ENABLE_F16
 HELIA_WRAP_SIZER(Route::kConvF16, arm_convolve_wrapper_f16_get_buffer_size,
@@ -221,7 +231,7 @@ uint16_t One<uint16_t>() {
 #endif
 
 void ExpectContext(Route route) {
-#if defined(HELIA_FLOAT_CONTEXT_LINK_WRAP)
+#if HELIA_FLOAT_CONTEXT_WRAPS
   const RouteState& state = State(route);
   EXPECT_EQ(1, state.sizer_calls);
   EXPECT_EQ(1, state.entry_calls);

@@ -15,6 +15,8 @@ limitations under the License.
 
 #include "tensorflow/lite/micro/memory_planner/linear_memory_planner.h"
 
+#include <climits>
+
 #include "tensorflow/lite/micro/micro_log.h"
 
 namespace tflite {
@@ -30,6 +32,11 @@ TfLiteStatus LinearMemoryPlanner::AddBuffer(int size, int first_time_used,
                                             int last_time_used) {
   if (current_buffer_count_ >= kMaxBufferCount) {
     MicroPrintf("Too many buffers (max is %d)", kMaxBufferCount);
+    return kTfLiteError;
+  }
+  // TODO(AmbiqAI/helia-rt#460): upstream hands out offsets above INT_MAX; drop when upstream has it.
+  if (size < 0 || static_cast<size_t>(size) > INT_MAX - next_free_offset_) {
+    MicroPrintf("Buffer of %d bytes does not fit the memory plan", size);
     return kTfLiteError;
   }
   buffer_offsets_[current_buffer_count_] = next_free_offset_;
