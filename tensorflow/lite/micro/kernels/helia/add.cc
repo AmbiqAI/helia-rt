@@ -15,6 +15,9 @@ limitations under the License.
 
 #include "tensorflow/lite/micro/kernels/internal/reference/add.h"
 
+#include <cmath>
+#include <limits>
+
 #include "Include/arm_nnfunctions.h"
 
 #include "tensorflow/lite/micro/c/builtin_op_data.h"
@@ -65,6 +68,37 @@ struct OpData {
   HeliaBroadcastClass broadcast_class;
 };
 
+// QuantizeMultiplierSmallerThanOneExp aborts unless `multiplier` is in (0, 1)
+// and stays below 1 when rounded to Q31.
+bool IsQ31MultiplierBelowOne(double multiplier) {
+  return multiplier > 0. && multiplier < 1. - 1. / (1LL << 32);
+}
+
+bool IsPositiveFiniteScale(float scale) {
+  return std::isfinite(scale) && scale > 0.f;
+}
+
+bool IsInt8ZeroPoint(int32_t zero_point) {
+  return zero_point >= std::numeric_limits<int8_t>::min() &&
+         zero_point <= std::numeric_limits<int8_t>::max();
+}
+
+// Releases a Prepare temporary on every return.
+class ScopedTempTensor {
+ public:
+  ScopedTempTensor(MicroContext* context, TfLiteTensor* tensor)
+      : context_(context), tensor_(tensor) {}
+  ~ScopedTempTensor() {
+    if (tensor_ != nullptr) {
+      context_->DeallocateTempTfLiteTensor(tensor_);
+    }
+  }
+
+ private:
+  MicroContext* context_;
+  TfLiteTensor* tensor_;
+};
+
 TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteAddParams* params,
                              const TfLiteTensor* input1,
                              const TfLiteTensor* input2, TfLiteTensor* output,
@@ -90,6 +124,11 @@ TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteAddParams* params,
     const double real_output_multiplier =
         twice_max_input_scale /
         ((1 << data->left_shift) * static_cast<double>(output->params.scale));
+    TF_LITE_ENSURE_MSG(context,
+                       IsQ31MultiplierBelowOne(real_input1_multiplier) &&
+                           IsQ31MultiplierBelowOne(real_input2_multiplier) &&
+                           IsQ31MultiplierBelowOne(real_output_multiplier),
+                       "ADD scales give a rescale multiplier outside (0, 1).");
 
     QuantizeMultiplierSmallerThanOneExp(
         real_input1_multiplier, &data->input1_multiplier, &data->input1_shift);
@@ -169,8 +208,11 @@ TfLiteStatus EvalAddQuantizedInt8(TfLiteContext* context, TfLiteNode* node,
   const int32_t input1_dims_count = input1_shape.DimensionsCount();
   const RuntimeShape input2_shape = tflite::micro::GetTensorShape(input2);
   const int32_t input2_dims_count = input2_shape.DimensionsCount();
+  const int32_t output_dims_count =
+      tflite::micro::GetTensorShape(output).DimensionsCount();
 
-  if (input1_dims_count > 4 || input2_dims_count > 4) {
+  // The heliaCORE route takes 4-D NHWC dims for all three tensors.
+  if (input1_dims_count > 4 || input2_dims_count > 4 || output_dims_count > 4) {
     reference_integer_ops::BroadcastAdd4DSlow(
         op_params, tflite::micro::GetTensorShape(input1),
         tflite::micro::GetTensorData<int8_t>(input1),
@@ -238,8 +280,11 @@ TfLiteStatus EvalAddQuantizedInt16(TfLiteContext* context, TfLiteNode* node,
   const int32_t input1_dims_count = input1_shape.DimensionsCount();
   const RuntimeShape input2_shape = tflite::micro::GetTensorShape(input2);
   const int32_t input2_dims_count = input2_shape.DimensionsCount();
+  const int32_t output_dims_count =
+      tflite::micro::GetTensorShape(output).DimensionsCount();
 
-  if (input1_dims_count > 4 || input2_dims_count > 4) {
+  // The heliaCORE route takes 4-D NHWC dims for all three tensors.
+  if (input1_dims_count > 4 || input2_dims_count > 4 || output_dims_count > 4) {
     reference_ops::BroadcastAdd4DSlow(
         op_params, tflite::micro::GetTensorShape(input1),
         tflite::micro::GetTensorData<int16_t>(input1),
@@ -461,13 +506,28 @@ TfLiteStatus PrepareAdd(TfLiteContext* context, TfLiteNode* node) {
 
   TfLiteTensor* input1 =
       micro_context->AllocateTempInputTensor(node, kInputTensor1);
+  ScopedTempTensor input1_guard(micro_context, input1);
   TF_LITE_ENSURE(context, input1 != nullptr);
   TfLiteTensor* input2 =
       micro_context->AllocateTempInputTensor(node, kInputTensor2);
+  ScopedTempTensor input2_guard(micro_context, input2);
   TF_LITE_ENSURE(context, input2 != nullptr);
   TfLiteTensor* output =
       micro_context->AllocateTempOutputTensor(node, kOutputTensor);
+  ScopedTempTensor output_guard(micro_context, output);
   TF_LITE_ENSURE(context, output != nullptr);
+  // RuntimeShape holds at most kMaxSmallSize dims and copies without a bound.
+  TF_LITE_ENSURE_MSG(context,
+                     NumDimensions(input1) <= RuntimeShape::kMaxSmallSize &&
+                         NumDimensions(input2) <= RuntimeShape::kMaxSmallSize &&
+                         NumDimensions(output) <= RuntimeShape::kMaxSmallSize,
+                     "ADD supports tensors of rank 6 or less.");
+  TF_LITE_ENSURE_MSG(
+      context,
+      HeliaShapesBroadcastToOutput(tflite::GetTensorShape(input1),
+                                   tflite::GetTensorShape(input2),
+                                   tflite::GetTensorShape(output)),
+      "ADD input shapes do not broadcast to the output.");
 
   TF_LITE_ENSURE_EQ(context, input1->type, output->type);
   TF_LITE_ENSURE_MSG(
@@ -484,6 +544,26 @@ TfLiteStatus PrepareAdd(TfLiteContext* context, TfLiteNode* node) {
     TF_LITE_ENSURE_EQ(context, input1->params.zero_point, 0);
     TF_LITE_ENSURE_EQ(context, input2->params.zero_point, 0);
     TF_LITE_ENSURE_EQ(context, output->params.zero_point, 0);
+  }
+  if (input1->type == kTfLiteInt8) {
+    TF_LITE_ENSURE_MSG(context,
+                       IsInt8ZeroPoint(input1->params.zero_point) &&
+                           IsInt8ZeroPoint(input2->params.zero_point) &&
+                           IsInt8ZeroPoint(output->params.zero_point),
+                       "ADD int8 zero points must be in [-128, 127].");
+  }
+  if (input1->type == kTfLiteInt8 || input1->type == kTfLiteInt16) {
+    TF_LITE_ENSURE_MSG(
+        context,
+        input1->quantization.type != kTfLiteNoQuantization &&
+            input2->quantization.type != kTfLiteNoQuantization &&
+            output->quantization.type != kTfLiteNoQuantization,
+        "ADD int8/int16 requires quantized input1, input2 and output.");
+    TF_LITE_ENSURE_MSG(context,
+                       IsPositiveFiniteScale(input1->params.scale) &&
+                           IsPositiveFiniteScale(input2->params.scale) &&
+                           IsPositiveFiniteScale(output->params.scale),
+                       "ADD int8/int16 requires finite scales above zero.");
   }
 
   OpData* data = static_cast<OpData*>(node->user_data);
@@ -507,10 +587,6 @@ TfLiteStatus PrepareAdd(TfLiteContext* context, TfLiteNode* node) {
     TF_LITE_ENSURE_EQ(context, input2->quantization.type,
                       kTfLiteNoQuantization);
   }
-
-  micro_context->DeallocateTempTfLiteTensor(input1);
-  micro_context->DeallocateTempTfLiteTensor(input2);
-  micro_context->DeallocateTempTfLiteTensor(output);
 
   return kTfLiteOk;
 }
