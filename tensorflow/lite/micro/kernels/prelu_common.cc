@@ -79,7 +79,7 @@ void BroadcastPrelu4DSlowFloat(const RuntimeShape& unextended_input1_shape,
   }
 }
 
-// TODO(AmbiqAI/helia-rt#460): upstream keeps the temporaries on a reject; drop when upstream has it.
+// TODO(AmbiqAI/helia-rt#460): free temps on reject; drop when upstream has it.
 static TfLiteStatus PreluPrepareTensors(TfLiteContext* context,
                                         const TfLiteTensor* input,
                                         const TfLiteTensor* alpha,
