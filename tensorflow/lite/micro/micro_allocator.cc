@@ -1062,6 +1062,13 @@ TfLiteStatus MicroAllocator::AllocateTfLiteEvalTensors(
         MicroPrintf("Failed to initialize tensor %d", i);
         return kTfLiteError;
       }
+      // TODO(AmbiqAI/helia-rt#460): upstream sizes tensors only after kernel Prepare; drop when upstream has it.
+      size_t bytes;
+      if (TfLiteEvalTensorByteLength(&tensors[i], &bytes) != kTfLiteOk) {
+        MicroPrintf("Failed to size tensor %d in subgraph %d",
+                    static_cast<int>(i), static_cast<int>(subgraph_idx));
+        return kTfLiteError;
+      }
     }
     subgraph_allocations[subgraph_idx].tensors = tensors;
   }

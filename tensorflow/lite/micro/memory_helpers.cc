@@ -15,7 +15,6 @@ limitations under the License.
 
 #include "tensorflow/lite/micro/memory_helpers.h"
 
-#include <climits>
 #include <cstddef>
 #include <cstdint>
 
@@ -106,7 +105,7 @@ TfLiteStatus TfLiteTypeSizeOf(TfLiteType type, size_t* size) {
   return kTfLiteOk;
 }
 
-// TODO(AmbiqAI/helia-rt#460): no overflow check; drop when upstream has it.
+// TODO(AmbiqAI/helia-rt#460): upstream does not bound tensor sizes; drop when upstream has it.
 TfLiteStatus MultiplyTensorSize(size_t* size, int64_t factor, size_t limit) {
   if (factor < 0) {
     MicroPrintf("Tensor dimension %d is negative", static_cast<int>(factor));
@@ -124,14 +123,14 @@ TfLiteStatus MultiplyTensorSize(size_t* size, int64_t factor, size_t limit) {
 
 TfLiteStatus BytesRequiredForTensor(const tflite::Tensor& flatbuffer_tensor,
                                     size_t* bytes, size_t* type_size) {
-  // TODO(AmbiqAI/helia-rt#460): no overflow check; drop when upstream has it.
+  // TODO(AmbiqAI/helia-rt#460): upstream multiplies the shape without an overflow check; drop when upstream has it.
   size_t element_count = 1;
   // If flatbuffer_tensor.shape == nullptr, then flatbuffer_tensor is a scalar
   // so has 1 element.
   if (flatbuffer_tensor.shape() != nullptr) {
     for (size_t n = 0; n < flatbuffer_tensor.shape()->size(); ++n) {
       TF_LITE_ENSURE_STATUS(MultiplyTensorSize(
-          &element_count, flatbuffer_tensor.shape()->Get(n), INT_MAX));
+          &element_count, flatbuffer_tensor.shape()->Get(n), kMaxTensorBytes));
     }
   }
 
@@ -140,7 +139,7 @@ TfLiteStatus BytesRequiredForTensor(const tflite::Tensor& flatbuffer_tensor,
       ConvertTensorType(flatbuffer_tensor.type(), &tf_lite_type));
   TF_LITE_ENSURE_STATUS(TfLiteTypeSizeOf(tf_lite_type, type_size));
   TF_LITE_ENSURE_STATUS(
-      MultiplyTensorSize(&element_count, *type_size, SIZE_MAX));
+      MultiplyTensorSize(&element_count, *type_size, kMaxTensorBytes));
   *bytes = element_count;
   return kTfLiteOk;
 }
@@ -149,19 +148,19 @@ TfLiteStatus TfLiteEvalTensorByteLength(const TfLiteEvalTensor* eval_tensor,
                                         size_t* out_bytes) {
   TFLITE_DCHECK(out_bytes != nullptr);
 
-  // TODO(AmbiqAI/helia-rt#460): no overflow check; drop when upstream has it.
+  // TODO(AmbiqAI/helia-rt#460): upstream multiplies the shape without an overflow check; drop when upstream has it.
   size_t element_count = 1;
   // If eval_tensor->dims == nullptr, then tensor is a scalar so has 1 element.
   if (eval_tensor->dims != nullptr) {
     for (int n = 0; n < eval_tensor->dims->size; ++n) {
       TF_LITE_ENSURE_STATUS(MultiplyTensorSize(
-          &element_count, eval_tensor->dims->data[n], INT_MAX));
+          &element_count, eval_tensor->dims->data[n], kMaxTensorBytes));
     }
   }
   size_t type_size;
   TF_LITE_ENSURE_STATUS(TfLiteTypeSizeOf(eval_tensor->type, &type_size));
   TF_LITE_ENSURE_STATUS(
-      MultiplyTensorSize(&element_count, type_size, SIZE_MAX));
+      MultiplyTensorSize(&element_count, type_size, kMaxTensorBytes));
   *out_bytes = element_count;
   return kTfLiteOk;
 }

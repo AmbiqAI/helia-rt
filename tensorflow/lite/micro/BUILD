@@ -237,12 +237,13 @@ tflm_cc_library(
     ],
 )
 
+# TODO(AmbiqAI/helia-rt#460): upstream lacks the size bounds that need :micro_arena_constants and :micro_log; drop when upstream has it.
 tflm_cc_library(
     name = "memory_helpers",
     srcs = ["memory_helpers.cc"],
     hdrs = ["memory_helpers.h"],
     deps = [
-        # TODO(AmbiqAI/helia-rt#460): no overflow check; drop when upstream has it.
+        ":micro_arena_constants",
         ":micro_log",
         "//tensorflow/lite/micro/c:common",
         "//tensorflow/lite/micro/kernels/internal:reference",

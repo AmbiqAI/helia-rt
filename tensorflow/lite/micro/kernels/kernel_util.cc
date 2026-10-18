@@ -153,7 +153,7 @@ size_t ValidateAndGetTensorSizes(const TfLiteEvalTensor* tensor1,
   TFLITE_DCHECK(tensor1->type == tensor2->type);
   size_t tensor1_size = 0;
   size_t tensor2_size = 0;
-  // TODO(AmbiqAI/helia-rt#460): status not checked; drop when upstream has it.
+  // TODO(AmbiqAI/helia-rt#460): upstream ignores these statuses; drop when upstream has it.
   if (TfLiteEvalTensorByteLength(tensor1, &tensor1_size) != kTfLiteOk ||
       TfLiteEvalTensorByteLength(tensor2, &tensor2_size) != kTfLiteOk) {
     return -1;
