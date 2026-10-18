@@ -52,7 +52,8 @@ README = "tensorflow/lite/micro/kernels/helia/README.md"
 NSX = "nsx/nsx-module.yaml"
 NSX_SOURCE = "nsx-source/nsx-module.yaml"
 
-# release-please src/updaters/generic.ts, version scope only.
+# release-please's version-scope regexes. see googleapis/release-please
+# src/updaters/generic.ts
 RP_VERSION = re.compile(r"(\d+)\.(\d+)\.(\d+)(-([\w.]+))?(\+([-\w.]+))?", re.A)
 RP_INLINE = re.compile("x-release-please-" + "version")
 RP_START = re.compile("x-release-please-start-" + "version")

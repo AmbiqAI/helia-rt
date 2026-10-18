@@ -102,9 +102,9 @@ helia-specific shell entrypoints follow the naming pattern `*_helia.sh`:
 | `check_helia_release_versions_test.py` | `helia_test.yml` |
 
 New helia CI scripts must follow the same `*_helia.sh` (or
-`<verb>_helia*.sh`, or `<verb>_helia*.py` for a Python check)
-pattern. Avoid editing the upstream `test_*.sh`
-scripts unless the behavior change is *also* useful upstream.
+`<verb>_helia*.sh`, or `<verb>_helia*.py` for a Python check) pattern.
+Avoid editing the upstream `test_*.sh` scripts unless the behavior change
+is *also* useful upstream.
 
 ### 5. GitHub workflows (`.github/workflows/`)
 

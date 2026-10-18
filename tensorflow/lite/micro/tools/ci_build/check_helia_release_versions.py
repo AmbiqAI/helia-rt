@@ -49,9 +49,10 @@ import sys
 import time
 from pathlib import Path
 
-# The marker regexes and VERSION_RE are release-please's own
-# (src/updaters/generic.ts); it applies VERSION_RE once per line, not
-# globally. Each pattern is split so this file carries no marker itself.
+# The marker regexes and VERSION_RE are release-please's own; it applies
+# VERSION_RE once per line, not globally. Each pattern is split so this file
+# carries no marker itself. see googleapis/release-please
+# src/updaters/generic.ts
 MARKER = "x-release-please-" + "version"
 SCOPES = "major|minor|patch|version-date|version|date"
 INLINE_RE = re.compile("x-release-please-" + f"(?P<scope>{SCOPES})", re.A)

@@ -70,7 +70,7 @@ concurrency:
 
 # The CI image is resolved by the `ci-image` setup job below and consumed via
 # `needs.ci-image.outputs.image`. `container.image` does not support the `env`
-# context, so a tiny setup job is the cleanest way to keep a single pin point.
+# context, so a setup job is the cleanest way to keep a single pin point.
 #
 # The image is pinned by DIGEST, not by tag. `:latest` is rebuilt by manual
 # dispatch of helia_build_docker_image.yml and is not a `needs:` of this
