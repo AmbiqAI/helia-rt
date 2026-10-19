@@ -15,6 +15,7 @@ limitations under the License.
 
 #include "tensorflow/lite/micro/memory_planner/greedy_memory_planner.h"
 
+#include <algorithm>
 #include <climits>
 #include <cstdint>
 
@@ -67,7 +68,8 @@ TfLiteStatus GreedyMemoryPlanner::Init(unsigned char* scratch_buffer,
   // Reset internal states
   buffer_count_ = 0;
   need_to_calculate_offsets_ = true;
-  // TODO(AmbiqAI/helia-rt#460): upstream adds offsets and sizes in int unchecked; drop when upstream has it.
+  // TODO(AmbiqAI/helia-rt#460): upstream adds offsets and sizes in int
+  // unchecked; drop when upstream has it.
   plan_overflowed_ = false;
 
   // Allocate the arrays we need within the scratch buffer arena.
@@ -100,7 +102,8 @@ TfLiteStatus GreedyMemoryPlanner::AddBuffer(int size, int first_time_used,
     MicroPrintf("Too many buffers (max is %d)", max_buffer_count_);
     return kTfLiteError;
   }
-  // TODO(AmbiqAI/helia-rt#460): upstream adds offsets and sizes in int unchecked; drop when upstream has it.
+  // TODO(AmbiqAI/helia-rt#460): upstream adds offsets and sizes in int
+  // unchecked; drop when upstream has it.
   if (size < 0) {
     MicroPrintf("Buffer size %d is negative", size);
     return kTfLiteError;
@@ -118,7 +121,8 @@ TfLiteStatus GreedyMemoryPlanner::AddBuffer(int size, int first_time_used,
 TfLiteStatus GreedyMemoryPlanner::AddBuffer(int size, int first_time_used,
                                             int last_time_used,
                                             int offline_offset) {
-  // TODO(AmbiqAI/helia-rt#460): upstream adds offsets and sizes in int unchecked; drop when upstream has it.
+  // TODO(AmbiqAI/helia-rt#460): upstream adds offsets and sizes in int
+  // unchecked; drop when upstream has it.
   if (offline_offset < 0 || size > INT_MAX - offline_offset) {
     MicroPrintf("Offline buffer of %d bytes at %d passes INT_MAX", size,
                 offline_offset);
@@ -180,7 +184,8 @@ void GreedyMemoryPlanner::CalculateOffsetsIfNeeded() {
     return;
   }
   need_to_calculate_offsets_ = false;
-  // TODO(AmbiqAI/helia-rt#460): upstream adds offsets and sizes in int unchecked; drop when upstream has it.
+  // TODO(AmbiqAI/helia-rt#460): upstream adds offsets and sizes in int
+  // unchecked; drop when upstream has it.
   plan_overflowed_ = false;
 
   // Start off by ordering the buffers in descending order of size.
@@ -281,7 +286,8 @@ void GreedyMemoryPlanner::CalculateOffsetsIfNeeded() {
       // Offline planned offset are to be considered constant
       candidate_offset = wanted_requirements->offline_offset;
     }
-    // TODO(AmbiqAI/helia-rt#460): upstream adds offsets and sizes in int unchecked; drop when upstream has it.
+    // TODO(AmbiqAI/helia-rt#460): upstream adds offsets and sizes in int
+    // unchecked; drop when upstream has it.
     if (candidate_offset > INT_MAX - wanted_size) {
       MicroPrintf("Buffer %d of %d bytes at offset %d passes INT_MAX",
                   buffer_id, wanted_size, candidate_offset);
@@ -339,7 +345,8 @@ size_t GreedyMemoryPlanner::GetMaximumMemorySize() {
   if (buffer_count_ == 0) {
     return 0;
   }
-  // TODO(AmbiqAI/helia-rt#460): upstream adds offsets and sizes in int unchecked; drop when upstream has it.
+  // TODO(AmbiqAI/helia-rt#460): upstream adds offsets and sizes in int
+  // unchecked; drop when upstream has it.
   if (plan_overflowed_) {
     return SIZE_MAX;
   }
@@ -409,8 +416,12 @@ void GreedyMemoryPlanner::PrintMemoryPlan() {
       }
       const int size = requirements->size;
       memory_use += size;
-      const int line_start = (offset * kLineWidth) / max_size;
-      const int line_end = ((offset + size) * kLineWidth) / max_size;
+      int line_start = static_cast<int>(
+          (static_cast<int64_t>(offset) * kLineWidth) / max_size);
+      int line_end = static_cast<int>(
+          (static_cast<int64_t>(offset + size) * kLineWidth) / max_size);
+      line_start = std::max(0, std::min(line_start, kLineWidth));
+      line_end = std::max(0, std::min(line_end, kLineWidth));
       for (int n = line_start; n < line_end; ++n) {
         if (line[n] == '.') {
           if (requirements->first_time_used == requirements->last_time_used) {
@@ -441,7 +452,8 @@ TfLiteStatus GreedyMemoryPlanner::GetOffsetForBuffer(int buffer_index,
                 buffer_count_);
     return kTfLiteError;
   }
-  // TODO(AmbiqAI/helia-rt#460): upstream adds offsets and sizes in int unchecked; drop when upstream has it.
+  // TODO(AmbiqAI/helia-rt#460): upstream adds offsets and sizes in int
+  // unchecked; drop when upstream has it.
   if (plan_overflowed_) {
     return kTfLiteError;
   }
