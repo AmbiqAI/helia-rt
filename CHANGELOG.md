@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.2.2](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v2.2.1...helia-rt-v2.2.2) (2026-10-19)
+
+
+### Bug Fixes
+
+* **helia:** dequantize a per-channel input with each channel's parameters ([5e7625c](https://github.com/AmbiqAI/helia-rt/commit/5e7625c505b2972feef3fae86f2e51a48107141a))
+* **helia:** dequantize a per-channel input with each channel's parameters ([f389ef7](https://github.com/AmbiqAI/helia-rt/commit/f389ef7dcbdfd864979a206ade8aa8c016be8fb5)), closes [#498](https://github.com/AmbiqAI/helia-rt/issues/498)
+* **helia:** keep per-channel DEQUANTIZE exact and its state off per-tensor nodes ([79303ea](https://github.com/AmbiqAI/helia-rt/commit/79303eac8a7eddc07303d6cf92f3762b197ba968)), closes [#498](https://github.com/AmbiqAI/helia-rt/issues/498)
+* **runtime:** keep the rank check linkable in C++14 stripped builds ([cae32cc](https://github.com/AmbiqAI/helia-rt/commit/cae32ccef634455bd26ec078f4b10e1babb6b9e1)), closes [#497](https://github.com/AmbiqAI/helia-rt/issues/497)
+* **runtime:** refuse tensors above rank 6 in AllocateTensors ([93ad98b](https://github.com/AmbiqAI/helia-rt/commit/93ad98b344220d8cae36d87a7d7322e3d74b7f67)), closes [#497](https://github.com/AmbiqAI/helia-rt/issues/497)
+
 ## [2.2.1](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v2.2.0...helia-rt-v2.2.1) (2026-10-19)
 
 
