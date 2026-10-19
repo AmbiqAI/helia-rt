@@ -388,30 +388,32 @@ jobs:
         # see AmbiqAI/helia-rt#471
         # The float16 DEPTHWISE_CONV_2D _acc16 opt-in registration adds one case
         # on every leg and three on the cortex-m55 ones. see AmbiqAI/ns-cmsis-nn#830
+        # The load-time rank-above-6 rejection adds five cases on every leg.
+        # see AmbiqAI/helia-rt#497
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 191
-            min-cases: 1756
+            min-cases: 1761
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 191
-            min-cases: 1756
+            min-cases: 1761
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 190
-            min-cases: 1754
+            min-cases: 1759
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 191
-            min-cases: 1821
+            min-cases: 1826
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 190
-            min-cases: 1819
+            min-cases: 1824
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}

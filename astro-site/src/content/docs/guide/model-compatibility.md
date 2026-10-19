@@ -10,7 +10,8 @@ heliaRT reads the LiteRT `.tflite` model format. Compatibility also depends on t
 1. Register every operator the model uses with `MicroMutableOpResolver`. Check each registration result; the resolver's template argument is its registration capacity.
 2. Check the input, weight and output types for each node. An operator supporting int8 does not imply support for every int16 or floating-point configuration.
 3. Check shape, axis, quantization and operator options against the selected adapter. These can change whether an optimized path is available or the operation is supported at all.
-4. Build with matching runtime and heliaCORE dependencies, then check both `AllocateTensors()` and `Invoke()` using representative inputs.
+4. Check that every tensor in every subgraph has rank 6 or less. heliaRT kernels hold shapes in a six-dimension `RuntimeShape`, as upstream tflite-micro kernels do, and `AllocateTensors()` returns `kTfLiteError` for a model with any higher-rank tensor, before any kernel runs. There are no exceptions: the rule also covers tensors that only pass through RESHAPE, SQUEEZE, SPLIT or SHAPE, constants no operator reads, and the tensors of application custom ops. The TFLite converter can produce such models, and TensorFlow Lite runs them. Every release up to and including 2.2.1 accepts them, and a kernel that builds the shape of such a tensor can overwrite stack memory.
+5. Build with matching runtime and heliaCORE dependencies, then check both `AllocateTensors()` and `Invoke()` using representative inputs.
 
 The [resolver declarations](https://github.com/AmbiqAI/helia-rt/blob/main/tensorflow/lite/micro/micro_mutable_op_resolver.h) and [HELIA adapters](https://github.com/AmbiqAI/helia-rt/tree/main/tensorflow/lite/micro/kernels/helia) define these contracts. Use the source revision matching your application when checking a released library.
 
@@ -49,7 +50,7 @@ Check the source or release notes for the version you link. For example, [quanti
 
 **Registration:** a failed `Add...()` call means the resolver could not accept that registration. Fix this before constructing the interpreter.
 
-**Allocation and preparation:** `AllocateTensors()` prepares the graph as well as allocating memory. An error can indicate an unsupported type, invalid shape or option, missing operator, or insufficient arena space. Increasing the arena is not a general fix for preparation failures.
+**Allocation and preparation:** `AllocateTensors()` prepares the graph as well as allocating memory. An error can indicate an unsupported type, invalid shape or option, a tensor above rank 6, missing operator, or insufficient arena space. Increasing the arena is not a general fix for preparation failures.
 
 **Invocation:** `Invoke()` executes the prepared graph. An adapter can still reject inputs or propagate a kernel error at this stage. Check its return value on every invocation and do not consume outputs from a failed invocation as valid results.
 
