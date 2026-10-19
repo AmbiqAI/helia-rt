@@ -39,25 +39,30 @@ namespace micro {
 
 namespace {
 
-// DequantizePrepare reads node->user_data as a DequantizeOpData, so `base`
-// must stay the first member.
-struct HeliaDequantizeOpData {
-  DequantizeOpData base;
-  // Per-channel route when num_channels > 0: persistent copies of the input's
-  // scales and zero points, with the input viewed as
-  // [outer_size, num_channels, inner_size] around its quantized dimension.
+// Persistent per-channel parameters: the input's quantization arrays do not
+// outlive Prepare. The input is viewed as [outer_size, num_channels,
+// inner_size] around its quantized dimension.
+struct PerChannelParams {
   const float* scales;
   const int32_t* zero_points;
   int32_t num_channels;
   int32_t outer_size;
   int32_t inner_size;
 };
+
+// DequantizePrepare reads node->user_data as a DequantizeOpData, so `base`
+// must stay the first member.
+struct HeliaDequantizeOpData {
+  DequantizeOpData base;
+  // nullptr for a per-tensor input.
+  const PerChannelParams* per_channel;
+};
 static_assert(std::is_standard_layout<HeliaDequantizeOpData>::value,
               "HeliaDequantizeOpData must be standard layout");
 static_assert(offsetof(HeliaDequantizeOpData, base) == 0,
               "DequantizePrepare needs base at offset 0");
 
-// TensorFlow Lite's IsQuantizedPerChannel: more than one scale.
+// Per-channel means more than one scale.
 bool IsQuantizedPerChannel(const TfLiteTensor* input) {
   if (input->quantization.type != kTfLiteAffineQuantization ||
       input->quantization.params == nullptr) {
@@ -68,8 +73,8 @@ bool IsQuantizedPerChannel(const TfLiteTensor* input) {
   return params->scale != nullptr && params->scale->size > 1;
 }
 
-// TensorFlow Lite supports per-channel int8 and uint8 here and rejects every
-// other type, int16 included. see AmbiqAI/helia-rt#498
+// Accepts a per-channel int8 or uint8 input and rejects every other type.
+// see AmbiqAI/helia-rt#498
 TfLiteStatus PreparePerChannel(TfLiteContext* context,
                                const TfLiteTensor* input,
                                const TfLiteTensor* output,
@@ -100,16 +105,20 @@ TfLiteStatus PreparePerChannel(TfLiteContext* context,
   TF_LITE_ENSURE_OK(context, HeliaCheckedSameShapeElementCount(
                                  context, input->dims, output->dims, &count));
 
+  // One persistent block: the parameters, the scales, then the zero points.
   static_assert(sizeof(float) == sizeof(int32_t), "one bound covers both");
-  TF_LITE_ENSURE(context,
-                 static_cast<size_t>(num_channels) <= SIZE_MAX / sizeof(float));
-  const size_t bytes = static_cast<size_t>(num_channels) * sizeof(float);
-  float* scales =
-      static_cast<float*>(context->AllocatePersistentBuffer(context, bytes));
-  TF_LITE_ENSURE(context, scales != nullptr);
-  int32_t* zero_points =
-      static_cast<int32_t*>(context->AllocatePersistentBuffer(context, bytes));
-  TF_LITE_ENSURE(context, zero_points != nullptr);
+  static_assert(sizeof(PerChannelParams) % alignof(float) == 0,
+                "the scales follow the parameters");
+  TF_LITE_ENSURE(
+      context, static_cast<size_t>(num_channels) <=
+                   (SIZE_MAX - sizeof(PerChannelParams)) / (2 * sizeof(float)));
+  const size_t bytes = sizeof(PerChannelParams) +
+                       2 * static_cast<size_t>(num_channels) * sizeof(float);
+  void* block = context->AllocatePersistentBuffer(context, bytes);
+  TF_LITE_ENSURE(context, block != nullptr);
+  auto* per_channel = static_cast<PerChannelParams*>(block);
+  float* scales = reinterpret_cast<float*>(per_channel + 1);
+  int32_t* zero_points = reinterpret_cast<int32_t*>(scales + num_channels);
   for (int32_t c = 0; c < num_channels; ++c) {
     scales[c] = params->scale->data[c];
     zero_points[c] = params->zero_point->data[c];
@@ -125,18 +134,19 @@ TfLiteStatus PreparePerChannel(TfLiteContext* context,
     inner_size = count / (outer_size * num_channels);
   }
 
-  data->scales = scales;
-  data->zero_points = zero_points;
-  data->outer_size = outer_size;
-  data->inner_size = inner_size;
-  data->num_channels = num_channels;
+  per_channel->scales = scales;
+  per_channel->zero_points = zero_points;
+  per_channel->num_channels = num_channels;
+  per_channel->outer_size = outer_size;
+  per_channel->inner_size = inner_size;
+  data->per_channel = per_channel;
   return kTfLiteOk;
 }
 
 TfLiteStatus HeliaDequantizePrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE(context, node->user_data != nullptr);
   auto* data = static_cast<HeliaDequantizeOpData*>(node->user_data);
-  data->num_channels = 0;
+  data->per_channel = nullptr;
   TF_LITE_ENSURE_OK(context, DequantizePrepare(context, node));
 
   MicroContext* micro_context = GetMicroContext(context);
@@ -156,21 +166,38 @@ TfLiteStatus HeliaDequantizePrepare(TfLiteContext* context, TfLiteNode* node) {
   return status;
 }
 
-// Matches TensorFlow Lite's reference PerChannelDequantize element for
-// element: scale[c] * (input - zero_point[c]) in float.
+// For any 8-bit q, q - zero_point fits int32 when |zero_point| is at most
+// this. A channel outside it subtracts in int64, so the difference is exact
+// before its one rounding to float.
+constexpr int32_t kInt32ExactZeroPoint = INT32_MAX - 255;
+
+template <typename Difference, typename T>
+void DequantizeSlice(const T* input, float* output, int32_t size, float scale,
+                     int32_t zero_point) {
+  for (int32_t i = 0; i < size; ++i) {
+    output[i] = scale * static_cast<float>(static_cast<Difference>(input[i]) -
+                                           zero_point);
+  }
+}
+
+// out = scale[c] * float(q - zero_point[c]) for channel c.
 template <typename T>
-void PerChannelDequantize(const HeliaDequantizeOpData& data, const T* input,
+void PerChannelDequantize(const PerChannelParams& params, const T* input,
                           float* output) {
-  int32_t index = 0;
-  for (int32_t outer = 0; outer < data.outer_size; ++outer) {
-    for (int32_t c = 0; c < data.num_channels; ++c) {
-      const float scale = data.scales[c];
-      const int32_t zero_point = data.zero_points[c];
-      for (int32_t inner = 0; inner < data.inner_size; ++inner, ++index) {
-        output[index] =
-            scale *
-            static_cast<float>(static_cast<int32_t>(input[index]) - zero_point);
+  int32_t offset = 0;
+  for (int32_t outer = 0; outer < params.outer_size; ++outer) {
+    for (int32_t c = 0; c < params.num_channels; ++c) {
+      const float scale = params.scales[c];
+      const int32_t zero_point = params.zero_points[c];
+      if (zero_point >= -kInt32ExactZeroPoint &&
+          zero_point <= kInt32ExactZeroPoint) {
+        DequantizeSlice<int32_t>(input + offset, output + offset,
+                                 params.inner_size, scale, zero_point);
+      } else {
+        DequantizeSlice<int64_t>(input + offset, output + offset,
+                                 params.inner_size, scale, zero_point);
       }
+      offset += params.inner_size;
     }
   }
 }
@@ -196,15 +223,15 @@ TfLiteStatus DequantizeEval(TfLiteContext* context, TfLiteNode* node) {
   // Output type ensured to be kTfLiteFloat32 at the Prepare stage
   TFLITE_DCHECK(output->type == kTfLiteFloat32);
 
-  if (helia_data->num_channels > 0) {
+  if (helia_data->per_channel != nullptr) {
     switch (input->type) {
       case kTfLiteInt8:
-        PerChannelDequantize(*helia_data,
+        PerChannelDequantize(*helia_data->per_channel,
                              tflite::micro::GetTensorData<int8_t>(input),
                              tflite::micro::GetTensorData<float>(output));
         return kTfLiteOk;
       case kTfLiteUInt8:
-        PerChannelDequantize(*helia_data,
+        PerChannelDequantize(*helia_data->per_channel,
                              tflite::micro::GetTensorData<uint8_t>(input),
                              tflite::micro::GetTensorData<float>(output));
         return kTfLiteOk;

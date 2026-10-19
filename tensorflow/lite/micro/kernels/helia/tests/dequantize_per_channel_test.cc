@@ -16,10 +16,13 @@ limitations under the License.
 // Per-channel DEQUANTIZE gives TensorFlow Lite's per-channel results for int8
 // and uint8 on the first, a middle and the last axis, rejects int16 and
 // inconsistent per-channel parameters in Prepare, and leaves per-tensor input
-// on arm_dequantize_s8_f32. The goldens are exact in float32. GCC and ATfE
-// links wrap the heliaCORE entry to prove the route. see AmbiqAI/helia-rt#498
+// on arm_dequantize_s8_f32. Eval uses Prepare's copies of the parameters,
+// and an extreme zero point gives the exact difference rounded once. The
+// goldens are exact in float32. GCC and ATfE links wrap the heliaCORE entry to
+// prove the route. see AmbiqAI/helia-rt#498
 
 #include <cstdint>
+#include <limits>
 
 #include "Include/arm_nnfunctions.h"
 #include "tensorflow/lite/micro/c/common.h"
@@ -297,11 +300,62 @@ TfLiteStatus PrepareChannels(int channels) {
 }  // namespace testing
 }  // namespace tflite
 
-// KernelRunner's 10000-byte arena holds neither 4096-entry copy, and holds the
-// 1500-entry scales but not the zero points after them.
+// KernelRunner's 10000-byte arena cannot hold 4096 scales and zero points.
 TEST(HeliaDequantizePerChannelTest, PersistentCopyFailureFailsPrepare) {
   EXPECT_EQ(kTfLiteError, tflite::testing::PrepareChannels(4096));
-  EXPECT_EQ(kTfLiteError, tflite::testing::PrepareChannels(1500));
+}
+
+// q - zero_point overflows int32 here; the result is the exact difference
+// rounded to float, not the wrapped one.
+TEST(HeliaDequantizePerChannelTest, ExtremeZeroPointsAreExact) {
+  int dims[] = {2, 2, 2};
+  const float scales[] = {1.0f, 1.0f};
+  const int zero_points[] = {std::numeric_limits<int32_t>::min(),
+                             std::numeric_limits<int32_t>::max()};
+  Quantization quant(2, scales, zero_points, 0);
+  int8_t input[4] = {0, -128, -128, 127};
+  float output[4] = {};
+  const Result result =
+      Run(QuantizedInput(input, IntArrayFromInts(dims), kTfLiteInt8, &quant),
+          IntArrayFromInts(dims), output);
+  EXPECT_EQ(kTfLiteOk, result.prepare);
+  EXPECT_EQ(kTfLiteOk, result.invoke);
+  // 2^31, 2^31 - 128, -2^31 - 128 rounded to -2^31, and -2^31 + 128.
+  const float expected[4] = {2147483648.0f, 2147483520.0f, -2147483648.0f,
+                             -2147483520.0f};
+  for (int i = 0; i < 4; ++i) {
+    EXPECT_EQ(expected[i], output[i]);
+  }
+}
+
+// The interpreter reuses the input's temporary quantization arrays after
+// Prepare, so Eval must not read them.
+TEST(HeliaDequantizePerChannelTest, EvalUsesPrepareTimeParameters) {
+  int dims[] = {2, 2, 3};
+  const float scales[] = {0.5f, 2.0f};
+  const int zero_points[] = {0, 1};
+  Quantization quant(2, scales, zero_points, 0);
+  int8_t input_data[6] = {-4, 2, 10, 3, -1, 7};
+  float output[6] = {};
+  TfLiteTensor tensors[2] = {
+      QuantizedInput(input_data, IntArrayFromInts(dims), kTfLiteInt8, &quant),
+      tflite::testing::CreateTensor(output, IntArrayFromInts(dims))};
+  int inputs[] = {1, 0};
+  int outputs[] = {1, 1};
+  const TFLMRegistration registration = tflite::Register_DEQUANTIZE();
+  tflite::micro::KernelRunner runner(registration, tensors, 2,
+                                     IntArrayFromInts(inputs),
+                                     IntArrayFromInts(outputs), nullptr);
+  EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
+  for (int c = 0; c < 2; ++c) {
+    quant.params.scale->data[c] = 100.0f;
+    quant.params.zero_point->data[c] = 50;
+  }
+  EXPECT_EQ(kTfLiteOk, runner.Invoke());
+  const float expected[6] = {-2.0f, 1.0f, 5.0f, 4.0f, -4.0f, 12.0f};
+  for (int i = 0; i < 6; ++i) {
+    EXPECT_EQ(expected[i], output[i]);
+  }
 }
 
 TF_LITE_MICRO_TESTS_MAIN
