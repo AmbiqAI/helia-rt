@@ -139,7 +139,7 @@
       "float16"
     ],
     "path": "Mixed",
-    "notes": "Output is FP32. FP16 means weight-storage widening, not FP16 computation; it calls arm_dequantize_f16_bits_f32 on every target, works without ARM_NN_ENABLE_F16, and matches the reference widening bit for bit at reset FPSCR: a NaN keeps its sign and payload and comes back quiet, on the MVE path too. On cores with an FPU but no MVE float16 (for example cortex-m4+fp) the widening runs on the FPU, so with FPSCR.DN (default NaN) set every NaN becomes 0x7FC00000."
+    "notes": "Output is FP32. A per-tensor int8 or int16 input runs on heliaCORE. An int8 or uint8 input may be per-channel (one scale and zero point per channel along any quantized dimension) and is dequantized with each channel's own parameters, matching TensorFlow Lite; a per-channel int16 input is rejected at Prepare, as in TensorFlow Lite. FP16 means weight-storage widening, not FP16 computation; it calls arm_dequantize_f16_bits_f32 on every target, works without ARM_NN_ENABLE_F16, and matches the reference widening bit for bit at reset FPSCR: a NaN keeps its sign and payload and comes back quiet, on the MVE path too. On cores with an FPU but no MVE float16 (for example cortex-m4+fp) the widening runs on the FPU, so with FPSCR.DN (default NaN) set every NaN becomes 0x7FC00000."
   },
   {
     "name": "DIV",
