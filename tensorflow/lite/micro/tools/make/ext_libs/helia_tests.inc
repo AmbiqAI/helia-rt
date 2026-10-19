@@ -517,6 +517,19 @@ $(kernel_dequantize_f16_test_BINARY): LDFLAGS += \
   -Wl,--wrap=arm_dequantize_f16_bits_f32
 endif
 
+# Per-channel int8/uint8 DEQUANTIZE on every axis, the Prepare rejections, and
+# per-tensor int8 staying on heliaCORE. GCC and ATfE links wrap the entry to
+# prove the route. see AmbiqAI/helia-rt#498
+$(eval $(call microlite_test,kernel_dequantize_per_channel_test,\
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/dequantize_per_channel_test.cc))
+
+ifneq (,$(filter gcc atfe,$(TOOLCHAIN)))
+$(kernel_dequantize_per_channel_test_BINARY): CXXFLAGS += \
+  -DHELIA_DEQUANTIZE_PER_CHANNEL_LINK_WRAP=1
+$(kernel_dequantize_per_channel_test_BINARY): LDFLAGS += \
+  -Wl,--wrap=arm_dequantize_s8_f32
+endif
+
 # MEAN, SUM, REDUCE_MIN/MAX and REDUCE_ALL fail at Invoke, on heliaCORE and
 # reference routes at ranks 0 through 6, when the output does not hold
 # exactly the reduced elements. see AmbiqAI/helia-rt#433
