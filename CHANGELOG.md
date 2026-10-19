@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.1](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v2.2.0...helia-rt-v2.2.1) (2026-10-19)
+
+
+### Bug Fixes
+
+* **helia:** run MVE float32 SQUARED_DIFFERENCE on heliaCORE again ([4a2048c](https://github.com/AmbiqAI/helia-rt/commit/4a2048c28e283d5913b0d7e6a8ee2dab350d0c42)), closes [#433](https://github.com/AmbiqAI/helia-rt/issues/433)
+
 ## [2.2.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v2.1.1...helia-rt-v2.2.0) (2026-10-18)
 
 
