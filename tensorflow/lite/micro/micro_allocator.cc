@@ -1109,7 +1109,8 @@ TfLiteStatus MicroAllocator::AllocateTfLiteEvalTensors(
         MicroPrintf(
             "Tensor %d in subgraph %d has rank %d, above the maximum %d",
             static_cast<int>(i), static_cast<int>(subgraph_idx),
-            static_cast<int>(shape->size()), RuntimeShape::kMaxSmallSize);
+            static_cast<int>(shape->size()),
+            static_cast<int>(RuntimeShape::kMaxSmallSize));
         return kTfLiteError;
       }
       // TODO(AmbiqAI/helia-rt#460): upstream sizes tensors only after kernel Prepare; drop when upstream has it.
