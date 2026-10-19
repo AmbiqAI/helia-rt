@@ -15,3 +15,13 @@ updates:
       - dependency-name: "peter-evans/create-pull-request"
       - dependency-name: "aws-actions/configure-aws-credentials"
       - dependency-name: "ARM-software/cmsis-actions"
+
+  # Docs site build tooling; nothing here ships in heliaRT.
+  - package-ecosystem: "npm"
+    directory: "/astro-site"
+    schedule:
+      interval: "weekly"
+    groups:
+      docs-site:
+        patterns:
+          - "*"
