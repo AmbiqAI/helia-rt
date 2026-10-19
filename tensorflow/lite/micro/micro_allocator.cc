@@ -27,6 +27,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/compatibility.h"
 #include "tensorflow/lite/micro/flatbuffer_utils.h"
 #include "tensorflow/lite/micro/kernels/internal/compatibility.h"
+#include "tensorflow/lite/micro/kernels/internal/runtime_shape.h"
 #include "tensorflow/lite/micro/memory_helpers.h"
 #include "tensorflow/lite/micro/memory_planner/greedy_memory_planner.h"
 #include "tensorflow/lite/micro/memory_planner/linear_memory_planner.h"
@@ -1097,6 +1098,18 @@ TfLiteStatus MicroAllocator::AllocateTfLiteEvalTensors(
           *subgraph->tensors()->Get(i), model->buffers(), &tensors[i]);
       if (status != kTfLiteOk) {
         MicroPrintf("Failed to initialize tensor %d", i);
+        return kTfLiteError;
+      }
+      // TODO(AmbiqAI/helia-rt#460): upstream lets kernels copy a rank above RuntimeShape's capacity onto the stack; drop when upstream has it.
+      const flatbuffers::Vector<int32_t>* shape =
+          subgraph->tensors()->Get(i)->shape();
+      if (shape != nullptr &&
+          shape->size() > static_cast<flatbuffers::uoffset_t>(
+                              RuntimeShape::kMaxSmallSize)) {
+        MicroPrintf(
+            "Tensor %d in subgraph %d has rank %d, above the maximum %d",
+            static_cast<int>(i), static_cast<int>(subgraph_idx),
+            static_cast<int>(shape->size()), RuntimeShape::kMaxSmallSize);
         return kTfLiteError;
       }
       // TODO(AmbiqAI/helia-rt#460): upstream sizes tensors only after kernel Prepare; drop when upstream has it.

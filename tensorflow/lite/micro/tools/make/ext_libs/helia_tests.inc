@@ -528,6 +528,8 @@ $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/reduce_output_size_t
 # AllocateTensors fails with them; the two-arena allocators and the memory
 # planners refuse requests and plans that pass their bounds.
 # see AmbiqAI/helia-rt#453
+# AllocateTensors also fails, before any kernel Init or Prepare, on a tensor
+# above rank 6. see AmbiqAI/helia-rt#497
 $(eval $(call microlite_test,kernel_tensor_byte_length_test,\
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/helia/tests/tensor_byte_length_test.cc))
 

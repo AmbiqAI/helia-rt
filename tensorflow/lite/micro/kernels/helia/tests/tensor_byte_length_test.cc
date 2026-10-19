@@ -23,6 +23,10 @@ limitations under the License.
 // allocators must refuse a request that does not fit, and the memory planners a
 // plan whose offset + size passes INT_MAX, rather than wrap. see
 // AmbiqAI/helia-rt#453
+//
+// Kernels copy a tensor's dims into RuntimeShape's six-entry array unchecked,
+// so a tensor above rank 6 must fail AllocateTensors before any kernel Init or
+// Prepare. see AmbiqAI/helia-rt#497
 
 #include <climits>
 #include <cstddef>
@@ -33,6 +37,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/arena_allocator/non_persistent_arena_buffer_allocator.h"
 #include "tensorflow/lite/micro/arena_allocator/persistent_arena_buffer_allocator.h"
 #include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/micro_ops.h"
@@ -40,6 +45,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/memory_planner/greedy_memory_planner.h"
 #include "tensorflow/lite/micro/memory_planner/linear_memory_planner.h"
 #include "tensorflow/lite/micro/micro_allocator.h"
+#include "tensorflow/lite/micro/micro_context.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/micro/micro_resource_variable.h"
@@ -325,6 +331,36 @@ const tflite::Model* MeanModel(int32_t rows, int32_t columns) {
                                          sizeof(axis)))});
 }
 
+// RELU of a `shape` float32 input to a `shape` output.
+const tflite::Model* ReluModel(const std::initializer_list<int32_t>& shape) {
+  flatbuffer_storage.Reset();
+  flatbuffers::FlatBufferBuilder builder(1024, &flatbuffer_storage);
+  return FinishModel(
+      builder,
+      tflite::CreateOperatorCode(builder, 0, 0, 1,
+                                 tflite::BuiltinOperator_RELU),
+      {tflite::CreateTensor(builder,
+                            builder.CreateVector(shape.begin(), shape.size()),
+                            TensorType_FLOAT32, 0, builder.CreateString("in")),
+       tflite::CreateTensor(
+           builder, builder.CreateVector(shape.begin(), shape.size()),
+           TensorType_FLOAT32, 0, builder.CreateString("out"))},
+      {0}, {1}, {0}, {1}, {tflite::CreateBuffer(builder)});
+}
+
+// The custom no_op with one float32 output that has no shape, so a scalar.
+const tflite::Model* NoOpScalarModel() {
+  flatbuffer_storage.Reset();
+  flatbuffers::FlatBufferBuilder builder(1024, &flatbuffer_storage);
+  return FinishModel(
+      builder,
+      tflite::CreateOperatorCodeDirect(builder, 0, "no_op", 0,
+                                       tflite::BuiltinOperator_CUSTOM),
+      {tflite::CreateTensor(builder, Offset<flatbuffers::Vector<int32_t>>(),
+                            TensorType_FLOAT32, 0, builder.CreateString("s"))},
+      {}, {0}, {}, {0}, {tflite::CreateBuffer(builder)});
+}
+
 TfLiteStatus FlatbufferBytes(TensorType type,
                              const std::initializer_list<int32_t>& shape,
                              size_t* bytes) {
@@ -384,6 +420,40 @@ TfLiteStatus AllocateMean(int32_t rows, int32_t columns) {
   TF_LITE_ENSURE_STATUS(op_resolver.AddMean());
   tflite::MicroInterpreter interpreter(MeanModel(rows, columns), op_resolver,
                                        arena, kArenaSize);
+  return interpreter.AllocateTensors();
+}
+
+int probe_inits = 0;
+int probe_prepares = 0;
+int probe_flat_size = 0;
+
+void* ProbeInit(TfLiteContext* context, const char* buffer, size_t length) {
+  ++probe_inits;
+  return nullptr;
+}
+
+// Builds the last output's RuntimeShape in Prepare, as most kernels do.
+TfLiteStatus ProbePrepare(TfLiteContext* context, TfLiteNode* node) {
+  ++probe_prepares;
+  tflite::MicroContext* micro_context = tflite::GetMicroContext(context);
+  TfLiteTensor* output =
+      micro_context->AllocateTempOutputTensor(node, node->outputs->size - 1);
+  TF_LITE_ENSURE(context, output != nullptr);
+  probe_flat_size = tflite::GetTensorShape(output).FlatSize();
+  micro_context->DeallocateTempTfLiteTensor(output);
+  return kTfLiteOk;
+}
+
+// Allocates `model` with no_op registered as the shape probe.
+TfLiteStatus AllocateProbe(const tflite::Model* model) {
+  probe_inits = 0;
+  probe_prepares = 0;
+  probe_flat_size = 0;
+  static TFLMRegistration registration =
+      tflite::micro::RegisterOp(ProbeInit, ProbePrepare, NoInvoke);
+  tflite::MicroMutableOpResolver<1> op_resolver;
+  TF_LITE_ENSURE_STATUS(op_resolver.AddCustom("no_op", &registration));
+  tflite::MicroInterpreter interpreter(model, op_resolver, arena, kArenaSize);
   return interpreter.AllocateTensors();
 }
 
@@ -795,6 +865,69 @@ TEST(TensorByteLengthTest, NonPersistentArenaAllocatorStaysInsideArena) {
     EXPECT_EQ(nullptr, allocator.AllocateResizableBuffer(4, 16));
     EXPECT_EQ(static_cast<size_t>(0), allocator.GetAvailableMemory(16));
     EXPECT_EQ(buffer + 1, allocator.AllocateResizableBuffer(4, 1));
+  }
+}
+
+// Before the rank check, the probe's Prepare copied seven dims into the
+// six-entry RuntimeShape on its stack.
+TEST(TensorByteLengthTest, AllocateTensorsRejectsRankAboveSixBeforeInit) {
+  EXPECT_EQ(kTfLiteError, AllocateProbe(NoOpModel(TensorType_FLOAT32,
+                                                  {1, 2, 1, 2, 1, 2, 3})));
+  EXPECT_EQ(0, probe_inits);
+  EXPECT_EQ(0, probe_prepares);
+}
+
+TEST(TensorByteLengthTest, AllocateTensorsAcceptsTensorWithoutShape) {
+  EXPECT_EQ(kTfLiteOk, AllocateProbe(NoOpScalarModel()));
+  EXPECT_EQ(1, probe_inits);
+  EXPECT_EQ(1, probe_prepares);
+  EXPECT_EQ(1, probe_flat_size);
+}
+
+// The TFLite converter emits RELU on rank-7 tensors, and RELU's Eval builds
+// their RuntimeShape. Invoke runs only if AllocateTensors wrongly succeeds, so
+// a sanitizer build reports the overwrite.
+TEST(TensorByteLengthTest, AllocateTensorsRejectsRankSevenRelu) {
+  tflite::MicroMutableOpResolver<1> op_resolver;
+  ASSERT_EQ(kTfLiteOk, op_resolver.AddRelu());
+  tflite::MicroInterpreter interpreter(ReluModel({1, 2, 1, 2, 1, 2, 3}),
+                                       op_resolver, arena, kArenaSize);
+  const TfLiteStatus status = interpreter.AllocateTensors();
+  EXPECT_EQ(kTfLiteError, status);
+  if (status == kTfLiteOk) {
+    interpreter.Invoke();
+  }
+}
+
+// RESHAPE builds no RuntimeShape, but its rank-7 output is refused too, and a
+// -1 dimension still counts towards the rank.
+TEST(TensorByteLengthTest, AllocateTensorsRejectsRankSevenReshape) {
+  tflite::MicroMutableOpResolver<1> op_resolver;
+  ASSERT_EQ(kTfLiteOk, op_resolver.AddReshape());
+  tflite::MicroInterpreter interpreter(
+      ReshapeStretchModel({1, 2, 1, 2, 1, 2, -1}, {24}), op_resolver, arena,
+      kArenaSize);
+  EXPECT_EQ(kTfLiteError, interpreter.AllocateTensors());
+}
+
+TEST(TensorByteLengthTest, RankSixReluAllocatesAndRuns) {
+  tflite::MicroMutableOpResolver<1> op_resolver;
+  ASSERT_EQ(kTfLiteOk, op_resolver.AddRelu());
+  tflite::MicroInterpreter interpreter(ReluModel({1, 2, 1, 2, 1, 3}),
+                                       op_resolver, arena, kArenaSize);
+  ASSERT_EQ(kTfLiteOk, interpreter.AllocateTensors());
+  TfLiteTensor* input = interpreter.input(0);
+  TfLiteTensor* output = interpreter.output(0);
+  ASSERT_NE(nullptr, input);
+  ASSERT_NE(nullptr, output);
+  for (int i = 0; i < 12; ++i) {
+    input->data.f[i] = static_cast<float>(i - 6);
+  }
+  ASSERT_EQ(kTfLiteOk, interpreter.Invoke());
+  ASSERT_EQ(6, output->dims->size);
+  for (int i = 0; i < 12; ++i) {
+    EXPECT_FLOAT_EQ(i < 6 ? 0.0f : static_cast<float>(i - 6),
+                    output->data.f[i]);
   }
 }
 

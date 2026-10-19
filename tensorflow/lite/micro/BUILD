@@ -184,6 +184,7 @@ tflm_cc_library(
     ],
 )
 
+# TODO(AmbiqAI/helia-rt#460): upstream lacks the rank check that needs kernels/internal:types; drop when upstream has it.
 tflm_cc_library(
     name = "micro_allocator",
     srcs = [
@@ -208,6 +209,7 @@ tflm_cc_library(
         "//tensorflow/lite/micro/arena_allocator:simple_memory_allocator",
         "//tensorflow/lite/micro/compression:metadata_saved",
         "//tensorflow/lite/micro/kernels/internal:compatibility",
+        "//tensorflow/lite/micro/kernels/internal:types",
         "//tensorflow/lite/micro/memory_planner:greedy_memory_planner",
         "//tensorflow/lite/micro/memory_planner:linear_memory_planner",
         "//tensorflow/lite/micro/memory_planner:micro_memory_planner",
