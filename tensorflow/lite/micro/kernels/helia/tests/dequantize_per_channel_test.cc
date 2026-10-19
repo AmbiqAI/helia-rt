@@ -103,6 +103,8 @@ Result Run(TfLiteTensor input, TfLiteIntArray* output_dims, float* output) {
   micro::KernelRunner runner(registration, tensors, 2, IntArrayFromInts(inputs),
                              IntArrayFromInts(outputs), nullptr);
   Result result = {runner.InitAndPrepare(), kTfLiteError, 0};
+  // InitAndPrepare checks temporaries only when Prepare succeeds.
+  EXPECT_TRUE(runner.ValidateTempBufferDeallocated());
   if (result.prepare == kTfLiteOk) {
     g_s8_calls = 0;
     result.invoke = runner.Invoke();
