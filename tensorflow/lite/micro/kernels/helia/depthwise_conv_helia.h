@@ -23,8 +23,8 @@ namespace micro {
 // DEPTHWISE_CONV_2D for every type Register_DEPTHWISE_CONV_2D() takes, except
 // that float16 layers call heliaCORE's arm_depthwise_conv_wrapper_f16_acc16,
 // which accumulates in float16 lanes on MVE: the speed-oriented alternative to
-// the default entry, which accumulates in float32 from the ns-cmsis-nn release
-// with AmbiqAI/ns-cmsis-nn#830 (before it, only past 32 taps). Opt in per
+// the default entry, which accumulates every tap in float32 (ns-cmsis-nn
+// v7.47.0 and newer, see AmbiqAI/ns-cmsis-nn#830). Opt in per
 // resolver with AddDepthwiseConv2D(Register_DEPTHWISE_CONV_2D_FLOAT16_ACC16()).
 // HELIA backend only: the reference and CMSIS-NN backends do not define it.
 TFLMRegistration Register_DEPTHWISE_CONV_2D_FLOAT16_ACC16();

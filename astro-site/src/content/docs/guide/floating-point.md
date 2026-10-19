@@ -88,7 +88,7 @@ These boundaries are recorded in the adapter changes and [RT changelog](https://
 
 ## FP16 depthwise accumulation
 
-`Register_DEPTHWISE_CONV_2D()` runs FP16 layers on heliaCORE's default `arm_depthwise_conv_wrapper_f16`. From the heliaCORE release with [AmbiqAI/ns-cmsis-nn#830](https://github.com/AmbiqAI/ns-cmsis-nn/issues/830) that entry accumulates every tap in FP32 on MVE; earlier releases fold FP16 partial sums into FP32 only past 32 taps, so a 3x3 or 5x5 layer accumulates in FP16 there. To trade accuracy for speed, register the float16-lane entry instead:
+`Register_DEPTHWISE_CONV_2D()` runs FP16 layers on heliaCORE's default `arm_depthwise_conv_wrapper_f16`. That entry accumulates every tap in FP32, on MVE too, and rounds to FP16 once ([AmbiqAI/ns-cmsis-nn#830](https://github.com/AmbiqAI/ns-cmsis-nn/issues/830), heliaCORE v7.47.0, the minimum this release requires). heliaCORE v7.46.0 and earlier summed in FP16 lanes on MVE up to 32 taps, so a 3x3 or 5x5 layer gives different bits than it did with those releases. To trade accuracy for speed, register the float16-lane entry instead; on MVE, for windows of at most 32 taps, it gives the v7.46.0 default's results:
 
 ```cpp
 #include "tensorflow/lite/micro/kernels/helia/depthwise_conv_helia.h"
