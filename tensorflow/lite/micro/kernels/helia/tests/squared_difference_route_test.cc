@@ -16,8 +16,8 @@ limitations under the License.
 // SQUARED_DIFFERENCE through the helia kernel. int8 and int16 compare bit for
 // bit with the TFLM quantized formula (kernels/squared_difference.cc) on equal
 // shapes at any rank and on 4-D broadcasts; float32 compares with (a - b)^2 on
-// equal shapes, where heliaCORE runs except on MVE float builds, and on
-// broadcasts, which stay on the reference. GCC and ATfE links wrap the
+// equal shapes, where heliaCORE runs, and on broadcasts, which stay on the
+// reference. GCC and ATfE links wrap the
 // heliaCORE entries and assert which ran. The float edge cases assert IEEE
 // results; float16 (M55) has no reference kernel, so it is checked against the
 // formula evaluated in float16.
@@ -143,9 +143,7 @@ namespace {
 
 enum class Route { kFlat, kWalk, kReference };
 
-// MVE float builds keep float32 on the reference; see squared_difference.cc.
-#if ARM_NN_ENABLE_F32 && \
-    !(defined(ARM_MATH_MVEF) && !defined(ARM_MATH_AUTOVECTORIZE))
+#if ARM_NN_ENABLE_F32
 constexpr Route kHeliaFloat32Route = Route::kFlat;
 #else
 constexpr Route kHeliaFloat32Route = Route::kReference;
@@ -443,12 +441,13 @@ TEST(HeliaSquaredDifferenceRouteTest, Float32EdgeValues) {
 }
 
 // Normal operands whose squared difference is subnormal keep gradual
-// underflow. The expected bits come from double arithmetic, which no float32
-// flush mode reaches.
-// CHARACTERIZATION on clang builds with MVE float: clang may auto-vectorize
-// the reference kernel's loop with MVE, which flushes subnormal results, so
-// each element there is the IEEE result or +0; the observed bits print.
-// see AmbiqAI/ns-cmsis-nn#877
+// underflow, on the MVE path of heliaCORE too (see AmbiqAI/ns-cmsis-nn#877).
+// The expected bits come from double arithmetic, which no float32 flush mode
+// reaches.
+// CHARACTERIZATION only where the reference runs on a clang build with MVE
+// float (HELIA_ENABLE_F32=0): clang may auto-vectorize the reference loop with
+// MVE, which flushes subnormal results, so each element there is the IEEE
+// result or +0; the observed bits print.
 TEST(HeliaSquaredDifferenceRouteTest, Float32SubnormalResults) {
   // 2^-65 squared is the subnormal 2^-130 (0x00080000).
   float in1[] = {1e-20f, 1e-20f,  1e-19f,
@@ -464,7 +463,8 @@ TEST(HeliaSquaredDifferenceRouteTest, Float32SubnormalResults) {
                                tflite::testing::kHeliaFloat32Route);
 #if defined(__clang__) && defined(__ARM_FEATURE_MVE) && \
     ((__ARM_FEATURE_MVE) & 2)
-  constexpr bool kFlushAllowed = true;
+  constexpr bool kFlushAllowed =
+      tflite::testing::kHeliaFloat32Route == Route::kReference;
 #else
   constexpr bool kFlushAllowed = false;
 #endif
