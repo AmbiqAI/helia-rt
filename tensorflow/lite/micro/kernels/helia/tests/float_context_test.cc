@@ -350,8 +350,8 @@ void RunDepthwise(
 #if ARM_NN_ENABLE_F16
 // 1x6x6x8 ones, a 6x6 filter of ones and bias 2048, VALID: 36 unit taps on
 // 2048, where a float16 ulp is 2. Float16 lanes lose every tap and give 2048
-// (0x6800); the default entry folds into or accumulates in float32 and does
-// not. Distinguishes the entries without link wraps. see
+// (0x6800); the default entry accumulates in float32 and gives the exact 2084
+// (0x6812). Distinguishes the entries without link wraps. see
 // AmbiqAI/ns-cmsis-nn#830
 uint16_t RunDepthwiseFloat16Bias2048(const TFLMRegistration& registration) {
   int input_dims[] = {4, 1, 6, 6, 8};
@@ -476,15 +476,15 @@ TEST(HeliaFloatContextTest, DepthwiseFloat16Batch2SizesWithBatch) {
   RunDepthwise<uint16_t>(Route::kDepthwiseF16, 2);
 }
 
-// The opt-in registration's output is the float16-lane entry's, the default
-// one's is not, on every toolchain. see AmbiqAI/ns-cmsis-nn#830
+// The opt-in registration's output is the float16-lane entry's and the default
+// one's the float32 sum, on every toolchain. see AmbiqAI/ns-cmsis-nn#830
 TEST(HeliaFloatContextTest,
      DepthwiseFloat16Acc16RegistrationKeepsFloat16Lanes) {
   ResetState();
   EXPECT_EQ(0x6800, RunDepthwiseFloat16Bias2048(
                         tflite::Register_DEPTHWISE_CONV_2D_FLOAT16_ACC16()));
   ResetState();
-  EXPECT_NE(0x6800,
+  EXPECT_EQ(0x6812,
             RunDepthwiseFloat16Bias2048(tflite::Register_DEPTHWISE_CONV_2D()));
 }
 
