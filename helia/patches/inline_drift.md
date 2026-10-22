@@ -652,6 +652,10 @@ leave reference, direct CMake, Bazel and source consumers unfixed.
   `kernels/reduce_test.cc`, `kernels/prelu_common.cc` (temporaries released on
   every rejection), `kernels/internal/reference/strided_slice.h` (64-bit loop
   offsets for a stride near `INT32_MAX`) and `kernels/strided_slice_test.cc`.
+- **Tensor rank (AmbiqAI/helia-rt#500).** `micro_allocator.cc` refuses a
+  tensor whose flatbuffer shape has more than `RuntimeShape::kMaxSmallSize`
+  (6) dimensions before any kernel Init or Prepare; `BUILD` adds the
+  `kernels/internal:types` dependency it needs.
 
 Drop condition: for each site, upstream carries an equivalent fix. Re-check
 every site at the next upstream sync (AmbiqAI/helia-rt#446) and drop it or
