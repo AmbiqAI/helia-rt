@@ -24,7 +24,7 @@ Set cache options before `add_subdirectory(helia-rt)`. The [root CMake file](htt
 | `HELIA_RT_CORE_OPT` | `-Os` | Compiler optimization option applied to common runtime sources. |
 | `HELIA_RT_KERNEL_OPT` | `-O2` | Compiler optimization option applied to selected kernel sources. |
 | `HELIA_RT_THIRD_PARTY_OPT` | `-O2` | Declared for third-party optimization; the root build does not apply it to a separate third-party source set. |
-| `HELIA_RT_CXX_STANDARD` | `17` | Requested C++ standard; cache choices are `14` and `17`. |
+| `HELIA_RT_CXX_STANDARD` | `17` | Requested C++ standard. heliaRT requires C++17, and a lower value stops the configure. |
 | `HELIA_RT_EXTRA_DEFINES` | Empty | Extra compile definitions exported by the runtime target. |
 | `HELIA_RT_PROVIDE_DEBUG_LOG` | `ON` | Compile the default logging implementation; turn off when the platform supplies it. |
 | `HELIA_RT_ENABLE_RECORDING` | `OFF` | Include recording allocators for arena auditing. |

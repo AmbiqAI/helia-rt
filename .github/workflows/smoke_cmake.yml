@@ -58,7 +58,7 @@ jobs:
           d = json.load(open('manifest.json'))
           assert d['schema'] == 'helia-rt-manifest-v1', d['schema']
           assert d['backend'] == '${{ matrix.backend }}', d['backend']
-          assert len(d['include_dirs'])  >= 4
+          assert len(d['include_dirs'])  >= 3
           assert len(d['common_sources']) >= 30
           assert len(d['kernel_sources']) >= 100
           # Path well-formedness: nothing absolute, no '..'.

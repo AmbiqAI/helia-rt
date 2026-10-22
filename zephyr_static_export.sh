@@ -9,7 +9,7 @@
 # scripts under `tensorflow/lite/micro/tools/make/`.
 #
 # Run this script after any upstream sync that touches a third-party pin
-# (flatbuffers, gemmlowp, ruy, kissfft). The companion CI job
+# (flatbuffers, kissfft). The companion CI job
 # `static_export_drift_check` in `.github/workflows/ci.yml` will fail the
 # PR if the committed tree is out of date.
 #
@@ -25,20 +25,13 @@ make -C "$MAKE_FOLDER" TENSORFLOW_ROOT="$(pwd)/" third_party_downloads
 # Wipe destinations before copying so:
 #   1. Files removed upstream don't linger as zombies.
 #   2. `cp -r src dst` doesn't nest into an existing dst directory.
-for d in flatbuffers gemmlowp "ruy/ruy" kissfft; do
+for d in flatbuffers kissfft; do
   rm -rf "third_party_static/$d"
   mkdir -p "third_party_static/$d"
 done
 
 cp "$DL_FOLDER/flatbuffers/LICENSE"     third_party_static/flatbuffers/LICENSE
 cp -r "$DL_FOLDER/flatbuffers/include"  third_party_static/flatbuffers/include
-
-cp "$DL_FOLDER/gemmlowp/LICENSE"        third_party_static/gemmlowp/LICENSE
-cp -r "$DL_FOLDER/gemmlowp/fixedpoint"  third_party_static/gemmlowp/fixedpoint
-cp -r "$DL_FOLDER/gemmlowp/internal"    third_party_static/gemmlowp/internal
-
-cp "$DL_FOLDER/ruy/LICENSE"             third_party_static/ruy/LICENSE
-cp -r "$DL_FOLDER/ruy/ruy/profiler"     third_party_static/ruy/ruy/profiler
 
 cp "$DL_FOLDER/kissfft/COPYING"         third_party_static/kissfft/COPYING
 cp "$DL_FOLDER/kissfft/_kiss_fft_guts.h" third_party_static/kissfft/_kiss_fft_guts.h

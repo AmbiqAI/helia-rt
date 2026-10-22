@@ -472,7 +472,6 @@ target_link_libraries(nsx_helia_rt_glue PRIVATE
 target_include_directories(nsx_helia_rt_glue PRIVATE
     "${HELIA_RT_TFLM_ROOT}"
     "${HELIA_RT_TFLM_ROOT}/third_party_static/flatbuffers/include"
-    "${HELIA_RT_TFLM_ROOT}/third_party_static/gemmlowp"
 )
 
 # --- Public-facing INTERFACE target ---

@@ -54,9 +54,7 @@ set(HELIA_RT_VERSION "${CMAKE_MATCH_1}")
 # ---------------------------------------------------------------------------
 set(HELIA_RT_INCLUDE_DIRS
     "${HELIA_RT_ROOT}"
-    "${HELIA_RT_ROOT}/third_party_static/gemmlowp"
     "${HELIA_RT_ROOT}/third_party_static/flatbuffers/include"
-    "${HELIA_RT_ROOT}/third_party_static/ruy"
     "${HELIA_RT_ROOT}/third_party_static/kissfft"
 )
 
@@ -90,7 +88,6 @@ set(HELIA_RT_RUNTIME_COMMON_SOURCES
     signal/src/kiss_fft_wrappers/kiss_fft_int32.cc
 
     # tensorflow/lite/micro (runtime)
-    tensorflow/lite/micro/c/common.cc
     tensorflow/lite/micro/debug_log.cc
     tensorflow/lite/micro/hexdump.cc
     tensorflow/lite/micro/memory_helpers.cc
@@ -98,11 +95,13 @@ set(HELIA_RT_RUNTIME_COMMON_SOURCES
     tensorflow/lite/micro/micro_time.cc
     tensorflow/lite/micro/micro_profiler.cc
     tensorflow/lite/micro/micro_utils.cc
+    tensorflow/lite/micro/flatbuffer_conversions.cc
     tensorflow/lite/micro/flatbuffer_utils.cc
     tensorflow/lite/micro/micro_interpreter.cc
     tensorflow/lite/micro/micro_interpreter_context.cc
     tensorflow/lite/micro/micro_interpreter_graph.cc
     tensorflow/lite/micro/micro_allocator.cc
+    tensorflow/lite/micro/micro_common.cc
     tensorflow/lite/micro/micro_context.cc
     tensorflow/lite/micro/micro_log.cc
     tensorflow/lite/micro/micro_op_resolver.cc
@@ -114,9 +113,6 @@ set(HELIA_RT_RUNTIME_COMMON_SOURCES
     tensorflow/lite/micro/arena_allocator/persistent_arena_buffer_allocator.cc
     tensorflow/lite/micro/arena_allocator/single_arena_buffer_allocator.cc
 
-    # tflite_bridge
-    tensorflow/lite/micro/tflite_bridge/flatbuffer_conversions_bridge.cc
-
     # memory planners
     tensorflow/lite/micro/memory_planner/linear_memory_planner.cc
     tensorflow/lite/micro/memory_planner/greedy_memory_planner.cc
@@ -126,8 +122,6 @@ set(HELIA_RT_RUNTIME_COMMON_SOURCES
     tensorflow/lite/micro/kernels/internal/quantization_util.cc
     tensorflow/lite/micro/kernels/internal/portable_tensor_utils.cc
     tensorflow/lite/micro/kernels/internal/tensor_ctypes.cc
-    tensorflow/lite/micro/kernels/internal/tensor_utils.cc
-    tensorflow/lite/micro/kernels/internal/reference/portable_tensor_utils.cc
 )
 
 # Arena recording / introspection. Only needed for RecordingMicroInterpreter /
@@ -226,7 +220,6 @@ set(HELIA_RT_KERNEL_BASENAMES
     lstm_eval.cc
     lstm_eval_common.cc
     maximum_minimum.cc
-    micro_tensor_utils.cc
     mirror_pad.cc
     mul.cc
     mul_common.cc
@@ -267,7 +260,6 @@ set(HELIA_RT_KERNEL_BASENAMES
     svdf.cc
     svdf_common.cc
     tanh.cc
-    tflite_kernel_util.cc
     transpose.cc
     transpose_common.cc
     transpose_conv.cc

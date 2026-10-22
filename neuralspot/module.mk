@@ -22,7 +22,6 @@
 includes_api += $(subdirectory)/.
 includes_api += $(subdirectory)/third_party
 includes_api += $(subdirectory)/third_party/flatbuffers/include
-includes_api += $(subdirectory)/third_party/gemmlowp
 
 # Preprocessor defines
 DEFINES += NS_TFSTRUCTURE_RECENT
