@@ -19,11 +19,12 @@ limitations under the License.
 #include <cstddef>
 #include <cstdint>
 
-#include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/micro_arena_constants.h"
-#include "tensorflow/lite/schema/schema_generated.h"
+#include "tensorflow/lite/micro/micro_common.h"
+#include "tensorflow/lite/micro/schema/schema_generated.h"  // IWYU pragma: export
 
 namespace tflite {
+namespace micro {
 
 // Returns the next pointer address aligned to the given alignment.
 uint8_t* AlignPointerUp(uint8_t* data, size_t alignment);
@@ -74,13 +75,14 @@ TfLiteStatus BytesRequiredForTensor(const tflite::Tensor& flatbuffer_tensor,
 TfLiteStatus TfLiteEvalTensorByteLength(const TfLiteEvalTensor* eval_tensor,
                                         size_t* out_bytes);
 
-// Deduce output dimensions from input and allocate given size.
-// Useful for operators with two inputs where the largest input should equal the
-// output dimension.
-TfLiteStatus AllocateOutputDimensionsFromInput(TfLiteContext* context,
-                                               const TfLiteTensor* input1,
-                                               const TfLiteTensor* input2,
-                                               TfLiteTensor* output);
+}  // namespace micro
+
+using micro::AlignPointerDown;
+using micro::AlignPointerUp;
+using micro::AlignSizeUp;
+using micro::BytesRequiredForTensor;
+using micro::TfLiteEvalTensorByteLength;
+using micro::TfLiteTypeSizeOf;
 
 }  // namespace tflite
 

@@ -155,9 +155,7 @@ helia-specific files:
   (see [Inline drift policy](#inline-drift-policy)).
 - Workflow files inherited from upstream (`ci.yml`, `cortex_m.yml`,
   `release-please.yml`, etc.).
-- Upstream CI scripts (`test_cortex_m_corstone_300.sh`, `test_size.sh`,
-  etc.) — exception: minimal localizations such as the size-comparison
-  reference URL in `test_size.sh`.
+- Upstream CI scripts (`test_cortex_m_corstone_300.sh`, etc.).
 
 ## Inline drift policy
 

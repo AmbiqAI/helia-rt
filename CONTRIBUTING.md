@@ -137,6 +137,14 @@ fixing a bug needs a bigger architectural change.
 1.  Bugfix PRs should be accompanied by a test case that fails prior to the fix
     and passes with the fix. This validates that the fix works as expected, and
     helps prevent future regressions.
+1.  **Error Handling & Security PRs:** We only accept changes that solve real
+    problems encountered in actual TFLM usage. Before adding input validation or
+    defensive checks, read our
+    [Error Handling & Defensive Programming Guide](tensorflow/lite/micro/docs/error_handling_guide.md)
+    and [Security Policy](SECURITY.md). Please do not submit mass-generated,
+    fuzzer-derived, or AI-scanned speculative PRs (such as adding runtime
+    `Eval` checks or integer-overflow checks for mutated `.tflite` model files);
+    such PRs will be closed without review.
 
 ### Reference Kernel Implementations
 
@@ -185,25 +193,16 @@ Below are some tips that might be useful and improve the development experience.
 * Install the latest clang and clang-format. For example, [here](ci/Dockerfile.micro)
   is the what we do for the TFLM continuous integration Docker container.
 
-* Get a copy of [cpplint](https://github.com/google/styleguide/tree/gh-pages/cpplint)
-  or install it:
-
-* Install Pillow.  For example, [here](ci/Dockerfile.micro) is what we do for
-  the TFLM continuous integration Docker container.
-
-  ```
-  pip install cpplint
-  ```
-
-* [ruff](https://github.com/astral-sh/ruff) should be used for formatting Python
+* [ruff](https://github.com/astral-sh/ruff) should be used for formatting and linting Python
   code. For example:
 
   ```
   pip install ruff
-  ruff format log_parser.py
+  ruff format <file>.py
+  ruff check --fix <file>.py
   ```
 
-* Add a git hook to check for code style etc. prior to creating a pull request:
+* Add a git hook to check for code style prior to pushing changes:
   ```
   cp tensorflow/lite/micro/tools/dev_setup/pre-push.tflm .git/hooks/pre-push
   ```
@@ -212,19 +211,13 @@ Below are some tips that might be useful and improve the development experience.
 
 ## Before submitting your PR
 
-1.  Run in-place clang-format on all the files that are modified in your git
-    tree with
+1.  Check and format your code using the code style script:
 
     ```
-    clang-format -i -style=google `git ls-files -m | grep "\.cc"`
-    clang-format -i -style=google `git ls-files -m | grep "\.h"`
+    tensorflow/lite/micro/tools/ci_build/test_code_style.sh --fix
     ```
 
-1.  Make sure your code is lint-free.
-
-    ```
-    cpplint `git ls-files -m`
-    ```
+    This runs `clang-format` on C/C++ files, `ruff` on Python files, and `buildifier` on Bazel BUILD/.bzl files.
 
 1.  Run all the tests for x86, and any other platform that you are modifying.
 
