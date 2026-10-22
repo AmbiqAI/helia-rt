@@ -1045,7 +1045,7 @@ TEST(FullyConnectedTest, SimpleFloat16MultiBatchGolden) {
   int outputs_array_data[] = {1, 3};
   TfLiteFullyConnectedParams params = {
       kTfLiteActNone, kTfLiteFullyConnectedWeightsFormatDefault, false, false,
-      kTfLiteNoType};
+      kTfLiteNoType, nullptr, 0};
 
   const TFLMRegistration registration = Register_FULLY_CONNECTED();
   micro::KernelRunner runner(registration, tensors, 4,

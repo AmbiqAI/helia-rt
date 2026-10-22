@@ -127,8 +127,6 @@ class AllocationFailureContext : public FakeMicroContext {
   TF_LITE_REMOVE_VIRTUAL_DELETE
 };
 
-inline void SilentReportError(TfLiteContext*, const char*, ...) {}
-
 constexpr int kMaxSweptTensors = 64;
 constexpr int kMaxSweptAllocations = 128;
 constexpr size_t kSweepArenaSize = 10000;
@@ -157,10 +155,6 @@ inline AllocationRun RunWithAllocationFailure(
                                          fail_later, kind);
   TfLiteContext context = {};
   context.impl_ = &micro_context;
-  context.ReportError = SilentReportError;
-  context.GetTensor = MicroContextGetTensor;
-  context.GetEvalTensor = MicroContextGetEvalTensor;
-  context.AllocatePersistentBuffer = MicroContextAllocatePersistentBuffer;
   TfLiteNode swept = node;
   swept.user_data = nullptr;
   AllocationRun run = {0, false, kTfLiteOk, false};
@@ -169,9 +163,6 @@ inline AllocationRun RunWithAllocationFailure(
   }
   run.init_failed = micro_context.failed();
   if (!run.init_failed && registration.prepare != nullptr) {
-    context.RequestScratchBufferInArena =
-        MicroContextRequestScratchBufferInArena;
-    context.GetExternalContext = MicroContextGetExternalContext;
     run.prepare_status = registration.prepare(&context, &swept);
   }
   if (registration.free != nullptr) {

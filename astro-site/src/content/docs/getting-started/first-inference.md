@@ -36,7 +36,7 @@ The interpreter borrows its model, resolver and tensor arena. Keep them alive fo
 
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
-#include "tensorflow/lite/schema/schema_generated.h"
+#include "tensorflow/lite/micro/schema/schema_generated.h"
 
 using TensorHandler = TfLiteStatus (*)(TfLiteTensor*);
 

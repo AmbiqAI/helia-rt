@@ -72,7 +72,7 @@ Save this as `hello-rt/app/main.cc`:
 #include "model_model_data.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
-#include "tensorflow/lite/schema/schema_generated.h"
+#include "tensorflow/lite/micro/schema/schema_generated.h"
 
 int main() {
   const tflite::Model* model = tflite::GetModel(g_model_model_data);
