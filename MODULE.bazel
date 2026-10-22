@@ -4,17 +4,26 @@ module(
     repo_name = "tflite_micro",
 )
 
-bazel_dep(name = "bazel_skylib", version = "1.9.0")
-bazel_dep(name = "flatbuffers", version = "25.9.23")
+bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "pybind11_bazel", version = "3.0.0")
-bazel_dep(name = "rules_cc", version = "0.2.17")
-bazel_dep(name = "rules_python", version = "1.8.3")
-bazel_dep(name = "rules_shell", version = "0.6.1")
+bazel_dep(name = "rules_cc", version = "0.2.26")
+bazel_dep(name = "rules_python", version = "1.9.2")
+bazel_dep(name = "rules_shell", version = "0.8.0")
 
 # TFLM Dependencies
 
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+# Use http_archive instead of BCR bazel_dep because the BCR flatbuffers module
+# pulls in heavy, unused transitive dependencies (grpc, rules_go, rules_nodejs,
+# rules_swift, aspect_rules_js, etc.).
+http_archive(
+    name = "flatbuffers",
+    sha256 = "9102253214dea6ae10c2ac966ea1ed2155d22202390b532d1dea64935c518ada",
+    strip_prefix = "flatbuffers-25.9.23",
+    urls = ["https://github.com/google/flatbuffers/archive/refs/tags/v25.9.23.tar.gz"],
+)
 
 http_archive(
     name = "kissfft",
@@ -27,25 +36,72 @@ http_archive(
 )
 
 http_archive(
-    name = "ruy",
-    build_file = "//third_party/ruy:BUILD",
-    sha256 = "da5ec0cc07472bdb21589b0b51c8f3d7f75d2ed6230b794912adf213838d289a",
-    strip_prefix = "ruy-54774a7a2cf85963777289193629d4bd42de4a59",
+    name = "cmsis_nn",
+    build_file = "//tensorflow/lite/micro/tools/toolchains/arm:cmsis_nn.BUILD",
+    sha256 = "c41f6d91fa118babe49f7554dd9ef3e28b7a2287e3be44e43820f63fea81e49c",
+    strip_prefix = "CMSIS-NN-4ab83cc3cc98fb85ed6dafb55e8ca02f1628dcae",
+    urls = ["https://github.com/ARM-software/CMSIS-NN/archive/4ab83cc3cc98fb85ed6dafb55e8ca02f1628dcae.zip"],
+)
+
+http_archive(
+    name = "cmsis_core",
+    build_file = "//tensorflow/lite/micro/tools/toolchains/arm:cmsis_core.BUILD",
+    sha256 = "7d1de644243e370e8d1d798a0dfa8c8d67ab1121082816fbfe75bdb2183aac54",
+    strip_prefix = "CMSIS_6-5782d6f8057906d360f4b95ec08a2354afe5c9b9",
+    urls = ["https://github.com/ARM-software/CMSIS_6/archive/5782d6f8057906d360f4b95ec08a2354afe5c9b9.zip"],
+)
+
+http_archive(
+    name = "ethos_u_core_driver",
+    build_file = "//tensorflow/lite/micro/tools/toolchains/arm:ethos_u_core_driver.BUILD",
+    sha256 = "fa062fd4cca1c32c60db47a3f711935a3ed35c8a0e4cd7bbb24369246bc77c58",
+    strip_prefix = "ethos-u-core-driver-9622608a5cc318c0933bcce720b59737d03bfb6f",
     urls = [
-        "https://storage.googleapis.com/mirror.tensorflow.org/github.com/google/ruy/archive/54774a7a2cf85963777289193629d4bd42de4a59.zip",
-        "https://github.com/google/ruy/archive/54774a7a2cf85963777289193629d4bd42de4a59.zip",
+        "https://gitlab.arm.com/artificial-intelligence/ethos-u/ethos-u-core-driver/-/archive/9622608a5cc318c0933bcce720b59737d03bfb6f/ethos-u-core-driver-9622608a5cc318c0933bcce720b59737d03bfb6f.tar.gz",
     ],
 )
 
 http_archive(
-    name = "gemmlowp",
-    sha256 = "43146e6f56cb5218a8caaab6b5d1601a083f1f31c06ff474a4378a7d35be9cfb",
-    strip_prefix = "gemmlowp-fda83bdc38b118cc6b56753bd540caa49e570745",
-    urls = [
-        "https://storage.googleapis.com/mirror.tensorflow.org/github.com/google/gemmlowp/archive/fda83bdc38b118cc6b56753bd540caa49e570745.zip",
-        "https://github.com/google/gemmlowp/archive/fda83bdc38b118cc6b56753bd540caa49e570745.zip",
-    ],
+    name = "nnlib_hifi4",
+    build_file = "//tensorflow/lite/micro/tools/toolchains/xtensa:nnlib_hifi4.BUILD",
+    sha256 = "8b490e8a2f0e28e36dc5f244b4a256b5bcba393c629bf73d3e6e50817fe719af",
+    strip_prefix = "xa_nnlib_hifi4",
+    urls = ["https://github.com/foss-xtensa/nnlib-hifi4/raw/master/archive/xa_nnlib_hifi4_09_03_2026.zip"],
 )
+
+http_archive(
+    name = "nnlib_hifi5",
+    build_file = "//tensorflow/lite/micro/tools/toolchains/xtensa:nnlib_hifi5.BUILD",
+    sha256 = "b96d396577813163b0271bd611aa674d5a834666986e2ace59d244d8c97544ee",
+    strip_prefix = "xa_nnlib_hifi5",
+    urls = ["https://github.com/foss-xtensa/nnlib-hifi5/raw/master/archive/xa_nnlib_hifi5_09_03_2026.zip"],
+)
+
+http_archive(
+    name = "xi_tflmlib_vision_p6",
+    build_file = "//tensorflow/lite/micro/tools/toolchains/xtensa:xi_tflmlib_vision_p6.BUILD",
+    patch_args = ["-p1"],
+    patches = ["//tensorflow/lite/micro/tools/toolchains/xtensa:xi_tflmlib_vision_p6.patch"],
+    sha256 = "b39f6d25305afec534fff806e7531151a5b15a23f4313392801f2754a30cc461",
+    strip_prefix = "xi_tflmlib_vision_p6",
+    urls = ["https://github.com/foss-xtensa/tflmlib_vision/raw/main/archive/xi_tflmlib_vision_p6_22_06_29.zip"],
+)
+
+arm_toolchain = use_repo_rule("//tensorflow/lite/micro/tools/toolchains/arm:repo.bzl", "arm_toolchain")
+
+arm_toolchain(name = "arm_none_eabi")
+
+xtensa_toolchain = use_repo_rule("//tensorflow/lite/micro/tools/toolchains/xtensa:repo.bzl", "xtensa_toolchain")
+
+xtensa_toolchain(name = "xtensa_toolchain")
+
+riscv_toolchain = use_repo_rule("//tensorflow/lite/micro/tools/toolchains/riscv:repo.bzl", "riscv_toolchain")
+
+riscv_toolchain(name = "riscv_toolchain")
+
+hexagon_toolchain = use_repo_rule("//tensorflow/lite/micro/tools/toolchains/hexagon:repo.bzl", "hexagon_toolchain")
+
+hexagon_toolchain(name = "hexagon_toolchain")
 
 # Python
 
@@ -103,10 +159,18 @@ use_repo(
 use_repo(
     pip,
     "tflm_pip_deps",
-    "tflm_pip_deps_310_numpy",
-    "tflm_pip_deps_311_numpy",
-    "tflm_pip_deps_312_numpy",
-    "tflm_pip_deps_313_numpy",
-    "tflm_pip_deps_314_numpy",
     "tflm_pip_deps_whl_mods",
+)
+
+# Embedded Toolchains
+register_toolchains(
+    "//tensorflow/lite/micro/tools/toolchains/arm:cortex_m0_toolchain",
+    "//tensorflow/lite/micro/tools/toolchains/arm:cortex_m4_toolchain",
+    "//tensorflow/lite/micro/tools/toolchains/arm:cortex_m55_toolchain",
+    "//tensorflow/lite/micro/tools/toolchains/xtensa:xtensa_fusion_f1_toolchain",
+    "//tensorflow/lite/micro/tools/toolchains/xtensa:xtensa_hifi3z_toolchain",
+    "//tensorflow/lite/micro/tools/toolchains/xtensa:xtensa_hifi5_toolchain",
+    "//tensorflow/lite/micro/tools/toolchains/xtensa:xtensa_vision_p6_toolchain",
+    "//tensorflow/lite/micro/tools/toolchains/riscv:riscv32_toolchain",
+    "//tensorflow/lite/micro/tools/toolchains/hexagon:hexagon_toolchain",
 )

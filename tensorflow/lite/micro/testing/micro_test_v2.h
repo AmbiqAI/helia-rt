@@ -40,15 +40,20 @@ limitations under the License.
 #include <limits>
 #include <type_traits>
 
-#include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/debug_log.h"
+#include "tensorflow/lite/micro/micro_common.h"
 #include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/system_setup.h"
 
 namespace tflite {
+namespace micro {
 // Initializes the target system for testing. This must be called in main()
 // before running any tests.
 inline void InitializeTest() { InitializeTarget(); }
+}  // namespace micro
+
+using micro::InitializeTest;
+
 }  // namespace tflite
 
 namespace micro_test {
@@ -102,16 +107,12 @@ inline void PrintValue(std::nullptr_t) {
 }
 
 template <typename T>
-inline typename std::enable_if<std::is_enum<T>::value>::type PrintValue(
-    const T& v) {
-  PrintValue(static_cast<typename std::underlying_type<T>::type>(v));
-}
-
-// Fallback for types that don't match the overloads above.
-template <typename T>
-inline typename std::enable_if<!std::is_enum<T>::value>::type PrintValue(
-    const T&) {
-  Printf("?");
+inline void PrintValue(const T& v) {
+  if constexpr (std::is_enum_v<T>) {
+    PrintValue(static_cast<std::underlying_type_t<T>>(v));
+  } else {
+    Printf("?");
+  }
 }
 
 // Helper to report a failure with the file, line, and comparison details.

@@ -16,24 +16,16 @@ limitations under the License.
 #define TENSORFLOW_LITE_MICRO_KERNELS_INTERNAL_COMMON_H_
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <type_traits>
 
-#include "tensorflow/lite/micro/kernels/internal/runtime_shape.h"
-#ifndef ALLOW_SLOW_GENERIC_DEPTHWISECONV_FALLBACK
-#ifdef GEMMLOWP_ALLOW_SLOW_SCALAR_FALLBACK
-#define ALLOW_SLOW_GENERIC_DEPTHWISECONV_FALLBACK
-#endif
-#endif
-
-#include <cmath>
-#include <functional>
-
-#include "fixedpoint/fixedpoint.h"
-#include "tensorflow/lite/micro/kernels/internal/compatibility.h"
+#include "tensorflow/lite/micro/compatibility.h"
 #include "tensorflow/lite/micro/kernels/internal/cppmath.h"
-#include "tensorflow/lite/micro/kernels/internal/optimized/neon_check.h"
+#include "tensorflow/lite/micro/kernels/internal/fixedpoint.h"
+#include "tensorflow/lite/micro/kernels/internal/runtime_shape.h"
 #include "tensorflow/lite/micro/kernels/internal/types.h"
 
 namespace tflite {
@@ -397,15 +389,12 @@ inline int32x4x4_t MultiplyByQuantizedMultiplier4Rows(
 #else
 inline int32_t MultiplyByQuantizedMultiplierSmallerThanOneExp(
     int32_t x, int32_t quantized_multiplier, int left_shift) {
-  using gemmlowp::RoundingDivideByPOT;
-  using gemmlowp::SaturatingRoundingDoublingHighMul;
   return RoundingDivideByPOT(
       SaturatingRoundingDoublingHighMul(x, quantized_multiplier), -left_shift);
 }
 
 inline int32_t MultiplyByQuantizedMultiplierGreaterThanOne(
     int32_t x, int32_t quantized_multiplier, int left_shift) {
-  using gemmlowp::SaturatingRoundingDoublingHighMul;
   return SaturatingRoundingDoublingHighMul(x * (1 << left_shift),
                                            quantized_multiplier);
 }
@@ -669,14 +658,14 @@ LUTPopulate(double input_scale, int32_t input_zero_point, double output_scale,
 // to interpolate the last value.
 template <typename T>
 constexpr int LUTSize() {
-  static_assert(std::is_same<T, uint8_t>::value ||
-                    std::is_same<T, int8_t>::value ||
-                    std::is_same<T, int16_t>::value,
+  static_assert(std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t> ||
+                    std::is_same_v<T, int16_t>,
                 "Only LUTs with uint8, int8 or int16 inputs are supported.");
-  // As per c++11: constexpr methods cannot have more than one return statement.
-  return (std::is_same<T, uint8_t>::value || std::is_same<T, int8_t>::value)
-             ? 256
-             : 513;
+  if constexpr (std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>) {
+    return 256;
+  } else {
+    return 513;
+  }
 }
 
 // int16_t -> int16_t table lookup with interpolation
@@ -745,7 +734,6 @@ static const uint16_t sigmoid_table_uint16[256] = {
     65533, 65533, 65533, 65534, 65534, 65534, 65534, 65534, 65534, 65534, 65534,
     65534, 65534, 65535};
 
-// TODO(b/77858996): Add these to gemmlowp.
 template <typename IntegerType>
 IntegerType SaturatingAddNonGemmlowp(IntegerType a, IntegerType b) {
   static_assert(std::is_same<IntegerType, void>::value, "unimplemented");
@@ -765,10 +753,10 @@ inline std::int32_t SaturatingAddNonGemmlowp(std::int32_t a, std::int32_t b) {
 }
 
 template <typename tRawType, int tIntegerBits>
-gemmlowp::FixedPoint<tRawType, tIntegerBits> SaturatingAddNonGemmlowp(
-    gemmlowp::FixedPoint<tRawType, tIntegerBits> a,
-    gemmlowp::FixedPoint<tRawType, tIntegerBits> b) {
-  return gemmlowp::FixedPoint<tRawType, tIntegerBits>::FromRaw(
+FixedPoint<tRawType, tIntegerBits> SaturatingAddNonGemmlowp(
+    FixedPoint<tRawType, tIntegerBits> a,
+    FixedPoint<tRawType, tIntegerBits> b) {
+  return FixedPoint<tRawType, tIntegerBits>::FromRaw(
       SaturatingAddNonGemmlowp(a.raw(), b.raw()));
 }
 
@@ -801,13 +789,12 @@ inline std::int32_t SaturatingSub(std::int32_t a, std::int32_t b) {
 }
 
 template <typename tRawType, int tIntegerBits>
-gemmlowp::FixedPoint<tRawType, tIntegerBits> SaturatingSub(
-    gemmlowp::FixedPoint<tRawType, tIntegerBits> a,
-    gemmlowp::FixedPoint<tRawType, tIntegerBits> b) {
-  return gemmlowp::FixedPoint<tRawType, tIntegerBits>::FromRaw(
+FixedPoint<tRawType, tIntegerBits> SaturatingSub(
+    FixedPoint<tRawType, tIntegerBits> a,
+    FixedPoint<tRawType, tIntegerBits> b) {
+  return FixedPoint<tRawType, tIntegerBits>::FromRaw(
       SaturatingSub(a.raw(), b.raw()));
 }
-// End section to be moved to gemmlowp.
 
 template <typename IntegerType>
 IntegerType SaturatingRoundingMultiplyByPOTParam(IntegerType x, int exponent) {
@@ -815,33 +802,32 @@ IntegerType SaturatingRoundingMultiplyByPOTParam(IntegerType x, int exponent) {
     return x;
   }
   using ScalarIntegerType =
-      typename gemmlowp::FixedPointRawTypeTraits<IntegerType>::ScalarRawType;
+      typename FixedPointRawTypeTraits<IntegerType>::ScalarRawType;
   const IntegerType min =
-      gemmlowp::Dup<IntegerType>(std::numeric_limits<ScalarIntegerType>::min());
+      Dup<IntegerType>(std::numeric_limits<ScalarIntegerType>::min());
   const IntegerType max =
-      gemmlowp::Dup<IntegerType>(std::numeric_limits<ScalarIntegerType>::max());
+      Dup<IntegerType>(std::numeric_limits<ScalarIntegerType>::max());
   const int ScalarIntegerTypeBits = 8 * sizeof(ScalarIntegerType);
 
   const std::int32_t threshold =
       ((1 << (ScalarIntegerTypeBits - 1 - exponent)) - 1);
   const IntegerType positive_mask =
-      gemmlowp::MaskIfGreaterThan(x, gemmlowp::Dup<IntegerType>(threshold));
+      MaskIfGreaterThan(x, Dup<IntegerType>(threshold));
   const IntegerType negative_mask =
-      gemmlowp::MaskIfLessThan(x, gemmlowp::Dup<IntegerType>(-threshold));
+      MaskIfLessThan(x, Dup<IntegerType>(-threshold));
 
-  IntegerType result = gemmlowp::ShiftLeft(x, exponent);
-  result = gemmlowp::SelectUsingMask(positive_mask, max, result);
-  result = gemmlowp::SelectUsingMask(negative_mask, min, result);
+  IntegerType result = ShiftLeft(x, exponent);
+  result = SelectUsingMask(positive_mask, max, result);
+  result = SelectUsingMask(negative_mask, min, result);
   return result;
 }
 
 // If we want to leave IntegerBits fixed, then multiplication
 // by a power of two has to be saturating/rounding, not exact anymore.
 template <typename tRawType, int tIntegerBits>
-gemmlowp::FixedPoint<tRawType, tIntegerBits>
-SaturatingRoundingMultiplyByPOTParam(
-    gemmlowp::FixedPoint<tRawType, tIntegerBits> a, int exponent) {
-  return gemmlowp::FixedPoint<tRawType, tIntegerBits>::FromRaw(
+FixedPoint<tRawType, tIntegerBits> SaturatingRoundingMultiplyByPOTParam(
+    FixedPoint<tRawType, tIntegerBits> a, int exponent) {
+  return FixedPoint<tRawType, tIntegerBits>::FromRaw(
       SaturatingRoundingMultiplyByPOTParam(a.raw(), exponent));
 }
 
@@ -884,39 +870,39 @@ constexpr int min_log_x_output_bits(int input_bits) {
 // x_max is the largest representable input.  In other words, the output range
 // is symmetric.
 template <int OutputIntegerBits, int InputIntegerBits>
-inline gemmlowp::FixedPoint<int32_t, OutputIntegerBits>
+inline FixedPoint<int32_t, OutputIntegerBits>
 log_x_for_x_greater_than_or_equal_to_1_impl(
-    gemmlowp::FixedPoint<int32_t, InputIntegerBits> input_val) {
+    FixedPoint<int32_t, InputIntegerBits> input_val) {
   // assert(__builtin_clz(0u) >= std::numeric_limits<uint32_t>::digits - 1);
   // assert(__builtin_clz(0u) <= std::numeric_limits<uint32_t>::digits);
-  using FixedPoint0 = gemmlowp::FixedPoint<int32_t, 0>;
+  using FixedPoint0 = FixedPoint<int32_t, 0>;
   // The reason for accumulating the result with an extra bit of headroom is
   // that z_pow_2_adj * log_2 might be saturated, and adding num_scaled *
   // recip_denom will otherwise introduce an error.
   static constexpr int kAccumIntegerBits = OutputIntegerBits + 1;
-  using FixedPointAccum = gemmlowp::FixedPoint<int32_t, kAccumIntegerBits>;
+  using FixedPointAccum = FixedPoint<int32_t, kAccumIntegerBits>;
 
-  const FixedPoint0 log_2 = GEMMLOWP_CHECKED_FIXEDPOINT_CONSTANT(
+  const FixedPoint0 log_2 = TFLITE_MICRO_CHECKED_FIXEDPOINT_CONSTANT(
       FixedPoint0, 1488522236, std::log(2.0));
-  const FixedPoint0 sqrt_sqrt_half = GEMMLOWP_CHECKED_FIXEDPOINT_CONSTANT(
+  const FixedPoint0 sqrt_sqrt_half = TFLITE_MICRO_CHECKED_FIXEDPOINT_CONSTANT(
       FixedPoint0, 1805811301, std::sqrt(std::sqrt(0.5)));
-  const FixedPoint0 sqrt_half = GEMMLOWP_CHECKED_FIXEDPOINT_CONSTANT(
+  const FixedPoint0 sqrt_half = TFLITE_MICRO_CHECKED_FIXEDPOINT_CONSTANT(
       FixedPoint0, 1518500250, std::sqrt(0.5));
-  const FixedPoint0 one_quarter =
-      GEMMLOWP_CHECKED_FIXEDPOINT_CONSTANT(FixedPoint0, 536870912, 1.0 / 4.0);
+  const FixedPoint0 one_quarter = TFLITE_MICRO_CHECKED_FIXEDPOINT_CONSTANT(
+      FixedPoint0, 536870912, 1.0 / 4.0);
 
-  const FixedPoint0 alpha_n = GEMMLOWP_CHECKED_FIXEDPOINT_CONSTANT(
+  const FixedPoint0 alpha_n = TFLITE_MICRO_CHECKED_FIXEDPOINT_CONSTANT(
       FixedPoint0, 117049297, 11.0 / 240.0 * std::sqrt(std::sqrt(2.0)));
-  const FixedPoint0 alpha_d = GEMMLOWP_CHECKED_FIXEDPOINT_CONSTANT(
+  const FixedPoint0 alpha_d = TFLITE_MICRO_CHECKED_FIXEDPOINT_CONSTANT(
       FixedPoint0, 127690142, 1.0 / 20.0 * std::sqrt(std::sqrt(2.0)));
-  const FixedPoint0 alpha_i = GEMMLOWP_CHECKED_FIXEDPOINT_CONSTANT(
+  const FixedPoint0 alpha_i = TFLITE_MICRO_CHECKED_FIXEDPOINT_CONSTANT(
       FixedPoint0, 1057819769,
       2.0 / std::sqrt(std::sqrt(2.0)) - std::sqrt(std::sqrt(2.0)));
-  const FixedPoint0 alpha_f = GEMMLOWP_CHECKED_FIXEDPOINT_CONSTANT(
+  const FixedPoint0 alpha_f = TFLITE_MICRO_CHECKED_FIXEDPOINT_CONSTANT(
       FixedPoint0, 638450708, 1.0 / 4.0 * std::sqrt(std::sqrt(2.0)));
 
   const FixedPointAccum shifted_quarter =
-      gemmlowp::Rescale<kAccumIntegerBits>(one_quarter);
+      Rescale<kAccumIntegerBits>(one_quarter);
 
   // Reinterpret the input value as Q0.31, because we will figure out the
   // required shift "ourselves" instead of using, say, Rescale.
@@ -951,7 +937,7 @@ log_x_for_x_greater_than_or_equal_to_1_impl(
   const FixedPointAccum z_pow_2_adj = FixedPointAccum::FromRaw(
       std::max(z_a_pow_2_adj.raw(), z_b_pow_2_adj.raw()));
 
-  const FixedPoint0 p = gemmlowp::RoundingHalfSum(r, sqrt_sqrt_half);
+  const FixedPoint0 p = RoundingHalfSum(r, sqrt_sqrt_half);
   FixedPoint0 q = r - sqrt_sqrt_half;
   q = q + q;
 
@@ -962,15 +948,15 @@ log_x_for_x_greater_than_or_equal_to_1_impl(
   const FixedPoint0 recip_denom =
       one_over_one_plus_x_for_x_in_0_1(denom_minus_one_0);
 
-  const FixedPointAccum num_scaled = gemmlowp::Rescale<kAccumIntegerBits>(num);
-  return gemmlowp::Rescale<OutputIntegerBits>(z_pow_2_adj * log_2 +
-                                              num_scaled * recip_denom);
+  const FixedPointAccum num_scaled = Rescale<kAccumIntegerBits>(num);
+  return Rescale<OutputIntegerBits>(z_pow_2_adj * log_2 +
+                                    num_scaled * recip_denom);
 }
 
 template <int OutputIntegerBits, int InputIntegerBits>
-inline gemmlowp::FixedPoint<int32_t, OutputIntegerBits>
+inline FixedPoint<int32_t, OutputIntegerBits>
 log_x_for_x_greater_than_or_equal_to_1(
-    gemmlowp::FixedPoint<int32_t, InputIntegerBits> input_val) {
+    FixedPoint<int32_t, InputIntegerBits> input_val) {
   static_assert(
       OutputIntegerBits >= min_log_x_output_bits(InputIntegerBits),
       "Output integer bits must be sufficient to accommodate logs of inputs.");
@@ -990,9 +976,8 @@ inline int32_t GetReciprocal(int32_t x, int x_integer_digits,
       static_cast<int32_t>((static_cast<uint32_t>(x) << headroom_plus_one) -
                            (static_cast<uint32_t>(1) << 31));
 
-  gemmlowp::FixedPoint<int32_t, 0> shifted_scale =
-      gemmlowp::one_over_one_plus_x_for_x_in_0_1(
-          gemmlowp::FixedPoint<int32_t, 0>::FromRaw(shifted_sum_minus_one));
+  FixedPoint<int32_t, 0> shifted_scale = one_over_one_plus_x_for_x_in_0_1(
+      FixedPoint<int32_t, 0>::FromRaw(shifted_sum_minus_one));
   return shifted_scale.raw();
 }
 
@@ -1024,9 +1009,6 @@ inline void GetInvSqrtQuantizedMultiplierExp(int32_t input, int reverse_shift,
   input <<= 2 * left_shift_bit_pairs;
   TFLITE_DCHECK_GE(input, (1 << 27));
   TFLITE_DCHECK_LT(input, (1 << 29));
-  using gemmlowp::FixedPoint;
-  using gemmlowp::Rescale;
-  using gemmlowp::SaturatingRoundingMultiplyByPOT;
   // Using 3 integer bits gives us enough room for the internal arithmetic in
   // this Newton-Raphson iteration.
   using F3 = FixedPoint<int32_t, 3>;
@@ -1035,7 +1017,7 @@ inline void GetInvSqrtQuantizedMultiplierExp(int32_t input, int reverse_shift,
   const F3 fixedpoint_half_input =
       SaturatingRoundingMultiplyByPOT<-1>(fixedpoint_input);
   const F3 fixedpoint_half_three =
-      GEMMLOWP_CHECKED_FIXEDPOINT_CONSTANT(F3, (1 << 28) + (1 << 27), 1.5);
+      TFLITE_MICRO_CHECKED_FIXEDPOINT_CONSTANT(F3, (1 << 28) + (1 << 27), 1.5);
   // Newton-Raphson iteration
   // Naive unoptimized starting guess: x = 1
   F3 x = F3::One();
@@ -1044,8 +1026,8 @@ inline void GetInvSqrtQuantizedMultiplierExp(int32_t input, int reverse_shift,
     const F3 x3 = Rescale<3>(x * x * x);
     x = Rescale<3>(fixedpoint_half_three * x - fixedpoint_half_input * x3);
   }
-  const F0 fixedpoint_half_sqrt_2 =
-      GEMMLOWP_CHECKED_FIXEDPOINT_CONSTANT(F0, 1518500250, std::sqrt(2.) / 2.);
+  const F0 fixedpoint_half_sqrt_2 = TFLITE_MICRO_CHECKED_FIXEDPOINT_CONSTANT(
+      F0, 1518500250, std::sqrt(2.) / 2.);
   x = x * fixedpoint_half_sqrt_2;
   *output_inv_sqrt = x.raw();
   if (*output_shift < 0) {
@@ -1363,32 +1345,26 @@ inline int LegacyHowManyThreads(int max_num_threads, int rows, int cols,
 }
 
 template <typename T>
-void optimized_ops_preload_l1_stream(const T* ptr) {
+void optimized_ops_preload_l1_stream([[maybe_unused]] const T* ptr) {
 #ifdef __GNUC__
   // builtin offered by GCC-compatible compilers including clang
   __builtin_prefetch(ptr, /* 0 means read */ 0, /* 0 means no locality */ 0);
-#else
-  (void)ptr;
 #endif
 }
 
 template <typename T>
-void optimized_ops_preload_l1_keep(const T* ptr) {
+void optimized_ops_preload_l1_keep([[maybe_unused]] const T* ptr) {
 #ifdef __GNUC__
   // builtin offered by GCC-compatible compilers including clang
   __builtin_prefetch(ptr, /* 0 means read */ 0, /* 3 means high locality */ 3);
-#else
-  (void)ptr;
 #endif
 }
 
 template <typename T>
-void optimized_ops_prefetch_write_l1_keep(const T* ptr) {
+void optimized_ops_prefetch_write_l1_keep([[maybe_unused]] const T* ptr) {
 #ifdef __GNUC__
   // builtin offered by GCC-compatible compilers including clang
   __builtin_prefetch(ptr, /* 1 means write */ 1, /* 3 means high locality */ 3);
-#else
-  (void)ptr;
 #endif
 }
 

@@ -18,12 +18,12 @@ limitations under the License.
 #include <algorithm>
 #include <limits>
 
-#include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/internal/cppmath.h"
 #include "tensorflow/lite/micro/kernels/internal/quantization_util.h"
 #include "tensorflow/lite/micro/kernels/internal/reference/process_broadcast_shapes.h"
 #include "tensorflow/lite/micro/kernels/internal/types.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/micro_common.h"
 #include "tensorflow/lite/micro/micro_log.h"
 
 namespace tflite {
@@ -62,7 +62,7 @@ void PopulateLookupTable(const TfLiteTensor* input, const TfLiteTensor* output,
     const int32_t quantized =
         static_cast<int32_t>(rescaled + output->params.zero_point);
     data->table[static_cast<uint8_t>(static_cast<T>(val))] =
-        static_cast<T>(std::max(std::min(maxval, quantized), minval));
+        static_cast<T>(std::clamp(quantized, minval, maxval));
   }
 }
 
@@ -109,7 +109,6 @@ void* EluInit(TfLiteContext* context, const char* buffer, size_t length) {
   // This is a builtin op, so we don't use the contents in 'buffer', if any.
   // Instead, we allocate a new object to carry information from Prepare() to
   // Eval().
-  TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
   return context->AllocatePersistentBuffer(context, sizeof(OpData));
 }
 

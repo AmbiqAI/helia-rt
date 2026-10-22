@@ -3,9 +3,7 @@
 MICROLITE_CC_BASE_SRCS := \
   $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/*.cc) \
   $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/arena_allocator/*.cc) \
-  $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/c/*.cc) \
   $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/memory_planner/*.cc) \
-  $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/tflite_bridge/*.cc) \
   $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/internal/*.cc) \
   $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/internal/reference/*.cc)
 
@@ -17,18 +15,13 @@ MICROLITE_CC_HDRS := \
   $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/c/*.h) \
   $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/*.h) \
   $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/internal/*.h) \
-  $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/internal/optimized/*.h) \
   $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/internal/reference/*.h) \
   $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/internal/reference/integer_ops/*.h) \
   $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/arena_allocator/*.h) \
   $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/memory_planner/*.h) \
-  $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/tflite_bridge/*.h) \
-  $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/types/*.h) \
-  $(TENSORFLOW_ROOT)tensorflow/lite/schema/schema_generated.h \
+  $(TENSORFLOW_ROOT)tensorflow/lite/micro/schema/schema_generated.h \
   $(TENSORFLOW_ROOT)LICENSE
 
-# TODO(b/165940489): Figure out how to avoid including fixed point
-# platform-specific headers.
 # some kiss fft source file has to be included in header sections because
 # the implemenation of three different resolution fft from one single c file.
 # See http://b/201319430 for additional context.
@@ -63,18 +56,12 @@ $(DOWNLOADS_DIR)/flatbuffers/include/flatbuffers/vector.h \
 $(DOWNLOADS_DIR)/flatbuffers/include/flatbuffers/vector_downward.h \
 $(DOWNLOADS_DIR)/flatbuffers/include/flatbuffers/verifier.h \
 $(DOWNLOADS_DIR)/flatbuffers/LICENSE \
-$(DOWNLOADS_DIR)/gemmlowp/fixedpoint/fixedpoint.h \
-$(DOWNLOADS_DIR)/gemmlowp/fixedpoint/fixedpoint_neon.h \
-$(DOWNLOADS_DIR)/gemmlowp/fixedpoint/fixedpoint_sse.h \
-$(DOWNLOADS_DIR)/gemmlowp/internal/detect_platform.h \
-$(DOWNLOADS_DIR)/gemmlowp/LICENSE \
 $(DOWNLOADS_DIR)/kissfft/COPYING \
 $(DOWNLOADS_DIR)/kissfft/kiss_fft.c \
 $(DOWNLOADS_DIR)/kissfft/kiss_fft.h \
 $(DOWNLOADS_DIR)/kissfft/_kiss_fft_guts.h \
 $(DOWNLOADS_DIR)/kissfft/tools/kiss_fftr.c \
-$(DOWNLOADS_DIR)/kissfft/tools/kiss_fftr.h \
-$(DOWNLOADS_DIR)/ruy/ruy/profiler/instrumentation.h
+$(DOWNLOADS_DIR)/kissfft/tools/kiss_fftr.h
 
 # These two must be defined before we include the target specific Makefile.inc
 # because we filter out the examples that are not supported for those targets.
@@ -94,9 +81,6 @@ endif
 
 # Kernel integration tests must be excluded on certain targets.
 MICRO_LITE_INTEGRATION_TESTS += $(call recursive_find,$(TENSORFLOW_ROOT)tensorflow/lite/micro/integration_tests/,Makefile.inc)
-
-MICRO_LITE_GEN_MUTABLE_OP_RESOLVER_TEST += \
-  $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/tools/gen_micro_mutable_op_resolver_test/person_detect/Makefile.inc)
 
 OLD_MICRO_LITE_BENCHMARKS := $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/benchmarks/Makefile.inc)
 MICRO_LITE_BENCHMARKS := $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/tools/benchmarking/Makefile.inc)
@@ -193,7 +177,6 @@ $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/hard_swish_common.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/if.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/kernel_runner.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/kernel_util.cc \
-$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/tflite_kernel_util.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/l2norm.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/l2_pool_2d.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/leaky_relu.cc \
@@ -206,7 +189,6 @@ $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/log_softmax.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/lstm_eval.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/lstm_eval_common.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/maximum_minimum.cc \
-$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/micro_tensor_utils.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/mirror_pad.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/mul.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/mul_common.cc \

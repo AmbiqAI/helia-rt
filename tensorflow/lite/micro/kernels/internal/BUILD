@@ -15,22 +15,19 @@ tflm_cc_library(
     srcs = ["common.cc"],
     hdrs = [
         "common.h",
-        "optimized/neon_check.h",
+        "fixedpoint.h",
     ],
     deps = [
-        ":compatibility",
         ":cppmath",
         ":types",
-        "@gemmlowp//:fixedpoint",
+        "//tensorflow/lite/micro:micro_compatibility",
     ],
 )
 
 tflm_cc_library(
     name = "compatibility",
     hdrs = ["compatibility.h"],
-    deps = [
-        "//tensorflow/lite/micro/kernels:op_macros",
-    ],
+    deps = ["//tensorflow/lite/micro:micro_compatibility"],
 )
 
 tflm_cc_library(
@@ -48,24 +45,15 @@ tflm_cc_library(
     srcs = ["quantization_util.cc"],
     hdrs = ["quantization_util.h"],
     deps = [
-        ":compatibility",
         ":cppmath",
         ":types",
+        "//tensorflow/lite/micro:micro_compatibility",
     ],
 )
 
-tflm_cc_library(
+alias(
     name = "reference",
-    srcs = ["tensor_ctypes.cc"],
-    hdrs = [
-        "portable_tensor.h",
-        "tensor_ctypes.h",
-    ],
-    deps = [
-        ":compatibility",
-        ":types",
-        "//tensorflow/lite/micro/c:common",
-    ],
+    actual = ":tensor",
 )
 
 tflm_cc_library(
@@ -75,26 +63,22 @@ tflm_cc_library(
             "reference/*.cc",
         ],
         allow_empty = True,
-        exclude = ["reference/portable_tensor_utils.cc"],
     ),
     hdrs = glob([
         "reference/*.h",
         "reference/integer_ops/*.h",
     ]),
-    features = ["-parse_headers"],
     deps = [
         ":common",
-        ":compatibility",
         ":cppmath",
         ":quantization_util",
         ":strided_slice_logic",
         ":tensor",
+        ":tensor_utils_no_eigen",
         ":types",
-        "//tensorflow/lite/micro/c:common",
+        "//tensorflow/lite/micro:micro_common",
+        "//tensorflow/lite/micro:micro_compatibility",
         "//tensorflow/lite/micro/kernels:kernel_util",
-        "//tensorflow/lite/micro/kernels:op_macros",
-        "@gemmlowp//:fixedpoint",
-        "@ruy//ruy/profiler:instrumentation",
     ],
 )
 
@@ -105,21 +89,22 @@ tflm_cc_library(
         "strided_slice_logic.h",
     ],
     deps = [
-        ":compatibility",
         ":types",
+        "//tensorflow/lite/micro:micro_compatibility",
     ],
 )
 
 tflm_cc_library(
     name = "tensor",
+    srcs = ["tensor_ctypes.cc"],
     hdrs = [
         "portable_tensor.h",
         "tensor_ctypes.h",
     ],
     deps = [
-        ":compatibility",
         ":types",
-        "//tensorflow/lite/micro/c:common",
+        "//tensorflow/lite/micro:micro_common",
+        "//tensorflow/lite/micro:micro_compatibility",
     ],
 )
 
@@ -130,8 +115,7 @@ tflm_cc_library(
         "types.h",
     ],
     deps = [
-        ":compatibility",
-        "//tensorflow/lite/micro/types:half",
+        "//tensorflow/lite/micro:micro_compatibility",
     ],
 )
 
@@ -139,20 +123,14 @@ tflm_cc_library(
     name = "tensor_utils_no_eigen",
     srcs = [
         "portable_tensor_utils.cc",
-        "reference/portable_tensor_utils.cc",
-        "tensor_utils.cc",
     ],
     hdrs = [
         "portable_tensor_utils.h",
-        "reference/portable_tensor_utils.h",
-        "reference/portable_tensor_utils_impl.h",
     ],
     deps = [
         ":common",
-        ":compatibility",
         ":cppmath",
-        "//tensorflow/lite/micro/c:common",
-        "//tensorflow/lite/micro/kernels:op_macros",
-        "@gemmlowp//:fixedpoint",
+        "//tensorflow/lite/micro:micro_common",
+        "//tensorflow/lite/micro:micro_compatibility",
     ],
 )

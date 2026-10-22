@@ -17,9 +17,9 @@ limitations under the License.
 #include <stddef.h>
 #include <stdint.h>
 
-#include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/micro_common.h"
 #include "tensorflow/lite/micro/micro_log.h"
 
 namespace tflite {
@@ -36,7 +36,6 @@ struct OpData {
 };
 
 void* SelectInit(TfLiteContext* context, const char* buffer, size_t length) {
-  TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
   auto* data = static_cast<OpData*>(
       context->AllocatePersistentBuffer(context, sizeof(OpData)));
   // TODO(AmbiqAI/helia-rt#460): arena check; drop when upstream has it.

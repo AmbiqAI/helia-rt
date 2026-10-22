@@ -19,9 +19,9 @@ limitations under the License.
 #include <cstdlib>
 #include <cstring>
 
-#include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/micro_common.h"
 #include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 
@@ -102,7 +102,9 @@ TfLiteStatus ReverseV2Eval(TfLiteContext* context, TfLiteNode* node) {
     if (axes_data[i] < 0) {
       axes_data[i] += rank;
     }
-    TF_LITE_ENSURE(context, axes_data[i] >= 0 && axes_data[i] < rank);
+    if (axes_data[i] < 0 || axes_data[i] >= rank) {
+      return kTfLiteError;
+    }
   }
   std::qsort(axes_data.data(), num_axes, sizeof(int32_t), comp);
 

@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#include "tensorflow/lite/micro/c/builtin_op_data.h"
-#include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/builtin_op_data.h"
+#include "tensorflow/lite/micro/compatibility.h"
 #include "tensorflow/lite/micro/kernels/hard_swish.h"
 #include "tensorflow/lite/micro/kernels/internal/common.h"
 #include "tensorflow/lite/micro/kernels/internal/quantization_util.h"
@@ -22,7 +22,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/micro/kernels/internal/types.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
-#include "tensorflow/lite/micro/kernels/op_macros.h"
+#include "tensorflow/lite/micro/micro_common.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 
 namespace tflite {
@@ -55,8 +55,8 @@ TfLiteStatus HardSwishPrepare(TfLiteContext* context, TfLiteNode* node) {
     const float reluish_scale = 3.0f / 32768.0f;
     const float output_scale = output->params.scale;
 
-    const double output_multiplier =
-        static_cast<double>(hires_input_scale / output_scale);
+    const double output_multiplier = static_cast<double>(hires_input_scale) /
+                                     static_cast<double>(output_scale);
     int32_t output_multiplier_fixedpoint_int32;
     QuantizeMultiplier(output_multiplier, &output_multiplier_fixedpoint_int32,
                        &params->output_multiplier_exponent);
@@ -66,8 +66,8 @@ TfLiteStatus HardSwishPrepare(TfLiteContext* context, TfLiteNode* node) {
 
     TF_LITE_ENSURE(context, params->output_multiplier_exponent <= 0);
 
-    const double reluish_multiplier =
-        static_cast<double>(hires_input_scale / reluish_scale);
+    const double reluish_multiplier = static_cast<double>(hires_input_scale) /
+                                      static_cast<double>(reluish_scale);
     int32_t reluish_multiplier_fixedpoint_int32;
     QuantizeMultiplier(reluish_multiplier, &reluish_multiplier_fixedpoint_int32,
                        &params->reluish_multiplier_exponent);

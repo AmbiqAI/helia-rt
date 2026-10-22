@@ -6,8 +6,6 @@ load(
 
 package(
     default_visibility = ["//visibility:public"],
-    # Disabling layering_check because of http://b/177257332
-    features = ["-layering_check"],
     licenses = ["notice"],
 )
 
@@ -17,7 +15,7 @@ tflm_cc_library(
         "ibuffer_allocator.h",
     ],
     deps = [
-        "//tensorflow/lite/micro/c:common",
+        "//tensorflow/lite/micro:micro_common",
     ],
 )
 
@@ -29,9 +27,9 @@ tflm_cc_library(
         ":ibuffer_allocator",
         "//tensorflow/lite/micro:memory_helpers",
         "//tensorflow/lite/micro:micro_arena_constants",
+        "//tensorflow/lite/micro:micro_common",
         "//tensorflow/lite/micro:micro_compatibility",
         "//tensorflow/lite/micro:micro_log",
-        "//tensorflow/lite/micro/c:common",
     ],
 )
 
@@ -53,9 +51,9 @@ tflm_cc_library(
         ":ibuffer_allocator",
         "//tensorflow/lite/micro:memory_helpers",
         "//tensorflow/lite/micro:micro_arena_constants",
+        "//tensorflow/lite/micro:micro_common",
         "//tensorflow/lite/micro:micro_compatibility",
         "//tensorflow/lite/micro:micro_log",
-        "//tensorflow/lite/micro/c:common",
     ],
 )
 
@@ -81,9 +79,9 @@ tflm_cc_library(
         ":ibuffer_allocator",
         "//tensorflow/lite/micro:memory_helpers",
         "//tensorflow/lite/micro:micro_arena_constants",
+        "//tensorflow/lite/micro:micro_common",
         "//tensorflow/lite/micro:micro_compatibility",
         "//tensorflow/lite/micro:micro_log",
-        "//tensorflow/lite/micro/c:common",
     ],
 )
 
@@ -93,6 +91,7 @@ tflm_cc_test(
         "single_arena_buffer_allocator_test.cc",
     ],
     deps = [
+        ":simple_memory_allocator",
         "//tensorflow/lite/micro:micro_framework",
         "//tensorflow/lite/micro:test_helpers",
         "//tensorflow/lite/micro/testing:micro_test",
@@ -111,7 +110,6 @@ tflm_cc_library(
         ":simple_memory_allocator",
         "//tensorflow/lite/micro:micro_compatibility",
         "//tensorflow/lite/micro:micro_framework",
-        "//tensorflow/lite/micro/kernels/internal:compatibility",
     ],
 )
 
