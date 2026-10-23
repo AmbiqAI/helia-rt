@@ -32,7 +32,6 @@ UPSTREAM_ONLY=(
   ".github/workflows/cortex_m.yml"
   ".github/workflows/cortex_m_arm_compiler.yml"
   ".github/workflows/cortex_m_virtual_hardware.yml"
-  ".github/workflows/log_binary_size_pr.yml"
   ".github/workflows/run_ci.yml"
   ".github/workflows/stale_handler.yml"
 )

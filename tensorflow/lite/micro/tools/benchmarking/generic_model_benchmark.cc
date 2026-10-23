@@ -25,8 +25,7 @@ limitations under the License.
 #include <random>
 #include <type_traits>
 
-#include "tensorflow/lite/micro/c/c_api_types.h"
-#include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/micro_common.h"
 #include "tensorflow/lite/micro/micro_context.h"
 #include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
@@ -38,7 +37,6 @@ limitations under the License.
 #include "tensorflow/lite/micro/tools/benchmarking/metrics.h"
 #include "tensorflow/lite/micro/tools/benchmarking/op_resolver.h"
 #include "tensorflow/lite/micro/tools/benchmarking/show_meta_data.h"
-#include "tensorflow/lite/schema/schema_generated.h"
 
 #if defined(GENERIC_BENCHMARK_USING_BUILTIN_MODEL)
 #if !defined(GENERIC_BENCHMARK_MODEL_HEADER_PATH)
@@ -206,6 +204,19 @@ void ShowInputCRC32(tflite::MicroInterpreter* interpreter) {
   }
 }
 
+#if defined(GENERIC_BENCHMARK_STREAMING_OUTPUT)
+bool IsOutputValid(tflite::MicroInterpreter& interpreter) {
+  TfLiteTensor* output =
+      interpreter.output_tensor(GENERIC_BENCHMARK_STREAMING_OUTPUT);
+  // Streaming models expose a scalar bool output_valid tensor
+  if (output != nullptr && output->type == kTfLiteBool &&
+      output->bytes == sizeof(bool)) {
+    return tflite::micro::GetTensorData<bool>(output)[0];
+  }
+  return true;
+}
+#endif  // defined(GENERIC_BENCHMARK_STREAMING_OUTPUT)
+
 int Benchmark(const uint8_t* model_data, tflite::PrettyPrintType print_type) {
   static Profiler profiler;
   static Profiler profiler2;
@@ -294,29 +305,44 @@ int Benchmark(const uint8_t* model_data, tflite::PrettyPrintType print_type) {
     MicroPrintf("");  // null MicroPrintf serves as a newline.
 
     status = interpreter.Invoke();
-    if ((status != kTfLiteOk) && (static_cast<int>(status) != kTfLiteAbort)) {
-      MicroPrintf("Model interpreter invocation failed: %d\n", status);
-      return -1;
+    if (status != kTfLiteOk) {
+      if (static_cast<int>(status) == kTfLiteAbort) {
+        continue;
+      } else {
+        MicroPrintf("Model interpreter invocation failed: %d\n", status);
+        return -1;
+      }
     }
 
-    profiler.Log();
-    MicroPrintf("");  // null MicroPrintf serves as a newline.
-    profiler.LogTicksPerTagCsv();
-    MicroPrintf("");  // null MicroPrintf serves as a newline.
+#if defined(GENERIC_BENCHMARK_STREAMING_OUTPUT)
+    const bool is_complete_inference =
+        (status == kTfLiteOk) && IsOutputValid(interpreter);
+#else
+    const bool is_complete_inference = (status == kTfLiteOk);
+#endif  // defined(GENERIC_BENCHMARK_STREAMING_OUTPUT)
+
+    if (is_complete_inference) {
+      profiler.Log();
+      MicroPrintf("");  // null MicroPrintf serves as a newline.
+      profiler.LogTicksPerTagCsv();
+      MicroPrintf("");  // null MicroPrintf serves as a newline.
+    }
     profiler.ClearEvents();
 
     if (using_compression) {
-      profiler2.Log();
-      MicroPrintf("");  // null MicroPrintf serves as a newline.
-      profiler2.LogTicksPerTagCsv();
-      MicroPrintf("");  // null MicroPrintf serves as a newline.
+      if (is_complete_inference) {
+        profiler2.Log();
+        MicroPrintf("");  // null MicroPrintf serves as a newline.
+        profiler2.LogTicksPerTagCsv();
+        MicroPrintf("");  // null MicroPrintf serves as a newline.
+      }
       profiler2.ClearEvents();
     }
 
     ShowOutputCRC32(&interpreter);
     MicroPrintf("");  // null MicroPrintf serves as a newline.
 
-    if (status == kTfLiteOk) {
+    if (is_complete_inference) {
       break;
     }
   }

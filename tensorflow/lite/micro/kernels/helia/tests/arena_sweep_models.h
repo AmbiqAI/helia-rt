@@ -46,9 +46,9 @@ limitations under the License.
 #include "tensorflow/lite/micro/models/keyword_scrambled_8bit_model_data.h"
 #include "tensorflow/lite/micro/models/keyword_scrambled_model_data.h"
 #include "tensorflow/lite/micro/models/person_detect_model_data.h"
+#include "tensorflow/lite/micro/schema/schema_generated.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 #include "tensorflow/lite/micro/testing/test_conv_model.h"
-#include "tensorflow/lite/schema/schema_generated.h"
 
 namespace {
 

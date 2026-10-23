@@ -90,8 +90,9 @@ TfLiteStatus CalculateOpDataDiv(TfLiteContext* context, TfLiteTensor* input1,
     TF_LITE_ENSURE_STATUS(CalculateActivationRangeQuantized(
         context, params->activation, output, &data->output_activation_min,
         &data->output_activation_max));
-    const double real_multiplier = static_cast<double>(
-        input1->params.scale / (input2->params.scale * output->params.scale));
+    const double real_multiplier = static_cast<double>(input1->params.scale) /
+                                   (static_cast<double>(input2->params.scale) *
+                                    static_cast<double>(output->params.scale));
     TF_LITE_ENSURE_MSG(context, std::isfinite(real_multiplier),
                        "DIV int8 scales give a non-finite multiplier.");
     QuantizeMultiplier(real_multiplier, &data->output_multiplier,

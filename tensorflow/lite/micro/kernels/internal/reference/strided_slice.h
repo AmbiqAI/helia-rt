@@ -15,12 +15,12 @@ limitations under the License.
 #ifndef TENSORFLOW_LITE_MICRO_KERNELS_INTERNAL_REFERENCE_STRIDED_SLICE_H_
 #define TENSORFLOW_LITE_MICRO_KERNELS_INTERNAL_REFERENCE_STRIDED_SLICE_H_
 
+#include <algorithm>
 #include <functional>
 #include <vector>
 
-#include "ruy/profiler/instrumentation.h"  // from @ruy
+#include "tensorflow/lite/micro/compatibility.h"
 #include "tensorflow/lite/micro/kernels/internal/common.h"
-#include "tensorflow/lite/micro/kernels/internal/compatibility.h"
 #include "tensorflow/lite/micro/kernels/internal/portable_tensor.h"
 #include "tensorflow/lite/micro/kernels/internal/strided_slice_logic.h"
 #include "tensorflow/lite/micro/kernels/internal/types.h"
@@ -53,9 +53,9 @@ inline int StartForAxis(const DynamicStridedSliceParams& params,
     start += axis_size;
   }
   if (stride > 0) {
-    start = strided_slice::Clamp(start, 0, axis_size);
+    start = std::clamp(start, 0, axis_size);
   } else {
-    start = strided_slice::Clamp(start, -1, axis_size - 1);
+    start = std::clamp(start, -1, axis_size - 1);
   }
   if (AxisMask(params.begin_mask, axis)) {
     start = stride > 0 ? 0 : axis_size - 1;
@@ -79,9 +79,9 @@ inline int EndForAxis(const DynamicStridedSliceParams& params,
     end += axis_size;
   }
   if (stride > 0) {
-    end = strided_slice::Clamp(end, 0, axis_size);
+    end = std::clamp(end, 0, axis_size);
   } else {
-    end = strided_slice::Clamp(end, -1, axis_size - 1);
+    end = std::clamp(end, -1, axis_size - 1);
   }
   if (AxisMask(params.end_mask, axis)) {
     end = stride > 0 ? axis_size : -1;
@@ -94,7 +94,6 @@ inline void StridedSlice(const DynamicStridedSliceParams& op_params,
                          const RuntimeShape& input_shape,
                          const RuntimeShape& output_shape,
                          SequentialTensorWriter<T>* writer) {
-  ruy::profiler::ScopeLabel label("StridedSlice");
   const int dims = input_shape.DimensionsCount();
   std::vector<int> starts(dims);
   std::vector<int> stops(dims);
@@ -152,8 +151,6 @@ inline void StridedSlice(const tflite::micro::StridedSliceParams& op_params,
                          const RuntimeShape& unextended_input_shape,
                          const RuntimeShape& unextended_output_shape,
                          SequentialTensorWriter<T>* writer) {
-  ruy::profiler::ScopeLabel label("StridedSlice");
-
   // Note that the output_shape is not used herein.
   tflite::micro::StridedSliceParams params_copy = op_params;
 

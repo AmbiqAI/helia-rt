@@ -19,13 +19,13 @@ limitations under the License.
 #include <cstdint>
 #include <limits>
 
-#include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/batch_matmul.h"
 #include "tensorflow/lite/micro/kernels/internal/quantization_util.h"
 #include "tensorflow/lite/micro/kernels/internal/reference/transpose.h"
 #include "tensorflow/lite/micro/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/micro/kernels/internal/types.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/micro_common.h"
 #include "tensorflow/lite/micro/micro_log.h"
 
 namespace tflite {
@@ -171,7 +171,6 @@ void* BatchMatMulInit(TfLiteContext* context, const char* buffer,
   // This is a builtin op, so we don't use the contents in 'buffer', if any.
   // Instead, we allocate a new object to carry information from Prepare() to
   // Eval().
-  TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
   MicroContext* micro_context = GetMicroContext(context);
   return micro_context->AllocatePersistentBuffer(sizeof(OpDataBatchMatmul));
 }

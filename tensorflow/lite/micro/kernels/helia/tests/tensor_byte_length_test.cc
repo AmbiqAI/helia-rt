@@ -36,7 +36,9 @@ limitations under the License.
 #include "flatbuffers/flatbuffers.h"  // from @flatbuffers
 #include "tensorflow/lite/micro/arena_allocator/non_persistent_arena_buffer_allocator.h"
 #include "tensorflow/lite/micro/arena_allocator/persistent_arena_buffer_allocator.h"
+#include "tensorflow/lite/micro/arena_allocator/single_arena_buffer_allocator.h"
 #include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/fake_micro_context.h"
 #include "tensorflow/lite/micro/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
@@ -49,9 +51,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/micro/micro_resource_variable.h"
+#include "tensorflow/lite/micro/mock_micro_graph.h"
+#include "tensorflow/lite/micro/schema/schema_generated.h"
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
-#include "tensorflow/lite/schema/schema_generated.h"
 
 namespace {
 
@@ -65,9 +68,9 @@ using tflite::TensorType_INT8;
 // [16, 2^28 + 1] holds 2^32 + 16 elements, which a 32-bit product wraps to 16.
 constexpr int32_t kWrapsToSixteen = (1 << 28) + 1;
 constexpr int32_t kMaxInt8Elements =
-    static_cast<int32_t>(tflite::kMaxTensorBytes);
+    static_cast<int32_t>(tflite::micro::kMaxTensorBytes);
 constexpr int32_t kMaxInt16Elements =
-    static_cast<int32_t>(tflite::kMaxTensorBytes / 2);
+    static_cast<int32_t>(tflite::micro::kMaxTensorBytes / 2);
 
 // Hands out static storage, so flatbuffers build without a heap. deallocate()
 // keeps the memory, so a finished buffer outlives its builder and stays valid
@@ -457,13 +460,7 @@ TfLiteStatus AllocateProbe(const tflite::Model* model) {
   return interpreter.AllocateTensors();
 }
 
-TfLiteEvalTensor copy_tensors[2];
-
-TfLiteEvalTensor* GetCopyTensor(const TfLiteContext* context, int index) {
-  return &copy_tensors[index];
-}
-
-void IgnoreError(TfLiteContext* context, const char* format, ...) {}
+TfLiteTensor copy_tensors[2];
 
 // Copies input 0 to output 0 of a node whose two tensors share `dims`.
 TfLiteStatus CopyWithDims(TfLiteType type, int* dims_data, int8_t* input,
@@ -475,9 +472,15 @@ TfLiteStatus CopyWithDims(TfLiteType type, int* dims_data, int8_t* input,
   copy_tensors[1] = copy_tensors[0];
   copy_tensors[1].data.int8 = output;
 
+  alignas(16) static uint8_t copy_arena[256];
+  tflite::micro::SingleArenaBufferAllocator* allocator =
+      tflite::micro::SingleArenaBufferAllocator::Create(copy_arena,
+                                                        sizeof(copy_arena));
+  tflite::micro::MockMicroGraph graph(allocator);
+  tflite::micro::FakeMicroContext micro_context(copy_tensors, allocator,
+                                                &graph);
   TfLiteContext context = {};
-  context.GetEvalTensor = GetCopyTensor;
-  context.ReportError = IgnoreError;
+  context.impl_ = &micro_context;
   int inputs_data[] = {1, 0};
   int outputs_data[] = {1, 1};
   TfLiteNode node = {};
@@ -543,10 +546,10 @@ TEST(TensorByteLengthTest, FlatbufferLargestByteCountSucceeds) {
   size_t bytes = 0;
   EXPECT_EQ(kTfLiteOk,
             FlatbufferBytes(TensorType_INT8, {kMaxInt8Elements}, &bytes));
-  EXPECT_EQ(tflite::kMaxTensorBytes, bytes);
+  EXPECT_EQ(tflite::micro::kMaxTensorBytes, bytes);
   EXPECT_EQ(kTfLiteOk,
             FlatbufferBytes(TensorType_INT16, {kMaxInt16Elements}, &bytes));
-  EXPECT_EQ(tflite::kMaxTensorBytes, bytes);
+  EXPECT_EQ(tflite::micro::kMaxTensorBytes, bytes);
   EXPECT_EQ(kTfLiteOk,
             FlatbufferBytes(TensorType_INT8, {0, 65536, 65536}, &bytes));
   EXPECT_EQ(static_cast<size_t>(0), bytes);
@@ -587,10 +590,10 @@ TEST(TensorByteLengthTest, EvalTensorLargestByteCountSucceeds) {
   size_t bytes = 0;
   int int8_dims[] = {1, kMaxInt8Elements};
   EXPECT_EQ(kTfLiteOk, EvalBytes(kTfLiteInt8, int8_dims, &bytes));
-  EXPECT_EQ(tflite::kMaxTensorBytes, bytes);
+  EXPECT_EQ(tflite::micro::kMaxTensorBytes, bytes);
   int int16_dims[] = {1, kMaxInt16Elements};
   EXPECT_EQ(kTfLiteOk, EvalBytes(kTfLiteInt16, int16_dims, &bytes));
-  EXPECT_EQ(tflite::kMaxTensorBytes, bytes);
+  EXPECT_EQ(tflite::micro::kMaxTensorBytes, bytes);
   int scalar[] = {0};
   EXPECT_EQ(kTfLiteOk, EvalBytes(kTfLiteFloat32, scalar, &bytes));
   EXPECT_EQ(sizeof(float), bytes);
@@ -600,35 +603,35 @@ TEST(TensorByteLengthTest, EvalTensorLargestByteCountSucceeds) {
 TEST(TensorByteLengthTest, MultiplyTensorSizeHonoursLimit) {
   constexpr size_t kLimit = UINT32_MAX;
   size_t size = size_t{1} << 30;
-  EXPECT_EQ(kTfLiteError, tflite::MultiplyTensorSize(&size, 4, kLimit));
+  EXPECT_EQ(kTfLiteError, tflite::micro::MultiplyTensorSize(&size, 4, kLimit));
   EXPECT_EQ(size_t{1} << 30, size);
-  EXPECT_EQ(kTfLiteOk, tflite::MultiplyTensorSize(&size, 3, kLimit));
+  EXPECT_EQ(kTfLiteOk, tflite::micro::MultiplyTensorSize(&size, 3, kLimit));
   EXPECT_EQ(size_t{3} << 30, size);
 
   size = kLimit / 7 + 1;
-  EXPECT_EQ(kTfLiteError, tflite::MultiplyTensorSize(&size, 7, kLimit));
+  EXPECT_EQ(kTfLiteError, tflite::micro::MultiplyTensorSize(&size, 7, kLimit));
   size = kLimit / 7;
-  EXPECT_EQ(kTfLiteOk, tflite::MultiplyTensorSize(&size, 7, kLimit));
+  EXPECT_EQ(kTfLiteOk, tflite::micro::MultiplyTensorSize(&size, 7, kLimit));
   EXPECT_EQ(kLimit / 7 * 7, size);
 
   size = kLimit;
-  EXPECT_EQ(kTfLiteOk, tflite::MultiplyTensorSize(&size, 1, kLimit));
+  EXPECT_EQ(kTfLiteOk, tflite::micro::MultiplyTensorSize(&size, 1, kLimit));
   EXPECT_EQ(kLimit, size);
-  EXPECT_EQ(kTfLiteOk, tflite::MultiplyTensorSize(&size, 0, kLimit));
+  EXPECT_EQ(kTfLiteOk, tflite::micro::MultiplyTensorSize(&size, 0, kLimit));
   EXPECT_EQ(static_cast<size_t>(0), size);
 
   // A factor above the limit, which does not fit a 32-bit size_t.
   constexpr int64_t kAboveLimit = int64_t{UINT32_MAX} + 1;
   size = 1;
   EXPECT_EQ(kTfLiteError,
-            tflite::MultiplyTensorSize(&size, kAboveLimit, kLimit));
+            tflite::micro::MultiplyTensorSize(&size, kAboveLimit, kLimit));
   EXPECT_EQ(static_cast<size_t>(1), size);
   size = 0;
-  EXPECT_EQ(kTfLiteOk, tflite::MultiplyTensorSize(&size, kAboveLimit, kLimit));
+  EXPECT_EQ(kTfLiteOk, tflite::micro::MultiplyTensorSize(&size, kAboveLimit, kLimit));
   EXPECT_EQ(static_cast<size_t>(0), size);
 
   size = 1;
-  EXPECT_EQ(kTfLiteError, tflite::MultiplyTensorSize(&size, -1, kLimit));
+  EXPECT_EQ(kTfLiteError, tflite::micro::MultiplyTensorSize(&size, -1, kLimit));
   EXPECT_EQ(static_cast<size_t>(1), size);
 }
 
@@ -836,7 +839,7 @@ TEST(TensorByteLengthTest, CopyOpInputsToOpOutputsFailsOnSizeOverflow) {
 }
 
 TEST(TensorByteLengthTest, AllocateTensorsFailsOnOversizedScratchRequest) {
-  EXPECT_EQ(kTfLiteError, AllocateWithScratch(tflite::kMaxTensorBytes + 1));
+  EXPECT_EQ(kTfLiteError, AllocateWithScratch(tflite::micro::kMaxTensorBytes + 1));
   // Rounding this up for the planner would wrap to a small size.
   EXPECT_EQ(kTfLiteError, AllocateWithScratch(SIZE_MAX - 7));
   EXPECT_EQ(kTfLiteOk, AllocateWithScratch(64));

@@ -15,11 +15,11 @@ limitations under the License.
 
 #include <cmath>
 
-#include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/internal/common.h"
 #include "tensorflow/lite/micro/kernels/internal/quantization_util.h"
 #include "tensorflow/lite/micro/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/micro_common.h"
 #include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 
@@ -63,15 +63,16 @@ bool IsRsqrtSupportedType(const TfLiteType type) {
 inline void SetAbsOutputMultiplier(const float input_scale,
                                    const float output_scale,
                                    int32_t* multiplier, int* shift) {
-  QuantizeMultiplier(static_cast<double>(input_scale / output_scale),
-                     multiplier, shift);
+  QuantizeMultiplier(
+      static_cast<double>(input_scale) / static_cast<double>(output_scale),
+      multiplier, shift);
 }
 
 inline void SetRsqrtOutputMultiplier(const float input_scale,
                                      const float output_scale,
                                      int32_t* multiplier, int* shift) {
-  const double scale =
-      1. / static_cast<double>((std::sqrt(input_scale) * output_scale));
+  const double scale = 1.0 / (std::sqrt(static_cast<double>(input_scale)) *
+                              static_cast<double>(output_scale));
   QuantizeMultiplier(scale, multiplier, shift);
 }
 
@@ -308,7 +309,6 @@ inline TfLiteStatus EvalLogical(TfLiteContext* context, TfLiteNode* node,
 
 void* ElementWiseAbsRsqrtInit(TfLiteContext* context, const char* buffer,
                               size_t length) {
-  TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
   return context->AllocatePersistentBuffer(context, sizeof(OpDataAbsRsqrt));
 }
 

@@ -17,9 +17,9 @@ limitations under the License.
 #define TENSORFLOW_LITE_MICRO_KERNELS_KERNEL_RUNNER_H_
 
 #include "tensorflow/lite/micro/arena_allocator/single_arena_buffer_allocator.h"
-#include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/compatibility.h"
 #include "tensorflow/lite/micro/fake_micro_context.h"
-#include "tensorflow/lite/micro/kernels/internal/compatibility.h"
+#include "tensorflow/lite/micro/micro_common.h"
 #include "tensorflow/lite/micro/mock_micro_graph.h"
 
 namespace tflite {
@@ -42,33 +42,6 @@ class KernelRunner {
                const CompressedTensorList* compressed_tensors = nullptr
 #endif  // USE_TFLM_COMPRESSION
   );
-
-  KernelRunner(const TfLiteRegistration& registration, TfLiteTensor* tensors,
-               int tensors_size, TfLiteIntArray* inputs,
-               TfLiteIntArray* outputs, const void* builtin_data,
-               TfLiteIntArray* intermediates = nullptr
-#ifdef USE_TFLM_COMPRESSION
-               ,
-               const CompressedTensorList* compressed_tensors = nullptr
-#endif  // USE_TFLM_COMPRESSION
-               )
-      : KernelRunner(
-            TFLMRegistration{
-                registration.init,
-                registration.free,
-                registration.prepare,
-                registration.invoke,
-                nullptr,
-                registration.builtin_code,
-                registration.custom_name,
-            },
-            tensors, tensors_size, inputs, outputs, builtin_data, intermediates
-#ifdef USE_TFLM_COMPRESSION
-            ,
-            compressed_tensors
-#endif  // USE_TFLM_COMPRESSION
-        ) {
-  }
 
   // Calls init and prepare on the kernel (i.e. TFLMRegistration) struct.
   // Any exceptions will be DebugLog'd and returned as a status code.

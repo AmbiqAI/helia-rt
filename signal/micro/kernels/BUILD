@@ -5,7 +5,10 @@ load(
     "tflm_cc_library",
 )
 
-package(licenses = ["notice"])
+package(
+    features = ["parse_headers"],
+    licenses = ["notice"],
+)
 
 tflm_cc_library(
     name = "register_signal_ops",
@@ -55,7 +58,6 @@ tflm_cc_library(
         "//tensorflow/lite/micro:micro_context",
         "//tensorflow/lite/micro:micro_utils",
         "//tensorflow/lite/micro:portable_type_to_tflitetype",
-        "//tensorflow/lite/micro/c:common",
         "//tensorflow/lite/micro/kernels:kernel_util",
         "//tensorflow/lite/micro/kernels/internal:tensor",
     ],
@@ -80,9 +82,9 @@ cc_test(
         ":fft_flexbuffers_generated_data",
         ":register_signal_ops",
         "//signal/testdata:fft_test_data",
+        "//tensorflow/lite/micro:micro_common",
         "//tensorflow/lite/micro:op_resolvers",
         "//tensorflow/lite/micro:test_helpers",
-        "//tensorflow/lite/micro/c:common",
         "//tensorflow/lite/micro/kernels:kernel_runner",
         "//tensorflow/lite/micro/testing:micro_test",
     ],
@@ -106,9 +108,9 @@ cc_test(
     deps = [
         ":register_signal_ops",
         ":window_flexbuffers_generated_data",
+        "//tensorflow/lite/micro:micro_common",
         "//tensorflow/lite/micro:op_resolvers",
         "//tensorflow/lite/micro:test_helpers",
-        "//tensorflow/lite/micro/c:common",
         "//tensorflow/lite/micro/kernels:kernel_runner",
         "//tensorflow/lite/micro/testing:micro_test",
     ],
@@ -132,9 +134,9 @@ cc_test(
     deps = [
         ":framer_flexbuffers_generated_data",
         ":register_signal_ops",
+        "//tensorflow/lite/micro:micro_common",
         "//tensorflow/lite/micro:op_resolvers",
         "//tensorflow/lite/micro:test_helpers",
-        "//tensorflow/lite/micro/c:common",
         "//tensorflow/lite/micro/kernels:kernel_runner",
         "//tensorflow/lite/micro/testing:micro_test",
     ],
@@ -158,9 +160,9 @@ cc_test(
     deps = [
         ":overlap_add_flexbuffers_generated_data",
         ":register_signal_ops",
+        "//tensorflow/lite/micro:micro_common",
         "//tensorflow/lite/micro:op_resolvers",
         "//tensorflow/lite/micro:test_helpers",
-        "//tensorflow/lite/micro/c:common",
         "//tensorflow/lite/micro/kernels:kernel_runner",
         "//tensorflow/lite/micro/testing:micro_test",
     ],
@@ -183,9 +185,9 @@ cc_test(
     ],
     deps = [
         ":delay_flexbuffers_generated_data",
+        "//tensorflow/lite/micro:micro_common",
         "//tensorflow/lite/micro:op_resolvers",
         "//tensorflow/lite/micro:test_helpers",
-        "//tensorflow/lite/micro/c:common",
         "//tensorflow/lite/micro/kernels:kernel_runner",
         "//tensorflow/lite/micro/testing:micro_test",
     ],
@@ -209,9 +211,9 @@ cc_test(
     deps = [
         ":register_signal_ops",
         ":stacker_flexbuffers_generated_data",
+        "//tensorflow/lite/micro:micro_common",
         "//tensorflow/lite/micro:op_resolvers",
         "//tensorflow/lite/micro:test_helpers",
-        "//tensorflow/lite/micro/c:common",
         "//tensorflow/lite/micro/kernels:kernel_runner",
         "//tensorflow/lite/micro/testing:micro_test",
     ],
@@ -235,9 +237,9 @@ cc_test(
     deps = [
         ":energy_flexbuffers_generated_data",
         ":register_signal_ops",
+        "//tensorflow/lite/micro:micro_common",
         "//tensorflow/lite/micro:op_resolvers",
         "//tensorflow/lite/micro:test_helpers",
-        "//tensorflow/lite/micro/c:common",
         "//tensorflow/lite/micro/kernels:kernel_runner",
         "//tensorflow/lite/micro/testing:micro_test",
     ],
@@ -280,9 +282,9 @@ cc_test(
     ],
     deps = [
         ":filter_bank_flexbuffers_generated_data",
+        "//tensorflow/lite/micro:micro_common",
         "//tensorflow/lite/micro:op_resolvers",
         "//tensorflow/lite/micro:test_helpers",
-        "//tensorflow/lite/micro/c:common",
         "//tensorflow/lite/micro/kernels:kernel_runner",
         "//tensorflow/lite/micro/testing:micro_test",
     ],
@@ -295,9 +297,9 @@ cc_test(
     ],
     deps = [
         ":filter_bank_log_flexbuffers_generated_data",
+        "//tensorflow/lite/micro:micro_common",
         "//tensorflow/lite/micro:op_resolvers",
         "//tensorflow/lite/micro:test_helpers",
-        "//tensorflow/lite/micro/c:common",
         "//tensorflow/lite/micro/kernels:kernel_runner",
         "//tensorflow/lite/micro/testing:micro_test",
     ],
@@ -310,9 +312,9 @@ cc_test(
     ],
     deps = [
         ":filter_bank_spectral_subtraction_flexbuffers_generated_data",
+        "//tensorflow/lite/micro:micro_common",
         "//tensorflow/lite/micro:op_resolvers",
         "//tensorflow/lite/micro:test_helpers",
-        "//tensorflow/lite/micro/c:common",
         "//tensorflow/lite/micro/kernels:kernel_runner",
         "//tensorflow/lite/micro/testing:micro_test",
     ],
@@ -324,9 +326,9 @@ cc_test(
         "filter_bank_square_root_test.cc",
     ],
     deps = [
+        "//tensorflow/lite/micro:micro_common",
         "//tensorflow/lite/micro:op_resolvers",
         "//tensorflow/lite/micro:test_helpers",
-        "//tensorflow/lite/micro/c:common",
         "//tensorflow/lite/micro/kernels:kernel_runner",
         "//tensorflow/lite/micro/testing:micro_test",
     ],
@@ -349,9 +351,9 @@ cc_test(
     ],
     deps = [
         ":pcan_flexbuffers_generated_data",
+        "//tensorflow/lite/micro:micro_common",
         "//tensorflow/lite/micro:op_resolvers",
         "//tensorflow/lite/micro:test_helpers",
-        "//tensorflow/lite/micro/c:common",
         "//tensorflow/lite/micro/kernels:kernel_runner",
         "//tensorflow/lite/micro/testing:micro_test",
     ],

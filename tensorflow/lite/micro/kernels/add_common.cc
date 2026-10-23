@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#include "tensorflow/lite/micro/c/builtin_op_data.h"
-#include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/builtin_op_data.h"
+#include "tensorflow/lite/micro/compatibility.h"
 #include "tensorflow/lite/micro/kernels/add.h"
 #include "tensorflow/lite/micro/kernels/internal/quantization_util.h"
 #include "tensorflow/lite/micro/kernels/internal/reference/add.h"
@@ -22,8 +22,8 @@ limitations under the License.
 #include "tensorflow/lite/micro/kernels/internal/reference/process_broadcast_shapes.h"
 #include "tensorflow/lite/micro/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
-#include "tensorflow/lite/micro/kernels/op_macros.h"
 #include "tensorflow/lite/micro/memory_helpers.h"
+#include "tensorflow/lite/micro/micro_common.h"
 
 namespace tflite {
 namespace micro {
@@ -38,7 +38,7 @@ TfLiteStatus CalculateOpDataAdd(TfLiteContext* context, TfLiteAddParams* params,
   data->requires_broadcast = !HaveSameShapes(input1, input2);
 
   if (output->type == kTfLiteInt8 || output->type == kTfLiteInt16) {
-    TFLITE_CHECK_NE(output->quantization.type, kTfLiteNoQuantization);
+    TF_LITE_ENSURE(context, output->quantization.type != kTfLiteNoQuantization);
 
     // 8bit -> 8bit general quantized path, with general rescalings
     data->input1_offset = -input1->params.zero_point;

@@ -6,9 +6,7 @@ if(CONFIG_HELIA_RT)
 
   zephyr_include_directories(
     ${HELIA_RT_DIR}/.
-    ${HELIA_RT_DIR}/third_party/gemmlowp
     ${HELIA_RT_DIR}/third_party/flatbuffers/include
-    ${HELIA_RT_DIR}/third_party/ruy
     ${HELIA_RT_DIR}/third_party/kissfft
     ${HELIA_RT_DIR}/third_party/ns_cmsis_nn/Include
   )

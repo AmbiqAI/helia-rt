@@ -1,5 +1,5 @@
 # Upstream tensorflow/tflite-micro commit this tree is synced to.
 # Update with each upstream sync; see helia/patches/inline_drift.md.
 repository: https://github.com/tensorflow/tflite-micro
-commit: 3f787dcff5c4693f3436a65aff1b268538a07bdb
-date: 2026-10-02
+commit: bd621c21ec47a490e2077be0951a9194c7cd31d6
+date: 2026-10-22

@@ -17,7 +17,6 @@ limitations under the License.
 
 #include <algorithm>
 
-#include "ruy/profiler/instrumentation.h"  // from @ruy
 #include "tensorflow/lite/micro/kernels/internal/common.h"
 #include "tensorflow/lite/micro/kernels/internal/types.h"
 
@@ -47,7 +46,6 @@ inline std::int16_t SaturatingDoublingHighMul(std::int16_t a, std::int16_t b) {
 template <typename T>
 inline void HardSwish(const RuntimeShape& input_shape, const T* input_data,
                       const RuntimeShape& output_shape, T* output_data) {
-  ruy::profiler::ScopeLabel label("ReferenceHardSwish/Float");
   auto matching_size = MatchingFlatSize(input_shape, output_shape);
   const T* in_end = input_data + matching_size;
   for (; input_data < in_end; input_data++, output_data++) {
@@ -62,8 +60,6 @@ template <typename T>
 inline void HardSwish(const HardSwishParams& params,
                       const RuntimeShape& input_shape, const T* input_data,
                       const RuntimeShape& output_shape, T* output_data) {
-  ruy::profiler::ScopeLabel label("ReferenceHardSwish/Quantized");
-
   const int flat_size = MatchingFlatSize(input_shape, output_shape);
 
   for (int i = 0; i < flat_size; i++) {
@@ -78,7 +74,7 @@ inline void HardSwish(const HardSwishParams& params,
     // case, and that in the general case we'll multiply against the "relu-ish"
     // fixed-point multiplier in [0, 1].
     const int16_t input_value_on_preshift_output_scale =
-        gemmlowp::SaturatingRoundingDoublingHighMul(
+        SaturatingRoundingDoublingHighMul(
             input_value_on_hires_input_scale,
             params.output_multiplier_fixedpoint_int16);
     // Now compute the "relu-ish multiplier". In the (-3 <= x <= +3) case, that
@@ -115,7 +111,7 @@ inline void HardSwish(const HardSwishParams& params,
     }
     // Apply the fixed-point multiplier, dividing the value by a divisor
     // ranging in [1, 2].
-    reluish_value = gemmlowp::SaturatingRoundingDoublingHighMul(
+    reluish_value = SaturatingRoundingDoublingHighMul(
         reluish_value, params.reluish_multiplier_fixedpoint_int16);
     // Apply the last bit of left-shift. Thus, in the left-shifting case, if
     // any saturation affects the result, it is happening here --- any
@@ -126,8 +122,8 @@ inline void HardSwish(const HardSwishParams& params,
     }
     // Shift right, in the right-shifting case.
     if (params.reluish_multiplier_exponent < 0) {
-      reluish_value = gemmlowp::RoundingDivideByPOT(
-          reluish_value, -params.reluish_multiplier_exponent);
+      reluish_value = RoundingDivideByPOT(reluish_value,
+                                          -params.reluish_multiplier_exponent);
     }
     // At this point we have rescaled the value into a 16bit fixedpoint
     // reluish_value in [-1, 1].
@@ -152,7 +148,7 @@ inline void HardSwish(const HardSwishParams& params,
         reluish_value, input_value_on_preshift_output_scale);
     // We were so far operating on the pre-shift output scale. Now we finally
     // apply that output shift, arriving at the final output scale.
-    int16_t output_value = gemmlowp::RoundingDivideByPOT(
+    int16_t output_value = RoundingDivideByPOT(
         preshift_output_value, -params.output_multiplier_exponent);
     output_value += params.output_zero_point;
     output_value =

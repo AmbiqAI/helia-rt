@@ -17,10 +17,10 @@ limitations under the License.
 
 #include <cstdint>
 
-#include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/micro/kernels/internal/types.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/micro_common.h"
 #include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 
@@ -137,7 +137,6 @@ TfLiteStatus CheckOutputShape(TfLiteContext* context, TfLiteNode* node,
 
 void* SpaceToBatchNDInit(TfLiteContext* context, const char* buffer,
                          size_t length) {
-  TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
   return context->AllocatePersistentBuffer(context, sizeof(SpaceToBatchParams));
 }
 

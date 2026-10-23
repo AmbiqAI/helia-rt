@@ -15,9 +15,9 @@ limitations under the License.
 
 #include "tensorflow/lite/micro/kernels/reduce.h"
 
-#include "tensorflow/lite/micro/c/builtin_op_data.h"
-#include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/builtin_op_data.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
+#include "tensorflow/lite/micro/micro_common.h"
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
@@ -75,7 +75,7 @@ TfLiteStatus ValidateReduceGoldens(TfLiteTensor* tensors, int tensors_size,
                                    T* output_data, int output_length,
                                    const TFLMRegistration& registration,
                                    TfLiteReducerParams* params,
-                                   float tolerance = 1e-5) {
+                                   [[maybe_unused]] float tolerance = 1e-5) {
   int inputs_array_data[] = {2, 0, 1};
   TfLiteIntArray* inputs_array = IntArrayFromInts(inputs_array_data);
   int outputs_array_data[] = {1, 2};
@@ -87,7 +87,7 @@ TfLiteStatus ValidateReduceGoldens(TfLiteTensor* tensors, int tensors_size,
   EXPECT_EQ(kTfLiteOk, runner.InitAndPrepare());
   EXPECT_EQ(kTfLiteOk, runner.Invoke());
 
-  if (std::is_same<T, bool>::value) {
+  if constexpr (std::is_same_v<T, bool>) {
     for (int i = 0; i < output_length; ++i) {
       EXPECT_EQ(expected_output_data[i], output_data[i]);
     }

@@ -20,6 +20,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/memory_planner/micro_memory_planner.h"
 
 namespace tflite {
+namespace micro {
 
 constexpr int kOnlinePlannedBuffer = -1;
 
@@ -170,6 +171,11 @@ class GreedyMemoryPlanner : public MicroMemoryPlanner {
 
   TF_LITE_REMOVE_VIRTUAL_DELETE
 };
+
+}  // namespace micro
+
+using micro::GreedyMemoryPlanner;
+using micro::kOnlinePlannedBuffer;
 
 }  // namespace tflite
 

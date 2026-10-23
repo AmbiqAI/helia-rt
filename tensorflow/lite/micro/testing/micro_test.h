@@ -55,7 +55,7 @@ limitations under the License.
 #include <limits>
 #include <type_traits>
 
-#include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/micro_common.h"
 #include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/system_setup.h"
 
@@ -74,6 +74,7 @@ extern bool did_test_fail;
 }  // namespace micro_test
 
 namespace tflite {
+namespace micro {
 
 // This additional helper function is used (instead of directly calling
 // tflite::InitializeTarget from the TF_LITE_MICRO_TESTS_BEGIN macro) to avoid
@@ -84,6 +85,10 @@ namespace tflite {
 // dependencies that can be contained within the micro/testing:micro_test
 // target bleeding on to all the tests.
 inline void InitializeTest() { InitializeTarget(); }
+}  // namespace micro
+
+using micro::InitializeTest;
+
 }  // namespace tflite
 
 #define TF_LITE_MICRO_TESTS_BEGIN   \

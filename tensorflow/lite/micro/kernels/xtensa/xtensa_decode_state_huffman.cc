@@ -13,11 +13,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#if defined(HIFI5)
+
 #include "tensorflow/lite/micro/kernels/xtensa/xtensa_decode_state_huffman.h"
 
 #include <cstddef>
 
-#include "tensorflow/lite/micro/kernels/internal/compatibility.h"
+#include "tensorflow/lite/micro/compatibility.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/xtensa/xtensa.h"
 #include "tensorflow/lite/micro/micro_log.h"
@@ -52,7 +54,6 @@ TfLiteStatus XtensaDecodeStateHuffman::Decode(const TfLiteEvalTensor& input,
 
 void XtensaDecodeStateHuffman::Decompress16BitTable_Xtensa(int8_t* buffer) {
   ScopedMicroProfiler scoped_profiler(__func__, micro_profiler_);
-  (void)scoped_profiler;
 
   size_t remaining = count_codewords_;
   const uint16_t* huffman_tables =
@@ -84,7 +85,6 @@ void XtensaDecodeStateHuffman::Decompress16BitTable_Xtensa(int8_t* buffer) {
 template <typename T>
 void XtensaDecodeStateHuffman::Decompress32BitTable_Xtensa(T* buffer) {
   ScopedMicroProfiler scoped_profiler(__func__, micro_profiler_);
-  (void)scoped_profiler;
 
   size_t remaining = count_codewords_;
   const uint32_t* huffman_tables =
@@ -120,3 +120,5 @@ template void XtensaDecodeStateHuffman::Decompress32BitTable_Xtensa<int16_t>(
 
 }  // namespace micro
 }  // namespace tflite
+
+#endif  // defined(HIFI5)

@@ -1,22 +1,27 @@
 load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
-load("@pybind11_bazel//:build_defs.bzl", "pybind_extension")
-load("@rules_python//python:packaging.bzl", "py_package", "py_wheel")
 load("@tflm_pip_deps//:requirements.bzl", "requirement")
 load("//python:py_namespace.bzl", "py_namespace")
-load("//python:py_rules.bzl", "tflm_py_library", "tflm_py_test", "tflm_whl_test")
 load(
-    "//tensorflow:extra_rules.bzl",
-    "tflm_python_op_resolver_friends",
+    "//python:py_rules.bzl",
+    "py_package",
+    "py_wheel",
+    "pybind_extension",
+    "tflm_py_library",
+    "tflm_py_test",
+    "tflm_whl_test",
 )
 load(
     "//tensorflow/lite/micro:build_def.bzl",
     "INCOMPATIBLE_WITH_WINDOWS",
     "tflm_cc_library",
 )
+load(
+    "//tensorflow/lite/micro:extra_rules.bzl",
+    "tflm_python_op_resolver_friends",
+)
 load("//tools:expand_stamp_vars.bzl", "expand_stamp_vars")
 
 package(
-    features = ["-layering_check"],
     licenses = ["notice"],
 )
 
@@ -36,7 +41,6 @@ tflm_cc_library(
     visibility = [
         ":op_resolver_friends",
         "//tensorflow/lite/micro/integration_tests:__subpackages__",
-        "//tensorflow/lite/micro/python/interpreter/src:__subpackages__",
     ],
     deps = [
         "//tensorflow/lite/micro:micro_compatibility",
@@ -63,9 +67,14 @@ pybind_extension(
     target_compatible_with = INCOMPATIBLE_WITH_WINDOWS,
     deps = [
         ":python_ops_resolver",
+        "//tensorflow/lite/micro:micro_allocator",
+        "//tensorflow/lite/micro:micro_common",
+        "//tensorflow/lite/micro:micro_context",
         "//tensorflow/lite/micro:micro_framework",
+        "//tensorflow/lite/micro:micro_utils",
         "//tensorflow/lite/micro:op_resolvers",
         "//tensorflow/lite/micro:recording_allocators",
+        "//tensorflow/lite/micro/schema:schema_fbs",
         "@tflm_pip_deps//numpy:cc_headers",
     ],
 )
@@ -82,8 +91,7 @@ tflm_py_library(
     visibility = ["//visibility:public"],
     deps = [
         requirement("numpy"),
-        "//tensorflow/lite/micro/tools:generate_test_for_model",
-        "//tensorflow/lite/python:schema_py",
+        "//tensorflow/lite/micro/python:schema_py",
     ],
 )
 
@@ -161,9 +169,8 @@ py_package(
     packages = [
         "python.tflite_micro",
         "tensorflow.lite.micro.compression",
+        "tensorflow.lite.micro.python",
         "tensorflow.lite.micro.tools",
-        "tensorflow.lite.micro.tools.generate_test_for_model",
-        "tensorflow.lite.python",
     ],
     deps = [
         ":postinstall_check",

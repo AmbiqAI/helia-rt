@@ -64,8 +64,12 @@ set(HELIA_RT_CORE_OPT        "-Os" CACHE STRING "Optimization flag for runtime c
 set(HELIA_RT_KERNEL_OPT      "-O2" CACHE STRING "Optimization flag for kernel sources")
 set(HELIA_RT_THIRD_PARTY_OPT "-O2" CACHE STRING "Optimization flag for third_party_static sources")
 
-set(HELIA_RT_CXX_STANDARD "17" CACHE STRING "C++ standard (14|17)")
-set_property(CACHE HELIA_RT_CXX_STANDARD PROPERTY STRINGS 14 17)
+set(HELIA_RT_CXX_STANDARD "17" CACHE STRING "C++ standard (17 or later)")
+set_property(CACHE HELIA_RT_CXX_STANDARD PROPERTY STRINGS 17)
+if(HELIA_RT_CXX_STANDARD LESS 17)
+    message(FATAL_ERROR
+        "heliaRT requires C++17; HELIA_RT_CXX_STANDARD is ${HELIA_RT_CXX_STANDARD}")
+endif()
 
 set(HELIA_RT_EXTRA_DEFINES "" CACHE STRING
     "Free-form list of extra compile definitions to apply to all heliaRT targets")

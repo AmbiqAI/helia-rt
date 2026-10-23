@@ -132,7 +132,7 @@ TEST(HeliaFp16LongReductionTest, FullyConnected) {
   int outputs[] = {1, 3};
   TfLiteFullyConnectedParams params = {
       kTfLiteActNone, kTfLiteFullyConnectedWeightsFormatDefault, false, false,
-      kTfLiteNoType};
+      kTfLiteNoType, nullptr, 0};
   RunAndExpect(tflite::Register_FULLY_CONNECTED(), tensors, 4, inputs, outputs,
                &params, output, k17152);
 }

@@ -38,7 +38,7 @@ add_library(helia_rt_prebuilt STATIC IMPORTED)
 set_target_properties(helia_rt_prebuilt PROPERTIES
   IMPORTED_LOCATION "${HELIA_RT_ARCHIVE}"
   INTERFACE_INCLUDE_DIRECTORIES
-    "${HELIA_RT_BUNDLE};${HELIA_RT_BUNDLE}/third_party/flatbuffers/include;${HELIA_RT_BUNDLE}/third_party/gemmlowp;${HELIA_RT_BUNDLE}/third_party/ruy;${HELIA_RT_BUNDLE}/third_party/kissfft;${HELIA_RT_BUNDLE}/third_party/ns_cmsis_nn/Include"
+    "${HELIA_RT_BUNDLE};${HELIA_RT_BUNDLE}/third_party/flatbuffers/include;${HELIA_RT_BUNDLE}/third_party/kissfft;${HELIA_RT_BUNDLE}/third_party/ns_cmsis_nn/Include"
 )
 target_link_libraries(my_firmware PRIVATE helia_rt_prebuilt)
 ```

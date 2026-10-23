@@ -16,10 +16,10 @@ limitations under the License.
 #include <cstddef>
 #include <cstdint>
 
-#include "tensorflow/lite/micro/c/builtin_op_data.h"
-#include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/builtin_op_data.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
 #include "tensorflow/lite/micro/micro_arena_constants.h"
+#include "tensorflow/lite/micro/micro_common.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
@@ -55,12 +55,13 @@ const float simple_weights_data[] = {
 int simple_bias_dims[] = {1, 3};
 const float simple_bias_data[] = {1, 2, 3};
 
-#if (defined(USE_TFLM_COMPRESSION) || (!defined(XTENSA) && !defined(HEXAGON)))
+#if (defined(USE_TFLM_COMPRESSION) || \
+     (!defined(VISION_P6) && !defined(HEXAGON)))
 
 constexpr size_t simple_bias_size =
     std::extent<decltype(simple_bias_data)>::value;
 
-#endif  // (defined(USE_TFLM_COMPRESSION) || (!defined(XTENSA) &&
+#endif  // (defined(USE_TFLM_COMPRESSION) || (!defined(VISION_P6) &&
         // !defined(HEXAGON)))
 
 #ifdef USE_TFLM_COMPRESSION
@@ -293,8 +294,13 @@ void ValidateFullyConnectedGoldens(
 #endif  // USE_TFLM_COMPRESSION
 ) {
   TfLiteFullyConnectedParams builtin_data = {
-      activation, kTfLiteFullyConnectedWeightsFormatDefault, false, false,
-      kTfLiteNoType};
+      activation,
+      kTfLiteFullyConnectedWeightsFormatDefault,
+      false,
+      false,
+      kTfLiteNoType,
+      nullptr,
+      0};
 
   // Avoid variable length array warning.
   constexpr int inputs_array_len = 4;
@@ -698,7 +704,7 @@ TEST(FullyConnectedTest, SimpleTestQuantizedInt8Compressed) {
 
 #if !defined(HEXAGON)
 
-#if !defined(XTENSA)
+#if !defined(VISION_P6)
 
 TEST(FullyConnectedTest, SimpleTestQuantizedPerChannelInt8) {
   const float input_scale = 0.5f;
@@ -727,7 +733,7 @@ TEST(FullyConnectedTest, SimpleTestQuantizedPerChannelInt8) {
       tflite::testing::simple_output_dims, output_scale, output_zero_point,
       kTfLiteActNone, output_data);
 }
-#endif  // #if !defined(XTENSA)
+#endif  // !defined(VISION_P6)
 
 TEST(FullyConnectedTest, SimpleTestQuantizedInt16) {
   const float input_scale = 128.0 / 65536;
@@ -1039,7 +1045,7 @@ TEST(FullyConnectedTest, SimpleFloat16MultiBatchGolden) {
   int outputs_array_data[] = {1, 3};
   TfLiteFullyConnectedParams params = {
       kTfLiteActNone, kTfLiteFullyConnectedWeightsFormatDefault, false, false,
-      kTfLiteNoType};
+      kTfLiteNoType, nullptr, 0};
 
   const TFLMRegistration registration = Register_FULLY_CONNECTED();
   micro::KernelRunner runner(registration, tensors, 4,
