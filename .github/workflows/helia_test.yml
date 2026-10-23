@@ -392,30 +392,31 @@ jobs:
         # see AmbiqAI/helia-rt#497
         # Per-channel DEQUANTIZE adds one binary and eleven cases on every leg.
         # see AmbiqAI/helia-rt#498
+        # Memory-plan overflow adds one case on every leg. see AmbiqAI/helia-rt#495
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
             min-binaries: 192
-            min-cases: 1772
+            min-cases: 1773
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
             min-binaries: 192
-            min-cases: 1772
+            min-cases: 1773
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
             min-binaries: 191
-            min-cases: 1770
+            min-cases: 1771
           - arch: "cortex-m55"
             toolchain: "gcc"
             min-binaries: 192
-            min-cases: 1837
+            min-cases: 1838
           - arch: "cortex-m55"
             toolchain: "atfe"
             min-binaries: 191
-            min-cases: 1835
+            min-cases: 1836
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
@@ -587,7 +588,7 @@ jobs:
           esac
           echo "ns-cmsis-nn ref accepted: ${NS_CMSIS_NN_REF}"
 
-      - name: Reduce and float route tests without ARM_NN_ENABLE_F32
+      - name: Planner, reduce and float route tests without ARM_NN_ENABLE_F32
         env:
           NS_CMSIS_NN_REF: ${{ inputs.ns-cmsis-nn-ref }}
         shell: bash
@@ -606,6 +607,7 @@ jobs:
             OPTIMIZED_KERNEL_DIR=helia HELIA_ENABLE_F32=0 \
             "CXX_TOOL=g++ ${ubsan}" "CC_TOOL=gcc ${ubsan}" \
             BASE_GENDIR=gen-f32-off -j"$(nproc)" \
+            test_greedy_memory_planner_test \
             test_kernel_reduce_test \
             test_kernel_reduce_output_size_test \
             test_kernel_reduce_prepare_test \

@@ -646,6 +646,10 @@ leave reference, direct CMake, Bazel and source consumers unfixed.
   sizes use checked arithmetic with a cap the planner's `int` can hold, a
   `-1` that a kernel resolves in Prepare keeps upstream's behaviour, and the
   planners refuse a plan whose real offsets pass `INT_MAX`.
+- **Memory-plan chart scaling (AmbiqAI/helia-rt#495).**
+  `memory_planner/greedy_memory_planner.cc` scales chart columns in 64-bit
+  arithmetic and clamps them to the line width; its large-plan regression
+  runs under host UBSan.
 - **Elementwise (AmbiqAI/helia-rt#462).** `kernels/elementwise.cc` and
   `kernels/elementwise_test.cc`: every Prepare rejection releases its
   temporaries, int16 RSQRT must be quantized, missing zero points are
