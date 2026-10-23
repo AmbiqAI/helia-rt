@@ -15,6 +15,7 @@ limitations under the License.
 
 #include "tensorflow/lite/micro/memory_planner/greedy_memory_planner.h"
 
+#include <algorithm>
 #include <climits>
 #include <cstdint>
 
@@ -409,8 +410,13 @@ void GreedyMemoryPlanner::PrintMemoryPlan() {
       }
       const int size = requirements->size;
       memory_use += size;
-      const int line_start = (offset * kLineWidth) / max_size;
-      const int line_end = ((offset + size) * kLineWidth) / max_size;
+      // TODO(AmbiqAI/helia-rt#460): upstream scales chart columns in int; drop when upstream has it.
+      int line_start = static_cast<int>(
+          (static_cast<int64_t>(offset) * kLineWidth) / max_size);
+      int line_end = static_cast<int>(
+          (static_cast<int64_t>(offset + size) * kLineWidth) / max_size);
+      line_start = std::max(0, std::min(line_start, kLineWidth));
+      line_end = std::max(0, std::min(line_end, kLineWidth));
       for (int n = line_start; n < line_end; ++n) {
         if (line[n] == '.') {
           if (requirements->first_time_used == requirements->last_time_used) {

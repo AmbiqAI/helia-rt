@@ -203,4 +203,15 @@ TEST(GreedyMemoryPlannerTest, TestSmallScratch) {
   EXPECT_EQ(kTfLiteError, planner.AddBuffer(50, 2, 3));
 }
 
+TEST(GreedyMemoryPlannerTest, TestPrintMemoryPlanOverflow) {
+  constexpr int scratch_buffer_size = 4096;
+  unsigned char scratch_buffer[scratch_buffer_size];
+  tflite::GreedyMemoryPlanner planner;
+  planner.Init(scratch_buffer, scratch_buffer_size);
+  constexpr int kLargeBufferSize = 30000000;
+  EXPECT_EQ(kTfLiteOk, planner.AddBuffer(kLargeBufferSize, 0, 1));
+  EXPECT_EQ(kTfLiteOk, planner.AddBuffer(1024, 1, 2));
+  planner.PrintMemoryPlan();
+}
+
 TF_LITE_MICRO_TESTS_MAIN
