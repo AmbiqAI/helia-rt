@@ -54,8 +54,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip3 install Pillow
-          pip3 install numpy
+          bash ci/bootstrap_python_trust.sh --refresh-system
+          python3 -m pip install Pillow numpy
       - name: Test
         run: |
           tensorflow/lite/micro/tools/ci_build/test_cortex_m_generic.sh
@@ -82,8 +82,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip3 install Pillow
-          pip3 install numpy
+          bash ci/bootstrap_python_trust.sh --refresh-system
+          python3 -m pip install Pillow numpy
       - name: Test
         run: |
           tensorflow/lite/micro/tools/ci_build/test_cortex_m_corstone_300.sh

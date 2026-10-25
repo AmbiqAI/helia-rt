@@ -23,6 +23,9 @@
 # is too old: clang/clang++ load but every compile aborts with
 #   `version 'GLIBC_2.34' not found` / `version 'GLIBCXX_3.4.30' not found`.
 FROM python:3.10-bookworm AS qemu_builder
+COPY ci/bootstrap_python_trust.sh ci/check_python_trust.py ci/python_trust_constraints.txt /opt/helia-python-trust/
+RUN bash /opt/helia-python-trust/bootstrap_python_trust.sh --refresh-system
+ENV PIP_CONSTRAINT=/opt/helia-python-trust/python_trust_constraints.txt
 RUN apt-get update
 
 RUN apt-get install -y ninja-build wget xz-utils
@@ -36,6 +39,9 @@ RUN ./install_qemu.sh /tmp/qemu_install
 # This stage is the final CI container.
 # See note above on why bookworm (not bullseye) is required for ATfE 22.1.0.
 FROM python:3.10-bookworm as tflm-ci
+COPY ci/bootstrap_python_trust.sh ci/check_python_trust.py ci/python_trust_constraints.txt /opt/helia-python-trust/
+RUN bash /opt/helia-python-trust/bootstrap_python_trust.sh --refresh-system
+ENV PIP_CONSTRAINT=/opt/helia-python-trust/python_trust_constraints.txt
 
 RUN apt-get update
 
@@ -106,8 +112,9 @@ RUN set -eux; \
 ENV PATH=/opt/atfe/bin:${PATH}
 ENV ATFE_PREINSTALL=/opt/atfe
 
-# Install uv (Python package manager) directly (no nanolayer dependency).
-RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/local/bin" sh
+# Install uv with the bootstrapped pip.
+RUN python3 -m pip install --no-cache-dir "uv>=0.13.4"
+RUN python3 /opt/helia-python-trust/check_python_trust.py
 
 # Add a non-root user 'ambiqai' with passwordless sudo access
 RUN useradd -m -s /bin/bash -G sudo ambiqai && \

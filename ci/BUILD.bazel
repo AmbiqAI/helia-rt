@@ -1,0 +1,1 @@
+exports_files(["rules_python_pip.patch"])

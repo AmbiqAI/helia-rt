@@ -9,7 +9,13 @@ bazel_dep(name = "flatbuffers", version = "25.9.23")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "pybind11_bazel", version = "3.0.0")
 bazel_dep(name = "rules_cc", version = "0.2.17")
-bazel_dep(name = "rules_python", version = "1.8.3")
+bazel_dep(name = "rules_python", version = "2.4.5")
+# TODO(AmbiqAI/helia-rt#460): upstream lacks the Python trust bootstrap; drop when upstream has it.
+single_version_override(
+    module_name = "rules_python",
+    patches = ["//ci:rules_python_pip.patch"],
+    patch_strip = 1,
+)
 bazel_dep(name = "rules_shell", version = "0.6.1")
 
 # TFLM Dependencies
@@ -103,10 +109,5 @@ use_repo(
 use_repo(
     pip,
     "tflm_pip_deps",
-    "tflm_pip_deps_310_numpy",
-    "tflm_pip_deps_311_numpy",
-    "tflm_pip_deps_312_numpy",
-    "tflm_pip_deps_313_numpy",
-    "tflm_pip_deps_314_numpy",
     "tflm_pip_deps_whl_mods",
 )

@@ -51,8 +51,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip3 install Pillow
-          pip3 install numpy
+          bash ci/bootstrap_python_trust.sh --refresh-system
+          python3 -m pip install Pillow numpy
 
       - name: Install Arm tools
         uses: ARM-software/cmsis-actions/vcpkg@v1
@@ -90,8 +90,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip3 install Pillow
-          pip3 install numpy
+          bash ci/bootstrap_python_trust.sh --refresh-system
+          python3 -m pip install Pillow numpy
 
       - name: Install Arm tools
         uses: ARM-software/cmsis-actions/vcpkg@v1

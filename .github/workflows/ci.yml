@@ -48,8 +48,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo ci/install_bazelisk.sh
-          pip3 install Pillow
-          pip3 install numpy
+          bash ci/bootstrap_python_trust.sh --refresh-system
+          python3 -m pip install Pillow numpy
       - name: Test
         run: |
           tensorflow/lite/micro/tools/ci_build/test_bazel.sh
@@ -68,8 +68,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo ci/install_bazelisk.sh
-          pip3 install Pillow
-          pip3 install numpy
+          bash ci/bootstrap_python_trust.sh --refresh-system
+          python3 -m pip install Pillow numpy
       - name: Fix kernel mmap rnd bits
         # Asan in llvm 14 provided in ubuntu 22.04 is incompatible with
         # high-entropy ASLR in much newer kernels that GitHub runners are
@@ -93,8 +93,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo ci/install_bazelisk.sh
-          pip3 install Pillow
-          pip3 install numpy
+          bash ci/bootstrap_python_trust.sh --refresh-system
+          python3 -m pip install Pillow numpy
       - name: Fix kernel mmap rnd bits
         # Asan in llvm 14 provided in ubuntu 22.04 is incompatible with
         # high-entropy ASLR in much newer kernels that GitHub runners are

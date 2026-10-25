@@ -69,8 +69,10 @@ RUN apt-get update && apt-get install -y \
 # - Pillow was added first for the C array generation
 # - pandas, and matplotlib for create_size_log scripts
 # - pyyaml, requests, psutil, and robotframework for Renode test
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir \
+COPY ci/bootstrap_python_trust.sh ci/check_python_trust.py ci/python_trust_constraints.txt /opt/helia-python-trust/
+RUN bash /opt/helia-python-trust/bootstrap_python_trust.sh --refresh-system
+ENV PIP_CONSTRAINT=/opt/helia-python-trust/python_trust_constraints.txt
+RUN python3 -m pip install --no-cache-dir \
     matplotlib \
     numpy \
     pandas \
@@ -92,3 +94,5 @@ RUN /install/install_bazelisk.sh && \
 
 # Configure git safe directories
 RUN git config --system --add safe.directory '*'
+
+RUN python3 /opt/helia-python-trust/check_python_trust.py

@@ -1,0 +1,51 @@
+--- a/python/private/python_repository.bzl
++++ b/python/private/python_repository.bzl
+@@ -144,6 +144,39 @@
+             else:
+                 rctx.delete(pycache_dir)
+                 rctx.symlink(null_device, pycache_dir)
++
++def _upgrade_bundled_pip(rctx, python_short_version, platform):
++    if int(python_short_version.split(".")[1].rstrip("t")) < 10:
++        return
++    stdlib = "Lib" if "windows" in platform else "lib/python" + python_short_version
++    site_packages = rctx.path(stdlib + "/site-packages")
++    for entry in site_packages.readdir():
++        if entry.basename == "pip" or (entry.basename.startswith("pip-") and entry.basename.endswith(".dist-info")):
++            rctx.delete(entry)
++    wheel_url = "https://files.pythonhosted.org/packages/3f/06/3e4420302363fbb71be3c7f35ce042f54bfca330e3e66b3a2e3c4cca579f/pip-26.2.2-py3-none-any.whl"
++    wheel_sha = "fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70"
++    rctx.download_and_extract(
++        url = wheel_url,
++        sha256 = wheel_sha,
++        type = "zip",
++        output = str(site_packages),
++    )
++    bundled = rctx.path(stdlib + "/ensurepip/_bundled")
++    if bundled.exists:
++        for entry in bundled.readdir():
++            if entry.basename.startswith("pip-") and entry.basename.endswith(".whl"):
++                rctx.delete(entry)
++        rctx.download(
++            url = wheel_url,
++            sha256 = wheel_sha,
++            output = str(bundled.get_child("pip-26.2.2-py3-none-any.whl")),
++        )
++        init_path = stdlib + "/ensurepip/__init__.py"
++        lines = rctx.read(init_path).splitlines()
++        rctx.file(init_path, "\n".join([
++            '_PIP_VERSION = "26.2.2"' if line.startswith("_PIP_VERSION =") else line
++            for line in lines
++        ]) + "\n")
+ 
+ def _python_repository_impl(rctx):
+     if rctx.attr.distutils and rctx.attr.distutils_content:
+@@ -196,6 +229,8 @@
+     if patches:
+         for patch in patches:
+             rctx.patch(patch, strip = rctx.attr.patch_strip)
++
++    _upgrade_bundled_pip(rctx, python_short_version, platform)
+ 
+     # Write distutils.cfg to the Python installation.
+     if "windows" in platform:
