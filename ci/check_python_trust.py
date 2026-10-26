@@ -27,13 +27,10 @@ REVOKED_ROOT = (
 
 
 def check_bundle(path):
-  for pem in re.findall(
-    r"-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----",
-    path.read_text(),
-    re.DOTALL,
-  ):
-    fingerprint = hashlib.sha256(ssl.PEM_cert_to_DER_cert(pem)).hexdigest()
-    if fingerprint == REVOKED_ROOT:
+  context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+  context.load_verify_locations(cafile=str(path))
+  for certificate in context.get_ca_certs(binary_form=True):
+    if hashlib.sha256(certificate).hexdigest() == REVOKED_ROOT:
       raise ValueError(f"Revoked emSign ECC Root CA - G3 in {path}")
 
 

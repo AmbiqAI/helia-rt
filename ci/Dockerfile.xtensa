@@ -30,6 +30,8 @@
 # ==============================================================================
 
 FROM python:3.11-bookworm AS installer
+COPY ci/bootstrap_python_trust.sh ci/check_python_trust.py ci/python_trust_constraints.txt /opt/helia-python-trust/
+RUN bash /opt/helia-python-trust/bootstrap_python_trust.sh --refresh-system
 WORKDIR /opt/xtensa
 
 COPY ./XtensaTools_RI_2022_9_linux.tgz .

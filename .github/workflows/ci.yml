@@ -47,8 +47,8 @@ jobs:
           ref: ${{ inputs.trigger-sha }}
       - name: Install dependencies
         run: |
-          sudo ci/install_bazelisk.sh
           bash ci/bootstrap_python_trust.sh --refresh-system
+          sudo ci/install_bazelisk.sh
           python3 -m pip install Pillow numpy
       - name: Test
         run: |
@@ -67,8 +67,8 @@ jobs:
           ref: ${{ inputs.trigger-sha }}
       - name: Install dependencies
         run: |
-          sudo ci/install_bazelisk.sh
           bash ci/bootstrap_python_trust.sh --refresh-system
+          sudo ci/install_bazelisk.sh
           python3 -m pip install Pillow numpy
       - name: Fix kernel mmap rnd bits
         # Asan in llvm 14 provided in ubuntu 22.04 is incompatible with
@@ -92,8 +92,8 @@ jobs:
           ref: ${{ inputs.trigger-sha }}
       - name: Install dependencies
         run: |
-          sudo ci/install_bazelisk.sh
           bash ci/bootstrap_python_trust.sh --refresh-system
+          sudo ci/install_bazelisk.sh
           python3 -m pip install Pillow numpy
       - name: Fix kernel mmap rnd bits
         # Asan in llvm 14 provided in ubuntu 22.04 is incompatible with

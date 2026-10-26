@@ -3,6 +3,7 @@
 from pathlib import Path
 import os
 import tempfile
+import ssl
 import unittest
 from unittest.mock import patch
 
@@ -14,6 +15,14 @@ class PythonTrustTest(unittest.TestCase):
   def test_rejects_revoked_root_even_with_current_packages(self):
     with self.assertRaisesRegex(ValueError, "Revoked emSign"):
       trust.check_bundle(Path(__file__).parent / "testdata/emsign_g3.pem")
+
+  def test_rejects_openssl_trusted_certificate_encoding(self):
+    bundle = Path(__file__).parent / "testdata/emsign_g3_trusted.pem"
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.load_verify_locations(cafile=str(bundle))
+    self.assertEqual(context.cert_store_stats()["x509_ca"], 1)
+    with self.assertRaisesRegex(ValueError, "Revoked emSign"):
+      trust.check_bundle(bundle)
 
   def test_scans_all_custom_certificate_directories(self):
     with tempfile.TemporaryDirectory() as directory:
