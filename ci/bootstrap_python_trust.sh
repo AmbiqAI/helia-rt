@@ -13,7 +13,9 @@ if [[ "${1:-}" == "--refresh-system" ]]; then
   "${elevate[@]}" apt-get update
   "${elevate[@]}" apt-get install -y --no-install-recommends ca-certificates
   # TODO(AmbiqAI/helia-rt#509): distrust G3 until distribution bundles remove it.
-  "${elevate[@]}" sed -i     '\|^mozilla/emSign_ECC_Root_CA_-_G3\.crt$|s|^|!|'     /etc/ca-certificates.conf
+  "${elevate[@]}" sed -i \
+    '\|^mozilla/emSign_ECC_Root_CA_-_G3\.crt$|s|^|!|' \
+    /etc/ca-certificates.conf
   "${elevate[@]}" update-ca-certificates --fresh
 fi
 
@@ -35,11 +37,14 @@ import pip
 from pip._vendor.packaging.version import Version
 raise SystemExit(Version(pip.__version__) < Version("26.2.2"))
 '; then
-  "${python_bin}" -I -m pip --isolated --disable-pip-version-check install     "${pip_flags[@]}" --no-index --no-deps --no-cache-dir --upgrade "pip @ ${pip_wheel}"
+  "${python_bin}" -I -m pip --isolated --disable-pip-version-check install \
+    "${pip_flags[@]}" --no-index --no-deps --no-cache-dir --upgrade "pip @ ${pip_wheel}"
 fi
-"${python_bin}" -I -m pip --isolated --disable-pip-version-check install   "${pip_flags[@]}" --no-cache-dir --upgrade -c "${script_dir}/python_trust_constraints.txt" certifi
+"${python_bin}" -I -m pip --isolated --disable-pip-version-check install \
+  "${pip_flags[@]}" --no-cache-dir --upgrade -c "${script_dir}/python_trust_constraints.txt" certifi
 if command -v uv >/dev/null 2>&1; then
-  "${python_bin}" -I -m pip --isolated --disable-pip-version-check install     "${pip_flags[@]}" --no-cache-dir --upgrade -c "${script_dir}/python_trust_constraints.txt" uv
+  "${python_bin}" -I -m pip --isolated --disable-pip-version-check install \
+    "${pip_flags[@]}" --no-cache-dir --upgrade -c "${script_dir}/python_trust_constraints.txt" uv
 fi
 "${python_bin}" -I "${script_dir}/check_python_trust.py"
 if [[ -n "${GITHUB_ENV:-}" ]]; then

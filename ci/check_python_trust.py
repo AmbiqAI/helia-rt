@@ -2,7 +2,7 @@
 """Check Python package and certificate stores without making network requests."""
 
 import hashlib
-import importlib.metadata
+import os
 import json
 from pathlib import Path
 import re
@@ -11,6 +11,7 @@ import ssl
 import subprocess
 import sys
 
+import pip
 from pip._vendor import certifi as pip_certifi
 from pip._vendor.packaging.version import Version
 
@@ -42,11 +43,28 @@ def check_version(name, actual, minimum):
   return actual
 
 
+def system_bundles():
+  paths = ssl.get_default_verify_paths()
+  bundles = set()
+  if paths.cafile:
+    bundles.add(Path(paths.cafile))
+  capath = os.environ.get(paths.openssl_capath_env, paths.openssl_capath) or ""
+  for directory in capath.split(os.pathsep):
+    if not directory or not Path(directory).is_dir():
+      continue
+    for candidate in Path(directory).iterdir():
+      if candidate.suffix == ".pem" or re.fullmatch(
+        r"[0-9a-f]{8}\.\d+", candidate.name
+      ):
+        bundles.add(candidate.resolve())
+  return bundles
+
+
 def main():
   report = {
     "python": sys.version.split()[0],
     "executable": sys.executable,
-    "pip": check_version("pip", importlib.metadata.version("pip"), "26.2.2"),
+    "pip": check_version("pip", pip.__version__, "26.2.2"),
     "certifi": check_version("certifi", certifi.__version__, "2026.10.19")
     if certifi
     else None,
@@ -63,15 +81,7 @@ def main():
   bundles = {Path(pip_certifi.where())}
   if certifi:
     bundles.add(Path(certifi.where()))
-  if paths.cafile:
-    bundles.add(Path(paths.cafile))
-  if paths.capath:
-    for directory in paths.capath.split(":"):
-      for candidate in Path(directory).iterdir():
-        if candidate.suffix == ".pem" or re.fullmatch(
-          r"[0-9a-f]{8}\.\d+", candidate.name
-        ):
-          bundles.add(candidate.resolve())
+  bundles.update(system_bundles())
   for bundle in bundles:
     check_bundle(bundle)
   report["certificate_bundles_checked"] = len(bundles)
