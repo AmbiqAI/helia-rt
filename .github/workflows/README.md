@@ -170,3 +170,44 @@ tag comment's date by hand.
 The dev container ([.devcontainer/](../../.devcontainer/)) builds its own
 image from `.devcontainer/Dockerfile` and is unaffected by this pinning
 scheme.
+
+## Python certificate trust
+
+Before Python package downloads, disposable Debian/Ubuntu environments run:
+
+```sh
+bash ci/bootstrap_python_trust.sh --refresh-system
+```
+
+This refreshes OS certificates, distrusts the revoked emSign ECC Root CA - G3,
+and bootstraps pip from the checksum-pinned wheel in the
+[Python maintainer notice](https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576/1).
+The package floors are pip 26.2.2, certifi 2026.10.19 and uv 0.13.4 where
+installed. `ci/check_python_trust.py` checks versions and rejects the revoked
+root in the default OpenSSL, certifi and pip certificate bundles.
+
+Existing virtual environments need their own bootstrap after the host's OS
+trust is refreshed. This updates only the selected environment's packages:
+
+```sh
+bash ci/bootstrap_python_trust.sh /path/to/venv/bin/python
+```
+
+New virtual environments created from an older Python installation need the
+same bootstrap before downloading packages. Bazel's declared Python
+runtimes have a separate checksum-pinned overlay for pip and ensurepip;
+upgrading the runner's pip does not update those runtimes.
+
+The image workflow pulls fresh bases, disables layer caching, and publishes
+a `python-trust-container` report for the built image. Build a candidate from
+a branch before changing any of the four digest pins:
+
+```sh
+gh workflow run helia_build_docker_image.yml --ref <branch> -f trigger-sha=<commit>
+```
+
+Inspect the report and build result, then update all four pins together.
+Existing devcontainers must also be rebuilt without cache. Optional
+`ci/Dockerfile.*` images require separate rebuilds by their publishers;
+updating their source recipes does not update a published image. Track
+verification and outstanding rebuilds in AmbiqAI/helia-rt#509.

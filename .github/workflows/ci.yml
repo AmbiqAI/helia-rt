@@ -32,7 +32,7 @@ jobs:
       image: ${{ steps.image.outputs.image }}
     steps:
       - id: image
-        run: echo "image=ghcr.io/ambiqai/helia-rt-ci@sha256:55372f29023cd1be1887af5761c8e6c18765b4e68ac28e02510d519e461692c9" >> "$GITHUB_OUTPUT"  # ghcr.io/ambiqai/helia-rt-ci:latest as of 2026-08-25
+        run: echo "image=ghcr.io/ambiqai/helia-rt-ci@sha256:9949e67b44a849a5735f028ba29f9ca5d2e2378d66804900e05548ce5bb0257c" >> "$GITHUB_OUTPUT"  # ghcr.io/ambiqai/helia-rt-ci:sha-6f99fd7 as of 2026-10-26
 
   bazel_tests:
     runs-on: ubuntu-latest-md
@@ -47,9 +47,9 @@ jobs:
           ref: ${{ inputs.trigger-sha }}
       - name: Install dependencies
         run: |
+          bash ci/bootstrap_python_trust.sh --refresh-system
           sudo ci/install_bazelisk.sh
-          pip3 install Pillow
-          pip3 install numpy
+          python3 -m pip install Pillow numpy
       - name: Test
         run: |
           tensorflow/lite/micro/tools/ci_build/test_bazel.sh
@@ -67,9 +67,9 @@ jobs:
           ref: ${{ inputs.trigger-sha }}
       - name: Install dependencies
         run: |
+          bash ci/bootstrap_python_trust.sh --refresh-system
           sudo ci/install_bazelisk.sh
-          pip3 install Pillow
-          pip3 install numpy
+          python3 -m pip install Pillow numpy
       - name: Fix kernel mmap rnd bits
         # Asan in llvm 14 provided in ubuntu 22.04 is incompatible with
         # high-entropy ASLR in much newer kernels that GitHub runners are
@@ -92,9 +92,9 @@ jobs:
           ref: ${{ inputs.trigger-sha }}
       - name: Install dependencies
         run: |
+          bash ci/bootstrap_python_trust.sh --refresh-system
           sudo ci/install_bazelisk.sh
-          pip3 install Pillow
-          pip3 install numpy
+          python3 -m pip install Pillow numpy
       - name: Fix kernel mmap rnd bits
         # Asan in llvm 14 provided in ubuntu 22.04 is incompatible with
         # high-entropy ASLR in much newer kernels that GitHub runners are

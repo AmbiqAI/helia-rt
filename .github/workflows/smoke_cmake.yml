@@ -1025,6 +1025,8 @@ jobs:
         uses: actions/checkout@v7
         with:
           path: helia-rt
+      - name: Refresh Python and system certificate trust
+        run: bash helia-rt/ci/bootstrap_python_trust.sh --refresh-system
       - name: Locate Zephyr SDK in CI image
         run: |
           set -euo pipefail

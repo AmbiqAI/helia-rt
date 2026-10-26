@@ -665,3 +665,15 @@ leave reference, direct CMake, Bazel and source consumers unfixed.
 Drop condition: for each site, upstream carries an equivalent fix. Re-check
 every site at the next upstream sync (AmbiqAI/helia-rt#446) and drop it or
 carry it forward.
+
+## Python tooling trust (AmbiqAI/helia-rt#509)
+
+`MODULE.bazel` uses rules_python 2.4.5 for its patched internal pip and uv.
+The local `ci/rules_python_pip.patch` overlays hash-verified pip 26.2.2 in
+Python 3.10+ toolchains and their ensurepip bundles. Obsolete direct NumPy
+repository imports are removed; the dependency hub still supplies NumPy.
+
+Drop condition: upstream's Bazel Python dependencies and downloaded runtimes
+supply equivalent patched tooling. Recheck at the upstream sync tracked by
+AmbiqAI/helia-rt#446 and reconcile the local patch tracker
+AmbiqAI/helia-rt#460.

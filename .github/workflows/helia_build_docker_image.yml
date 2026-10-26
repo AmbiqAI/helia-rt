@@ -61,12 +61,28 @@ jobs:
             type=ref,event=branch
             type=ref,event=tag
 
-      - name: Build & push (cached)
+      - name: Build & push
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: ${{ env.CONTEXT }}
           file: ${{ env.DOCKERFILE }}
           push: true
+          pull: true
+          no-cache: true
           platforms: linux/amd64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Verify published Python trust
+        env:
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          docker run --rm "${IMAGE_NAME}@${IMAGE_DIGEST}" \
+            python3 /opt/helia-python-trust/check_python_trust.py > python-trust.json
+          cat python-trust.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: python-trust-container
+          path: python-trust.json
+          if-no-files-found: error

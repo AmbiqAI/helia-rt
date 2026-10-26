@@ -35,8 +35,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir \
+COPY ci/bootstrap_python_trust.sh ci/check_python_trust.py ci/python_trust_constraints.txt /opt/helia-python-trust/
+RUN bash /opt/helia-python-trust/bootstrap_python_trust.sh --refresh-system
+ENV PIP_CONSTRAINT=/opt/helia-python-trust/python_trust_constraints.txt
+RUN python3 -m pip install --no-cache-dir \
     numpy \
     Pillow
 
@@ -56,3 +58,5 @@ RUN git config --system --add safe.directory '*'
 WORKDIR /workspace
 
 CMD ["hexagon-clang++"]
+
+RUN python3 /opt/helia-python-trust/check_python_trust.py

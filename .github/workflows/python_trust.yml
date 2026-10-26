@@ -1,0 +1,100 @@
+name: Python certificate trust
+
+on:
+  pull_request:
+    paths:
+      - 'ci/**'
+      - '.devcontainer/**'
+      - '.github/workflows/**'
+      - 'MODULE.bazel*'
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  trust:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Bootstrap Python and system certificate trust
+        run: bash ci/bootstrap_python_trust.sh --refresh-system
+      - name: Install representative dependencies
+        run: python3 -m pip install --no-cache-dir Pillow numpy requests
+      - name: Verify recovery from a stale pip certificate bundle
+        if: matrix.python == '3.11'
+        run: |
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          import re
+          import subprocess
+          import tempfile
+          bootstrap = str(Path('ci/bootstrap_python_trust.sh').resolve())
+          revoked = Path('ci/testdata/emsign_g3.pem').read_bytes()
+          with tempfile.TemporaryDirectory() as directory:
+              subprocess.run(['python3', '-m', 'venv', directory], check=True)
+              python = str(Path(directory) / 'bin/python')
+              subprocess.run(['bash', bootstrap, python], check=True)
+              vendor = Path(subprocess.check_output([
+                  python, '-I', '-c', 'from pip._vendor import certifi; print(certifi.__file__)',
+              ], text=True).strip())
+              assert vendor.is_relative_to(directory)
+              vendor.write_text(re.sub(r'__version__ = "[^"]+"', '__version__ = "2023.7.22"', vendor.read_text()))
+              bundle = vendor.with_name('cacert.pem')
+              bundle.write_bytes(bundle.read_bytes() + revoked)
+              subprocess.run(['bash', bootstrap, python], check=True)
+          PYTHON
+      - name: Check trust and generator dependencies
+        run: |
+          python3 ci/check_python_trust.py > python-trust.json
+          python3 -m unittest discover -s ci -p '*trust_test.py'
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          import subprocess
+          import tempfile
+          import numpy as np
+          from PIL import Image
+          with tempfile.TemporaryDirectory() as directory:
+              root = Path(directory)
+              Image.new('RGB', (2, 2)).save(root / 'input.bmp')
+              np.save(root / 'input.npy', np.array([1.0, 2.0], dtype=np.float32))
+              subprocess.run([
+                  'python3', str(Path('tensorflow/lite/micro/tools/generate_cc_arrays.py').resolve()),
+                  str(root / 'genfiles'), 'input.bmp', 'input.npy',
+              ], cwd=root, check=True)
+              assert len(list((root / 'genfiles').rglob('*.cc'))) == 2
+          PYTHON
+      - uses: actions/upload-artifact@v7
+        with:
+          name: python-trust-${{ matrix.python }}
+          path: python-trust.json
+          if-no-files-found: error
+
+  bazel-trust:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+      - name: Bootstrap Python and system certificate trust
+        run: bash ci/bootstrap_python_trust.sh --refresh-system
+      - name: Install Bazelisk
+        run: sudo ci/install_bazelisk.sh
+      - name: Audit Bazel runtimes, venvs and requirements tooling
+        run: python3 ci/check_bazel_python_trust.py > python-trust-bazel.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: python-trust-bazel
+          path: python-trust-bazel.json
+          if-no-files-found: error
