@@ -30,6 +30,29 @@ jobs:
         run: bash ci/bootstrap_python_trust.sh --refresh-system
       - name: Install representative dependencies
         run: python3 -m pip install --no-cache-dir Pillow numpy requests
+      - name: Verify recovery from a stale pip certificate bundle
+        if: matrix.python == '3.11'
+        run: |
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          import re
+          import subprocess
+          import tempfile
+          bootstrap = str(Path('ci/bootstrap_python_trust.sh').resolve())
+          revoked = Path('ci/testdata/emsign_g3.pem').read_bytes()
+          with tempfile.TemporaryDirectory() as directory:
+              subprocess.run(['python3', '-m', 'venv', directory], check=True)
+              python = str(Path(directory) / 'bin/python')
+              subprocess.run(['bash', bootstrap, python], check=True)
+              vendor = Path(subprocess.check_output([
+                  python, '-I', '-c', 'from pip._vendor import certifi; print(certifi.__file__)',
+              ], text=True).strip())
+              assert vendor.is_relative_to(directory)
+              vendor.write_text(re.sub(r'__version__ = "[^"]+"', '__version__ = "2023.7.22"', vendor.read_text()))
+              bundle = vendor.with_name('cacert.pem')
+              bundle.write_bytes(bundle.read_bytes() + revoked)
+              subprocess.run(['bash', bootstrap, python], check=True)
+          PYTHON
       - name: Check trust and generator dependencies
         run: |
           python3 ci/check_python_trust.py > python-trust.json
