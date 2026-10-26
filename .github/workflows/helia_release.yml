@@ -88,7 +88,7 @@ jobs:
       image: ${{ steps.image.outputs.image }}
     steps:
       - id: image
-        run: echo "image=ghcr.io/ambiqai/helia-rt-ci@sha256:55372f29023cd1be1887af5761c8e6c18765b4e68ac28e02510d519e461692c9" >> "$GITHUB_OUTPUT"  # ghcr.io/ambiqai/helia-rt-ci:latest as of 2026-08-25
+        run: echo "image=ghcr.io/ambiqai/helia-rt-ci@sha256:9949e67b44a849a5735f028ba29f9ca5d2e2378d66804900e05548ce5bb0257c" >> "$GITHUB_OUTPUT"  # ghcr.io/ambiqai/helia-rt-ci:sha-6f99fd7 as of 2026-10-26
 
       # Every build needs this job, so a release whose version or ns-cmsis-nn
       # pin sites disagree stops before the matrix. Refs older than the check
