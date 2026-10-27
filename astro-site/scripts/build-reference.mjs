@@ -74,15 +74,15 @@ for (const symbol of symbols) {
   if (ids.has(symbol.id)) throw new Error(`Duplicate API identity: ${symbol.id}`);
   ids.add(symbol.id);
 }
-const interpreter = symbols.find(symbol => symbol.id === 'tflite::MicroInterpreter');
+const interpreter = symbols.find(symbol => symbol.id === 'tflite::micro::MicroInterpreter');
 const constructors = interpreter.members.filter(symbol => symbol.name === 'MicroInterpreter');
 if (constructors.length !== 2 || !constructors.some(symbol => /ownership remains with the caller/.test(symbol.description))) throw new Error('Interpreter overload or ownership contract lost.');
-for (const id of ['tflite::MicroMutableOpResolver', 'tflite::MicroInterpreter::typed_input_tensor']) {
+for (const id of ['tflite::micro::MicroMutableOpResolver', 'tflite::micro::MicroInterpreter::typed_input_tensor']) {
   if (!/template\s*</.test(symbols.find(symbol => symbol.id === id)?.signature ?? '')) throw new Error(`Template contract lost: ${id}. Install a released helia-ui with C++ template support.`);
 }
-const resolverInterface = symbols.find(symbol => symbol.id === 'tflite::MicroOpResolver');
+const resolverInterface = symbols.find(symbol => symbol.id === 'tflite::micro::MicroOpResolver');
 if (!resolverInterface.members.filter(member => member.name === 'FindOp').every(member => /= 0$/.test(member.signature))) throw new Error('Pure-virtual resolver contract lost.');
-if (!/public tflite::MicroInterpreter/.test(symbols.find(symbol => symbol.id === 'tflite::RecordingMicroInterpreter').signature)) throw new Error('Interpreter inheritance contract lost.');
+if (!/public tflite::micro::MicroInterpreter/.test(symbols.find(symbol => symbol.id === 'tflite::micro::RecordingMicroInterpreter').signature)) throw new Error('Interpreter inheritance contract lost.');
 if (warnings.length) throw new Error(warnings.join('\n'));
 const resolverModule = modules.find(module => module.name === 'MicroMutableOpResolver');
 const resolver = resolverModule.symbols[0];

@@ -65,10 +65,10 @@ function collect(value) {
   }
 }
 collect(model);
-const interpreter = symbols.find((symbol) => symbol.id === 'tflite::MicroInterpreter');
+const interpreter = symbols.find((symbol) => symbol.id === 'tflite::micro::MicroInterpreter');
 const constructors = interpreter?.members.filter((symbol) => symbol.name === 'MicroInterpreter') ?? [];
-const resolver = symbols.find((symbol) => symbol.id === 'tflite::MicroMutableOpResolver');
-const typedInput = symbols.find((symbol) => symbol.id === 'tflite::MicroInterpreter::typed_input_tensor');
+const resolver = symbols.find((symbol) => symbol.id === 'tflite::micro::MicroMutableOpResolver');
+const typedInput = symbols.find((symbol) => symbol.id === 'tflite::micro::MicroInterpreter::typed_input_tensor');
 const checks = [
   { name: 'Both interpreter constructors extracted', pass: constructors.length === 2 },
   { name: 'No overload identity warnings', pass: !warnings.some((warning) => warning.includes('duplicate id')) },
