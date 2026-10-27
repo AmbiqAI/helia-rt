@@ -529,8 +529,8 @@ endfunction()
 # helia_rt_backend_compile_definitions(OUT_VAR BACKEND <name>)
 #
 # Returns the compile definitions a backend variant of heliaRT requires.
-# Matches the historical Zephyr behavior:
-#   reference  → (none)
+# Every backend starts with TFLM_REMOVE_VIRTUAL_DELETE (see below), then:
+#   reference  → (nothing more)
 #   cmsis_nn   → CMSIS_NN
 #   helia      → CMSIS_NN, HELIA
 #                plus ARM_NN_ENABLE_F32/F16 mirroring the ns-cmsis-nn build
@@ -546,14 +546,16 @@ function(helia_rt_backend_compile_definitions OUT_VAR)
         message(FATAL_ERROR "helia_rt_backend_compile_definitions: BACKEND <name> is required")
     endif()
 
-    set(_defs "")
+    # Gives the runtime's virtual classes a no-op operator delete, as the make
+    # build does. Consumers must see it too, or the class definitions differ.
+    set(_defs TFLM_REMOVE_VIRTUAL_DELETE)
     if(_ARG_BACKEND STREQUAL "cmsis_nn")
-        set(_defs CMSIS_NN)
+        list(APPEND _defs CMSIS_NN)
     elseif(_ARG_BACKEND STREQUAL "helia")
         # heliaCore's float API is opt-in. Keep these definitions aligned with
         # the external ns-cmsis-nn target so helia kernel headers expose the
         # same API that the linked library provides.
-        set(_defs CMSIS_NN HELIA)
+        list(APPEND _defs CMSIS_NN HELIA)
         helia_rt_float_feature_flags(_helia_f32 _helia_f16)
         if(_helia_f32)
             list(APPEND _defs ARM_NN_ENABLE_F32=1)

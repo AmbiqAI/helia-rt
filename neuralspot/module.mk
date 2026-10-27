@@ -26,6 +26,8 @@ includes_api += $(subdirectory)/third_party/flatbuffers/include
 # Preprocessor defines
 DEFINES += NS_TFSTRUCTURE_RECENT
 DEFINES += NS_TFLM_NEW_MICRO_PROFILER
+# The archives are built with it; application code includes the same classes.
+DEFINES += TFLM_REMOVE_VIRTUAL_DELETE
 
 # Determine short architecture tag
 TFP := $(if $(filter apollo5,$(ARCH)),cm55,cm4)

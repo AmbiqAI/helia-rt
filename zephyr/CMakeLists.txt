@@ -78,6 +78,9 @@ helia_rt_backend_compile_definitions(_HELIA_RT_BACKEND_DEFS
 if(_HELIA_RT_BACKEND_DEFS)
     zephyr_library_compile_definitions(${_HELIA_RT_BACKEND_DEFS})
 endif()
+# Application code includes the runtime's virtual classes, so it needs the
+# same definition the library is built with.
+zephyr_compile_definitions(TFLM_REMOVE_VIRTUAL_DELETE)
 
 # --- External CMSIS-NN / ns-cmsis-nn header dirs ---
 # heliaRT helia & cmsis_nn kernels include the cmsis-nn API as

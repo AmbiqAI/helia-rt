@@ -220,6 +220,8 @@ function(_helia_rt_add_backend_target backend)
         CXX_STANDARD_REQUIRED YES
         CXX_EXTENSIONS        NO
         POSITION_INDEPENDENT_CODE OFF)
+    # The public headers need C++17, so consumers that link this target do too.
+    target_compile_features(${_target} PUBLIC cxx_std_17)
 
         # The runtime's arena objects hide operator delete, so its placement new
         # compiles only without exceptions.
