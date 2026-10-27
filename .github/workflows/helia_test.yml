@@ -392,30 +392,33 @@ jobs:
         # see AmbiqAI/helia-rt#497
         # Per-channel DEQUANTIZE adds one binary and eleven cases on every leg.
         # see AmbiqAI/helia-rt#498
+        # Upstream tflite-micro deleted binary_size_test and two cases with the
+        # code they tested, removing one binary and three cases on every leg.
+        # see AmbiqAI/helia-rt#446
         include:
           - arch: "cortex-m3"
             toolchain: "gcc"
-            min-binaries: 192
-            min-cases: 1772
+            min-binaries: 191
+            min-cases: 1769
           - arch: "cortex-m4+fp"
             toolchain: "gcc"
-            min-binaries: 192
-            min-cases: 1772
+            min-binaries: 191
+            min-cases: 1769
           - arch: "cortex-m4+fp"
             toolchain: "atfe"
             # One binary and two cases fewer than gcc: cortex_m_corstone_300_atfe.inc
             # filters flatbuffer_utils_test out for ATfE, with its own
             # justification in that file.
-            min-binaries: 191
-            min-cases: 1770
+            min-binaries: 190
+            min-cases: 1767
           - arch: "cortex-m55"
             toolchain: "gcc"
-            min-binaries: 192
-            min-cases: 1837
+            min-binaries: 191
+            min-cases: 1834
           - arch: "cortex-m55"
             toolchain: "atfe"
-            min-binaries: 191
-            min-cases: 1835
+            min-binaries: 190
+            min-cases: 1832
 
     env:
       ARM_UBL_LICENSE_IDENTIFIER: ${{ secrets.ARM_UBL_LICENSE_IDENTIFIER }}
