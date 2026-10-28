@@ -34,7 +34,7 @@ for (const page of report.routes) {
 }
 const contracts = {
   microinterpreter: [
-    'tflite::MicroInterpreter::MicroInterpreter(',
+    'tflite::micro::MicroInterpreter::MicroInterpreter(',
     '| tensor_arena | uint8_t * | Required |',
     'ownership remains with the caller',
     'template <class T>',

@@ -52,9 +52,7 @@ CC_TOOL := clang
 AR := ar
 
 # Building with C++17 requires libc++
-ifneq ($(CC_VER11), true)
-  PLATFORM_FLAGS += -stdlib=libc++
-endif
+PLATFORM_FLAGS += -stdlib=libc++
 
 # Unused exception related symbols make their way into a binary that links
 # against TFLM as described in https://github.com/tensorflow/tensorflow/issues/47575.
@@ -136,7 +134,6 @@ ifeq ($(OPTIMIZED_KERNEL_DIR), xtensa)
 
   # Needed for LSTM support.
   MICROLITE_CC_KERNEL_SRCS += \
-    $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/internal/reference/portable_tensor_utils.cc \
     $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/kernel_util.cc
 
   # Additional kernel sources for DECODE operator support

@@ -17,13 +17,13 @@ limitations under the License.
 #include <cmath>
 #include <cstring>
 
-#include "tensorflow/lite/micro/c/builtin_op_data.h"
-#include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/builtin_op_data.h"
+#include "tensorflow/lite/micro/compatibility.h"
 #include "tensorflow/lite/micro/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
-#include "tensorflow/lite/micro/kernels/op_macros.h"
 #include "tensorflow/lite/micro/kernels/strided_slice.h"
 #include "tensorflow/lite/micro/kernels/xtensa/xtensa.h"
+#include "tensorflow/lite/micro/micro_common.h"
 #include "tensorflow/lite/micro/micro_log.h"
 
 namespace tflite {
@@ -37,8 +37,6 @@ void StridedSlice_int16_hifi4opt(
     const RuntimeShape& unextended_output_shape, int16_t* output_data) {
   using ::tflite::micro::strided_slice::StartForAxis;
   using ::tflite::micro::strided_slice::StopForAxis;
-
-  ruy::profiler::ScopeLabel label("StridedSlice");
 
   // Note that the output_shape is not used herein.
   tflite::micro::StridedSliceParams params_copy = op_params;

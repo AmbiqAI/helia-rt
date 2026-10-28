@@ -26,7 +26,6 @@ limitations under the License.
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/lstm_eval.h"
 #include "tensorflow/lite/micro/kernels/lstm_shared.h"
-#include "tensorflow/lite/micro/kernels/micro_tensor_utils.h"
 namespace tflite {
 namespace micro {
 namespace {
@@ -317,7 +316,6 @@ TfLiteStatus CMSIS_NN_EvalInteger16x8_16Lstm(
 /*Kernel functions*/
 void* UnidirectionalSequenceLstmInit(TfLiteContext* context, const char* buffer,
                                      size_t length) {
-  TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
   return context->AllocatePersistentBuffer(context, sizeof(OpData));
 }
 

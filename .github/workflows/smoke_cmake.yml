@@ -60,7 +60,7 @@ jobs:
           d = json.load(open('manifest.json'))
           assert d['schema'] == 'helia-rt-manifest-v1', d['schema']
           assert d['backend'] == '${{ matrix.backend }}', d['backend']
-          assert len(d['include_dirs'])  >= 4
+          assert len(d['include_dirs'])  >= 3
           assert len(d['common_sources']) >= 30
           assert len(d['kernel_sources']) >= 100
           # Path well-formedness: nothing absolute, no '..'.
@@ -72,9 +72,10 @@ jobs:
           # (see HELIA_RT_GLOBAL_KERNEL_OPTIMIZE / _CONV_OPT / _FC_OPT in
           # cmake/helia_rt_sources.cmake).
           want = {
-              'reference': [],
-              'cmsis_nn':  ['CMSIS_NN'],
-              'helia':     ['CMSIS_NN', 'HELIA', 'ARM_NN_ENABLE_F32=1',
+              'reference': ['TFLM_REMOVE_VIRTUAL_DELETE'],
+              'cmsis_nn':  ['TFLM_REMOVE_VIRTUAL_DELETE', 'CMSIS_NN'],
+              'helia':     ['TFLM_REMOVE_VIRTUAL_DELETE', 'CMSIS_NN', 'HELIA',
+                            'ARM_NN_ENABLE_F32=1',
                             'CONV_KERNEL_OPTIMIZED_FOR_SPEED',
                             'FC_KERNEL_OPTIMIZED_FOR_SPEED',
                             'KERNELS_OPTIMIZED_FOR_SPEED'],
@@ -106,6 +107,32 @@ jobs:
         run: |
           test -f build/libhelia_rt_reference.a
           ls -lh build/libhelia_rt_reference.a
+      # A consumer that asks for C++14 must be raised to C++17 by the target
+      # and see the definitions the library is built with.
+      - name: Build a C++14 consumer of helia_rt::reference
+        run: |
+          mkdir -p consumer
+          cat > consumer/CMakeLists.txt <<'EOF'
+          cmake_minimum_required(VERSION 3.21)
+          project(helia_rt_cxx14_consumer CXX)
+          set(CMAKE_CXX_STANDARD 14)
+          add_subdirectory(${HELIA_RT_DIR} helia-rt EXCLUDE_FROM_ALL)
+          add_library(consumer STATIC consumer.cc)
+          target_link_libraries(consumer PRIVATE helia_rt::reference)
+          EOF
+          cat > consumer/consumer.cc <<'EOF'
+          #include "tensorflow/lite/micro/micro_interpreter.h"
+          #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
+          #ifndef TFLM_REMOVE_VIRTUAL_DELETE
+          #error "helia_rt::reference must publish TFLM_REMOVE_VIRTUAL_DELETE"
+          #endif
+          tflite::MicroMutableOpResolver<1> resolver;
+          EOF
+          cmake -S consumer -B build-consumer -G Ninja \
+              -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+              -DHELIA_RT_DIR="${GITHUB_WORKSPACE}" \
+              -DHELIA_RT_DISABLE_X86_NEON=ON
+          cmake --build build-consumer --target consumer -j
 
   invariant:
     name: Upstream-sync invariant (no SSoT edits under tensorflow/, signal/)

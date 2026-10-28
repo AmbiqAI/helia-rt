@@ -114,11 +114,23 @@ echo "Running clang-tidy diff against ${BASE_REF} (merge-base: ${MERGE_BASE})...
 git diff -U0 --diff-filter=d "${MERGE_BASE}" -- \
     tensorflow/lite/micro signal \
     ':(exclude)*.inc' \
-    ':(exclude)*schema_generated.h' \
-    ':(exclude)*metadata_saved.h' \
+    ':(exclude)*_generated.h' \
     ':(exclude)*/downloads/*' \
     ':(exclude)*_model_data.h' \
     ':(exclude)*_test_data.h' \
+    ':(exclude)tensorflow/lite/micro/arc_custom/*' \
+    ':(exclude)tensorflow/lite/micro/arc_emsdp/*' \
+    ':(exclude)tensorflow/lite/micro/bluepill/*' \
+    ':(exclude)tensorflow/lite/micro/ceva/*' \
+    ':(exclude)tensorflow/lite/micro/chre/*' \
+    ':(exclude)tensorflow/lite/micro/cortex_m_corstone_300/*' \
+    ':(exclude)tensorflow/lite/micro/cortex_m_generic/*' \
+    ':(exclude)tensorflow/lite/micro/hexagon/*' \
+    ':(exclude)tensorflow/lite/micro/riscv32_generic/*' \
+    ':(exclude)tensorflow/lite/micro/python/*' \
+    ':(exclude)tensorflow/lite/micro/tools/toolchains/*' \
+    ':(exclude)tensorflow/lite/micro/tools/tflite_flatbuffer_align_wrapper.cc' \
+    ':(exclude)tensorflow/lite/micro/tools/tflite_size/*' \
     ':(exclude)tensorflow/lite/micro/examples/*' \
     ':(exclude)tensorflow/lite/micro/integration_tests/*' \
     ':(exclude)tensorflow/lite/micro/benchmarks/*' \
@@ -127,8 +139,10 @@ git diff -U0 --diff-filter=d "${MERGE_BASE}" -- \
     ':(exclude)tensorflow/lite/micro/kernels/cmsis_nn/*' \
     ':(exclude)tensorflow/lite/micro/kernels/ethos_u/*' \
     ':(exclude)tensorflow/lite/micro/kernels/ethosu.*' \
+    ':(exclude)tensorflow/lite/micro/kernels/hexagon/*' \
     ':(exclude)tensorflow/lite/micro/kernels/xtensa/*' \
     ':(exclude)tensorflow/lite/micro/kernels/internal/*' \
-    ':(exclude)tensorflow/lite/micro/kernels/tflite_kernel_util.*' \
-    ':(exclude)tensorflow/lite/micro/c/*' | \
+    ':(exclude)tensorflow/lite/micro/c/*' \
+    ':(exclude)tensorflow/lite/micro/micro_common.*' \
+    ':(exclude)tensorflow/lite/micro/builtin_op_data.h' | \
   clang-tidy-diff.py -p1 -path . -iregex '.*\.(cpp|cc|c\+\+|cxx|c|h|hpp)$'

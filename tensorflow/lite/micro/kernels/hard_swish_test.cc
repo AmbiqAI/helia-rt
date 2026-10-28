@@ -15,9 +15,9 @@ limitations under the License.
 
 #include <random>
 
-#include "tensorflow/lite/micro/c/builtin_op_data.h"
-#include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/builtin_op_data.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
+#include "tensorflow/lite/micro/micro_common.h"
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
 
@@ -49,7 +49,7 @@ void GenerateUniformRandomVector(int size, float min, float max,
 void EvalTestReferenceHardSwish(int size, float* input, float* result) {
   for (int i = 0; i < size; i++) {
     const float in = input[i];
-    result[i] = in * std::min(6.0f, std::max(0.0f, in + 3)) * (1.0f / 6.0f);
+    result[i] = in * std::clamp(in + 3.0f, 0.0f, 6.0f) * (1.0f / 6.0f);
   }
 }
 
@@ -85,8 +85,7 @@ void TestHardSwishQuantized(int size, const T* output_data,
   EvalTestReferenceHardSwish(size, float_input_values, float_ref_output_values);
   for (int i = 0; i < size; i++) {
     float val = float_ref_output_values[i];
-    float_ref_output_values[i] =
-        std::min(output_max, std::max(output_min, val));
+    float_ref_output_values[i] = std::clamp(val, output_min, output_max);
   }
 
   constexpr int inputs_size = 1;
@@ -153,8 +152,7 @@ void TestHardSwishQuantizedBias(const int size, const T* output_data,
   EvalTestReferenceHardSwish(size, float_input_values, float_ref_output_values);
   for (int i = 0; i < size; i++) {
     float val = float_ref_output_values[i];
-    float_ref_output_values[i] =
-        std::min(output_max, std::max(output_min, val));
+    float_ref_output_values[i] = std::clamp(val, output_min, output_max);
   }
 
   int input_dims_data[] = {2, 1, size};

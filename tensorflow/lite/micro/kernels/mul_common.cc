@@ -13,7 +13,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/internal/quantization_util.h"
 #include "tensorflow/lite/micro/kernels/internal/reference/integer_ops/mul.h"
 #include "tensorflow/lite/micro/kernels/internal/reference/mul.h"
@@ -22,6 +21,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/mul.h"
 #include "tensorflow/lite/micro/memory_helpers.h"
+#include "tensorflow/lite/micro/micro_common.h"
 
 namespace tflite {
 namespace micro {
@@ -30,7 +30,6 @@ const int kMulInput2Tensor = 1;
 const int kMulOutputTensor = 0;
 
 void* MulInit(TfLiteContext* context, const char* buffer, size_t length) {
-  TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
   return context->AllocatePersistentBuffer(context, sizeof(OpDataMul));
 }
 

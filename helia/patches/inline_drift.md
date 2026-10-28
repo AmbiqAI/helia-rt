@@ -222,14 +222,6 @@ SDK consumers compile with `-DAMBIQ`.
 Drop condition: upstream adds an `OPTIMIZED_KERNEL_DIR=helia`-aware
 benchmarking template.
 
-## `tensorflow/lite/micro/tools/ci_build/test_size.sh`
-
-Single-line change: the size-comparison reference clones
-`https://github.com/AmbiqAI/helia-rt.git` instead of upstream
-`tensorflow/tflite-micro` so the size-regression baseline tracks helia main.
-
-Drop condition: upstream parameterizes the reference URL.
-
 ## `tensorflow/lite/micro/kernels/Makefile.inc`
 
 Adds an optional `-include $(MAKEFILE_DIR)/ext_libs/$(OPTIMIZED_KERNEL_DIR)_tests.inc`
@@ -373,8 +365,7 @@ jobs to a sibling `helia_*.yml`.
 
 ## Action references in upstream-derived workflows
 
-`log_binary_size_pr.yml` and `issue_on_error.yml` reference
-actions by version tag; upstream pins them by commit SHA. Upstream's
+`issue_on_error.yml` references actions by version tag; upstream pins them by commit SHA. Upstream's
 read-only default `permissions` blocks are taken. `.github/dependabot.yml`
 adds an `ignore` list for actions used only by upstream-vendored workflows
 that helia disables, so dependabot does not open PRs against upstream YAML.
@@ -661,6 +652,10 @@ leave reference, direct CMake, Bazel and source consumers unfixed.
   `kernels/reduce_test.cc`, `kernels/prelu_common.cc` (temporaries released on
   every rejection), `kernels/internal/reference/strided_slice.h` (64-bit loop
   offsets for a stride near `INT32_MAX`) and `kernels/strided_slice_test.cc`.
+- **Tensor rank (AmbiqAI/helia-rt#500).** `micro_allocator.cc` refuses a
+  tensor whose flatbuffer shape has more than `RuntimeShape::kMaxSmallSize`
+  (6) dimensions before any kernel Init or Prepare; `BUILD` adds the
+  `kernels/internal:types` dependency it needs.
 
 Drop condition: for each site, upstream carries an equivalent fix. Re-check
 every site at the next upstream sync (AmbiqAI/helia-rt#446) and drop it or

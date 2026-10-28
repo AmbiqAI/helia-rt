@@ -19,9 +19,8 @@ limitations under the License.
 
 #include <algorithm>
 
-#include "ruy/profiler/instrumentation.h"  // from @ruy
+#include "tensorflow/lite/micro/compatibility.h"
 #include "tensorflow/lite/micro/kernels/internal/common.h"
-#include "tensorflow/lite/micro/kernels/internal/compatibility.h"
 #include "tensorflow/lite/micro/kernels/internal/reference/broadcast_loop.h"
 #include "tensorflow/lite/micro/kernels/internal/types.h"
 
@@ -50,7 +49,6 @@ void BroadcastSubSlow(const ArithmeticParams& params,
                       const RuntimeShape& input1_shape, const T* input1_data,
                       const RuntimeShape& input2_shape, const T* input2_data,
                       const RuntimeShape& output_shape, T* output_data) {
-  ruy::profiler::ScopeLabel label("BroadcastSubSlow/T");
   BroadcastSubCommon<T>(
       params, input1_shape, input1_data, input2_shape, input2_data,
       output_shape, output_data,
@@ -69,16 +67,15 @@ inline void BroadcastSub16POTSlow(const ArithmeticParams& params,
                                   const int16_t* input2_data,
                                   const RuntimeShape& output_shape,
                                   int16_t* output_data) {
-  ruy::profiler::ScopeLabel label("BroadcastSub16POTSlow/int16_t");
   BroadcastSubCommon<int16_t>(
       params, input1_shape, input1_data, input2_shape, input2_data,
       output_shape, output_data,
       [](int16_t input1_val, int16_t input2_val,
          const ArithmeticParams& params) {
         const int32_t scaled_input1_val =
-            gemmlowp::RoundingDivideByPOT(input1_val, -params.input1_shift);
+            RoundingDivideByPOT(input1_val, -params.input1_shift);
         const int32_t scaled_input2_val =
-            gemmlowp::RoundingDivideByPOT(input2_val, -params.input2_shift);
+            RoundingDivideByPOT(input2_val, -params.input2_shift);
         const int32_t raw_output = scaled_input1_val - scaled_input2_val;
         const int32_t clamped_output =
             std::min(params.quantized_activation_max,
@@ -94,7 +91,6 @@ void BroadcastQuantSubSlow(const ArithmeticParams& params,
                            const RuntimeShape& input2_shape,
                            const T* input2_data,
                            const RuntimeShape& output_shape, T* output_data) {
-  ruy::profiler::ScopeLabel label("BroadcastQuantSubSlow/T");
   BroadcastSubCommon<T>(
       params, input1_shape, input1_data, input2_shape, input2_data,
       output_shape, output_data,
@@ -240,7 +236,6 @@ inline void SubWithActivation(
     const ArithmeticParams& params, const RuntimeShape& input1_shape,
     const T* input1_data, const RuntimeShape& input2_shape,
     const T* input2_data, const RuntimeShape& output_shape, T* output_data) {
-  ruy::profiler::ScopeLabel label("SubWithActivation");
   const int flat_size =
       MatchingElementsSize(input1_shape, input2_shape, output_shape);
   T activation_min, activation_max;

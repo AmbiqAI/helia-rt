@@ -60,7 +60,7 @@ When consuming via the top-level `CMakeLists.txt` (or NSX/Zephyr source-mode she
 | `HELIA_RT_THIRD_PARTY_OPT` | `-O2` | Reserved — applied when `third_party_static/` ships compile units |
 | `HELIA_RT_USE_COMPRESSION` | `OFF` | Defines `USE_TFLM_COMPRESSION` |
 | `HELIA_RT_DISABLE_X86_NEON` | `OFF` | Defines `TF_LITE_DISABLE_X86_NEON` (host builds only) |
-| `HELIA_RT_CXX_STANDARD` | `17` | C++ standard (14 or 17) |
+| `HELIA_RT_CXX_STANDARD` | `17` | C++ standard (17 or later) |
 | `HELIA_RT_EXTRA_DEFINES` | (empty) | Free-form compile-definitions escape hatch |
 
 ## Example: consuming via `add_subdirectory`

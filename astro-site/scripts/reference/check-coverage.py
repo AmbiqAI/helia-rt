@@ -25,6 +25,9 @@ for entry in manifest:
     if compound is None:
         symbol = symbols[entry['symbol']]
         candidates = [member for member in declarations.values() if member.findtext('name') == entry['name'] and member.attrib['kind'] == {'function': 'function', 'macro': 'define', 'enum': 'enum'}.get(symbol['kind'], symbol['kind'])]
+        # A using-declaration of the symbol in another namespace is a second memberdef.
+        if len(candidates) > 1:
+            candidates = [member for member in candidates if member.findtext('qualifiedname') == entry['symbol']]
         if len(candidates) != 1:
             raise SystemExit(f"Expected one XML declaration for {entry['symbol']}; found {len(candidates)}")
         if symbol['kind'] == 'enum':

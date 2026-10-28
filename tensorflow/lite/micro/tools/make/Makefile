@@ -116,10 +116,8 @@ DOWNLOADS_DIR := $(MAKEFILE_DIR)/downloads
 INCLUDES := \
 -I. \
 -I$(DOWNLOADS_DIR) \
--I$(DOWNLOADS_DIR)/gemmlowp \
 -I$(DOWNLOADS_DIR)/flatbuffers/include \
--I$(DOWNLOADS_DIR)/kissfft \
--I$(DOWNLOADS_DIR)/ruy
+-I$(DOWNLOADS_DIR)/kissfft
 
 ifneq ($(TENSORFLOW_ROOT),)
   INCLUDES += -I$(TENSORFLOW_ROOT)
@@ -296,6 +294,7 @@ COMMON_FLAGS := \
   -ffunction-sections \
   -fdata-sections \
   -fmessage-length=0 \
+  -DTFLM_REMOVE_VIRTUAL_DELETE \
   -DTF_LITE_DISABLE_X86_NEON \
   $(CC_WARNINGS) \
   $(ADDITIONAL_DEFINES)
@@ -307,6 +306,7 @@ ifeq ($(TARGET), $(HOST_OS))
 endif
 
 CXXFLAGS := \
+  -std=c++17 \
   -fno-rtti \
   -fno-exceptions \
   -fno-threadsafe-statics \
@@ -314,6 +314,7 @@ CXXFLAGS := \
   $(COMMON_FLAGS)
 
 CCFLAGS := \
+  -std=c17 \
   -Wimplicit-function-declaration \
   $(COMMON_FLAGS)
 
@@ -369,14 +370,6 @@ else ifeq ($(BUILD_TYPE), release_with_logs)
   # for profiling and benchmarking.
   CXXFLAGS += -DNDEBUG
   CCFLAGS  += -DNDEBUG
-endif
-
-ifeq ($(CC_VER11), true)
-  CXXFLAGS += -std=c++11
-  CCFLAGS += -std=c11
-else
-  CXXFLAGS += -std=c++17
-  CCFLAGS += -std=c17
 endif
 
 # This library is the main target for this makefile. It will contain a minimal
@@ -567,7 +560,7 @@ ALL_SRCS := \
 
 .PHONY: all microlite tflm libtflm \
         build build_all build_tests build_examples build_benchmarks build_integration_tests \
-        test integration_tests generated_micro_mutable_op_resolver \
+        test integration_tests \
         clean clean_downloads list_gendir list_library_sources list_library_headers \
         list_third_party_sources list_third_party_headers list_generator_dir \
         third_party_downloads
@@ -752,15 +745,11 @@ endif
 # Create kernel test targets.
 include $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/Makefile.inc
 
-# Create binary size test target.
-include $(TENSORFLOW_ROOT)tensorflow/lite/micro/tools/ci_build/binary_size_test/Makefile.inc
-
 
 
 ifeq ($(TARGET_SPECIFIC_MAKE_TEST),0)
 test: $(MICROLITE_TEST_TARGETS)
 integration_tests: $(MICROLITE_INTEGRATION_TEST_TARGETS)
-generated_micro_mutable_op_resolver: $(MICROLITE_GEN_OP_RESOLVER_TEST_TARGETS)
 endif
 
 # Build targets for each tier

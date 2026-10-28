@@ -14,13 +14,13 @@ limitations under the License.
 ==============================================================================*/
 #include "tensorflow/lite/micro/kernels/dynamic_update_slice.h"
 
-#include "tensorflow/lite/micro/c/builtin_op_data.h"
-#include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/builtin_op_data.h"
+#include "tensorflow/lite/micro/compatibility.h"
 #include "tensorflow/lite/micro/kernels/internal/common.h"
 #include "tensorflow/lite/micro/kernels/internal/quantization_util.h"
 #include "tensorflow/lite/micro/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
-#include "tensorflow/lite/micro/kernels/op_macros.h"
+#include "tensorflow/lite/micro/micro_common.h"
 #include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 
@@ -35,9 +35,8 @@ void CalculateClampedStartIndices(int num_dims, const int64_t* raw_indices_data,
                                   const int32_t* update_dims_data,
                                   int32_t* clamped_start_indices_output) {
   for (int i = 0; i < num_dims; ++i) {
-    clamped_start_indices_output[i] = static_cast<int32_t>(
-        std::min<int64_t>(std::max<int64_t>(0, raw_indices_data[i]),
-                          input_dims_data[i] - update_dims_data[i]));
+    clamped_start_indices_output[i] = static_cast<int32_t>(std::clamp<int64_t>(
+        raw_indices_data[i], 0, input_dims_data[i] - update_dims_data[i]));
   }
   return;
 }
@@ -152,6 +151,8 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, NumDimensions(start_indices), 1);
   TF_LITE_ENSURE_EQ(context, SizeOfDimension(start_indices, 0),
                     NumDimensions(operand));
+  TF_LITE_ENSURE(context, NumDimensions(operand) >= 1 &&
+                              NumDimensions(operand) <= kMaxDimensions);
 
   TF_LITE_ENSURE_EQ(context, NumDimensions(update), NumDimensions(operand));
   // Check that update dimensions are not larger than operand dimensions

@@ -4,12 +4,12 @@
     "header": "tensorflow/lite/micro/micro_interpreter.h",
     "group": "Execution",
     "role": "Allocate tensors, invoke a model and access inputs/outputs.",
-    "symbol": "tflite::MicroInterpreter",
+    "symbol": "tflite::micro::MicroInterpreter",
     "route": "reference/api/microinterpreter"
   },
   {
     "name": "Model",
-    "header": "tensorflow/lite/schema/schema_generated.h",
+    "header": "tensorflow/lite/micro/schema/schema_generated.h",
     "group": "Execution",
     "role": "FlatBuffer model view; GetModel returns a view into caller-owned bytes.",
     "symbol": "tflite::Model",
@@ -17,7 +17,7 @@
   },
   {
     "name": "GetModel",
-    "header": "tensorflow/lite/schema/schema_generated.h",
+    "header": "tensorflow/lite/micro/schema/schema_generated.h",
     "group": "Execution",
     "role": "Return a model view over the caller-owned FlatBuffer bytes.",
     "symbol": "tflite::GetModel",
@@ -28,7 +28,7 @@
     "header": "tensorflow/lite/micro/micro_op_resolver.h",
     "group": "Operator registration",
     "role": "Interface for builtin and custom operator lookup.",
-    "symbol": "tflite::MicroOpResolver",
+    "symbol": "tflite::micro::MicroOpResolver",
     "route": "reference/api/microopresolver"
   },
   {
@@ -36,7 +36,7 @@
     "header": "tensorflow/lite/micro/micro_mutable_op_resolver.h",
     "group": "Operator registration",
     "role": "Fixed-capacity registration template; capacity counts registrations, not model nodes.",
-    "symbol": "tflite::MicroMutableOpResolver",
+    "symbol": "tflite::micro::MicroMutableOpResolver",
     "route": "reference/api/micromutableopresolver"
   },
   {
@@ -44,7 +44,7 @@
     "header": "tensorflow/lite/micro/micro_allocator.h",
     "group": "Memory",
     "role": "Arena allocation and memory-planner integration.",
-    "symbol": "tflite::MicroAllocator",
+    "symbol": "tflite::micro::MicroAllocator",
     "route": "reference/api/microallocator"
   },
   {
@@ -52,7 +52,7 @@
     "header": "tensorflow/lite/micro/recording_micro_allocator.h",
     "group": "Memory",
     "role": "Allocation accounting for memory diagnostics.",
-    "symbol": "tflite::RecordingMicroAllocator",
+    "symbol": "tflite::micro::RecordingMicroAllocator",
     "route": "reference/api/recordingmicroallocator"
   },
   {
@@ -60,7 +60,7 @@
     "header": "tensorflow/lite/micro/recording_micro_allocator.h",
     "group": "Memory",
     "role": "Byte and allocation-count recording result.",
-    "symbol": "tflite::RecordedAllocation",
+    "symbol": "tflite::micro::RecordedAllocation",
     "route": "reference/api/recordedallocation"
   },
   {
@@ -68,7 +68,7 @@
     "header": "tensorflow/lite/micro/recording_micro_interpreter.h",
     "group": "Memory",
     "role": "Interpreter variant exposing the recording allocator.",
-    "symbol": "tflite::RecordingMicroInterpreter",
+    "symbol": "tflite::micro::RecordingMicroInterpreter",
     "route": "reference/api/recordingmicrointerpreter"
   },
   {
@@ -76,7 +76,7 @@
     "header": "tensorflow/lite/micro/memory_planner/micro_memory_planner.h",
     "group": "Memory",
     "role": "Interface for planning reusable buffers.",
-    "symbol": "tflite::MicroMemoryPlanner",
+    "symbol": "tflite::micro::MicroMemoryPlanner",
     "route": "reference/api/micromemoryplanner"
   },
   {
@@ -84,7 +84,7 @@
     "header": "tensorflow/lite/micro/memory_planner/greedy_memory_planner.h",
     "group": "Memory",
     "role": "Plan buffers using lifetimes and sizes.",
-    "symbol": "tflite::GreedyMemoryPlanner",
+    "symbol": "tflite::micro::GreedyMemoryPlanner",
     "route": "reference/api/greedymemoryplanner"
   },
   {
@@ -92,7 +92,7 @@
     "header": "tensorflow/lite/micro/memory_planner/linear_memory_planner.h",
     "group": "Memory",
     "role": "Sequential buffer placement without reuse.",
-    "symbol": "tflite::LinearMemoryPlanner",
+    "symbol": "tflite::micro::LinearMemoryPlanner",
     "route": "reference/api/linearmemoryplanner"
   },
   {
@@ -100,7 +100,7 @@
     "header": "tensorflow/lite/micro/micro_profiler_interface.h",
     "group": "Profiling and state",
     "role": "Profiling callback interface.",
-    "symbol": "tflite::MicroProfilerInterface",
+    "symbol": "tflite::micro::MicroProfilerInterface",
     "route": "reference/api/microprofilerinterface"
   },
   {
@@ -108,7 +108,7 @@
     "header": "tensorflow/lite/micro/micro_profiler.h",
     "group": "Profiling and state",
     "role": "Record and report runtime profiling events.",
-    "symbol": "tflite::MicroProfiler",
+    "symbol": "tflite::micro::MicroProfiler",
     "route": "reference/api/microprofiler"
   },
   {
@@ -116,7 +116,7 @@
     "header": "tensorflow/lite/micro/micro_profiler.h",
     "group": "Profiling and state",
     "role": "Scope-based profiling event lifetime.",
-    "symbol": "tflite::ScopedMicroProfiler",
+    "symbol": "tflite::micro::ScopedMicroProfiler",
     "route": "reference/api/scopedmicroprofiler"
   },
   {
@@ -124,7 +124,7 @@
     "header": "tensorflow/lite/micro/micro_resource_variable.h",
     "group": "Profiling and state",
     "role": "Allocate, read, assign and reset resource variables.",
-    "symbol": "tflite::MicroResourceVariables",
+    "symbol": "tflite::micro::MicroResourceVariables",
     "route": "reference/api/microresourcevariables"
   },
   {
@@ -132,7 +132,7 @@
     "header": "tensorflow/lite/micro/system_setup.h",
     "group": "Platform and version",
     "role": "Platform initialization hook; use the implementation matching the application.",
-    "symbol": "tflite::InitializeTarget",
+    "symbol": "tflite::micro::InitializeTarget",
     "route": "reference/api/initializetarget"
   },
   {
@@ -153,7 +153,7 @@
   },
   {
     "name": "TfLiteTensor",
-    "header": "tensorflow/lite/micro/c/common.h",
+    "header": "tensorflow/lite/micro/micro_common.h",
     "role": "Tensor data, dimensions, quantization and allocation metadata.",
     "group": "Tensor and status types",
     "symbol": "TfLiteTensor",
@@ -161,7 +161,7 @@
   },
   {
     "name": "TfLiteEvalTensor",
-    "header": "tensorflow/lite/micro/c/common.h",
+    "header": "tensorflow/lite/micro/micro_common.h",
     "role": "Evaluation-time tensor data, dimensions and type.",
     "group": "Tensor and status types",
     "symbol": "TfLiteEvalTensor",
@@ -169,7 +169,7 @@
   },
   {
     "name": "TfLiteStatus",
-    "header": "tensorflow/lite/micro/c/c_api_types.h",
+    "header": "tensorflow/lite/micro/micro_common.h",
     "role": "Status values returned by runtime operations.",
     "group": "Tensor and status types",
     "symbol": "TfLiteStatus",
@@ -177,7 +177,7 @@
   },
   {
     "name": "TfLiteType",
-    "header": "tensorflow/lite/micro/c/c_api_types.h",
+    "header": "tensorflow/lite/micro/micro_common.h",
     "role": "Tensor element type identifiers.",
     "group": "Tensor and status types",
     "symbol": "TfLiteType",

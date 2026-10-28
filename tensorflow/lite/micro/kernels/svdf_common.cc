@@ -15,15 +15,15 @@ limitations under the License.
 
 #include <math.h>
 
-#include "tensorflow/lite/micro/c/builtin_op_data.h"
-#include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/builtin_op_data.h"
+#include "tensorflow/lite/micro/compatibility.h"
 #include "tensorflow/lite/micro/kernels/activation_utils.h"
 #include "tensorflow/lite/micro/kernels/internal/common.h"
 #include "tensorflow/lite/micro/kernels/internal/quantization_util.h"
 #include "tensorflow/lite/micro/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
-#include "tensorflow/lite/micro/kernels/op_macros.h"
 #include "tensorflow/lite/micro/kernels/svdf.h"
+#include "tensorflow/lite/micro/micro_common.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 
 namespace tflite {
@@ -65,7 +65,6 @@ void EvalIntegerSvdfReference(TfLiteContext* context, TfLiteNode* node,
   const int n_memory = weights_time_tensor->dims->data[1];
 
   TFLITE_DCHECK(context != nullptr);
-  TFLITE_DCHECK(context->GetScratchBuffer != nullptr);
 
   int32_t* scratch_tensor = static_cast<int32_t*>(
       context->GetScratchBuffer(context, data.scratch_tensor_index));
@@ -107,7 +106,7 @@ void EvalIntegerSvdfReference(TfLiteContext* context, TfLiteNode* node,
         }
         dot_prod = MultiplyByQuantizedMultiplier(
             dot_prod, data.effective_scale_1_a, data.effective_scale_1_b);
-        dot_prod = std::min(std::max(output_min, dot_prod), output_max);
+        dot_prod = std::clamp(dot_prod, output_min, output_max);
         // The int16 version of the op assumes a zero_point of 0.  This
         // code accounts for the potentially non-zero zero_point for the int8
         // version of the op.
@@ -183,7 +182,7 @@ void EvalIntegerSvdfReference(TfLiteContext* context, TfLiteNode* node,
       int32_t x2 = MultiplyByQuantizedMultiplier(x1, data.effective_scale_2_a,
                                                  data.effective_scale_2_b);
       int32_t x3 = x2 + data.output_zero_point;
-      int32_t x4 = std::min(std::max(output_min, x3), output_max);
+      int32_t x4 = std::clamp(x3, output_min, output_max);
       tflite::micro::GetTensorData<int8_t>(output_tensor)[i] =
           static_cast<int8_t>(x4);
     }
@@ -310,7 +309,6 @@ void EvalFloatSvdfReference(
   float* state_ptr = tflite::micro::GetTensorData<float>(activation_state);
 
   TFLITE_DCHECK(context != nullptr);
-  TFLITE_DCHECK(context->GetScratchBuffer != nullptr);
 
   float* scratch_ptr = static_cast<float*>(
       context->GetScratchBuffer(context, scratch_tensor_index));
@@ -452,20 +450,22 @@ TfLiteStatus PrepareSvdf(TfLiteContext* context, TfLiteNode* node) {
 
     TF_LITE_ENSURE_TYPES_EQ(context, output->type, kTfLiteInt8);
 
-    const double effective_scale_1 = static_cast<double>(
-        input->params.scale * weights_feature->params.scale /
-        activation_state->params.scale);
+    const double effective_scale_1 =
+        static_cast<double>(input->params.scale) *
+        static_cast<double>(weights_feature->params.scale) /
+        static_cast<double>(activation_state->params.scale);
     const double effective_scale_2 =
-        static_cast<double>(activation_state->params.scale *
-                            weights_time->params.scale / output->params.scale);
+        static_cast<double>(activation_state->params.scale) *
+        static_cast<double>(weights_time->params.scale) /
+        static_cast<double>(output->params.scale);
 
     // TODO(b/162018098): Use TF_LITE_ENSURE_NEAR when it is ready.
     // TODO(#1751): account for optional bias tensor
     TF_LITE_ENSURE(
         context,
         std::abs(static_cast<double>(bias->params.scale) -
-                 static_cast<double>(activation_state->params.scale *
-                                     weights_time->params.scale)) < 1e-5);
+                 (static_cast<double>(activation_state->params.scale) *
+                  static_cast<double>(weights_time->params.scale))) < 1e-5);
 
     QuantizeMultiplier(effective_scale_1, &(data->effective_scale_1_a),
                        &(data->effective_scale_1_b));
@@ -475,8 +475,6 @@ TfLiteStatus PrepareSvdf(TfLiteContext* context, TfLiteNode* node) {
     data->input_zero_point = input->params.zero_point;
     data->output_zero_point = output->params.zero_point;
     data->activation_state_zero_point = activation_state->params.zero_point;
-
-    TFLITE_DCHECK(context->RequestScratchBufferInArena != nullptr);
 
     const TfLiteStatus scratch_status = context->RequestScratchBufferInArena(
         context, batch_size * num_filters * sizeof(int32_t),
@@ -497,7 +495,6 @@ TfLiteStatus PrepareSvdf(TfLiteContext* context, TfLiteNode* node) {
     }
     TF_LITE_ENSURE_TYPES_EQ(context, output->type, kTfLiteFloat32);
 
-    TFLITE_DCHECK(context->RequestScratchBufferInArena != nullptr);
     const TfLiteStatus scratch_status = context->RequestScratchBufferInArena(
         context, batch_size * num_filters * sizeof(float),
         &(data->scratch_tensor_index));

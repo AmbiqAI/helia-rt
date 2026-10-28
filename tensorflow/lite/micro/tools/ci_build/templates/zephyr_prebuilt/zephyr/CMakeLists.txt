@@ -6,9 +6,7 @@ if(CONFIG_HELIA_RT)
 
   zephyr_include_directories(
     ${HELIA_RT_DIR}/.
-    ${HELIA_RT_DIR}/third_party/gemmlowp
     ${HELIA_RT_DIR}/third_party/flatbuffers/include
-    ${HELIA_RT_DIR}/third_party/ruy
     ${HELIA_RT_DIR}/third_party/kissfft
     ${HELIA_RT_DIR}/third_party/ns_cmsis_nn/Include
   )
@@ -16,6 +14,8 @@ if(CONFIG_HELIA_RT)
   zephyr_compile_options(-fshort-enums)
   zephyr_library_compile_definitions(NS_CMSIS_NN)
   zephyr_library_compile_definitions(HELIA)
+  # The archives are built with it; application code includes the same classes.
+  zephyr_compile_definitions(TFLM_REMOVE_VIRTUAL_DELETE)
 
   if(CONFIG_CPU_CORTEX_M55)
     set(HELIA_RT_ARCH_TOKEN cm55)

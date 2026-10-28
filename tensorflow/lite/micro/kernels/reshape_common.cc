@@ -15,13 +15,13 @@ limitations under the License.
 
 #include <cstring>
 
-#include "tensorflow/lite/micro/c/builtin_op_data.h"
-#include "tensorflow/lite/micro/c/common.h"
+#include "tensorflow/lite/micro/builtin_op_data.h"
+#include "tensorflow/lite/micro/compatibility.h"
 #include "tensorflow/lite/micro/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
-#include "tensorflow/lite/micro/kernels/op_macros.h"
 #include "tensorflow/lite/micro/kernels/reshape.h"
 #include "tensorflow/lite/micro/memory_helpers.h"
+#include "tensorflow/lite/micro/micro_common.h"
 #include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 
@@ -65,7 +65,7 @@ TfLiteStatus ReshapeOutput(TfLiteContext* context, TfLiteNode* node) {
     }
   }
   if (stretch_dim != -1) {
-    // TODO(AmbiqAI/helia-rt#460): upstream divides by a zero product of the other dimensions; drop when upstream has it.
+    // TODO(AmbiqAI/helia-rt#460): upstream rejects this without releasing the temporaries; drop when upstream releases them.
     if (num_output_elements == 0) {
       MicroPrintf("RESHAPE cannot infer a -1 when the other dimensions are 0");
       micro_context->DeallocateTempTfLiteTensor(input);
@@ -94,7 +94,7 @@ TfLiteStatus ReshapeOutput(TfLiteContext* context, TfLiteNode* node) {
 TfLiteStatus PrepareReshapeReference(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE(context, NumInputs(node) == 1 || NumInputs(node) == 2);
   TF_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
-  TF_LITE_ENSURE_EQ(context, ReshapeOutput(context, node), kTfLiteOk);
+  TF_LITE_ENSURE_STATUS(ReshapeOutput(context, node));
   return kTfLiteOk;
 }
 

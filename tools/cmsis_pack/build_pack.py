@@ -290,8 +290,8 @@ def stage_pack_files(
     # Header staging strategy:
     #   * For "narrow" include dirs (everything under the repo root except
     #     the root itself), enumerate every header — these are typically
-    #     small self-contained third-party trees (flatbuffers, gemmlowp,
-    #     ruy, kissfft) where the consumer needs the whole include set.
+    #     small self-contained third-party trees (flatbuffers, kissfft)
+    #     where the consumer needs the whole include set.
     #   * For the bare "" (repo-root) include dir, never recurse the entire
     #     repo. Instead derive header roots from the parent directory of
     #     every source file in the manifest, then enumerate *.h/.hpp/.inc

@@ -21,6 +21,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/c/builtin_op_data.h"
 #include "tensorflow/lite/micro/c/common.h"
 #include "tensorflow/lite/micro/kernels/internal/common.h"
+#include "tensorflow/lite/micro/kernels/internal/fixedpoint.h"
 #include "tensorflow/lite/micro/kernels/internal/quantization_util.h"
 #include "tensorflow/lite/micro/kernels/internal/reference/tanh.h"
 #include "tensorflow/lite/micro/kernels/internal/tensor_ctypes.h"
@@ -59,7 +60,7 @@ void PopulateLookupTable(int32_t input_zero_point, int32_t input_range_radius,
   static constexpr int32_t kOutputScale = 7;
   static constexpr int32_t kMinInt8 = std::numeric_limits<int8_t>::min();
   static constexpr int32_t kMaxInt8 = std::numeric_limits<int8_t>::max();
-  using F4 = gemmlowp::FixedPoint<int32_t, kInputIntegerBits>;
+  using F4 = FixedPoint<int32_t, kInputIntegerBits>;
 
 
   for (int32_t i = kMinInt8; i <= kMaxInt8; ++i) {
@@ -73,10 +74,9 @@ void PopulateLookupTable(int32_t input_zero_point, int32_t input_range_radius,
       const int32_t input_in_q4 =
           MultiplyByQuantizedMultiplier(input, input_multiplier, input_shift);
       const int32_t output_in_q0 =
-          gemmlowp::tanh(F4::FromRaw(input_in_q4)).raw();
+          ::tflite::micro::tanh(F4::FromRaw(input_in_q4)).raw();
 
       // Rescale and downcast.
-      using gemmlowp::RoundingDivideByPOT;
       int32_t output_in_q24 =
           RoundingDivideByPOT(output_in_q0, 31 - kOutputScale);
       output_in_q24 = std::min(std::max(output_in_q24, kMinInt8), kMaxInt8);
