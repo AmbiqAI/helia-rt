@@ -40,15 +40,54 @@ class UpstreamSyncTest(unittest.TestCase):
     )
 
   def verify(self, head, base=None):
-    with mock.patch.object(scope, "fetch_commits") as fetch:
+    with mock.patch.object(
+      scope, "fetch_upstream_main", return_value=self.new
+    ) as fetch:
       result = scope.check_sync(self.root, base or self.base, head)
     fetch.assert_called_once_with(
       self.root,
       "https://github.com/tensorflow/tflite-micro",
-      self.old,
-      self.new,
     )
     return result
+
+  def publish_upstream_main(self, commit):
+    directory = tempfile.TemporaryDirectory()
+    self.addCleanup(directory.cleanup)
+    remote = pathlib.Path(directory.name)
+    subprocess.run(["git", "init", "--bare", "-q", str(remote)], check=True)
+    scope.git(remote, "fetch", "-q", str(self.root), commit)
+    scope.git(remote, "update-ref", "refs/heads/main", commit)
+    self.git(
+      "config",
+      f"url.{remote.as_uri()}.insteadOf",
+      "https://github.com/tensorflow/tflite-micro",
+    )
+
+  def test_local_only_revision_is_not_exempt(self):
+    self.metadata(self.new)
+    head = self.commit("record local-only descendant")
+    self.publish_upstream_main(self.old)
+    with self.assertRaises(subprocess.CalledProcessError):
+      scope.check_sync(self.root, self.base, head)
+
+  def test_published_upstream_revision_is_exempt(self):
+    self.metadata(self.new)
+    head = self.commit("record published descendant")
+    self.publish_upstream_main(self.new)
+    self.assertIn(
+      "Recorded upstream sync", scope.check_sync(self.root, self.base, head)
+    )
+
+  def test_older_published_revision_is_exempt(self):
+    self.git("checkout", "-q", "--detach", self.new)
+    tip = self.commit("upstream main advances further")
+    self.git("checkout", "-q", "--detach", self.base)
+    self.metadata(self.new)
+    head = self.commit("record an ancestor of upstream main")
+    self.publish_upstream_main(tip)
+    self.assertIn(
+      "Recorded upstream sync", scope.check_sync(self.root, self.base, head)
+    )
 
   def test_recorded_advance(self):
     self.metadata(self.new)
@@ -60,7 +99,9 @@ class UpstreamSyncTest(unittest.TestCase):
     (self.root / "tensorflow").mkdir()
     (self.root / "tensorflow/kernel.cc").write_text("// changed upstream\n")
     head = self.commit("mixed change")
-    with mock.patch.object(scope, "fetch_commits") as fetch:
+    with mock.patch.object(
+      scope, "fetch_upstream_main", return_value=self.new
+    ) as fetch:
       with self.assertRaisesRegex(ValueError, "does not advance"):
         scope.check_sync(self.root, self.base, head)
     fetch.assert_not_called()
@@ -96,14 +137,14 @@ class UpstreamSyncTest(unittest.TestCase):
     base = self.commit("record newer upstream")
     self.metadata(self.old)
     head = self.commit("move backwards")
-    with mock.patch.object(scope, "fetch_commits"):
+    with mock.patch.object(scope, "fetch_upstream_main", return_value=self.new):
       with self.assertRaises(subprocess.CalledProcessError):
         scope.check_sync(self.root, base, head)
 
   def test_unknown_revision_is_not_exempt(self):
     self.metadata("f" * 40)
     head = self.commit("unknown SHA")
-    with mock.patch.object(scope, "fetch_commits"):
+    with mock.patch.object(scope, "fetch_upstream_main", return_value=self.new):
       with self.assertRaises(subprocess.CalledProcessError):
         scope.check_sync(self.root, self.base, head)
 
@@ -113,7 +154,7 @@ class UpstreamSyncTest(unittest.TestCase):
     self.git("checkout", "-q", "--detach", self.base)
     self.metadata(unrelated)
     head = self.commit("record unrelated revision")
-    with mock.patch.object(scope, "fetch_commits"):
+    with mock.patch.object(scope, "fetch_upstream_main", return_value=self.new):
       with self.assertRaises(subprocess.CalledProcessError):
         scope.check_sync(self.root, self.base, head)
 
@@ -121,14 +162,14 @@ class UpstreamSyncTest(unittest.TestCase):
     self.metadata(self.new)
     head = self.commit("record sync")
     error = subprocess.CalledProcessError(1, ["git", "fetch"])
-    with mock.patch.object(scope, "fetch_commits", side_effect=error):
+    with mock.patch.object(scope, "fetch_upstream_main", side_effect=error):
       with self.assertRaises(subprocess.CalledProcessError):
         scope.check_sync(self.root, self.base, head)
 
   def test_wrong_commit_date_is_not_exempt(self):
     self.metadata(self.new, date="2000-01-01")
     head = self.commit("wrong date")
-    with mock.patch.object(scope, "fetch_commits"):
+    with mock.patch.object(scope, "fetch_upstream_main", return_value=self.new):
       with self.assertRaisesRegex(ValueError, "date does not match"):
         scope.check_sync(self.root, self.base, head)
 

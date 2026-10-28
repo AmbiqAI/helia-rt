@@ -2,9 +2,9 @@
 """Verify that a PR records an advancing upstream revision.
 
 Usage: check_upstream_sync.py BASE HEAD
-The comparison uses BASE's merge base with HEAD. Upstream objects are fetched
-from the unchanged repository in helia/UPSTREAM; invalid metadata, fetch errors,
-and non-descendant revisions fail the check.
+The comparison uses BASE's merge base with HEAD. The recorded revision must
+advance the old pin and belong to the configured upstream main branch. Invalid
+metadata, remote-query errors, and non-descendant revisions fail the check.
 """
 
 import datetime
@@ -46,7 +46,14 @@ def read_upstream(text):
   return fields
 
 
-def fetch_commits(root, upstream, old, new):
+def fetch_upstream_main(root, upstream):
+  advertised = git(
+    root, "ls-remote", "--exit-code", upstream, "refs/heads/main"
+  )
+  match = re.fullmatch(r"([0-9a-f]{40})\trefs/heads/main", advertised)
+  if not match:
+    raise ValueError("invalid upstream main advertisement")
+  tip = match.group(1)
   git(
     root,
     "fetch",
@@ -54,9 +61,9 @@ def fetch_commits(root, upstream, old, new):
     "--no-recurse-submodules",
     "--filter=blob:none",
     upstream,
-    old,
-    new,
+    tip,
   )
+  return tip
 
 
 def check_sync(root, base, head):
@@ -65,8 +72,9 @@ def check_sync(root, base, head):
   after = read_upstream(git(root, "show", f"{head}:helia/UPSTREAM"))
   if before["commit"] == after["commit"]:
     raise ValueError("helia/UPSTREAM does not advance the upstream commit")
-  fetch_commits(root, before["repository"], before["commit"], after["commit"])
+  upstream_main = fetch_upstream_main(root, before["repository"])
   git(root, "merge-base", "--is-ancestor", before["commit"], after["commit"])
+  git(root, "merge-base", "--is-ancestor", after["commit"], upstream_main)
   actual_date = git(root, "show", "-s", "--format=%cs", after["commit"])
   if after["date"] != actual_date:
     raise ValueError("helia/UPSTREAM date does not match the upstream commit")
