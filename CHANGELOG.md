@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.2.3](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v2.2.2...helia-rt-v2.2.3) (2026-10-28)
+
+
+### Bug Fixes
+
+* **build:** publish C++17 and TFLM_REMOVE_VIRTUAL_DELETE to consumers ([a1f1fa7](https://github.com/AmbiqAI/helia-rt/commit/a1f1fa770e56cea6b766e2c3efc788218c5a2eaa)), closes [#446](https://github.com/AmbiqAI/helia-rt/issues/446)
+* **docs:** follow upstream's header and namespace moves in the API reference ([186ac1f](https://github.com/AmbiqAI/helia-rt/commit/186ac1ffda75b14ab23cb168b393dc4c03c9a9c6)), closes [#446](https://github.com/AmbiqAI/helia-rt/issues/446)
+* **helia:** adapt kernels and tests to upstream tflite-micro bd621c21 ([8158d40](https://github.com/AmbiqAI/helia-rt/commit/8158d40de00bf010cbe56331edc723dff4ebf16c)), closes [#446](https://github.com/AmbiqAI/helia-rt/issues/446)
+* **helia:** compute quantization multipliers in double precision ([b0b4f2d](https://github.com/AmbiqAI/helia-rt/commit/b0b4f2d406f9a1d00e8a61983ef47310b5e0e649)), closes [#446](https://github.com/AmbiqAI/helia-rt/issues/446)
+
 ## [2.2.2](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v2.2.1...helia-rt-v2.2.2) (2026-10-19)
 
 
