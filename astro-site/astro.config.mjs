@@ -68,6 +68,7 @@ export default defineConfig({
                 { label: 'Upstream sync', slug: 'guide/maintenance/upstream-sync' },
                 { label: 'Releases', slug: 'guide/maintenance/releases' },
                 { label: 'Support', slug: 'guide/maintenance/support' },
+                { label: 'Migrate to 2.5', slug: 'guide/maintenance/migrate-2-5' },
                 { label: 'Attribution', slug: 'guide/maintenance/attribution' },
               ] },
             ],

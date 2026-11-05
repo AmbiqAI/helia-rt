@@ -3,6 +3,8 @@ title: Build option reference
 description: Public heliaRT configuration options across CMake, neuralSPOT-X, Zephyr and Make.
 ---
 
+For changes from 2.2.2 to the planned 2.5 release, see [Migrate to heliaRT 2.5](/helia-rt/guide/maintenance/migrate-2-5/).
+
 This page lists the heliaRT integration options defined by the repository. Compiler flags, board configuration and options belonging to heliaCORE or upstream build tools have their own contracts. Start with [Build configuration](/helia-rt/guide/build-configuration/) for the decisions behind these settings.
 
 ## Root CMake options
