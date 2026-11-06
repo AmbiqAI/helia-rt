@@ -3,9 +3,9 @@ title: Migrate to heliaRT 2.5
 description: Update source and build integrations for the LiteRT Micro baseline in heliaRT 2.5.
 ---
 
-heliaRT 2.5.0 is planned and has not been released. This guide describes the upstream update already on `main`; a release date and transition notice are still pending. Continue using a supported published release for production.
+This guide covers migration from 2.2.2 to 2.5.0. A source checkout or open release PR is not a published release: check the [published releases](https://github.com/AmbiqAI/helia-rt/releases) before selecting a production version.
 
-The planned release updates the LiteRT Micro baseline and requires C++17. It includes source and build compatibility changes from 2.2.2. Update application includes and build settings, rebuild the runtime and application together, and validate your models before deployment.
+heliaRT 2.5.0 updates the LiteRT Micro baseline and requires C++17. It includes source and build compatibility changes from 2.2.2. Update application includes and build settings, rebuild the runtime and application together, and validate your models before deployment.
 
 The documented model, resolver and interpreter workflow remains available. Qualified names such as `tflite::MicroInterpreter` remain available through compatibility declarations; this does not preserve forward declarations or binary compatibility. See the [support policy](/helia-rt/guide/maintenance/support/) for supported releases and transition notices.
 
