@@ -18,6 +18,14 @@ This release includes source and build compatibility changes from 2.2.2. The 2.5
 
 Upon publication of 2.5.0, the supported minor tracks are 2.5.x and 2.2.x; 2.1.x leaves the current/previous-minor window. Versions 2.3 and 2.4 were skipped. The existing 12-month critical/security-fix limit is unchanged, and the 2.2 support clock does not restart. See the [support policy](https://ambiqai.github.io/helia-rt/guide/maintenance/support/).
 
+### One-release notice exception
+
+For heliaRT 2.5.0 only, Ambiq waives the usual 90-day advance-notice period for the documented upstream compatibility changes: C++17 becoming mandatory, the schema-header relocation, runtime-class forward-declaration changes, and changes to custom context integrations and bundled dependencies.
+
+This allows the upstream update to ship after qualification, while 2.2.x remains supported under the existing support window. The exception does not change the notice requirement for future releases.
+
+The [approved transition decision](https://github.com/AmbiqAI/helia-rt/pull/513#issuecomment-6697860047) covers notice timing only; release qualification and publication approval remain separate.
+
 ### Bug Fixes
 
 * **build:** publish C++17 and TFLM_REMOVE_VIRTUAL_DELETE to consumers ([a1f1fa7](https://github.com/AmbiqAI/helia-rt/commit/a1f1fa770e56cea6b766e2c3efc788218c5a2eaa)), closes [#446](https://github.com/AmbiqAI/helia-rt/issues/446)

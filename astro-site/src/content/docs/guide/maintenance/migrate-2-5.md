@@ -1,4 +1,6 @@
 ---
+banner:
+  content: 'heliaRT 2.5.0 changes source and build compatibility. Read the <a href="/helia-rt/guide/maintenance/support/#one-release-notice-exception-250">approved notice exception</a> and <a href="/helia-rt/guide/maintenance/migrate-2-5/">migration guide</a> before upgrading.'
 title: Migrate to heliaRT 2.5
 description: Update source and build integrations for the LiteRT Micro baseline in heliaRT 2.5.
 ---
