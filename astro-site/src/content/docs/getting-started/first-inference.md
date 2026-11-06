@@ -3,6 +3,8 @@ title: First inference
 description: Model loading, operator registration, tensor allocation and inference with MicroInterpreter.
 ---
 
+For changes from 2.2.2 to the planned 2.5 release, see [Migrate to heliaRT 2.5](/helia-rt/guide/maintenance/migrate-2-5/).
+
 Once heliaRT is linked into your firmware, inference follows the LiteRT for Microcontrollers sequence. The example below illustrates a model containing one fully connected operator. Replace the resolver registrations and tensor handling with those required by your model.
 
 ## Embed a model

@@ -15,6 +15,8 @@ Ambiq supports the current and previous heliaRT minor releases. Use the latest p
 
 These commitments follow the recorded [support decision](https://github.com/AmbiqAI/helia-rt/issues/200) and [approved policy](https://github.com/AmbiqAI/helia-rt/pull/215). Release versions are maintained with the runtime's [changelog](https://github.com/AmbiqAI/helia-rt/blob/main/CHANGELOG.md).
 
+The planned 2.5.0 transition is described in [Migrate to heliaRT 2.5](/helia-rt/guide/maintenance/migrate-2-5/). It has not been released and does not change this support table or the deprecation policy below.
+
 ## Critical and security fixes
 
 Ambiq provides critical/security fixes for 12 months from the minor release date, within the current and previous minor window. Older minors are not eligible simply because fewer than 12 months have passed.
