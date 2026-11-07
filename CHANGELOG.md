@@ -1,5 +1,43 @@
 # Changelog
 
+## [2.5.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v2.2.2...helia-rt-v2.5.0) (2026-11-06)
+
+
+### Compatibility and migration
+
+This release includes source and build compatibility changes from 2.2.2. The 2.5.0 version does not imply that existing source integrations compile unchanged. Read the [migration guide](https://ambiqai.github.io/helia-rt/guide/maintenance/migrate-2-5/) before upgrading.
+
+- **C++17 is required.** CMake no longer accepts `HELIA_RT_CXX_STANDARD=14`; Zephyr applications need `CONFIG_STD_CPP17=y`. Rebuild runtime and application components together with matching headers, compiler settings and `TFLM_REMOVE_VIRTUAL_DELETE` definitions.
+- **The schema include moved** from `tensorflow/lite/schema/schema_generated.h` to `tensorflow/lite/micro/schema/schema_generated.h`.
+- **Runtime classes moved to `tflite::micro`.** Compatibility declarations preserve ordinary `tflite::MicroInterpreter` and resolver usage, but old namespace forward declarations must be replaced with the public headers. Cross-release binary compatibility is not promised.
+- **`TfLiteContext` services are no longer assignable callbacks.** Custom integrations that replace these services must adapt to the current context implementation; ordinary service calls remain available.
+- **gemmlowp and ruy are no longer bundled.** Remove assumptions about their include directories and review direct dependencies on removed internal headers. Fixed-point helpers now live in `tensorflow/lite/micro/kernels/internal/fixedpoint.h` under `tflite::micro`.
+- **Revalidate model outputs.** Quantization-multiplier calculations now use double precision. Do not assume bit-exact outputs or apply a blanket output tolerance; retain the application's accuracy requirements.
+
+### Support transition
+
+Upon publication of 2.5.0, the supported minor tracks are 2.5.x and 2.2.x; 2.1.x leaves the current/previous-minor window. Versions 2.3 and 2.4 were skipped. The existing 12-month critical/security-fix limit is unchanged, and the 2.2 support clock does not restart. See the [support policy](https://ambiqai.github.io/helia-rt/guide/maintenance/support/).
+
+### One-release notice exception
+
+For heliaRT 2.5.0 only, Ambiq waives the usual 90-day advance-notice period for the documented upstream compatibility changes: C++17 becoming mandatory, the schema-header relocation, runtime-class forward-declaration changes, and changes to custom context integrations and bundled dependencies.
+
+This allows the upstream update to ship after qualification, while 2.2.x remains supported under the existing support window. The exception does not change the notice requirement for future releases.
+
+The [approved transition decision](https://github.com/AmbiqAI/helia-rt/pull/513#issuecomment-6697860047) covers notice timing only; release qualification and publication approval remain separate.
+
+### Bug Fixes
+
+* **build:** publish C++17 and TFLM_REMOVE_VIRTUAL_DELETE to consumers ([a1f1fa7](https://github.com/AmbiqAI/helia-rt/commit/a1f1fa770e56cea6b766e2c3efc788218c5a2eaa)), closes [#446](https://github.com/AmbiqAI/helia-rt/issues/446)
+* **docs:** follow upstream's header and namespace moves in the API reference ([186ac1f](https://github.com/AmbiqAI/helia-rt/commit/186ac1ffda75b14ab23cb168b393dc4c03c9a9c6)), closes [#446](https://github.com/AmbiqAI/helia-rt/issues/446)
+* **helia:** adapt kernels and tests to upstream tflite-micro bd621c21 ([8158d40](https://github.com/AmbiqAI/helia-rt/commit/8158d40de00bf010cbe56331edc723dff4ebf16c)), closes [#446](https://github.com/AmbiqAI/helia-rt/issues/446)
+* **helia:** compute quantization multipliers in double precision ([b0b4f2d](https://github.com/AmbiqAI/helia-rt/commit/b0b4f2d406f9a1d00e8a61983ef47310b5e0e649)), closes [#446](https://github.com/AmbiqAI/helia-rt/issues/446)
+
+
+### Docs
+
+* prepare migration to heliaRT 2.5 ([#514](https://github.com/AmbiqAI/helia-rt/issues/514)) ([7f04a14](https://github.com/AmbiqAI/helia-rt/commit/7f04a140991eca66370f19a085f27b02125c562f))
+
 ## [2.2.2](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v2.2.1...helia-rt-v2.2.2) (2026-10-19)
 
 

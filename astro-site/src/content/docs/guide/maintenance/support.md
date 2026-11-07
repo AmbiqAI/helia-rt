@@ -1,21 +1,25 @@
 ---
+banner:
+  content: 'heliaRT 2.5.0 changes source and build compatibility. Read the <a href="/helia-rt/guide/maintenance/support/#one-release-notice-exception-250">approved notice exception</a> and <a href="/helia-rt/guide/maintenance/migrate-2-5/">migration guide</a> before upgrading.'
 title: Support policy
 description: Supported releases, critical fixes, deprecation notice and help channels.
 ---
 
 Ambiq supports the current and previous heliaRT minor releases. Use the latest patch release of a supported minor when reproducing or reporting an issue.
 
+This table takes effect when 2.5.0 is [published](https://github.com/AmbiqAI/helia-rt/releases). Until then, 2.2.x and 2.1.x remain the supported minor tracks.
+
 | Track | Version | Status |
 | --- | --- | --- |
-| Current minor | `v2.2.x` | Supported |
-| Previous minor | `v2.1.x` | Supported |
-| Older minors | `v2.0.x` and earlier | Not supported |
+| Current minor | `v2.5.x` | Supported |
+| Previous minor | `v2.2.x` | Supported |
+| Older minors | `v2.1.x` and earlier | Not supported |
 
 `v1.18.0` is withdrawn because its heliaCORE pin is defective for the float32 and float16 kernels, including NaN handling and FP16 LSTM. It does not count as a supported minor. Upgrade to a supported release; its tag remains for reproducibility.
 
 These commitments follow the recorded [support decision](https://github.com/AmbiqAI/helia-rt/issues/200) and [approved policy](https://github.com/AmbiqAI/helia-rt/pull/215). Release versions are maintained with the runtime's [changelog](https://github.com/AmbiqAI/helia-rt/blob/main/CHANGELOG.md).
 
-The planned 2.5.0 transition is described in [Migrate to heliaRT 2.5](/helia-rt/guide/maintenance/migrate-2-5/). It has not been released and does not change this support table or the deprecation policy below.
+Versions 2.3 and 2.4 were skipped; they are not released support tracks. Publication of 2.5.0 does not restart the 2.2 critical/security-fix clock. See [Migrate to heliaRT 2.5](/helia-rt/guide/maintenance/migrate-2-5/) for source and build changes. The deprecation notice requirement below remains the default; the explicit exception applies only to 2.5.0.
 
 ## Critical and security fixes
 
@@ -28,6 +32,16 @@ Report security issues to [support.aitg@ambiq.com](mailto:support.aitg@ambiq.com
 ## Deprecation notice
 
 Ambiq gives at least 90 days notice before removing a supported public API, build option, toolchain or target. Notices appear in release notes, `CHANGELOG.md` and a documentation-site banner.
+
+## One-release notice exception: 2.5.0
+
+For heliaRT 2.5.0 only, Ambiq waives the usual 90-day advance-notice period for the documented upstream compatibility changes: C++17 becoming mandatory, the schema-header relocation, runtime-class forward-declaration changes, and changes to custom context integrations and bundled dependencies.
+
+This allows the upstream update to ship after qualification, while 2.2.x remains supported under the existing support window. The exception does not change the notice requirement for future releases.
+
+The [approved transition decision](https://github.com/AmbiqAI/helia-rt/pull/513#issuecomment-6697860047) covers notice timing only; release qualification and publication approval remain separate.
+
+See [Migrate to heliaRT 2.5](/helia-rt/guide/maintenance/migrate-2-5/) for the affected integration surfaces.
 
 ## Stateful quantized LSTM
 
