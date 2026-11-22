@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.5.1](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v2.5.0...helia-rt-v2.5.1) (2026-11-22)
+
+
+### Bug Fixes
+
+* **helia:** pin CORE 7.47.2 and test int16 activation saturation ([#515](https://github.com/AmbiqAI/helia-rt/issues/515)) ([0c8211f](https://github.com/AmbiqAI/helia-rt/commit/0c8211ffa2db0f530ffa4ec2b833c0cb30383df9))
+* **helia:** require heliaCORE 7.47.2 for int16 activations ([8c66382](https://github.com/AmbiqAI/helia-rt/commit/8c6638232ac6825e1c6fdfb4a51776668879e8f3))
+
 ## [2.5.0](https://github.com/AmbiqAI/helia-rt/compare/helia-rt-v2.2.2...helia-rt-v2.5.0) (2026-11-06)
 
 
