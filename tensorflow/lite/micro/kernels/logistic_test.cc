@@ -276,6 +276,17 @@ TEST(LogisticTest, LogisticQuantizedInt16ShouldMatchGolden) {
       output_data, 16.0f);
 }
 
+TEST(LogisticTest, Int16LargeScaleSaturatesBothSigns) {
+  constexpr int count = 9;
+  int shape[] = {2, 1, count};
+  const float input[count] = {0, 1800, -1800, 3000, -3000, 32, -32, 0, 3000};
+  const float expected[count] = {0.5f, 1, 0, 1, 0, 1, 0, 0.5f, 1};
+  int16_t input_q[count], expected_q[count], output[count];
+  tflite::testing::TestLogisticQuantized<int16_t>(
+      shape, input, input_q, 0.125f, 0, expected, expected_q, shape,
+      1.0f / 32768, 0, output, 1);
+}
+
 #if ARM_NN_ENABLE_F16
 namespace tflite {
 namespace testing {
